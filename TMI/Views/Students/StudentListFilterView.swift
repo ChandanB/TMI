@@ -7,7 +7,7 @@ struct StudentListFilterView: View {
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 ForEach(StudentListView.FilterOption.allCases, id: \.self) { option in
                     HStack {

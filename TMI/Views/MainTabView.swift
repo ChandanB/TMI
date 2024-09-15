@@ -11,7 +11,7 @@ struct MainTabView: View {
     @State private var selectedTab: Tab = .dashboard
     
     enum Tab: String, CaseIterable, Identifiable {
-        case dashboard, students, tmiPlans, interestsAndHobbies, settings
+        case dashboard, students, tmiPlans, interestsAndHobbies, surveys, resources, careerExplorer, settings
         var id: Self { self }
     }
     
@@ -32,33 +32,36 @@ struct MainTabView: View {
         Group {
             switch tab {
             case .dashboard:
-                DashboardView() 
-                    .tabItem {
-                        Label(tab.rawValue.capitalized, systemImage: iconName(for: tab))
-                    }
+                DashboardView()
             case .students:
                 StudentListView()
-                    .tabItem {
-                        Label(tab.rawValue.capitalized, systemImage: iconName(for: tab))
-                    }
             case .tmiPlans:
                 TMIPlanListView(tmiPlans: [TMIPlan.samplePlan])
-                    .tabItem {
-                        Label("TMI Plans", systemImage: iconName(for: tab))
-                    }
             case .interestsAndHobbies:
                 InterestsAndHobbiesView(interests: Interest.sampleInterests, hobbies: Hobby.sampleHobbies)
-                    .tabItem {
-                        Label("Interests", systemImage: iconName(for: tab))
-                    }
+            case .surveys:
+                FormsAndSurveysView()
+            case .resources:
+                ResourcesView()
+            case .careerExplorer:
+                CareerExplorerView()
             case .settings:
                 SettingsView()
-                    .tabItem {
-                        Label(tab.rawValue.capitalized, systemImage: iconName(for: tab))
-                    }
             }
         }
+        .tabItem {
+            Label(tabLabel(for: tab), systemImage: iconName(for: tab))
+        }
         .tag(tab)
+    }
+    
+    func tabLabel(for tab: Tab) -> String {
+        switch tab {
+        case .tmiPlans: return "TMI Plans"
+        case .interestsAndHobbies: return "Interests & Hobbies"
+        case .careerExplorer: return "Career Explorer"
+        default: return tab.rawValue.capitalized
+        }
     }
     
     func iconName(for tab: Tab) -> String {
@@ -67,13 +70,14 @@ struct MainTabView: View {
         case .students: return "person.3"
         case .tmiPlans: return "doc.text"
         case .interestsAndHobbies: return "heart"
+        case .surveys: return "list.clipboard"
+        case .resources: return "book"
+        case .careerExplorer: return "briefcase"
         case .settings: return "gear"
         }
     }
 }
 
 #Preview {
-    Group {
-        MainTabView()
-    }
+    MainTabView()
 }

@@ -9,13 +9,13 @@ class AuthViewModel: ObservableObject {
     var user: User?
 
     init() {
-        self.user = Auth.auth().currentUser
-        self.isLoggedIn = self.user != nil
-        
-        Auth.auth().addStateDidChangeListener { [weak self] _, user in
-            self?.user = user
-            self?.isLoggedIn = user != nil
-        }
+//        self.user = Auth.auth().currentUser
+//        self.isLoggedIn = self.user != nil
+//        
+//        Auth.auth().addStateDidChangeListener { [weak self] _, user in
+//            self?.user = user
+//            self?.isLoggedIn = user != nil
+//        }
     }
     
     func signIn(email: String, password: String, completion: @escaping (Error?) -> Void) {

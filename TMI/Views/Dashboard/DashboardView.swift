@@ -10,6 +10,7 @@ import SwiftUI
 import Charts
 
 struct DashboardView: View {
+    @StateObject private var viewModel = DashboardViewModel()
     @State private var selectedTimeFrame: TimeFrame = .week
     @State private var selectedDataPoint: EngagementData?
     @State private var showingInsightsSheet = false
@@ -88,15 +89,14 @@ struct DashboardView: View {
             .pickerStyle(SegmentedPickerStyle())
             
             VStack(spacing: 15) {
-                StatCard(title: "Total Students", value: "150", icon: "person.3", color: .blue)
-                StatCard(title: "Active TMI Plans", value: "75", icon: "doc.text", color: .green)
-                StatCard(title: "Interests Identified", value: "250", icon: "star", color: .orange)
+                StatCard(title: "Total Students", value: "\(viewModel.totalStudents)", icon: "person.3", color: .blue)
+                StatCard(title: "Active TMI Plans", value: "\(viewModel.activeTMIPlans)", icon: "doc.text", color: .green)
+                StatCard(title: "Interests Identified", value: "\(viewModel.interestsIdentified)", icon: "star", color: .orange)
             }
         }
         .frame(maxWidth: .infinity)
         .padding()
         .background(Color.tmiSecondary.opacity(0.1))
-        .cornerRadius(15)
     }
     
     private var recentActivitiesView: some View {

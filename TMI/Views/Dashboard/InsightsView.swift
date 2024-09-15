@@ -373,13 +373,6 @@ let performanceData: [PerformanceData] = [
     PerformanceData(subject: "History", score: 88)
 ]
 
-struct EngagementData: Identifiable {
-    let id = UUID()
-    let day: String
-    let week: String
-    let engagement: Double
-}
-
 struct InterestData: Identifiable {
     let id = UUID()
     let category: String

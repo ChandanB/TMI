@@ -2,7 +2,6 @@ import SwiftUI
 import FirebaseFirestore
 
 struct AddStudentView: View {
-    @EnvironmentObject private var firestoreContext: FirestoreContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     
@@ -15,9 +14,9 @@ struct AddStudentView: View {
     @State private var inputImage: UIImage?
     @State private var currentStep = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
-
+    
     private let steps = ["Basic Info", "Interests", "Avatar"]
-
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
@@ -30,11 +29,11 @@ struct AddStudentView: View {
                 }
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 .animation(.easeInOut, value: currentStep)
-                                
+                
                 navigationButtons
                 
                 if sizeClass == .regular {
-                    Spacer(minLength: 150)
+                    Spacer(minLength: 200)
                 }
             }
             .background(Color.tmiBackground.ignoresSafeArea())
@@ -45,7 +44,7 @@ struct AddStudentView: View {
             }
         }
     }
-
+    
     private var stepIndicator: some View {
         HStack {
             ForEach(0..<steps.count, id: \.self) { index in
@@ -61,7 +60,7 @@ struct AddStudentView: View {
         }
         .padding(.horizontal)
     }
-
+    
     private var basicInfoView: some View {
         VStack(spacing: 20) {
             FloatingTextField(placeholder: "Full Name", text: $name)
@@ -74,12 +73,12 @@ struct AddStudentView: View {
         }
         .padding()
     }
-
+    
     private var interestsView: some View {
         VStack(spacing: 20) {
             Text("What are the student's interests?")
                 .font(.headline)
-
+            
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 10) {
                     ForEach(Interest.sampleInterests) { interest in
@@ -97,12 +96,12 @@ struct AddStudentView: View {
         }
         .padding()
     }
-
+    
     private var avatarView: some View {
         VStack(spacing: 20) {
             Text("Add a profile picture")
                 .font(.headline)
-
+            
             if let avatar = avatar {
                 avatar
                     .resizable()
@@ -117,7 +116,7 @@ struct AddStudentView: View {
                     .frame(width: 200, height: 200)
                     .foregroundColor(.gray)
             }
-
+            
             Button("Choose Photo") {
                 isShowingImagePicker = true
             }
@@ -128,7 +127,7 @@ struct AddStudentView: View {
             ImagePicker(image: $inputImage)
         }
     }
-
+    
     private var navigationButtons: some View {
         HStack {
             if currentStep > 0 {
@@ -159,26 +158,26 @@ struct AddStudentView: View {
         }
         .padding()
     }
-
+    
     private func addStudent() {
-            let newStudent = Student(
-                name: name,
-                grade: grade,
-                dateOfBirth: dateOfBirth,
-                interests: interests,
-                hobbies: []
-            )
-            // Save the new student to Firestore or local storage
-        }
-
+        let newStudent = Student(
+            name: name,
+            grade: grade,
+            dateOfBirth: dateOfBirth,
+            interests: interests,
+            hobbies: []
+        )
+        // Save the new student to Firestore or local storage
+    }
+    
     private func loadImage() {
         guard let inputImage = inputImage else { return }
         avatar = Image(uiImage: inputImage)
     }
-
+    
     @State private var showAlert = false
     @State private var alertMessage = ""
-
+    
     private func validateCurrentStep() -> Bool {
         switch currentStep {
         case 0:
@@ -203,7 +202,7 @@ struct AddStudentView: View {
 struct FloatingTextField: View {
     let placeholder: String
     @Binding var text: String
-
+    
     var body: some View {
         ZStack(alignment: .leading) {
             Text(placeholder)
@@ -221,7 +220,7 @@ struct InterestButton: View {
     let interest: Interest
     let isSelected: Bool
     let action: () -> Void
-
+    
     var body: some View {
         Button(action: action) {
             Text(interest.name)
@@ -259,26 +258,26 @@ struct SecondaryButtonStyle: ButtonStyle {
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
     @Environment(\.presentationMode) var presentationMode
-
+    
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.delegate = context.coordinator
         return picker
     }
-
+    
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-
+    
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-
+    
     class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
         let parent: ImagePicker
-
+        
         init(_ parent: ImagePicker) {
             self.parent = parent
         }
-
+        
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
             if let uiImage = info[.originalImage] as? UIImage {
                 parent.image = uiImage
@@ -288,6 +287,6 @@ struct ImagePicker: UIViewControllerRepresentable {
     }
 }
 
- #Preview {
-     AddStudentView()
- }
+#Preview {
+    AddStudentView()
+}

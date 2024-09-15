@@ -7,8 +7,6 @@
 
 import Foundation
 
-// MARK: - Supporting Models
-
 struct ProgressData: Identifiable {
     let id = UUID()
     let date: String

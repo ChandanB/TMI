@@ -48,7 +48,6 @@
 		1185DB352C94D8FB004616D5 /* ResourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB342C94D8FB004616D5 /* ResourceService.swift */; };
 		1185DB372C94D92A004616D5 /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB362C94D92A004616D5 /* View+Extensions.swift */; };
 		1185DB3A2C94D944004616D5 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB392C94D944004616D5 /* Constants.swift */; };
-		1185DB3C2C94D94A004616D5 /* Validation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB3B2C94D94A004616D5 /* Validation.swift */; };
 		1185DB3F2C94D96A004616D5 /* AvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB3E2C94D96A004616D5 /* AvatarView.swift */; };
 		1185DB412C94D970004616D5 /* ProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB402C94D970004616D5 /* ProgressBar.swift */; };
 		1185DB432C94D979004616D5 /* SelectableChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB422C94D979004616D5 /* SelectableChip.swift */; };
@@ -59,21 +58,53 @@
 		1185DB502C94D9D3004616D5 /* Endpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB4F2C94D9D3004616D5 /* Endpoints.swift */; };
 		1185DB542C94DBA5004616D5 /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB532C94DBA5004616D5 /* AuthenticationView.swift */; };
 		1185DB562C94DBD4004616D5 /* RegistrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB552C94DBD4004616D5 /* RegistrationView.swift */; };
-		1185DB582C94DDF6004616D5 /* SurveyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB572C94DDF6004616D5 /* SurveyView.swift */; };
 		1185DB5A2C94DDFF004616D5 /* QuestionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB592C94DDFF004616D5 /* QuestionView.swift */; };
 		1185DB5C2C94DE15004616D5 /* InterestDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB5B2C94DE15004616D5 /* InterestDetailView.swift */; };
 		1185DB5E2C94DE21004616D5 /* HobbyDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB5D2C94DE21004616D5 /* HobbyDetailView.swift */; };
 		1185DB602C94DE2A004616D5 /* AddItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB5F2C94DE2A004616D5 /* AddItemView.swift */; };
 		1185DB622C94DE41004616D5 /* TMIPlanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB612C94DE41004616D5 /* TMIPlanCard.swift */; };
 		1185DB642C94E2B6004616D5 /* ProgressData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB632C94E2B6004616D5 /* ProgressData.swift */; };
+		1185DB662C94FD6D004616D5 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB652C94FD6D004616D5 /* DashboardViewModel.swift */; };
+		1185DB682C953212004616D5 /* Survey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB672C953212004616D5 /* Survey.swift */; };
+		1185DB6A2C953218004616D5 /* Resource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB692C953218004616D5 /* Resource.swift */; };
+		11A9B2262C96596F00F2F464 /* FormsAndSurveysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2252C96596F00F2F464 /* FormsAndSurveysView.swift */; };
+		11A9B2292C965C4A00F2F464 /* ResourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2282C965C4A00F2F464 /* ResourcesView.swift */; };
+		11A9B22B2C965C8E00F2F464 /* CareerExplorerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B22A2C965C8E00F2F464 /* CareerExplorerView.swift */; };
+		11A9B22D2C965CA600F2F464 /* Career.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B22C2C965CA600F2F464 /* Career.swift */; };
+		11A9B2302C96614600F2F464 /* Form.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B22F2C96614600F2F464 /* Form.swift */; };
+		11A9B2322C96618C00F2F464 /* AnyCodable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2312C96618C00F2F464 /* AnyCodable.swift */; };
+		11A9B2342C9661BD00F2F464 /* Validation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2332C9661BD00F2F464 /* Validation.swift */; };
+		11A9B2422C96628000F2F464 /* FormCreationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2362C96628000F2F464 /* FormCreationView.swift */; };
+		11A9B2432C96628000F2F464 /* FormDetailEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2372C96628000F2F464 /* FormDetailEditorView.swift */; };
+		11A9B2442C96628000F2F464 /* FormPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2382C96628000F2F464 /* FormPreviewView.swift */; };
+		11A9B2452C96628000F2F464 /* FormsDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2392C96628000F2F464 /* FormsDashboardView.swift */; };
+		11A9B2462C96628000F2F464 /* FormSectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B23A2C96628000F2F464 /* FormSectionCard.swift */; };
+		11A9B2472C96628000F2F464 /* FormStoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B23B2C96628000F2F464 /* FormStoreView.swift */; };
+		11A9B2482C96628000F2F464 /* FormTemplateBuilderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B23C2C96628000F2F464 /* FormTemplateBuilderView.swift */; };
+		11A9B2492C96628000F2F464 /* FormTemplateBuilderViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B23D2C96628000F2F464 /* FormTemplateBuilderViewModel.swift */; };
+		11A9B24A2C96628000F2F464 /* FormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B23E2C96628000F2F464 /* FormView.swift */; };
+		11A9B24B2C96628000F2F464 /* MyFormsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B23F2C96628000F2F464 /* MyFormsView.swift */; };
+		11A9B24C2C96628000F2F464 /* ValidationRulesEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2402C96628000F2F464 /* ValidationRulesEditor.swift */; };
+		11A9B24E2C96648400F2F464 /* FirebaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B24D2C96648400F2F464 /* FirebaseManager.swift */; };
+		11A9B2502C9664F000F2F464 /* FormService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B24F2C9664F000F2F464 /* FormService.swift */; };
+		11A9B2522C96651D00F2F464 /* DefaultFormTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2512C96651D00F2F464 /* DefaultFormTemplate.swift */; };
+		11A9B2552C96653E00F2F464 /* DefaultSectionTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2542C96653E00F2F464 /* DefaultSectionTemplate.swift */; };
+		11A9B2572C96668100F2F464 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2562C96668100F2F464 /* User.swift */; };
+		11A9B2592C96675E00F2F464 /* MenuItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2582C96675E00F2F464 /* MenuItem.swift */; };
+		11A9B25B2C96679000F2F464 /* CustomNavigationLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B25A2C96679000F2F464 /* CustomNavigationLink.swift */; };
+		11A9B2632C9668AE00F2F464 /* FormComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B25E2C9668A700F2F464 /* FormComponents.swift */; };
+		11A9B2652C9668AE00F2F464 /* ButtonFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2602C9668AB00F2F464 /* ButtonFactory.swift */; };
+		11A9B2662C9668AE00F2F464 /* CustomComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2612C9668AE00F2F464 /* CustomComponents.swift */; };
+		11A9B26B2C96698D00F2F464 /* FontConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2672C96698D00F2F464 /* FontConstants.swift */; };
+		11A9B26C2C96698D00F2F464 /* TextFieldComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2682C96698D00F2F464 /* TextFieldComponents.swift */; };
+		11A9B26D2C96698D00F2F464 /* TextLabelComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2692C96698D00F2F464 /* TextLabelComponents.swift */; };
+		11A9B26F2C9669BC00F2F464 /* FormElementFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B26E2C9669BC00F2F464 /* FormElementFactory.swift */; };
+		11A9B2722C9669E700F2F464 /* Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2712C9669E700F2F464 /* Search.swift */; };
+		11A9B2742C966AF300F2F464 /* DocumentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2732C966AF300F2F464 /* DocumentService.swift */; };
+		11A9B2762C966B3400F2F464 /* FirestoreConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2752C966B3400F2F464 /* FirestoreConstants.swift */; };
 		11E7D1262C93A2B60021AC20 /* TMIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E7D1252C93A2B60021AC20 /* TMIApp.swift */; };
 		11E7D12A2C93A2B70021AC20 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11E7D1292C93A2B70021AC20 /* Assets.xcassets */; };
 		11E7D12D2C93A2B70021AC20 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11E7D12C2C93A2B70021AC20 /* Preview Assets.xcassets */; };
-		11E7D14C2C93A2E40021AC20 /* FirestoreModelMacro.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E7D1332C93A2E40021AC20 /* FirestoreModelMacro.swift */; };
-		11E7D14D2C93A2E40021AC20 /* FirestoreQueryMacro.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E7D1342C93A2E40021AC20 /* FirestoreQueryMacro.swift */; };
-		11E7D14E2C93A2E50021AC20 /* FirestoreContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E7D1362C93A2E40021AC20 /* FirestoreContext.swift */; };
-		11E7D14F2C93A2E50021AC20 /* FirestoreModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E7D1372C93A2E40021AC20 /* FirestoreModel.swift */; };
-		11E7D1502C93A2E50021AC20 /* FirestoreQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E7D1382C93A2E40021AC20 /* FirestoreQuery.swift */; };
 		11E7D1512C93A2E50021AC20 /* Hobby.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E7D13A2C93A2E40021AC20 /* Hobby.swift */; };
 		11E7D1522C93A2E50021AC20 /* Interest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E7D13B2C93A2E40021AC20 /* Interest.swift */; };
 		11E7D1532C93A2E50021AC20 /* RecentActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E7D13C2C93A2E40021AC20 /* RecentActivity.swift */; };
@@ -112,7 +143,6 @@
 		1185DB342C94D8FB004616D5 /* ResourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceService.swift; sourceTree = "<group>"; };
 		1185DB362C94D92A004616D5 /* View+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Extensions.swift"; sourceTree = "<group>"; };
 		1185DB392C94D944004616D5 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
-		1185DB3B2C94D94A004616D5 /* Validation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Validation.swift; sourceTree = "<group>"; };
 		1185DB3E2C94D96A004616D5 /* AvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarView.swift; sourceTree = "<group>"; };
 		1185DB402C94D970004616D5 /* ProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressBar.swift; sourceTree = "<group>"; };
 		1185DB422C94D979004616D5 /* SelectableChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectableChip.swift; sourceTree = "<group>"; };
@@ -123,22 +153,54 @@
 		1185DB4F2C94D9D3004616D5 /* Endpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Endpoints.swift; sourceTree = "<group>"; };
 		1185DB532C94DBA5004616D5 /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
 		1185DB552C94DBD4004616D5 /* RegistrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationView.swift; sourceTree = "<group>"; };
-		1185DB572C94DDF6004616D5 /* SurveyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurveyView.swift; sourceTree = "<group>"; };
 		1185DB592C94DDFF004616D5 /* QuestionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuestionView.swift; sourceTree = "<group>"; };
 		1185DB5B2C94DE15004616D5 /* InterestDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterestDetailView.swift; sourceTree = "<group>"; };
 		1185DB5D2C94DE21004616D5 /* HobbyDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HobbyDetailView.swift; sourceTree = "<group>"; };
 		1185DB5F2C94DE2A004616D5 /* AddItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddItemView.swift; sourceTree = "<group>"; };
 		1185DB612C94DE41004616D5 /* TMIPlanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIPlanCard.swift; sourceTree = "<group>"; };
 		1185DB632C94E2B6004616D5 /* ProgressData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressData.swift; sourceTree = "<group>"; };
+		1185DB652C94FD6D004616D5 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		1185DB672C953212004616D5 /* Survey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Survey.swift; sourceTree = "<group>"; };
+		1185DB692C953218004616D5 /* Resource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Resource.swift; sourceTree = "<group>"; };
+		11A9B2252C96596F00F2F464 /* FormsAndSurveysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormsAndSurveysView.swift; sourceTree = "<group>"; };
+		11A9B2282C965C4A00F2F464 /* ResourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourcesView.swift; sourceTree = "<group>"; };
+		11A9B22A2C965C8E00F2F464 /* CareerExplorerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareerExplorerView.swift; sourceTree = "<group>"; };
+		11A9B22C2C965CA600F2F464 /* Career.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Career.swift; sourceTree = "<group>"; };
+		11A9B22F2C96614600F2F464 /* Form.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Form.swift; sourceTree = "<group>"; };
+		11A9B2312C96618C00F2F464 /* AnyCodable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnyCodable.swift; sourceTree = "<group>"; };
+		11A9B2332C9661BD00F2F464 /* Validation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Validation.swift; sourceTree = "<group>"; };
+		11A9B2362C96628000F2F464 /* FormCreationView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormCreationView.swift; sourceTree = "<group>"; };
+		11A9B2372C96628000F2F464 /* FormDetailEditorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormDetailEditorView.swift; sourceTree = "<group>"; };
+		11A9B2382C96628000F2F464 /* FormPreviewView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormPreviewView.swift; sourceTree = "<group>"; };
+		11A9B2392C96628000F2F464 /* FormsDashboardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormsDashboardView.swift; sourceTree = "<group>"; };
+		11A9B23A2C96628000F2F464 /* FormSectionCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormSectionCard.swift; sourceTree = "<group>"; };
+		11A9B23B2C96628000F2F464 /* FormStoreView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormStoreView.swift; sourceTree = "<group>"; };
+		11A9B23C2C96628000F2F464 /* FormTemplateBuilderView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormTemplateBuilderView.swift; sourceTree = "<group>"; };
+		11A9B23D2C96628000F2F464 /* FormTemplateBuilderViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormTemplateBuilderViewModel.swift; sourceTree = "<group>"; };
+		11A9B23E2C96628000F2F464 /* FormView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormView.swift; sourceTree = "<group>"; };
+		11A9B23F2C96628000F2F464 /* MyFormsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MyFormsView.swift; sourceTree = "<group>"; };
+		11A9B2402C96628000F2F464 /* ValidationRulesEditor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ValidationRulesEditor.swift; sourceTree = "<group>"; };
+		11A9B24D2C96648400F2F464 /* FirebaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseManager.swift; sourceTree = "<group>"; };
+		11A9B24F2C9664F000F2F464 /* FormService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormService.swift; sourceTree = "<group>"; };
+		11A9B2512C96651D00F2F464 /* DefaultFormTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultFormTemplate.swift; sourceTree = "<group>"; };
+		11A9B2542C96653E00F2F464 /* DefaultSectionTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultSectionTemplate.swift; sourceTree = "<group>"; };
+		11A9B2562C96668100F2F464 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		11A9B2582C96675E00F2F464 /* MenuItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuItem.swift; sourceTree = "<group>"; };
+		11A9B25A2C96679000F2F464 /* CustomNavigationLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomNavigationLink.swift; sourceTree = "<group>"; };
+		11A9B25E2C9668A700F2F464 /* FormComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormComponents.swift; sourceTree = "<group>"; };
+		11A9B2602C9668AB00F2F464 /* ButtonFactory.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ButtonFactory.swift; sourceTree = "<group>"; };
+		11A9B2612C9668AE00F2F464 /* CustomComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CustomComponents.swift; sourceTree = "<group>"; };
+		11A9B2672C96698D00F2F464 /* FontConstants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FontConstants.swift; sourceTree = "<group>"; };
+		11A9B2682C96698D00F2F464 /* TextFieldComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TextFieldComponents.swift; sourceTree = "<group>"; };
+		11A9B2692C96698D00F2F464 /* TextLabelComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TextLabelComponents.swift; sourceTree = "<group>"; };
+		11A9B26E2C9669BC00F2F464 /* FormElementFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormElementFactory.swift; sourceTree = "<group>"; };
+		11A9B2712C9669E700F2F464 /* Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Search.swift; sourceTree = "<group>"; };
+		11A9B2732C966AF300F2F464 /* DocumentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentService.swift; sourceTree = "<group>"; };
+		11A9B2752C966B3400F2F464 /* FirestoreConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreConstants.swift; sourceTree = "<group>"; };
 		11E7D1222C93A2B60021AC20 /* TMI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TMI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		11E7D1252C93A2B60021AC20 /* TMIApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIApp.swift; sourceTree = "<group>"; };
 		11E7D1292C93A2B70021AC20 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		11E7D12C2C93A2B70021AC20 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		11E7D1332C93A2E40021AC20 /* FirestoreModelMacro.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirestoreModelMacro.swift; sourceTree = "<group>"; };
-		11E7D1342C93A2E40021AC20 /* FirestoreQueryMacro.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirestoreQueryMacro.swift; sourceTree = "<group>"; };
-		11E7D1362C93A2E40021AC20 /* FirestoreContext.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirestoreContext.swift; sourceTree = "<group>"; };
-		11E7D1372C93A2E40021AC20 /* FirestoreModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirestoreModel.swift; sourceTree = "<group>"; };
-		11E7D1382C93A2E40021AC20 /* FirestoreQuery.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FirestoreQuery.swift; sourceTree = "<group>"; };
 		11E7D13A2C93A2E40021AC20 /* Hobby.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Hobby.swift; sourceTree = "<group>"; };
 		11E7D13B2C93A2E40021AC20 /* Interest.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Interest.swift; sourceTree = "<group>"; };
 		11E7D13C2C93A2E40021AC20 /* RecentActivity.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecentActivity.swift; sourceTree = "<group>"; };
@@ -223,15 +285,6 @@
 			path = Authentication;
 			sourceTree = "<group>";
 		};
-		1185DB202C94D864004616D5 /* Surveys */ = {
-			isa = PBXGroup;
-			children = (
-				1185DB572C94DDF6004616D5 /* SurveyView.swift */,
-				1185DB592C94DDFF004616D5 /* QuestionView.swift */,
-			);
-			path = Surveys;
-			sourceTree = "<group>";
-		};
 		1185DB212C94D86F004616D5 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
@@ -243,6 +296,7 @@
 		1185DB222C94D882004616D5 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				1185DB652C94FD6D004616D5 /* DashboardViewModel.swift */,
 				1185DB232C94D893004616D5 /* StudentListViewModel.swift */,
 				1185DB252C94D8A0004616D5 /* TMIPlanViewModel.swift */,
 				1185DB272C94D8AA004616D5 /* AuthenticationViewModel.swift */,
@@ -254,11 +308,15 @@
 		1185DB2B2C94D8BD004616D5 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				11A9B2752C966B3400F2F464 /* FirestoreConstants.swift */,
+				11A9B24D2C96648400F2F464 /* FirebaseManager.swift */,
 				1185DB2C2C94D8CD004616D5 /* AuthenticationService.swift */,
+				11A9B2732C966AF300F2F464 /* DocumentService.swift */,
 				1185DB2E2C94D8D9004616D5 /* DatabaseService.swift */,
 				1185DB302C94D8E2004616D5 /* TMIPlanService.swift */,
 				1185DB322C94D8ED004616D5 /* SurveyService.swift */,
 				1185DB342C94D8FB004616D5 /* ResourceService.swift */,
+				11A9B24F2C9664F000F2F464 /* FormService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -267,7 +325,6 @@
 			isa = PBXGroup;
 			children = (
 				1185DB392C94D944004616D5 /* Constants.swift */,
-				1185DB3B2C94D94A004616D5 /* Validation.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -275,9 +332,13 @@
 		1185DB3D2C94D951004616D5 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				11A9B2702C9669D800F2F464 /* SearchComponents */,
+				11A9B25C2C96687400F2F464 /* ZLHNComponents */,
+				11A9B2532C96652D00F2F464 /* FormComponents */,
 				1185DB3E2C94D96A004616D5 /* AvatarView.swift */,
 				1185DB402C94D970004616D5 /* ProgressBar.swift */,
 				1185DB422C94D979004616D5 /* SelectableChip.swift */,
+				11A9B2582C96675E00F2F464 /* MenuItem.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -323,6 +384,83 @@
 			path = Images;
 			sourceTree = "<group>";
 		};
+		11A9B2272C965C2200F2F464 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				11A9B2282C965C4A00F2F464 /* ResourcesView.swift */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		11A9B22E2C96613400F2F464 /* FormModels */ = {
+			isa = PBXGroup;
+			children = (
+				11A9B22F2C96614600F2F464 /* Form.swift */,
+				11A9B2332C9661BD00F2F464 /* Validation.swift */,
+			);
+			path = FormModels;
+			sourceTree = "<group>";
+		};
+		11A9B2352C96625500F2F464 /* Forms */ = {
+			isa = PBXGroup;
+			children = (
+				11A9B2252C96596F00F2F464 /* FormsAndSurveysView.swift */,
+				1185DB592C94DDFF004616D5 /* QuestionView.swift */,
+				11A9B2392C96628000F2F464 /* FormsDashboardView.swift */,
+				11A9B2362C96628000F2F464 /* FormCreationView.swift */,
+				11A9B2372C96628000F2F464 /* FormDetailEditorView.swift */,
+				11A9B2382C96628000F2F464 /* FormPreviewView.swift */,
+				11A9B23A2C96628000F2F464 /* FormSectionCard.swift */,
+				11A9B23B2C96628000F2F464 /* FormStoreView.swift */,
+				11A9B23C2C96628000F2F464 /* FormTemplateBuilderView.swift */,
+				11A9B23D2C96628000F2F464 /* FormTemplateBuilderViewModel.swift */,
+				11A9B23E2C96628000F2F464 /* FormView.swift */,
+				11A9B23F2C96628000F2F464 /* MyFormsView.swift */,
+				11A9B2402C96628000F2F464 /* ValidationRulesEditor.swift */,
+			);
+			path = Forms;
+			sourceTree = "<group>";
+		};
+		11A9B2532C96652D00F2F464 /* FormComponents */ = {
+			isa = PBXGroup;
+			children = (
+				11A9B25E2C9668A700F2F464 /* FormComponents.swift */,
+				11A9B2512C96651D00F2F464 /* DefaultFormTemplate.swift */,
+				11A9B2542C96653E00F2F464 /* DefaultSectionTemplate.swift */,
+				11A9B26E2C9669BC00F2F464 /* FormElementFactory.swift */,
+			);
+			path = FormComponents;
+			sourceTree = "<group>";
+		};
+		11A9B25C2C96687400F2F464 /* ZLHNComponents */ = {
+			isa = PBXGroup;
+			children = (
+				11A9B26A2C96698D00F2F464 /* TextAndTypographyFactory */,
+				11A9B25A2C96679000F2F464 /* CustomNavigationLink.swift */,
+				11A9B2602C9668AB00F2F464 /* ButtonFactory.swift */,
+				11A9B2612C9668AE00F2F464 /* CustomComponents.swift */,
+			);
+			path = ZLHNComponents;
+			sourceTree = "<group>";
+		};
+		11A9B26A2C96698D00F2F464 /* TextAndTypographyFactory */ = {
+			isa = PBXGroup;
+			children = (
+				11A9B2672C96698D00F2F464 /* FontConstants.swift */,
+				11A9B2682C96698D00F2F464 /* TextFieldComponents.swift */,
+				11A9B2692C96698D00F2F464 /* TextLabelComponents.swift */,
+			);
+			path = TextAndTypographyFactory;
+			sourceTree = "<group>";
+		};
+		11A9B2702C9669D800F2F464 /* SearchComponents */ = {
+			isa = PBXGroup;
+			children = (
+				11A9B2712C9669E700F2F464 /* Search.swift */,
+			);
+			path = SearchComponents;
+			sourceTree = "<group>";
+		};
 		11E7D1192C93A2B60021AC20 = {
 			isa = PBXGroup;
 			children = (
@@ -366,18 +504,6 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		11E7D1352C93A2E40021AC20 /* FirestoreModelMacros */ = {
-			isa = PBXGroup;
-			children = (
-				11E7D1362C93A2E40021AC20 /* FirestoreContext.swift */,
-				11E7D1372C93A2E40021AC20 /* FirestoreModel.swift */,
-				11E7D1382C93A2E40021AC20 /* FirestoreQuery.swift */,
-				11E7D1332C93A2E40021AC20 /* FirestoreModelMacro.swift */,
-				11E7D1342C93A2E40021AC20 /* FirestoreQueryMacro.swift */,
-			);
-			path = FirestoreModelMacros;
-			sourceTree = "<group>";
-		};
 		11E7D1392C93A2E40021AC20 /* Helpers */ = {
 			isa = PBXGroup;
 			children = (
@@ -385,7 +511,6 @@
 				1185DB3D2C94D951004616D5 /* Components */,
 				11E7D1812C93A4240021AC20 /* Extensions */,
 				1185DB382C94D931004616D5 /* Utilities */,
-				11E7D1352C93A2E40021AC20 /* FirestoreModelMacros */,
 			);
 			path = Helpers;
 			sourceTree = "<group>";
@@ -393,6 +518,7 @@
 		11E7D13F2C93A2E40021AC20 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				11A9B22E2C96613400F2F464 /* FormModels */,
 				11E7D13D2C93A2E40021AC20 /* Student.swift */,
 				11E7D13E2C93A2E40021AC20 /* TMIPlan.swift */,
 				11E7D13B2C93A2E40021AC20 /* Interest.swift */,
@@ -400,6 +526,11 @@
 				1185DB1C2C94D7CE004616D5 /* EngagementData.swift */,
 				11E7D13C2C93A2E40021AC20 /* RecentActivity.swift */,
 				1185DB632C94E2B6004616D5 /* ProgressData.swift */,
+				1185DB672C953212004616D5 /* Survey.swift */,
+				1185DB692C953218004616D5 /* Resource.swift */,
+				11A9B22C2C965CA600F2F464 /* Career.swift */,
+				11A9B2312C96618C00F2F464 /* AnyCodable.swift */,
+				11A9B2562C96668100F2F464 /* User.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -420,13 +551,15 @@
 			isa = PBXGroup;
 			children = (
 				11E7D1632C93A4000021AC20 /* MainTabView.swift */,
+				1185DB1F2C94D859004616D5 /* Authentication */,
 				11E7D1622C93A3FF0021AC20 /* Dashboard */,
 				11E7D1442C93A2E40021AC20 /* Students */,
 				11E7D16F2C93A4020021AC20 /* TMIPlans */,
 				1185DB1E2C94D81C004616D5 /* InterestsAndHobbies */,
-				1185DB1F2C94D859004616D5 /* Authentication */,
-				1185DB202C94D864004616D5 /* Surveys */,
+				11A9B2352C96625500F2F464 /* Forms */,
+				11A9B2272C965C2200F2F464 /* Resources */,
 				1185DB212C94D86F004616D5 /* Settings */,
+				11A9B22A2C965C8E00F2F464 /* CareerExplorerView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -534,7 +667,6 @@
 			mainGroup = 11E7D1192C93A2B60021AC20;
 			packageReferences = (
 				1185DAD82C93A75C004616D5 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
-				1185DB072C93A797004616D5 /* XCRemoteSwiftPackageReference "swift-syntax" */,
 				1185DB082C93A7CC004616D5 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
 			);
 			productRefGroup = 11E7D1232C93A2B60021AC20 /* Products */;
@@ -567,61 +699,92 @@
 				11E7D1762C93A4020021AC20 /* SettingsView.swift in Sources */,
 				11E7D1582C93A2E50021AC20 /* StudentListView.swift in Sources */,
 				1185DB5E2C94DE21004616D5 /* HobbyDetailView.swift in Sources */,
+				11A9B2462C96628000F2F464 /* FormSectionCard.swift in Sources */,
 				1185DB282C94D8AA004616D5 /* AuthenticationViewModel.swift in Sources */,
 				1185DB642C94E2B6004616D5 /* ProgressData.swift in Sources */,
 				1185DB4E2C94D9C9004616D5 /* APIClient.swift in Sources */,
+				11A9B2292C965C4A00F2F464 /* ResourcesView.swift in Sources */,
 				1185DB2D2C94D8CD004616D5 /* AuthenticationService.swift in Sources */,
+				11A9B24C2C96628000F2F464 /* ValidationRulesEditor.swift in Sources */,
+				11A9B2442C96628000F2F464 /* FormPreviewView.swift in Sources */,
 				11E7D1742C93A4020021AC20 /* InsightsView.swift in Sources */,
 				1185DB1D2C94D7CE004616D5 /* EngagementData.swift in Sources */,
 				1185DB5C2C94DE15004616D5 /* InterestDetailView.swift in Sources */,
 				1185DB242C94D893004616D5 /* StudentListViewModel.swift in Sources */,
 				1185DB432C94D979004616D5 /* SelectableChip.swift in Sources */,
 				11E7D1712C93A4020021AC20 /* ActivityRow.swift in Sources */,
+				11A9B2492C96628000F2F464 /* FormTemplateBuilderViewModel.swift in Sources */,
 				1185DB122C94B71C004616D5 /* StudentListFilterView.swift in Sources */,
 				11E7D17D2C93A4020021AC20 /* NewTMIPlanView.swift in Sources */,
+				11A9B26F2C9669BC00F2F464 /* FormElementFactory.swift in Sources */,
 				1185DB372C94D92A004616D5 /* View+Extensions.swift in Sources */,
 				1185DB3A2C94D944004616D5 /* Constants.swift in Sources */,
-				1185DB3C2C94D94A004616D5 /* Validation.swift in Sources */,
 				1185DB412C94D970004616D5 /* ProgressBar.swift in Sources */,
 				11E7D1822C93A4240021AC20 /* Color+Extensions.swift in Sources */,
-				11E7D14C2C93A2E40021AC20 /* FirestoreModelMacro.swift in Sources */,
+				11A9B26D2C96698D00F2F464 /* TextLabelComponents.swift in Sources */,
+				11A9B2742C966AF300F2F464 /* DocumentService.swift in Sources */,
+				11A9B22D2C965CA600F2F464 /* Career.swift in Sources */,
+				11A9B2572C96668100F2F464 /* User.swift in Sources */,
+				11A9B22B2C965C8E00F2F464 /* CareerExplorerView.swift in Sources */,
 				1185DB502C94D9D3004616D5 /* Endpoints.swift in Sources */,
 				1185DB142C94B725004616D5 /* StudentDetailView.swift in Sources */,
+				11A9B2762C966B3400F2F464 /* FirestoreConstants.swift in Sources */,
 				11E7D17F2C93A4020021AC20 /* TMIPlanListView.swift in Sources */,
 				1185DB602C94DE2A004616D5 /* AddItemView.swift in Sources */,
 				11E7D1512C93A2E50021AC20 /* Hobby.swift in Sources */,
 				11E7D1542C93A2E50021AC20 /* Student.swift in Sources */,
 				1185DB0E2C93AFD6004616D5 /* TimeFrame.swift in Sources */,
+				11A9B2432C96628000F2F464 /* FormDetailEditorView.swift in Sources */,
 				1185DB542C94DBA5004616D5 /* AuthenticationView.swift in Sources */,
+				11A9B2322C96618C00F2F464 /* AnyCodable.swift in Sources */,
+				11A9B24B2C96628000F2F464 /* MyFormsView.swift in Sources */,
 				11E7D1522C93A2E50021AC20 /* Interest.swift in Sources */,
-				11E7D1502C93A2E50021AC20 /* FirestoreQuery.swift in Sources */,
 				1185DB2F2C94D8D9004616D5 /* DatabaseService.swift in Sources */,
 				11E7D17E2C93A4020021AC20 /* TMIPlanDetailView.swift in Sources */,
+				11A9B2632C9668AE00F2F464 /* FormComponents.swift in Sources */,
+				1185DB6A2C953218004616D5 /* Resource.swift in Sources */,
+				11A9B2302C96614600F2F464 /* Form.swift in Sources */,
+				11A9B24A2C96628000F2F464 /* FormView.swift in Sources */,
 				1185DB2A2C94D8B5004616D5 /* SurveyViewModel.swift in Sources */,
+				11A9B25B2C96679000F2F464 /* CustomNavigationLink.swift in Sources */,
+				11A9B2662C9668AE00F2F464 /* CustomComponents.swift in Sources */,
 				1185DB262C94D8A0004616D5 /* TMIPlanViewModel.swift in Sources */,
+				11A9B2592C96675E00F2F464 /* MenuItem.swift in Sources */,
 				1185DB5A2C94DDFF004616D5 /* QuestionView.swift in Sources */,
 				11E7D1572C93A2E50021AC20 /* AddStudentView.swift in Sources */,
-				1185DB582C94DDF6004616D5 /* SurveyView.swift in Sources */,
 				11E7D1262C93A2B60021AC20 /* TMIApp.swift in Sources */,
+				11A9B2522C96651D00F2F464 /* DefaultFormTemplate.swift in Sources */,
+				11A9B2422C96628000F2F464 /* FormCreationView.swift in Sources */,
+				11A9B2472C96628000F2F464 /* FormStoreView.swift in Sources */,
 				1185DB622C94DE41004616D5 /* TMIPlanCard.swift in Sources */,
-				11E7D14D2C93A2E40021AC20 /* FirestoreQueryMacro.swift in Sources */,
 				11E7D1702C93A4020021AC20 /* InterestsAndHobbiesView.swift in Sources */,
-				11E7D14E2C93A2E50021AC20 /* FirestoreContext.swift in Sources */,
 				1185DB492C94D9A6004616D5 /* SampleInterests.swift in Sources */,
+				11A9B2502C9664F000F2F464 /* FormService.swift in Sources */,
 				1185DB162C94B7A3004616D5 /* StudentCard.swift in Sources */,
+				11A9B2342C9661BD00F2F464 /* Validation.swift in Sources */,
 				11E7D1732C93A4020021AC20 /* DashboardView.swift in Sources */,
+				1185DB662C94FD6D004616D5 /* DashboardViewModel.swift in Sources */,
 				1185DB562C94DBD4004616D5 /* RegistrationView.swift in Sources */,
 				11E7D1552C93A2E50021AC20 /* TMIPlan.swift in Sources */,
 				1185DB472C94D99F004616D5 /* SampleStudents.swift in Sources */,
 				1185DB352C94D8FB004616D5 /* ResourceService.swift in Sources */,
 				1185DB3F2C94D96A004616D5 /* AvatarView.swift in Sources */,
+				11A9B2482C96628000F2F464 /* FormTemplateBuilderView.swift in Sources */,
 				1185DB332C94D8ED004616D5 /* SurveyService.swift in Sources */,
 				1185DB4B2C94D9AF004616D5 /* SampleHobbies.swift in Sources */,
-				11E7D14F2C93A2E50021AC20 /* FirestoreModel.swift in Sources */,
+				11A9B24E2C96648400F2F464 /* FirebaseManager.swift in Sources */,
 				11E7D1532C93A2E50021AC20 /* RecentActivity.swift in Sources */,
+				11A9B2722C9669E700F2F464 /* Search.swift in Sources */,
+				11A9B2552C96653E00F2F464 /* DefaultSectionTemplate.swift in Sources */,
 				1185DB312C94D8E2004616D5 /* TMIPlanService.swift in Sources */,
+				11A9B2652C9668AE00F2F464 /* ButtonFactory.swift in Sources */,
+				11A9B26B2C96698D00F2F464 /* FontConstants.swift in Sources */,
+				11A9B2452C96628000F2F464 /* FormsDashboardView.swift in Sources */,
+				1185DB682C953212004616D5 /* Survey.swift in Sources */,
+				11A9B2262C96596F00F2F464 /* FormsAndSurveysView.swift in Sources */,
 				11E7D1722C93A4020021AC20 /* DashboardStatCard.swift in Sources */,
 				11E7D1752C93A4020021AC20 /* MainTabView.swift in Sources */,
+				11A9B26C2C96698D00F2F464 /* TextFieldComponents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -835,14 +998,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 11.2.0;
-			};
-		};
-		1185DB072C93A797004616D5 /* XCRemoteSwiftPackageReference "swift-syntax" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/swiftlang/swift-syntax.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 510.0.3;
 			};
 		};
 		1185DB082C93A7CC004616D5 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */ = {

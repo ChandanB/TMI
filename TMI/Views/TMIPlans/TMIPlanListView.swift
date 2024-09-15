@@ -138,7 +138,7 @@ struct PlanFilterView: View {
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 ForEach(TMIPlanListView.PlanFilter.allCases) { filter in
                     HStack {
