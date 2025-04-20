@@ -16,7 +16,7 @@ struct StudentListFilterView: View {
                         Spacer()
                         if option == selectedOption {
                             Image(systemName: "checkmark")
-                                .foregroundColor(.tmiPrimary)
+                                .foregroundColor(Color.tmiPrimary)
                         }
                     }
                     .contentShape(Rectangle())

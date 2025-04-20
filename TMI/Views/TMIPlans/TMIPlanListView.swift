@@ -32,7 +32,6 @@ struct TMIPlanListView: View {
                 .padding()
             }
             .background(Color.tmiBackground.ignoresSafeArea())
-            .navigationBarHidden(true)
             .sheet(isPresented: $showingNewPlanSheet) {
                 NewTMIPlanView()
             }
@@ -48,16 +47,16 @@ struct TMIPlanListView: View {
                 Text("Your Plans")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
                 Text("Manage and track your TMI Plans")
                     .font(.subheadline)
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(Color.tmiSecondary)
             }
             Spacer()
             Button(action: { showingNewPlanSheet = true }) {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 28))
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
             }
             .accessibilityLabel("Add New Plan")
         }
@@ -67,7 +66,7 @@ struct TMIPlanListView: View {
         HStack(spacing: 15) {
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(Color.tmiSecondary)
                 TextField("Search Plans", text: $searchText)
                     .autocorrectionDisabled()
             }
@@ -78,7 +77,7 @@ struct TMIPlanListView: View {
             Button(action: { showingFilterSheet = true }) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.title2)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
             }
             .accessibilityLabel("Filter Plans")
         }
@@ -101,13 +100,13 @@ struct TMIPlanListView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 80, height: 80)
-                .foregroundColor(.tmiSecondary)
+                .foregroundColor(Color.tmiSecondary)
             Text("No Plans Found")
                 .font(.title2)
-                .foregroundColor(.tmiPrimary)
+                .foregroundColor(Color.tmiPrimary)
             Text("Try adjusting your search or filter criteria.")
                 .font(.body)
-                .foregroundColor(.tmiSecondary)
+                .foregroundColor(Color.tmiSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             Spacer()
@@ -143,11 +142,11 @@ struct PlanFilterView: View {
                 ForEach(TMIPlanListView.PlanFilter.allCases) { filter in
                     HStack {
                         Text(filter.rawValue)
-                            .foregroundColor(.tmiText)
+                            .foregroundColor(Color.tmiText)
                         Spacer()
                         if filter == selectedFilter {
                             Image(systemName: "checkmark")
-                                .foregroundColor(.tmiPrimary)
+                                .foregroundColor(Color.tmiPrimary)
                         }
                     }
                     .contentShape(Rectangle())

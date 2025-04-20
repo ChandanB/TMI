@@ -133,7 +133,7 @@ struct ZLHNDescriptionButton: View {
         HStack {
             Image(systemName: iconName)
                 .font(.title)
-                .foregroundColor(.tmiPrimary)
+                .foregroundColor(Color.tmiPrimary)
                 .frame(width: 44, height: 44)
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)

@@ -16,11 +16,11 @@ struct TMIPlanCard: View {
             HStack {
                 Text(plan.model.rawValue)
                     .font(.headline)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
                 Spacer()
                 Text("\(Int(plan.progress * 100))%")
                     .font(.subheadline)
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(Color.tmiSecondary)
             }
 
             // Progress Bar
@@ -30,7 +30,7 @@ struct TMIPlanCard: View {
             // Plan Description
             Text(plan.model.description)
                 .font(.body)
-                .foregroundColor(.tmiText)
+                .foregroundColor(Color.tmiText)
                 .lineLimit(2)
 
             // Associated Students
@@ -41,7 +41,7 @@ struct TMIPlanCard: View {
                 if plan.students.count > 3 {
                     Text("+\(plan.students.count - 3)")
                         .font(.caption)
-                        .foregroundColor(.tmiSecondary)
+                        .foregroundColor(Color.tmiSecondary)
                         .padding(.leading, 5)
                 }
                 Spacer()

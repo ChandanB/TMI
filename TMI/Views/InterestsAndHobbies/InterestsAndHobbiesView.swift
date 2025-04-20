@@ -37,7 +37,6 @@ struct InterestsAndHobbiesView: View {
                 .padding()
             }
             .background(Color.tmiBackground.ignoresSafeArea())
-            .navigationBarHidden(true)
             .sheet(isPresented: $showingAddSheet) {
                 AddItemView(itemType: $newItemType, itemName: $newItemName, onSave: addItem)
             }
@@ -52,16 +51,16 @@ struct InterestsAndHobbiesView: View {
                 Text("Interests & Hobbies")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
                 Text("Explore and manage your interests and hobbies")
                     .font(.subheadline)
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(Color.tmiSecondary)
             }
             Spacer()
             Button(action: { showingAddSheet = true }) {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 28))
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
             }
             .accessibilityLabel("Add New Item")
         }
@@ -72,7 +71,7 @@ struct InterestsAndHobbiesView: View {
     private var searchBar: some View {
         HStack {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.tmiSecondary)
+                .foregroundColor(Color.tmiSecondary)
             TextField("Search", text: $searchText)
                 .autocorrectionDisabled()
         }
@@ -130,10 +129,10 @@ struct InterestsAndHobbiesView: View {
     private func addItem() {
         withAnimation {
             if newItemType == .interest {
-                let newInterest = Interest(id: UUID().uuidString, name: newItemName, details: nil, relatedStudents: nil)
+                let newInterest = Interest(id: UUID(), name: newItemName, category: [.academics])
                 interests.append(newInterest)
             } else {
-                let newHobby = Hobby(id: UUID().uuidString, name: newItemName, details: nil, relatedStudents: nil)
+                let newHobby = Hobby(id: UUID(), name: newItemName, category: [.arts])
                 hobbies.append(newHobby)
             }
             newItemName = ""
@@ -171,7 +170,7 @@ struct ItemCardView: View {
             
             Text(title)
                 .font(.headline)
-                .foregroundColor(.tmiText)
+                .foregroundColor(Color.tmiText)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
@@ -209,16 +208,16 @@ struct AddItemView: View {
                 Text("Add New Item")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
                 Text("Enter the details below")
                     .font(.title3)
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(Color.tmiSecondary)
             }
             Spacer()
             Button(action: { dismiss() }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
             }
         }
     }
@@ -268,10 +267,10 @@ struct InterestDetailView: View {
             Text(interest.name)
                 .font(.largeTitle)
                 .fontWeight(.bold)
-                .foregroundColor(.tmiPrimary)
+                .foregroundColor(Color.tmiPrimary)
             Text("Details about this interest will be displayed here.")
                 .font(.body)
-                .foregroundColor(.tmiText)
+                .foregroundColor(Color.tmiText)
             Spacer()
         }
         .padding()
@@ -288,10 +287,10 @@ struct HobbyDetailView: View {
             Text(hobby.name)
                 .font(.largeTitle)
                 .fontWeight(.bold)
-                .foregroundColor(.tmiPrimary)
+                .foregroundColor(Color.tmiPrimary)
             Text("Details about this hobby will be displayed here.")
                 .font(.body)
-                .foregroundColor(.tmiText)
+                .foregroundColor(Color.tmiText)
             Spacer()
         }
         .padding()

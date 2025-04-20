@@ -6,12 +6,13 @@
 //
 
 import Firebase
+import FirebaseAuth
 import FirebaseFirestore
 import FirebaseStorage
 
 struct FirestoreConstants {
     // Authentication
-//    static let currentUser = Auth.auth().currentUser
+    static let currentUser = Auth.auth().currentUser
     static let uid = "uid"
 
     // User Fields

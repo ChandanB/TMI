@@ -38,16 +38,16 @@ struct NewTMIPlanView: View {
                 Text("Create New TMI Plan")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
                 Text(stepTitle)
                     .font(.title3)
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(Color.tmiSecondary)
             }
             Spacer()
             Button(action: { dismiss() }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
             }
         }
     }
@@ -122,7 +122,7 @@ struct NewTMIPlanView: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 15) {
                     ForEach(fetchInterests()) { interest in
-                        SelectableChip(title: interest.name, isSelected: selectedInterests.contains(interest)) {
+                        InterestSelectionChip(interest: interest, isSelected: selectedInterests.contains(interest)) {
                             toggleSelection(of: interest, in: &selectedInterests)
                         }
                     }
@@ -136,7 +136,7 @@ struct NewTMIPlanView: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 15) {
                     ForEach(fetchHobbies()) { hobby in
-                        SelectableChip(title: hobby.name, isSelected: selectedHobbies.contains(hobby)) {
+                        HobbySelectionChip(hobby: hobby, isSelected: selectedHobbies.contains(hobby)) {
                             toggleSelection(of: hobby, in: &selectedHobbies)
                         }
                     }
@@ -153,7 +153,7 @@ struct NewTMIPlanView: View {
                         Image(systemName: "chevron.left")
                         Text("Back")
                     }
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
                     .padding()
                     .background(Color.tmiSecondary.opacity(0.1))
                     .cornerRadius(10)
@@ -229,6 +229,7 @@ struct NewTMIPlanView: View {
             hobbies: selectedHobbies,
             creationDate: Date(),
             lastUpdated: Date(),
+            goals: [],
             progress: 0.0,
             notes: ""
         )
@@ -271,10 +272,10 @@ struct StudentSelectionCard: View {
                 VStack(alignment: .leading) {
                     Text(student.name)
                         .font(.headline)
-                        .foregroundColor(.tmiText)
+                        .foregroundColor(Color.tmiText)
                     Text("Grade \(student.grade)")
                         .font(.subheadline)
-                        .foregroundColor(.tmiSecondary)
+                        .foregroundColor(Color.tmiSecondary)
                 }
                 Spacer()
                 if isSelected {
@@ -303,7 +304,7 @@ struct TMIModelCard: View {
                 HStack {
                     Text(model.rawValue)
                         .font(.headline)
-                        .foregroundColor(.tmiText)
+                        .foregroundColor(Color.tmiText)
                     Spacer()
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
@@ -313,7 +314,7 @@ struct TMIModelCard: View {
                 }
                 Text(model.description)
                     .font(.body)
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(Color.tmiSecondary)
             }
             .padding()
             .background(
@@ -324,22 +325,64 @@ struct TMIModelCard: View {
     }
 }
 
-struct SelectableChip: View {
-    let title: String
+struct InterestSelectionChip: View {
+    let interest: Interest
     let isSelected: Bool
     let action: () -> Void
-
+    
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(isSelected ? .white : .tmiText)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(isSelected ? Color.tmiPrimary : Color.tmiSecondary.opacity(0.2))
-                )
+            HStack(spacing: 6) {
+                Image(systemName: interest.iconName)
+                    .font(.system(size: 14))
+                    .foregroundColor(isSelected ? .white : interest.color)
+                
+                Text(interest.name)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                    .foregroundColor(isSelected ? .white : .tmiText)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(isSelected ? interest.color : Color.tmiSecondary.opacity(0.2))
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(interest.color, lineWidth: isSelected ? 0 : 1)
+            )
+        }
+    }
+}
+
+struct HobbySelectionChip: View {
+    let hobby: Hobby
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: hobby.iconName)
+                    .font(.system(size: 14))
+                    .foregroundColor(isSelected ? .white : hobby.color)
+                
+                Text(hobby.name)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                    .foregroundColor(isSelected ? .white : .tmiText)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(isSelected ? hobby.color : Color.tmiSecondary.opacity(0.2))
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(hobby.color, lineWidth: isSelected ? 0 : 1)
+            )
         }
     }
 }

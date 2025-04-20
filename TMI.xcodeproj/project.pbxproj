@@ -37,10 +37,6 @@
 		1185DB142C94B725004616D5 /* StudentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB132C94B725004616D5 /* StudentDetailView.swift */; };
 		1185DB162C94B7A3004616D5 /* StudentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB152C94B7A3004616D5 /* StudentCard.swift */; };
 		1185DB1D2C94D7CE004616D5 /* EngagementData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB1C2C94D7CE004616D5 /* EngagementData.swift */; };
-		1185DB242C94D893004616D5 /* StudentListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB232C94D893004616D5 /* StudentListViewModel.swift */; };
-		1185DB262C94D8A0004616D5 /* TMIPlanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB252C94D8A0004616D5 /* TMIPlanViewModel.swift */; };
-		1185DB282C94D8AA004616D5 /* AuthenticationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB272C94D8AA004616D5 /* AuthenticationViewModel.swift */; };
-		1185DB2A2C94D8B5004616D5 /* SurveyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB292C94D8B5004616D5 /* SurveyViewModel.swift */; };
 		1185DB2D2C94D8CD004616D5 /* AuthenticationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB2C2C94D8CD004616D5 /* AuthenticationService.swift */; };
 		1185DB2F2C94D8D9004616D5 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB2E2C94D8D9004616D5 /* DatabaseService.swift */; };
 		1185DB312C94D8E2004616D5 /* TMIPlanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB302C94D8E2004616D5 /* TMIPlanService.swift */; };
@@ -64,7 +60,6 @@
 		1185DB602C94DE2A004616D5 /* AddItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB5F2C94DE2A004616D5 /* AddItemView.swift */; };
 		1185DB622C94DE41004616D5 /* TMIPlanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB612C94DE41004616D5 /* TMIPlanCard.swift */; };
 		1185DB642C94E2B6004616D5 /* ProgressData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB632C94E2B6004616D5 /* ProgressData.swift */; };
-		1185DB662C94FD6D004616D5 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB652C94FD6D004616D5 /* DashboardViewModel.swift */; };
 		1185DB682C953212004616D5 /* Survey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB672C953212004616D5 /* Survey.swift */; };
 		1185DB6A2C953218004616D5 /* Resource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1185DB692C953218004616D5 /* Resource.swift */; };
 		11A9B2262C96596F00F2F464 /* FormsAndSurveysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2252C96596F00F2F464 /* FormsAndSurveysView.swift */; };
@@ -89,7 +84,7 @@
 		11A9B2502C9664F000F2F464 /* FormService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B24F2C9664F000F2F464 /* FormService.swift */; };
 		11A9B2522C96651D00F2F464 /* DefaultFormTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2512C96651D00F2F464 /* DefaultFormTemplate.swift */; };
 		11A9B2552C96653E00F2F464 /* DefaultSectionTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2542C96653E00F2F464 /* DefaultSectionTemplate.swift */; };
-		11A9B2572C96668100F2F464 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2562C96668100F2F464 /* User.swift */; };
+		11A9B2572C96668100F2F464 /* TMIUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2562C96668100F2F464 /* TMIUser.swift */; };
 		11A9B2592C96675E00F2F464 /* MenuItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2582C96675E00F2F464 /* MenuItem.swift */; };
 		11A9B25B2C96679000F2F464 /* CustomNavigationLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B25A2C96679000F2F464 /* CustomNavigationLink.swift */; };
 		11A9B2632C9668AE00F2F464 /* FormComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B25E2C9668A700F2F464 /* FormComponents.swift */; };
@@ -102,6 +97,17 @@
 		11A9B2722C9669E700F2F464 /* Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2712C9669E700F2F464 /* Search.swift */; };
 		11A9B2742C966AF300F2F464 /* DocumentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2732C966AF300F2F464 /* DocumentService.swift */; };
 		11A9B2762C966B3400F2F464 /* FirestoreConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A9B2752C966B3400F2F464 /* FirestoreConstants.swift */; };
+		11C813C72DB57544005477FC /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 11C813C62DB57544005477FC /* SwiftSoup */; };
+		11C813C92DB57F10005477FC /* ImageSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C813C82DB57F10005477FC /* ImageSource.swift */; };
+		11C813CB2DB58003005477FC /* ErrorHandlingHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C813CA2DB58003005477FC /* ErrorHandlingHelper.swift */; };
+		11C813CD2DB58BAD005477FC /* TMIStatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C813CC2DB58BAD005477FC /* TMIStatCard.swift */; };
+		11C813CF2DB58DD4005477FC /* TMISpacing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C813CE2DB58DD4005477FC /* TMISpacing.swift */; };
+		11C813D12DB58DFC005477FC /* TMIRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C813D02DB58DFC005477FC /* TMIRadius.swift */; };
+		11C813D32DB58E16005477FC /* TMIAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C813D22DB58E16005477FC /* TMIAnimation.swift */; };
+		11C813D52DB58E3D005477FC /* TMIHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C813D42DB58E3A005477FC /* TMIHaptics.swift */; };
+		11C813D92DB59044005477FC /* View+TMIShadow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C813D82DB59044005477FC /* View+TMIShadow.swift */; };
+		11C813DF2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md in Resources */ = {isa = PBXBuildFile; fileRef = 11C813DE2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md */; };
+		11C813E12DB59A6D005477FC /* Apple’s Official UI_UX Design Guidelines for iOS and macOS.md in Resources */ = {isa = PBXBuildFile; fileRef = 11C813E02DB59A6D005477FC /* Apple’s Official UI_UX Design Guidelines for iOS and macOS.md */; };
 		11E7D1262C93A2B60021AC20 /* TMIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E7D1252C93A2B60021AC20 /* TMIApp.swift */; };
 		11E7D12A2C93A2B70021AC20 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11E7D1292C93A2B70021AC20 /* Assets.xcassets */; };
 		11E7D12D2C93A2B70021AC20 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11E7D12C2C93A2B70021AC20 /* Preview Assets.xcassets */; };
@@ -132,10 +138,6 @@
 		1185DB132C94B725004616D5 /* StudentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentDetailView.swift; sourceTree = "<group>"; };
 		1185DB152C94B7A3004616D5 /* StudentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentCard.swift; sourceTree = "<group>"; };
 		1185DB1C2C94D7CE004616D5 /* EngagementData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementData.swift; sourceTree = "<group>"; };
-		1185DB232C94D893004616D5 /* StudentListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentListViewModel.swift; sourceTree = "<group>"; };
-		1185DB252C94D8A0004616D5 /* TMIPlanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIPlanViewModel.swift; sourceTree = "<group>"; };
-		1185DB272C94D8AA004616D5 /* AuthenticationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationViewModel.swift; sourceTree = "<group>"; };
-		1185DB292C94D8B5004616D5 /* SurveyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurveyViewModel.swift; sourceTree = "<group>"; };
 		1185DB2C2C94D8CD004616D5 /* AuthenticationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationService.swift; sourceTree = "<group>"; };
 		1185DB2E2C94D8D9004616D5 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		1185DB302C94D8E2004616D5 /* TMIPlanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIPlanService.swift; sourceTree = "<group>"; };
@@ -159,7 +161,6 @@
 		1185DB5F2C94DE2A004616D5 /* AddItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddItemView.swift; sourceTree = "<group>"; };
 		1185DB612C94DE41004616D5 /* TMIPlanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIPlanCard.swift; sourceTree = "<group>"; };
 		1185DB632C94E2B6004616D5 /* ProgressData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressData.swift; sourceTree = "<group>"; };
-		1185DB652C94FD6D004616D5 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		1185DB672C953212004616D5 /* Survey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Survey.swift; sourceTree = "<group>"; };
 		1185DB692C953218004616D5 /* Resource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Resource.swift; sourceTree = "<group>"; };
 		11A9B2252C96596F00F2F464 /* FormsAndSurveysView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormsAndSurveysView.swift; sourceTree = "<group>"; };
@@ -184,7 +185,7 @@
 		11A9B24F2C9664F000F2F464 /* FormService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormService.swift; sourceTree = "<group>"; };
 		11A9B2512C96651D00F2F464 /* DefaultFormTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultFormTemplate.swift; sourceTree = "<group>"; };
 		11A9B2542C96653E00F2F464 /* DefaultSectionTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultSectionTemplate.swift; sourceTree = "<group>"; };
-		11A9B2562C96668100F2F464 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		11A9B2562C96668100F2F464 /* TMIUser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIUser.swift; sourceTree = "<group>"; };
 		11A9B2582C96675E00F2F464 /* MenuItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuItem.swift; sourceTree = "<group>"; };
 		11A9B25A2C96679000F2F464 /* CustomNavigationLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomNavigationLink.swift; sourceTree = "<group>"; };
 		11A9B25E2C9668A700F2F464 /* FormComponents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FormComponents.swift; sourceTree = "<group>"; };
@@ -197,6 +198,16 @@
 		11A9B2712C9669E700F2F464 /* Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Search.swift; sourceTree = "<group>"; };
 		11A9B2732C966AF300F2F464 /* DocumentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentService.swift; sourceTree = "<group>"; };
 		11A9B2752C966B3400F2F464 /* FirestoreConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreConstants.swift; sourceTree = "<group>"; };
+		11C813C82DB57F10005477FC /* ImageSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSource.swift; sourceTree = "<group>"; };
+		11C813CA2DB58003005477FC /* ErrorHandlingHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorHandlingHelper.swift; sourceTree = "<group>"; };
+		11C813CC2DB58BAD005477FC /* TMIStatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIStatCard.swift; sourceTree = "<group>"; };
+		11C813CE2DB58DD4005477FC /* TMISpacing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMISpacing.swift; sourceTree = "<group>"; };
+		11C813D02DB58DFC005477FC /* TMIRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIRadius.swift; sourceTree = "<group>"; };
+		11C813D22DB58E16005477FC /* TMIAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIAnimation.swift; sourceTree = "<group>"; };
+		11C813D42DB58E3A005477FC /* TMIHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIHaptics.swift; sourceTree = "<group>"; };
+		11C813D82DB59044005477FC /* View+TMIShadow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+TMIShadow.swift"; sourceTree = "<group>"; };
+		11C813DE2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "TMI_App_ Development_Breakdown.md"; sourceTree = "<group>"; };
+		11C813E02DB59A6D005477FC /* Apple’s Official UI_UX Design Guidelines for iOS and macOS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Apple’s Official UI_UX Design Guidelines for iOS and macOS.md"; sourceTree = "<group>"; };
 		11E7D1222C93A2B60021AC20 /* TMI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TMI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		11E7D1252C93A2B60021AC20 /* TMIApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMIApp.swift; sourceTree = "<group>"; };
 		11E7D1292C93A2B70021AC20 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -235,6 +246,7 @@
 				1185DAE22C93A75C004616D5 /* FirebaseAppDistribution-Beta in Frameworks */,
 				1185DADE2C93A75C004616D5 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */,
 				1185DAE82C93A75C004616D5 /* FirebaseCrashlytics in Frameworks */,
+				11C813C72DB57544005477FC /* SwiftSoup in Frameworks */,
 				1185DAEA2C93A75C004616D5 /* FirebaseDatabase in Frameworks */,
 				1185DAF42C93A75C004616D5 /* FirebaseFunctionsCombine-Community in Frameworks */,
 				1185DAE62C93A75C004616D5 /* FirebaseAuthCombine-Community in Frameworks */,
@@ -291,18 +303,6 @@
 				11E7D1642C93A4010021AC20 /* SettingsView.swift */,
 			);
 			path = Settings;
-			sourceTree = "<group>";
-		};
-		1185DB222C94D882004616D5 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				1185DB652C94FD6D004616D5 /* DashboardViewModel.swift */,
-				1185DB232C94D893004616D5 /* StudentListViewModel.swift */,
-				1185DB252C94D8A0004616D5 /* TMIPlanViewModel.swift */,
-				1185DB272C94D8AA004616D5 /* AuthenticationViewModel.swift */,
-				1185DB292C94D8B5004616D5 /* SurveyViewModel.swift */,
-			);
-			path = ViewModels;
 			sourceTree = "<group>";
 		};
 		1185DB2B2C94D8BD004616D5 /* Services */ = {
@@ -480,13 +480,16 @@
 		11E7D1242C93A2B60021AC20 /* TMI */ = {
 			isa = PBXGroup;
 			children = (
+				11C813E02DB59A6D005477FC /* Apple’s Official UI_UX Design Guidelines for iOS and macOS.md */,
+				11C813DE2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md */,
+				11C813CA2DB58003005477FC /* ErrorHandlingHelper.swift */,
+				11C813C82DB57F10005477FC /* ImageSource.swift */,
 				11E7D1252C93A2B60021AC20 /* TMIApp.swift */,
 				11E7D1292C93A2B70021AC20 /* Assets.xcassets */,
 				11E7D12B2C93A2B70021AC20 /* Preview Content */,
 				1185DB172C94D76D004616D5 /* Resources */,
 				11E7D13F2C93A2E40021AC20 /* Models */,
 				11E7D1452C93A2E40021AC20 /* Views */,
-				1185DB222C94D882004616D5 /* ViewModels */,
 				1185DB2B2C94D8BD004616D5 /* Services */,
 				11E7D1392C93A2E40021AC20 /* Helpers */,
 				1185DB442C94D986004616D5 /* Data */,
@@ -507,6 +510,10 @@
 		11E7D1392C93A2E40021AC20 /* Helpers */ = {
 			isa = PBXGroup;
 			children = (
+				11C813D42DB58E3A005477FC /* TMIHaptics.swift */,
+				11C813D22DB58E16005477FC /* TMIAnimation.swift */,
+				11C813D02DB58DFC005477FC /* TMIRadius.swift */,
+				11C813CE2DB58DD4005477FC /* TMISpacing.swift */,
 				1185DB0D2C93AFD5004616D5 /* TimeFrame.swift */,
 				1185DB3D2C94D951004616D5 /* Components */,
 				11E7D1812C93A4240021AC20 /* Extensions */,
@@ -530,7 +537,7 @@
 				1185DB692C953218004616D5 /* Resource.swift */,
 				11A9B22C2C965CA600F2F464 /* Career.swift */,
 				11A9B2312C96618C00F2F464 /* AnyCodable.swift */,
-				11A9B2562C96668100F2F464 /* User.swift */,
+				11A9B2562C96668100F2F464 /* TMIUser.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -551,7 +558,6 @@
 			isa = PBXGroup;
 			children = (
 				11E7D1632C93A4000021AC20 /* MainTabView.swift */,
-				1185DB1F2C94D859004616D5 /* Authentication */,
 				11E7D1622C93A3FF0021AC20 /* Dashboard */,
 				11E7D1442C93A2E40021AC20 /* Students */,
 				11E7D16F2C93A4020021AC20 /* TMIPlans */,
@@ -559,6 +565,7 @@
 				11A9B2352C96625500F2F464 /* Forms */,
 				11A9B2272C965C2200F2F464 /* Resources */,
 				1185DB212C94D86F004616D5 /* Settings */,
+				1185DB1F2C94D859004616D5 /* Authentication */,
 				11A9B22A2C965C8E00F2F464 /* CareerExplorerView.swift */,
 			);
 			path = Views;
@@ -567,6 +574,7 @@
 		11E7D1622C93A3FF0021AC20 /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
+				11C813CC2DB58BAD005477FC /* TMIStatCard.swift */,
 				11E7D1602C93A3FF0021AC20 /* DashboardView.swift */,
 				11E7D15E2C93A3FF0021AC20 /* ActivityRow.swift */,
 				11E7D15F2C93A3FF0021AC20 /* DashboardStatCard.swift */,
@@ -591,6 +599,7 @@
 			children = (
 				11E7D1802C93A4240021AC20 /* Color+Extensions.swift */,
 				1185DB362C94D92A004616D5 /* View+Extensions.swift */,
+				11C813D82DB59044005477FC /* View+TMIShadow.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -636,6 +645,7 @@
 				1185DB032C93A75C004616D5 /* FirebaseStorageCombine-Community */,
 				1185DB052C93A75C004616D5 /* FirebaseVertexAI-Preview */,
 				1185DB092C93A7CC004616D5 /* SDWebImageSwiftUI */,
+				11C813C62DB57544005477FC /* SwiftSoup */,
 			);
 			productName = TMI;
 			productReference = 11E7D1222C93A2B60021AC20 /* TMI.app */;
@@ -668,6 +678,7 @@
 			packageReferences = (
 				1185DAD82C93A75C004616D5 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				1185DB082C93A7CC004616D5 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
+				11C813C52DB57544005477FC /* XCRemoteSwiftPackageReference "SwiftSoup" */,
 			);
 			productRefGroup = 11E7D1232C93A2B60021AC20 /* Products */;
 			projectDirPath = "";
@@ -683,6 +694,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				11C813E12DB59A6D005477FC /* Apple’s Official UI_UX Design Guidelines for iOS and macOS.md in Resources */,
+				11C813DF2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md in Resources */,
 				11E7D12D2C93A2B70021AC20 /* Preview Assets.xcassets in Resources */,
 				11E7D12A2C93A2B70021AC20 /* Assets.xcassets in Resources */,
 				1185DB0C2C93AA92004616D5 /* GoogleService-Info.plist in Resources */,
@@ -700,7 +713,6 @@
 				11E7D1582C93A2E50021AC20 /* StudentListView.swift in Sources */,
 				1185DB5E2C94DE21004616D5 /* HobbyDetailView.swift in Sources */,
 				11A9B2462C96628000F2F464 /* FormSectionCard.swift in Sources */,
-				1185DB282C94D8AA004616D5 /* AuthenticationViewModel.swift in Sources */,
 				1185DB642C94E2B6004616D5 /* ProgressData.swift in Sources */,
 				1185DB4E2C94D9C9004616D5 /* APIClient.swift in Sources */,
 				11A9B2292C965C4A00F2F464 /* ResourcesView.swift in Sources */,
@@ -710,7 +722,6 @@
 				11E7D1742C93A4020021AC20 /* InsightsView.swift in Sources */,
 				1185DB1D2C94D7CE004616D5 /* EngagementData.swift in Sources */,
 				1185DB5C2C94DE15004616D5 /* InterestDetailView.swift in Sources */,
-				1185DB242C94D893004616D5 /* StudentListViewModel.swift in Sources */,
 				1185DB432C94D979004616D5 /* SelectableChip.swift in Sources */,
 				11E7D1712C93A4020021AC20 /* ActivityRow.swift in Sources */,
 				11A9B2492C96628000F2F464 /* FormTemplateBuilderViewModel.swift in Sources */,
@@ -721,13 +732,16 @@
 				1185DB3A2C94D944004616D5 /* Constants.swift in Sources */,
 				1185DB412C94D970004616D5 /* ProgressBar.swift in Sources */,
 				11E7D1822C93A4240021AC20 /* Color+Extensions.swift in Sources */,
+				11C813D32DB58E16005477FC /* TMIAnimation.swift in Sources */,
 				11A9B26D2C96698D00F2F464 /* TextLabelComponents.swift in Sources */,
 				11A9B2742C966AF300F2F464 /* DocumentService.swift in Sources */,
 				11A9B22D2C965CA600F2F464 /* Career.swift in Sources */,
-				11A9B2572C96668100F2F464 /* User.swift in Sources */,
+				11A9B2572C96668100F2F464 /* TMIUser.swift in Sources */,
+				11C813D92DB59044005477FC /* View+TMIShadow.swift in Sources */,
 				11A9B22B2C965C8E00F2F464 /* CareerExplorerView.swift in Sources */,
 				1185DB502C94D9D3004616D5 /* Endpoints.swift in Sources */,
 				1185DB142C94B725004616D5 /* StudentDetailView.swift in Sources */,
+				11C813D52DB58E3D005477FC /* TMIHaptics.swift in Sources */,
 				11A9B2762C966B3400F2F464 /* FirestoreConstants.swift in Sources */,
 				11E7D17F2C93A4020021AC20 /* TMIPlanListView.swift in Sources */,
 				1185DB602C94DE2A004616D5 /* AddItemView.swift in Sources */,
@@ -745,17 +759,17 @@
 				1185DB6A2C953218004616D5 /* Resource.swift in Sources */,
 				11A9B2302C96614600F2F464 /* Form.swift in Sources */,
 				11A9B24A2C96628000F2F464 /* FormView.swift in Sources */,
-				1185DB2A2C94D8B5004616D5 /* SurveyViewModel.swift in Sources */,
 				11A9B25B2C96679000F2F464 /* CustomNavigationLink.swift in Sources */,
 				11A9B2662C9668AE00F2F464 /* CustomComponents.swift in Sources */,
-				1185DB262C94D8A0004616D5 /* TMIPlanViewModel.swift in Sources */,
 				11A9B2592C96675E00F2F464 /* MenuItem.swift in Sources */,
 				1185DB5A2C94DDFF004616D5 /* QuestionView.swift in Sources */,
 				11E7D1572C93A2E50021AC20 /* AddStudentView.swift in Sources */,
 				11E7D1262C93A2B60021AC20 /* TMIApp.swift in Sources */,
 				11A9B2522C96651D00F2F464 /* DefaultFormTemplate.swift in Sources */,
+				11C813D12DB58DFC005477FC /* TMIRadius.swift in Sources */,
 				11A9B2422C96628000F2F464 /* FormCreationView.swift in Sources */,
 				11A9B2472C96628000F2F464 /* FormStoreView.swift in Sources */,
+				11C813CD2DB58BAD005477FC /* TMIStatCard.swift in Sources */,
 				1185DB622C94DE41004616D5 /* TMIPlanCard.swift in Sources */,
 				11E7D1702C93A4020021AC20 /* InterestsAndHobbiesView.swift in Sources */,
 				1185DB492C94D9A6004616D5 /* SampleInterests.swift in Sources */,
@@ -763,8 +777,8 @@
 				1185DB162C94B7A3004616D5 /* StudentCard.swift in Sources */,
 				11A9B2342C9661BD00F2F464 /* Validation.swift in Sources */,
 				11E7D1732C93A4020021AC20 /* DashboardView.swift in Sources */,
-				1185DB662C94FD6D004616D5 /* DashboardViewModel.swift in Sources */,
 				1185DB562C94DBD4004616D5 /* RegistrationView.swift in Sources */,
+				11C813CF2DB58DD4005477FC /* TMISpacing.swift in Sources */,
 				11E7D1552C93A2E50021AC20 /* TMIPlan.swift in Sources */,
 				1185DB472C94D99F004616D5 /* SampleStudents.swift in Sources */,
 				1185DB352C94D8FB004616D5 /* ResourceService.swift in Sources */,
@@ -772,11 +786,13 @@
 				11A9B2482C96628000F2F464 /* FormTemplateBuilderView.swift in Sources */,
 				1185DB332C94D8ED004616D5 /* SurveyService.swift in Sources */,
 				1185DB4B2C94D9AF004616D5 /* SampleHobbies.swift in Sources */,
+				11C813C92DB57F10005477FC /* ImageSource.swift in Sources */,
 				11A9B24E2C96648400F2F464 /* FirebaseManager.swift in Sources */,
 				11E7D1532C93A2E50021AC20 /* RecentActivity.swift in Sources */,
 				11A9B2722C9669E700F2F464 /* Search.swift in Sources */,
 				11A9B2552C96653E00F2F464 /* DefaultSectionTemplate.swift in Sources */,
 				1185DB312C94D8E2004616D5 /* TMIPlanService.swift in Sources */,
+				11C813CB2DB58003005477FC /* ErrorHandlingHelper.swift in Sources */,
 				11A9B2652C9668AE00F2F464 /* ButtonFactory.swift in Sources */,
 				11A9B26B2C96698D00F2F464 /* FontConstants.swift in Sources */,
 				11A9B2452C96628000F2F464 /* FormsDashboardView.swift in Sources */,
@@ -1008,6 +1024,14 @@
 				minimumVersion = 3.1.2;
 			};
 		};
+		11C813C52DB57544005477FC /* XCRemoteSwiftPackageReference "SwiftSoup" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/scinfu/SwiftSoup.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.7;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1130,6 +1154,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1185DB082C93A7CC004616D5 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
 			productName = SDWebImageSwiftUI;
+		};
+		11C813C62DB57544005477FC /* SwiftSoup */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 11C813C52DB57544005477FC /* XCRemoteSwiftPackageReference "SwiftSoup" */;
+			productName = SwiftSoup;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

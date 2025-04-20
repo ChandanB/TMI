@@ -8,32 +8,32 @@
 import Foundation
 import FirebaseAuth
 
-class AuthenticationService {
-    static let shared = AuthenticationService()
-    private init() {}
-    
-    func signIn(email: String, password: String, completion: @escaping (Result<User, Error>) -> Void) {
-//        Auth.auth().signIn(withEmail: email, password: password) { authResult, error in
-//            if let user = authResult?.user {
-//                completion(.success(user))
-//            } else if let error = error {
-//                completion(.failure(error))
-//            }
-//        }
+extension FirebaseManager {
+    func signIn(email: String, password: String) async throws {
+        try await Auth.auth().signIn(withEmail: email, password: password)
     }
     
-    func signUp(email: String, password: String, completion: @escaping (Result<User, Error>) -> Void) {
-//        Auth.auth().createUser(withEmail: email, password: password) { authResult, error in
-//            if let user = authResult?.user {
-//                completion(.success(user))
-//            } else if let error = error {
-//                completion(.failure(error))
-//            }
-//        }
+    func signUp(email: String, password: String) async throws {
+        try await Auth.auth().createUser(withEmail: email, password: password)
     }
     
     func signOut() throws {
         try Auth.auth().signOut()
+    }
+    
+    func resetPassword(email: String) async throws {
+        try await Auth.auth().sendPasswordReset(withEmail: email)
+    }
+    
+    func deleteAccount() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw NSError(domain: "AuthenticationError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No user is currently signed in."])
+        }
+        try await user.delete()
+    }
+    
+    func getCurrentUser() -> User? {
+        return Auth.auth().currentUser
     }
 }
 

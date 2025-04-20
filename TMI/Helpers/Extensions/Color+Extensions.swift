@@ -29,11 +29,13 @@ TMIText:
   Dark:  #F9E9AB (RGB: 249, 233, 171)
 */
 
+
 extension Color {
-    static let tmiPrimary = Color(light: #colorLiteral(red: 0.0653751418, green: 0.004413233139, blue: 0.238399297, alpha: 1), dark: #colorLiteral(red: 0.3312325776, green: 0.3195435107, blue: 0.9338886142, alpha: 1))
-    static let tmiSecondary = Color(light: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1), dark: #colorLiteral(red: 0.1764705926, green: 0.4980392158, blue: 0.7568627596, alpha: 1))
-    static let tmiBackground = Color(light: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1), dark: #colorLiteral(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006, alpha: 1))
-    static let tmiText = Color(light: #colorLiteral(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006, alpha: 1), dark: #colorLiteral(red: 0.9764705896, green: 0.850980401, blue: 0.5490196347, alpha: 1))
+    static let tmiPrimary = Color(light: #colorLiteral(red: 0.0653751418, green: 0.004413233139, blue: 0.238399297, alpha: 1), dark: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1))
+    static let tmiPrimaryDark = Color(light: #colorLiteral(red: 0.01977282949, green: 0.001201396808, blue: 0.0739999935, alpha: 1), dark: #colorLiteral(red: 0.5325596929, green: 0.5392637253, blue: 0.5391458273, alpha: 1))
+    static let tmiSecondary = Color(light: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1), dark: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1))
+    static let tmiBackground = Color(light: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1), dark: #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1))
+    static let tmiText = Color(light: #colorLiteral(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006, alpha: 1), dark: #colorLiteral(red: 0.8498495817, green: 0.9484829307, blue: 0.9581733346, alpha: 1))
     static let backgroundTop = Color(red: 0.0, green: 0.47, blue: 0.75)
     static let backgroundBottom = Color(red: 0.0, green: 0.35, blue: 0.65)
     static let cardBackground = Color.black.opacity(0.5)
@@ -41,10 +43,10 @@ extension Color {
 
 #if DEBUG
 extension Color {
-    static let debugTMIPrimary = Color(light: #colorLiteral(red: 0.2196078449, green: 0.007843137719, blue: 0.8549019694, alpha: 1), dark: #colorLiteral(red: 0.3647058904, green: 0.06666667014, blue: 0.9686274529, alpha: 1))
-    static let debugTMISecondary = Color(light: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1), dark: #colorLiteral(red: 0.1764705926, green: 0.4980392158, blue: 0.7568627596, alpha: 1))
-    static let debugTMIBackground = Color(light: #colorLiteral(red: 0.9764705896, green: 0.850980401, blue: 0.5490196347, alpha: 1), dark: #colorLiteral(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006, alpha: 1))
-    static let debugTMIText = Color(light: #colorLiteral(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006, alpha: 1), dark: #colorLiteral(red: 0.9764705896, green: 0.850980401, blue: 0.5490196347, alpha: 1))
+    static let debugTMIPrimary = Color(light: #colorLiteral(red: 0.0653751418, green: 0.004413233139, blue: 0.238399297, alpha: 1), dark: #colorLiteral(red: 0.7058569789, green: 0.6915217638, blue: 0.8136684895, alpha: 1))
+    static let debugTMISecondary = Color(light: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1), dark: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1))
+    static let debugTMIBackground = Color(light: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1), dark: #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1))
+    static let debugTMIText = Color(light: #colorLiteral(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006, alpha: 1), dark: #colorLiteral(red: 0.8498495817, green: 0.9484829307, blue: 0.9581733346, alpha: 1))
 }
  
 extension Color {
@@ -88,6 +90,57 @@ struct ColorRow: View {
         }
     }
 }
+
+extension Color {
+
+    // MARK: - Surface Colors
+    
+    /// Primary surface color - background for cards and elevated surfaces
+    static var tmiSurface: Color {
+        return Color("TMISurface", bundle: .main)
+    }
+
+    /// Secondary text color
+    static var tmiTextSecondary: Color {
+        return Color("TMITextSecondary", bundle: .main)
+    }
+    
+    // MARK: - Semantic Colors
+    
+    /// Success color
+    static var tmiSuccess: Color {
+        return Color("TMISuccess", bundle: .main)
+    }
+    
+    /// Warning color
+    static var tmiWarning: Color {
+        return Color("TMIWarning", bundle: .main)
+    }
+    
+    /// Error color
+    static var tmiError: Color {
+        return Color("TMIError", bundle: .main)
+    }
+    
+    /// Info color
+    static var tmiInfo: Color {
+        return Color("TMIInfo", bundle: .main)
+    }
+}
+
+extension ShapeStyle where Self == Color {
+    static var tmiPrimary: Color { .tmiPrimary }
+    static var tmiSecondary: Color { .tmiSecondary }
+    static var tmiSurface: Color { .tmiSurface }
+    static var tmiBackground: Color { .tmiBackground }
+    static var tmiText: Color { .tmiText }
+    static var tmiTextSecondary: Color { .tmiTextSecondary }
+    static var tmiSuccess: Color { .tmiSuccess }
+    static var tmiWarning: Color { .tmiWarning }
+    static var tmiError: Color { .tmiError }
+    static var tmiInfo: Color { .tmiInfo }
+}
+
 
 #Preview {
     Group {

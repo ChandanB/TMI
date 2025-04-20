@@ -8,9 +8,9 @@ enum TMIPlanModel: String, CaseIterable, Codable {
     case chaseYourSpace = "Chase Your Space"
     case acknowledgeInterests = "Acknowledge Your Interests and Hobbies"
     case alignYourMind = "Align Your Mind"
-    case directAndCorrect = "Direct & Correct Your Negative Thoughts & Behavior"
+    case directAndCorrect = "Direct & Correct Negative Behavior"
     case bullyToBoss = "From Bully to Boss"
-    case meekToProtector = "From Meek & Passive to Promising Protector"
+    case meekToProtector = "From Meek to Promising Protector"
     
     var description: String {
         switch self {
@@ -39,10 +39,11 @@ struct TMIPlan: Codable, Identifiable, Hashable {
     var hobbies: [Hobby]
     var creationDate: Date
     var lastUpdated: Date
+    let goals: [Goal]
     var progress: Double
     var notes: String
     
-    init(id: String? = nil, student: Student, students: [Student], model: TMIPlanModel, interests: [Interest], hobbies: [Hobby], creationDate: Date, lastUpdated: Date, progress: Double, notes: String) {
+    init(id: String? = nil, student: Student, students: [Student], model: TMIPlanModel, interests: [Interest], hobbies: [Hobby], creationDate: Date, lastUpdated: Date, goals: [Goal], progress: Double, notes: String) {
         self.id = id
         self.student = student
         self.students = students
@@ -51,6 +52,7 @@ struct TMIPlan: Codable, Identifiable, Hashable {
         self.hobbies = hobbies
         self.creationDate = creationDate
         self.lastUpdated = lastUpdated
+        self.goals = goals
         self.progress = progress
         self.notes = notes
     }
@@ -75,6 +77,7 @@ extension TMIPlan {
             hobbies: student.hobbies,
             creationDate: Date(),
             lastUpdated: Date(),
+            goals: [],
             progress: 0.50,
             notes: "Student is actively engaged in science club and coding workshops."
         )
@@ -92,6 +95,7 @@ extension TMIPlan {
             hobbies: student.hobbies,
             creationDate: Date(),
             lastUpdated: Date(),
+            goals: [],
             progress: 0.75,
             notes: "Student is actively engaged in science club and coding workshops.")
         
@@ -103,9 +107,40 @@ extension TMIPlan {
             hobbies: student.hobbies,
             creationDate: Date(),
             lastUpdated: Date(),
+            goals: [],
             progress: 0.15,
             notes: "Student is actively engaged in science club and coding workshops.")
         
         return [plan1, plan2, plan3]
+    }
+}
+
+enum GoalStatus: String, Codable, CaseIterable {
+    case notStarted = "Not Started"
+    case inProgress = "In Progress"
+    case completed = "Completed"
+}
+
+struct Goal: Identifiable, Codable {
+    let id: UUID
+    var description: String
+    var dueDate: Date?
+    var status: GoalStatus
+    var progress: Double // Range from 0.0 to 1.0
+    var notes: String?
+    
+    // Initializer
+    init(id: UUID = UUID(),
+         description: String,
+         dueDate: Date? = nil,
+         status: GoalStatus = .notStarted,
+         progress: Double = 0.0,
+         notes: String? = nil) {
+        self.id = id
+        self.description = description
+        self.dueDate = dueDate
+        self.status = status
+        self.progress = progress
+        self.notes = notes
     }
 }

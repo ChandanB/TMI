@@ -32,10 +32,10 @@ struct TMIPlanDetailView: View {
                 Text(plan.model.rawValue)
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
                 Text("Created on \(formattedDate(plan.creationDate))")
                     .font(.subheadline)
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(Color.tmiSecondary)
             }
             Spacer()
             Menu {
@@ -44,7 +44,7 @@ struct TMIPlanDetailView: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.title)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
             }
         }
     }
@@ -56,7 +56,7 @@ struct TMIPlanDetailView: View {
             Text("Progress Overview")
                 .font(.title2)
                 .fontWeight(.bold)
-                .foregroundColor(.tmiText)
+                .foregroundColor(Color.tmiText)
 
             Chart {
                 ForEach(progressData) { dataPoint in
@@ -88,7 +88,7 @@ struct TMIPlanDetailView: View {
             Text("Key Insights")
                 .font(.title2)
                 .fontWeight(.bold)
-                .foregroundColor(.tmiText)
+                .foregroundColor(Color.tmiText)
 
             VStack(alignment: .leading, spacing: 8) {
                 InsightRow(title: "Current Progress", value: "\(Int(plan.progress * 100))%")
@@ -108,7 +108,7 @@ struct TMIPlanDetailView: View {
             Text("Associated Students")
                 .font(.title2)
                 .fontWeight(.bold)
-                .foregroundColor(.tmiText)
+                .foregroundColor(Color.tmiText)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 15) {
@@ -128,17 +128,17 @@ struct TMIPlanDetailView: View {
             Text("Interests & Hobbies")
                 .font(.title2)
                 .fontWeight(.bold)
-                .foregroundColor(.tmiText)
+                .foregroundColor(Color.tmiText)
 
             if plan.interests.isEmpty && plan.hobbies.isEmpty {
                 Text("No interests or hobbies specified.")
                     .font(.body)
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(Color.tmiSecondary)
             } else {
                 if !plan.interests.isEmpty {
                     Text("Interests")
                         .font(.headline)
-                        .foregroundColor(.tmiText)
+                        .foregroundColor(Color.tmiText)
                     WrapView(items: plan.interests.map { $0.name }) { item in
                         TagView(title: item)
                     }
@@ -147,7 +147,7 @@ struct TMIPlanDetailView: View {
                 if !plan.hobbies.isEmpty {
                     Text("Hobbies")
                         .font(.headline)
-                        .foregroundColor(.tmiText)
+                        .foregroundColor(Color.tmiText)
                     WrapView(items: plan.hobbies.map { $0.name }) { item in
                         TagView(title: item)
                     }
@@ -163,16 +163,16 @@ struct TMIPlanDetailView: View {
             Text("Notes")
                 .font(.title2)
                 .fontWeight(.bold)
-                .foregroundColor(.tmiText)
+                .foregroundColor(Color.tmiText)
 
             if plan.notes.isEmpty {
                 Text("No notes added.")
                     .font(.body)
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(Color.tmiSecondary)
             } else {
                 Text(plan.notes)
                     .font(.body)
-                    .foregroundColor(.tmiText)
+                    .foregroundColor(Color.tmiText)
             }
         }
     }
@@ -214,11 +214,11 @@ struct InsightRow: View {
         HStack {
             Text(title)
                 .font(.headline)
-                .foregroundColor(.tmiText)
+                .foregroundColor(Color.tmiText)
             Spacer()
             Text(value)
                 .font(.subheadline)
-                .foregroundColor(.tmiSecondary)
+                .foregroundColor(Color.tmiSecondary)
         }
     }
 }

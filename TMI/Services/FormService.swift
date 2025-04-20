@@ -39,7 +39,7 @@ extension FirebaseManager {
     }
     
     func addFormTemplateToUserCollection(formTemplateId: String, userId: String) async throws {
-        var user: User = try await FIREBASE_MANAGER.fetchDocument(inCollection: .users, withId: userId)
+        var user: TMIUser = try await FIREBASE_MANAGER.fetchDocument(inCollection: .users, withId: userId)
         var formTemplates = user.formTemplates
         if !formTemplates.contains(formTemplateId) {
             formTemplates.append(formTemplateId)

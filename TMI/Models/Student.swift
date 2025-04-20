@@ -13,6 +13,7 @@ struct Student: Codable, Identifiable, Hashable {
     let studentID: String?
     var interests: [Interest]
     var hobbies: [Hobby]
+    let photoURL: URL?
     
     var initials: String {
         let components = name.components(separatedBy: " ")
@@ -26,7 +27,7 @@ struct Student: Codable, Identifiable, Hashable {
         Double.random(in: 0...1)
     }
     
-    init(id: String? = nil, name: String, grade: String, dateOfBirth: Date, tmiPlans: [TMIPlan]? = nil, studentID: String? = nil, interests: [Interest], hobbies: [Hobby]) {
+    init(id: String? = nil, name: String, grade: String, dateOfBirth: Date, tmiPlans: [TMIPlan]? = nil, studentID: String? = nil, interests: [Interest], hobbies: [Hobby], photoURL: URL? = nil) {
         self.id = id
         self.name = name
         self.grade = grade
@@ -35,6 +36,7 @@ struct Student: Codable, Identifiable, Hashable {
         self.studentID = studentID
         self.interests = interests
         self.hobbies = hobbies
+        self.photoURL = photoURL
     }
     
     static func == (lhs: Student, rhs: Student) -> Bool {

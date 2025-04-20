@@ -32,11 +32,11 @@ extension RecentActivity {
     
     static var sampleRecentActivities: [RecentActivity] {
         return [
-            RecentActivity(icon: "doc.fill", title: "New TMI Plan Created", description: "For student John Doe", date: Date()),
-            RecentActivity(icon: "list.clipboard.fill", title: "Interest Survey Completed", description: "By student Jane Smith", date: Date().addingTimeInterval(-3600)),
-            RecentActivity(icon: "person.fill.checkmark", title: "Student Goal Achieved", description: "Alex Johnson completed Python course", date: Date().addingTimeInterval(-7200)),
-            RecentActivity(icon: "doc.fill", title: "New TMI Plan Created", description: "For student Jane Doo", date: Date().addingTimeInterval(-8600)),
-            RecentActivity(icon: "doc.fill", title: "New TMI Plan Created", description: "For student Jake Dee", date: Date().addingTimeInterval(-10600))
+            RecentActivity(id: UUID().uuidString, icon: "doc.fill", title: "New TMI Plan Created", description: "For student John Doe", date: Date()),
+            RecentActivity(id: UUID().uuidString, icon: "list.clipboard.fill", title: "Interest Survey Completed", description: "By student Jane Smith", date: Date().addingTimeInterval(-3600)),
+            RecentActivity(id: UUID().uuidString, icon: "person.fill.checkmark", title: "Student Goal Achieved", description: "Alex Johnson completed Python course", date: Date().addingTimeInterval(-7200)),
+            RecentActivity(id: UUID().uuidString, icon: "doc.fill", title: "New TMI Plan Created", description: "For student Jane Doo", date: Date().addingTimeInterval(-8600)),
+            RecentActivity(id: UUID().uuidString, icon: "doc.fill", title: "New TMI Plan Created", description: "For student Jake Dee", date: Date().addingTimeInterval(-10600))
         ]
     }
 }

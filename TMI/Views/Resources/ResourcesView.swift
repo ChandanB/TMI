@@ -41,7 +41,7 @@ struct ResourcesView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingAddResource = true }) {
                         Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.tmiPrimary)
+                            .foregroundColor(Color.tmiPrimary)
                     }
                 }
             }
@@ -107,7 +107,7 @@ struct ResourceCard: View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: iconForCategory(resource.category))
                 .font(.largeTitle)
-                .foregroundColor(.tmiPrimary)
+                .foregroundColor(Color.tmiPrimary)
             
             Text(resource.title)
                 .font(.headline)
@@ -130,7 +130,7 @@ struct ResourceCard: View {
                 Spacer()
                 
                 Image(systemName: "arrow.right.circle.fill")
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(Color.tmiPrimary)
             }
         }
         .padding()

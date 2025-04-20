@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 import SDWebImageSwiftUI
-import AVKit
+import UniformTypeIdentifiers
 
 struct BottomSheet<SheetContent: View>: ViewModifier {
     let sheetHeight: CGFloat
@@ -103,15 +103,6 @@ struct CustomFontModifier: ViewModifier {
     
     func body(content: Content) -> some View {
         content.font(Font.custom(fontName, size: size))
-    }
-}
-
-struct VideoPlayerView: View {
-    var videoURL: URL
-    
-    var body: some View {
-        VideoPlayer(player: AVPlayer(url: videoURL))
-            .edgesIgnoringSafeArea(.all)
     }
 }
 

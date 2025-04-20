@@ -60,11 +60,11 @@ extension FirebaseManager {
         if let fieldName = fieldName, let fieldValue = fieldValue {
             query = query.whereField(fieldName, isEqualTo: fieldValue)
         }
-//        
-//        if let currentDocumentId = FirestoreConstants.currentUser?.uid, !includeCurrentDocument {
-//            query = query.whereField("uid", isNotEqualTo: currentDocumentId)
-//        }
-//        
+        
+        if let currentDocumentId = FirestoreConstants.currentUser?.uid, !includeCurrentDocument {
+            query = query.whereField("uid", isNotEqualTo: currentDocumentId)
+        }
+        
         if let excludeDocumentIds = excludeDocumentIds, !excludeDocumentIds.isEmpty {
             query = query.whereField("uid", notIn: excludeDocumentIds)
         }
