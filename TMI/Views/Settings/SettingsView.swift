@@ -7,24 +7,34 @@
 
 import Foundation
 import SwiftUI
+import FirebaseAuth
 
 struct SettingsView: View {
-    @AppStorage("userName") private var userName: String = ""
-    @AppStorage("userRole") private var userRole: String = "Teacher"
     @AppStorage("darkModeEnabled") private var darkModeEnabled = false
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     
     @State private var showingLogoutAlert = false
+    @State private var isLoggedOut = false
     
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("User Profile")) {
-                    TextField("Name", text: $userName)
-                    Picker("Role", selection: $userRole) {
-                        Text("Teacher").tag("Teacher")
-                        Text("Administrator").tag("Administrator")
-                        Text("Support Staff").tag("Support Staff")
+                Section(header: Text("Account")) {
+                    NavigationLink(destination: UserProfileView()) {
+                        HStack {
+                            Image(systemName: "person.circle")
+                                .foregroundColor(Color.tmiPrimary)
+                            Text("User Profile")
+                        }
+                    }
+                    
+                    if let user = Auth.auth().currentUser {
+                        HStack {
+                            Text("Email")
+                            Spacer()
+                            Text(user.email ?? "Not available")
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
                 
@@ -59,11 +69,23 @@ struct SettingsView: View {
             .alert("Log Out", isPresented: $showingLogoutAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Log Out", role: .destructive) {
-                    // TODO: Implement logout functionality
+                    logOut()
                 }
             } message: {
                 Text("Are you sure you want to log out?")
             }
+            .fullScreenCover(isPresented: $isLoggedOut) {
+                AuthenticationView()
+            }
+        }
+    }
+    
+    private func logOut() {
+        do {
+            try FIREBASE_MANAGER.signOut()
+            isLoggedOut = true
+        } catch {
+            print("Error signing out: \(error.localizedDescription)")
         }
     }
 }

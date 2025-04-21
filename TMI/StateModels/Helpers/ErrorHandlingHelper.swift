@@ -8,6 +8,7 @@
 
 import Firebase
 import Foundation
+import FirebaseAuth
 
 // MARK: - Error Categories
 
@@ -101,6 +102,322 @@ struct IdentifiableError: Identifiable, Equatable, Error {
     
     static func == (lhs: IdentifiableError, rhs: IdentifiableError) -> Bool {
         return lhs.id == rhs.id && lhs.message == rhs.message
+    }
+}
+
+// MARK: - Error Handling Helper
+
+/// A utility for consistent error handling across state models
+struct ErrorHandlingHelper {
+    
+    // MARK: - Default Recovery Options
+    
+    /// Provides default recovery options based on error category
+    /// - Parameter category: The error category
+    /// - Returns: Array of recovery option strings
+    static func defaultRecoveryOptions(for category: ErrorCategory) -> [String] {
+        switch category {
+        case .authentication:
+            return ["Try Again", "Sign Out"]
+        case .network:
+            return ["Retry", "Check Connection"]
+        case .userProfile:
+            return ["Retry", "Edit Profile"]
+        case .dataFetch, .validation, .permission, .unknown:
+            return ["Try Again", "Cancel"]
+        }
+    }
+    
+    // MARK: - Error Categorization
+    
+    /// Determines the appropriate error category based on the error type
+    /// - Parameter error: The error to categorize
+    /// - Returns: The determined error category
+    static func categoryFor(_ error: Error) -> ErrorCategory {
+        if let firebaseError = error as? FirebaseError {
+            return categoryForFirebaseError(firebaseError)
+        } else {
+            let nsError = error as NSError
+            
+            if nsError.domain == AuthErrorDomain {
+                return .authentication
+            } else if nsError.domain == NSURLErrorDomain {
+                return .network
+            }
+        }
+        
+        return .unknown
+    }
+    
+    /// Determines the category for a Firebase-specific error
+    /// - Parameter error: The Firebase error
+    /// - Returns: The appropriate error category
+    private static func categoryForFirebaseError(_ error: FirebaseError) -> ErrorCategory {
+        switch error {
+        case .signInFailed, .signUpFailed, .signOutFailed, .userNotAuthenticated, .authError:
+            return .authentication
+        case .dataFetchFailed, .userFetchFailed, .documentNotFound, .missingData:
+            return .dataFetch
+        case .userProfileUpdateFailed, .accountCreationFailed:
+            return .userProfile
+        case .validationFailed:
+            return .validation
+        case .insufficientPermission:
+            return .permission
+        case .networkError:
+            return .network
+        default:
+            return .unknown
+        }
+    }
+    
+    // MARK: - General Error Handling
+    
+    /// Main error handling method that converts any error to IdentifiableError
+    /// - Parameters:
+    ///   - error: The error to handle
+    ///   - userFriendlyMessage: Optional user-friendly message
+    ///   - category: Optional error category (determined automatically if nil)
+    ///   - recoveryOptions: Optional recovery options (defaults provided if nil)
+    /// - Returns: An IdentifiableError
+    static func handleError(
+        _ error: Error,
+        userFriendlyMessage: String? = nil,
+        category: ErrorCategory? = nil,
+        recoveryOptions: [String]? = nil
+    ) -> IdentifiableError {
+        let errorCategory = category ?? categoryFor(error)
+        let defaultOptions = recoveryOptions ?? defaultRecoveryOptions(for: errorCategory)
+        
+        // Log error for debugging
+        print("📛 Error [\(errorCategory.rawValue)]: \(error.localizedDescription)")
+        
+        // Create identifiable error
+        return IdentifiableError(
+            error: error,
+            message: error.localizedDescription,
+            category: errorCategory,
+            userFriendlyMessage: userFriendlyMessage,
+            recoveryOptions: defaultOptions
+        )
+    }
+    
+    // MARK: - Specialized Error Handling
+    
+    /// Handle repository errors (database, storage, etc.)
+    /// - Parameters:
+    ///   - error: The repository error
+    ///   - userFriendlyMessage: Optional user-friendly message
+    ///   - recoveryOptions: Optional recovery options
+    /// - Returns: An IdentifiableError
+    static func handleRepositoryError(
+        _ error: Error,
+        userFriendlyMessage: String? = nil,
+        recoveryOptions: [String]? = nil
+    ) -> IdentifiableError {
+        if let firebaseError = error as? FirebaseError {
+            return handleFirebaseError(
+                firebaseError,
+                userFriendlyMessage: userFriendlyMessage,
+                recoveryOptions: recoveryOptions
+            )
+        } else {
+            return handleError(
+                error,
+                userFriendlyMessage: userFriendlyMessage,
+                recoveryOptions: recoveryOptions
+            )
+        }
+    }
+    
+    /// Handle Firebase-specific errors
+    /// - Parameters:
+    ///   - error: The Firebase error
+    ///   - userFriendlyMessage: Optional user-friendly message
+    ///   - recoveryOptions: Optional recovery options
+    /// - Returns: An IdentifiableError
+    private static func handleFirebaseError(
+        _ firebaseError: FirebaseError,
+        userFriendlyMessage: String? = nil,
+        recoveryOptions: [String]? = nil
+    ) -> IdentifiableError {
+        // Get a descriptive message from the FirebaseError
+        let errorMessage: String
+        let category = categoryFor(firebaseError)
+        
+        switch firebaseError {
+        case .errorDescription(let description):
+            errorMessage = description
+        case .validationFailed(let field, let reason):
+            errorMessage = "Invalid \(field): \(reason)"
+        default:
+            // Extract error message based on the case
+            errorMessage = String(describing: firebaseError)
+        }
+        
+        return IdentifiableError(
+            error: firebaseError,
+            message: errorMessage,
+            category: category,
+            userFriendlyMessage: userFriendlyMessage,
+            recoveryOptions: recoveryOptions ?? defaultRecoveryOptions(for: category)
+        )
+    }
+    
+    /// Handle authentication errors specifically
+    /// - Parameters:
+    ///   - error: The authentication error
+    ///   - userFriendlyMessage: Optional user-friendly message
+    /// - Returns: An IdentifiableError
+    static func handleAuthError(
+        _ error: Error,
+        userFriendlyMessage: String? = nil
+    ) -> IdentifiableError {
+        let nsError = error as NSError
+        let category: ErrorCategory = .authentication
+        
+        if nsError.domain == AuthErrorDomain {
+            let message = getAuthErrorMessage(code: nsError.code)
+            
+            return IdentifiableError(
+                error: error,
+                message: message,
+                category: category,
+                userFriendlyMessage: userFriendlyMessage ?? message,
+                recoveryOptions: ["Try Again", "Reset Password", "Cancel"]
+            )
+        } else {
+            return handleError(
+                error,
+                userFriendlyMessage: userFriendlyMessage,
+                category: category
+            )
+        }
+    }
+    
+    /// Gets a user-friendly message for an authentication error code
+    /// - Parameter code: The authentication error code
+    /// - Returns: A user-friendly error message
+    private static func getAuthErrorMessage(code: Int) -> String {
+        switch code {
+        case AuthErrorCode.emailAlreadyInUse.rawValue:
+            return "This email address is already in use."
+        case AuthErrorCode.invalidEmail.rawValue:
+            return "Please enter a valid email address."
+        case AuthErrorCode.weakPassword.rawValue:
+            return "Password must be at least 8 characters long."
+        case AuthErrorCode.wrongPassword.rawValue:
+            return "Incorrect password. Please try again."
+        case AuthErrorCode.userNotFound.rawValue:
+            return "No account found with this email address."
+        case AuthErrorCode.userDisabled.rawValue:
+            return "This account has been disabled. Please contact support."
+        case AuthErrorCode.networkError.rawValue:
+            return "Network error. Please check your connection and try again."
+        case AuthErrorCode.tooManyRequests.rawValue:
+            return "Too many attempts. Please try again later."
+        default:
+            return "An authentication error occurred. Please try again."
+        }
+    }
+    
+    /// Handle network-related errors
+    /// - Parameters:
+    ///   - error: The network error
+    ///   - userFriendlyMessage: Optional user-friendly message
+    /// - Returns: An IdentifiableError
+    static func handleNetworkError(
+        _ error: Error,
+        userFriendlyMessage: String? = nil
+    ) -> IdentifiableError {
+        let category: ErrorCategory = .network
+        let defaultMessage = "Network connection issue. Please check your internet connection and try again."
+        
+        let nsError = error as NSError
+        let message = getNetworkErrorMessage(nsError) ?? defaultMessage
+        
+        return IdentifiableError(
+            error: error,
+            message: message,
+            category: category,
+            userFriendlyMessage: userFriendlyMessage ?? message,
+            recoveryOptions: ["Retry", "Check Connection", "Cancel"]
+        )
+    }
+    
+    /// Gets a user-friendly message for a network error
+    /// - Parameter error: The network error as NSError
+    /// - Returns: A user-friendly error message, or nil if not a recognized network error
+    private static func getNetworkErrorMessage(_ error: NSError) -> String? {
+        guard error.domain == NSURLErrorDomain else { return nil }
+        
+        switch error.code {
+        case NSURLErrorNotConnectedToInternet:
+            return "You appear to be offline. Please check your internet connection."
+        case NSURLErrorTimedOut:
+            return "The request timed out. Please try again."
+        case NSURLErrorNetworkConnectionLost:
+            return "The network connection was lost. Please try again."
+        default:
+            return nil
+        }
+    }
+    
+    // MARK: - Custom Error Creation
+    
+    /// Create a general error with a custom message
+    /// - Parameters:
+    ///   - message: The error message
+    ///   - category: The error category
+    ///   - recoveryOptions: Optional recovery options
+    /// - Returns: An IdentifiableError
+    static func createError(
+        message: String,
+        category: ErrorCategory = .unknown,
+        recoveryOptions: [String]? = nil
+    ) -> IdentifiableError {
+        return IdentifiableError(
+            message: message,
+            category: category,
+            recoveryOptions: recoveryOptions ?? defaultRecoveryOptions(for: category)
+        )
+    }
+    
+    /// Handle registration-specific errors
+    /// - Parameters:
+    ///   - error: The registration error
+    ///   - userFriendlyMessage: Optional user-friendly message
+    /// - Returns: An IdentifiableError
+    static func handleRegistrationError(
+        _ error: Error,
+        userFriendlyMessage: String? = nil
+    ) -> IdentifiableError {
+        if let regError = error as? RegistrationError {
+            return IdentifiableError(
+                error: error,
+                message: regError.errorMessage,
+                category: .authentication,
+                userFriendlyMessage: userFriendlyMessage ?? regError.errorMessage,
+                recoveryOptions: ["Try Again", "Sign In Instead", "Cancel"]
+            )
+        } else {
+            return handleAuthError(error, userFriendlyMessage: userFriendlyMessage)
+        }
+    }
+    
+    // MARK: - Logging
+    
+    /// Log error details to analytics or logging service
+    /// - Parameter error: The error to log
+    static func logError(_ error: IdentifiableError) {
+        // In a real app, you would send this to your analytics service
+        print("🔍 Error details:")
+        print("  ID: \(error.id)")
+        print("  Category: \(error.category.rawValue)")
+        print("  Message: \(error.message)")
+        print("  Time: \(error.timestamp)")
+        
+        // Here you would add code to send to Firebase Analytics or similar service
     }
 }
 

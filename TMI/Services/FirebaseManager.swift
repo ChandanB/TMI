@@ -43,11 +43,25 @@ extension FirebaseManager {
         }
     }
     
-//    func signUp(withEmail email: String, password: String, name: String) async throws -> Student {
-//        let authResult = try await auth.createUser(withEmail: email, password: password)
-//        let student = Student(id: authResult.user.uid, name: name, email: email, grade: "", dateOfBirth: [], tmiPlans: [], studentID: [])
-//        return student
-//    }
+    func signUp(withEmail email: String, password: String) async throws -> String {
+        do {
+            let authResult = try await auth.createUser(withEmail: email, password: password)
+            let uid = authResult.user.uid
+            
+            // Create a user profile document in Firestore
+            let userData: [String: Any] = [
+                "uid": uid,
+                "email": email,
+                "createdAt": FieldValue.serverTimestamp(),
+                "role": "student" // Default role
+            ]
+            
+            try await firestore.collection("users").document(uid).setData(userData)
+            return uid
+        } catch {
+            throw FirebaseManagerError.accountCreationFailed(error.localizedDescription)
+        }
+    }
     
     func signOut() async throws -> Bool {
         do {
@@ -56,6 +70,28 @@ extension FirebaseManager {
         } catch {
             throw FirebaseManagerError.signOutFailed
         }
+    }
+    
+    func getCurrentUserProfile() async throws -> [String: Any]? {
+        guard let currentUser = auth.currentUser else {
+            throw FirebaseManagerError.userNotLoggedIn
+        }
+        
+        let documentSnapshot = try await firestore.collection("users").document(currentUser.uid).getDocument()
+        
+        if documentSnapshot.exists {
+            return documentSnapshot.data()
+        } else {
+            return nil
+        }
+    }
+    
+    func updateUserProfile(data: [String: Any]) async throws {
+        guard let currentUser = auth.currentUser else {
+            throw FirebaseManagerError.userNotLoggedIn
+        }
+        
+        try await firestore.collection("users").document(currentUser.uid).updateData(data)
     }
 }
 

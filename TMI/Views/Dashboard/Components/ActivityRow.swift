@@ -69,7 +69,7 @@ struct ActivityRow: View {
 }
 
 #Preview {
-    ActivityRow(activity: RecentActivity.sampleRecentActivity)
+    ActivityRow(activity: RecentActivity.sampleActivity)
         .padding()
         .background(Color.gray.opacity(0.1))
 }

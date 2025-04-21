@@ -14,7 +14,8 @@ extension FirebaseManager {
     }
     
     func signUp(email: String, password: String) async throws {
-        try await Auth.auth().createUser(withEmail: email, password: password)
+        let uid = try await signUp(withEmail: email, password: password)
+        print("User created with ID: \(uid)")
     }
     
     func signOut() throws {
@@ -29,11 +30,45 @@ extension FirebaseManager {
         guard let user = Auth.auth().currentUser else {
             throw NSError(domain: "AuthenticationError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No user is currently signed in."])
         }
+        
+        // First delete user data from Firestore
+        try await firestore.collection("users").document(user.uid).delete()
+        
+        // Then delete the auth account
         try await user.delete()
     }
     
     func getCurrentUser() -> User? {
         return Auth.auth().currentUser
+    }
+    
+    func verifyEmail() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw NSError(domain: "AuthenticationError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No user is currently signed in."])
+        }
+        try await user.sendEmailVerification()
+    }
+    
+    func updateEmail(to newEmail: String) async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw NSError(domain: "AuthenticationError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No user is currently signed in."])
+        }
+        
+        try await user.updateEmail(to: newEmail)
+        
+        // Update email in Firestore as well
+        try await firestore.collection("users").document(user.uid).updateData([
+            "email": newEmail
+        ])
+    }
+    
+    func reauthenticate(with password: String) async throws {
+        guard let user = Auth.auth().currentUser, let email = user.email else {
+            throw NSError(domain: "AuthenticationError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No user email available."])
+        }
+        
+        let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+        try await user.reauthenticate(with: credential)
     }
 }
 

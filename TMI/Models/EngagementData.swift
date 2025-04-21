@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct EngagementData: Identifiable {
+struct EngagementData: Identifiable, Equatable {
     let id = UUID()
     let day: String
     let week: String

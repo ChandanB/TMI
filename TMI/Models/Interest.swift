@@ -397,7 +397,11 @@ enum Skill: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - InterestCategory Extension
 
-enum InterestCategory: String, CaseIterable, Identifiable, Codable {
+enum InterestCategory: String, CaseIterable, Identifiable, Codable, Comparable, Equatable {
+    static func < (lhs: InterestCategory, rhs: InterestCategory) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+    
     case academics = "Academics"
     case arts = "Arts & Creativity"
     case sports = "Sports & Athletics"

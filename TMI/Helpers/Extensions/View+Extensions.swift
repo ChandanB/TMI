@@ -97,3 +97,41 @@ extension String {
         return size.width
     }
 }
+
+extension View {
+    /// Creates a binding for any property on an object
+    /// - Parameters:
+    ///   - object: Observable object
+    ///   - keyPath: Path to the property
+    /// - Returns: A binding to the property
+    func binding<Object, T>(_ object: Object, _ keyPath: ReferenceWritableKeyPath<Object, T>) -> Binding<T> {
+        Binding(
+            get: { object[keyPath: keyPath] },
+            set: { object[keyPath: keyPath] = $0 }
+        )
+    }
+    
+    /// Creates a binding for an optional Identifiable item (useful for .sheet(item:) modifiers)
+    /// - Parameters:
+    ///   - object: Observable object
+    ///   - keyPath: Path to the optional Identifiable property
+    /// - Returns: A binding to the optional Identifiable property
+    func itemBinding<Object, Item: Identifiable>(_ object: Object, _ keyPath: ReferenceWritableKeyPath<Object, Item?>) -> Binding<Item?> {
+        Binding(
+            get: { object[keyPath: keyPath] },
+            set: { object[keyPath: keyPath] = $0 }
+        )
+    }
+    
+    /// Creates a computed binding from getter and setter functions
+    /// - Parameters:
+    ///   - get: Function to get the value
+    ///   - set: Function to set the value
+    /// - Returns: A binding using the provided getter and setter
+    func computedBinding<T>(
+        get: @escaping () -> T,
+        set: @escaping (T) -> Void
+    ) -> Binding<T> {
+        Binding(get: get, set: set)
+    }
+}

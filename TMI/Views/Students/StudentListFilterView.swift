@@ -3,20 +3,20 @@
 import SwiftUI
 
 struct StudentListFilterView: View {
-    @Binding var selectedOption: StudentListView.FilterOption
+    @Binding var selectedOption: FilterOption
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
         NavigationStack {
             List {
-                ForEach(StudentListView.FilterOption.allCases, id: \.self) { option in
+                ForEach(FilterOption.allCases, id: \.self) { option in
                     HStack {
                         Text(option.rawValue)
                             .foregroundColor(.primary)
                         Spacer()
                         if option == selectedOption {
                             Image(systemName: "checkmark")
-                                .foregroundColor(Color.tmiPrimary)
+                                .foregroundColor(.tmiPrimary)
                         }
                     }
                     .contentShape(Rectangle())

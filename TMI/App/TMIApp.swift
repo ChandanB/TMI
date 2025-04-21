@@ -22,24 +22,24 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct TMIApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    @State private var authViewModel = AuthenticationViewModel()
     
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(authViewModel)
+                .environment(\.authStateModel, AuthStateModel())
+                .environment(\.dashboardStateModel, DashboardStateModel())
                 .preferredColorScheme(.light)
         }
     }
 }
 
 struct ContentView: View {
-    @EnvironmentObject var authViewModel: AuthenticationViewModel
+    @Environment(\.authStateModel) var authStateModel
     @State private var isShowingAuthentication = false
     
     var body: some View {
         Group {
-            if authViewModel.isLoggedIn {
+            if authStateModel.isLoggedIn {
                 MainTabView()
             } else {
                 AuthenticationView()
@@ -47,7 +47,7 @@ struct ContentView: View {
         }
         .onAppear {
             // Check authentication status when the app appears
-            if !authViewModel.isLoggedIn {
+            if !authStateModel.isLoggedIn {
                 isShowingAuthentication = true
             }
         }

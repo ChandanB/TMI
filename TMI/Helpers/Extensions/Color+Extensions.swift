@@ -11,25 +11,6 @@ import SwiftUI
 // MARK: - Color Definitions
 // Note: These are programmatic definitions. In a real app, you'd define these in the asset catalog.
 
-/*
-TMIPrimary:
-  Light: #3857DF (RGB: 56, 87, 223)
-  Dark:  #5D7CE0 (RGB: 93, 124, 224)
-
-TMISecondary:
-  Light: #3DA5D9 (RGB: 61, 165, 217)
-  Dark:  #2D7FB0 (RGB: 45, 127, 176)
-
-TMIBackground:
-  Light: #F9E9AB (RGB: 249, 233, 171)
-  Dark:  #1A4766 (RGB: 26, 71, 102)
-
-TMIText:
-  Light: #1A4766 (RGB: 26, 71, 102)
-  Dark:  #F9E9AB (RGB: 249, 233, 171)
-*/
-
-
 extension Color {
     static let tmiPrimary = Color(light: #colorLiteral(red: 0.0653751418, green: 0.004413233139, blue: 0.238399297, alpha: 1), dark: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1))
     static let tmiPrimaryDark = Color(light: #colorLiteral(red: 0.01977282949, green: 0.001201396808, blue: 0.0739999935, alpha: 1), dark: #colorLiteral(red: 0.5325596929, green: 0.5392637253, blue: 0.5391458273, alpha: 1))
