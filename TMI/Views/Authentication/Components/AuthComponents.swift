@@ -395,20 +395,6 @@ struct TMILogoView: View {
     }
 }
 
-// MARK: - Extension for TextField placeholder
-extension View {
-    func placeholder<Content: View>(
-        when shouldShow: Bool,
-        alignment: Alignment = .leading,
-        @ViewBuilder placeholder: () -> Content
-    ) -> some View {
-        ZStack(alignment: alignment) {
-            placeholder().opacity(shouldShow ? 1 : 0)
-            self
-        }
-    }
-}
-
 // MARK: - Alert View
 struct CustomAlertView: View {
     var title: String

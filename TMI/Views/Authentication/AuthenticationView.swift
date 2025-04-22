@@ -16,16 +16,8 @@ enum AuthenticationState: Equatable {
 }
 
 // MARK: - Environment Key
-
-struct AuthStateModelKey: EnvironmentKey {
-    static let defaultValue: AuthStateModel = AuthStateModel()
-}
-
 extension EnvironmentValues {
-    var authStateModel: AuthStateModel {
-        get { self[AuthStateModelKey.self] }
-        set { self[AuthStateModelKey.self] = newValue }
-    }
+    @Entry var authStateModel: AuthStateModel = AuthStateModel()
 }
 
 // MARK: - State Model

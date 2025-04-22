@@ -53,7 +53,7 @@ enum FilterOption: String, CaseIterable, Identifiable {
     case lowEngagement = "Low Engagement"
 }
 
-// MARK: - Enhanced Student List View
+// MARK: -  Student List View
 
 struct StudentListView: View {
     @State private var viewModel = StudentListViewModel()
@@ -111,6 +111,7 @@ struct StudentListView: View {
                     }
                 }
                 .navigationTitle("Students")
+                .foregroundColor(.white)
                 .navigationBarTitleDisplayMode(.large)
                 .toolbarBackground(.hidden, for: .navigationBar)
                 .toolbar {
@@ -154,22 +155,25 @@ struct StudentListView: View {
                     }
                 }
                 .sheet(isPresented: $showingAddStudent) {
-                    EnhancedAddStudentView()
+                    AddStudentView()
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                         .presentationCornerRadius(30)
+                        .presentationSizing(.page)
                 }
                 .sheet(isPresented: $showingFilterSheet) {
-                    EnhancedFilterView(selectedOption: $selectedFilterOption)
+                    StudentListFilterView(selectedOption: $selectedFilterOption)
                         .presentationDetents([.medium])
                         .presentationDragIndicator(.visible)
                         .presentationCornerRadius(30)
+                        .presentationSizing(.page)
                 }
                 .sheet(item: $selectedStudent) { student in
-                    EnhancedStudentDetailView(student: student)
+                    StudentDetailView(student: student)
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                         .presentationCornerRadius(30)
+                        .presentationSizing(.page)
                 }
                 .onAppear {
                     viewModel.fetchStudents()
@@ -212,7 +216,7 @@ struct StudentListView: View {
             .ignoresSafeArea()
             
             // Animated blob overlay
-            AnimatedBlobView()
+            StudentListAnimatedBlobView()
                 .opacity(0.15)
             
             // Particle effect
@@ -300,7 +304,7 @@ struct StudentListView: View {
                         spacing: 20
                     ) {
                         ForEach(filteredStudents) { student in
-                            EnhancedStudentCard(student: student)
+                            StudentCard(student: student)
                                 .onTapGesture {
                                     selectedStudent = student
                                 }
@@ -417,7 +421,7 @@ struct StudentListView: View {
             // Action buttons
             HStack(spacing: 20) {
                 // Add Student Button
-                EnhancedActionButton(
+                StudentListActionButton(
                     icon: "person.badge.plus",
                     title: "Add Student",
                     action: {
@@ -426,7 +430,7 @@ struct StudentListView: View {
                 )
                 
                 // Bulk Actions Button
-                EnhancedActionButton(
+                StudentListActionButton(
                     icon: "person.crop.rectangle.stack.fill",
                     title: "Bulk Actions",
                     action: {
@@ -435,7 +439,7 @@ struct StudentListView: View {
                 )
                 
                 // Export Button
-                EnhancedActionButton(
+                StudentListActionButton(
                     icon: "square.and.arrow.up",
                     title: "Export",
                     action: {
@@ -498,9 +502,9 @@ struct StudentListView: View {
     }
 }
 
-// MARK: - Enhanced Student Card
+// MARK: -  Student Card
 
-struct EnhancedStudentCard: View {
+struct StudentCard: View {
     var student: Student
     
     @State private var isHovered = false
@@ -740,7 +744,7 @@ struct StudentStatCard: View {
 
 // MARK: - Quick Action Button
 
-struct EnhancedActionButton: View {
+struct StudentListActionButton: View {
     var icon: String
     var title: String
     var action: () -> Void
@@ -785,7 +789,7 @@ struct EnhancedActionButton: View {
 
 // MARK: - Add Student View
 
-struct EnhancedAddStudentView: View {
+struct AddStudentView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var name = ""
@@ -892,7 +896,7 @@ struct EnhancedAddStudentView: View {
 
 // MARK: - Filter View
 
-struct EnhancedFilterView: View {
+struct StudentListFilterView: View {
     @Binding var selectedOption: FilterOption
     @Environment(\.dismiss) private var dismiss
     
@@ -906,7 +910,7 @@ struct EnhancedFilterView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         ForEach(FilterOption.allCases) { option in
-                            FilterOptionCard(
+                            StudentListFilterOptionCard(
                                 option: option,
                                 isSelected: selectedOption == option,
                                 action: {
@@ -948,7 +952,7 @@ struct EnhancedFilterView: View {
     }
 }
 
-struct FilterOptionCard: View {
+struct StudentListFilterOptionCard: View {
     var option: FilterOption
     var isSelected: Bool
     var action: () -> Void
@@ -1072,7 +1076,7 @@ struct FilterOptionCard: View {
 
 // MARK: - Student Detail View
 
-struct EnhancedStudentDetailView: View {
+struct StudentDetailView: View {
     var student: Student
     @Environment(\.dismiss) private var dismiss
     
@@ -1086,7 +1090,7 @@ struct EnhancedStudentDetailView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         profileHeader
-                        TabPicker(selection: $tabSelection)
+                        StudentListTabPicker(selection: $tabSelection)
                             .padding(.horizontal, 20)
                         tabContent
                             .padding(.horizontal, 20)
@@ -1341,7 +1345,7 @@ struct EnhancedStudentDetailView: View {
 
 // MARK: - Tab Picker
 
-struct TabPicker: View {
+struct StudentListTabPicker: View {
     @Binding var selection: Int
     @Namespace private var tabAnimation
     
@@ -1464,7 +1468,7 @@ struct GlassTextField: View {
 
 // MARK: - Animated Blob View
 
-struct AnimatedBlobView: View {
+struct StudentListAnimatedBlobView: View {
     @State private var animateBlob1 = false
     @State private var animateBlob2 = false
     

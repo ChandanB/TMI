@@ -12,9 +12,92 @@ import Observation
 @Observable
 class FormStoreViewModel {
     var formTemplates: [FormTemplate] = []
+    var isLoading: Bool = false
+    var errorMessage: String?
 
     func loadTemplates() {
-        formTemplates = [DefaultFormTemplates.camperRegistrationFormTemplate, DefaultFormTemplates.jobApplicationFormTemplate]
+        formTemplates = [
+            DefaultFormTemplates.camperRegistrationFormTemplate,
+            DefaultFormTemplates.jobApplicationFormTemplate,
+            FormTemplate(
+            name: "Student Interest Survey",
+            templateDescription: "Comprehensive survey to identify student interests, hobbies, and career aspirations to help develop personalized TMI plans.",
+            sections: [
+                FormSection(title: "Personal Interests", fields: [
+                    FormField(label: "What are your favorite subjects?", type: .multipleChoice, isRequired: true, options: ["Math", "Science", "English", "History", "Art", "Music", "Physical Education", "Other"]),
+                    FormField(label: "Describe your ideal learning environment", type: .longText, isRequired: false)
+                ]),
+                FormSection(title: "Career Aspirations", fields: [
+                    FormField(label: "What careers are you interested in exploring?", type: .multipleChoice, isRequired: true, options: ["Healthcare", "Technology", "Education", "Business", "Arts", "Trades", "Science", "Other"]),
+                    FormField(label: "Do you have any specific career goals?", type: .longText, isRequired: false)
+                ])
+            ],
+            createdAt: Date(),
+            updatedAt: Date(),
+            isActive: true,
+            category: "Survey"
+        ),
+        FormTemplate(
+            name: "Academic Progress Tracker",
+            templateDescription: "Track student academic progress across subjects and identify areas that align with their interests and strengths.",
+            sections: [
+                FormSection(title: "Current Academic Performance", fields: [
+                    FormField(label: "Subject Grades", type: .table, isRequired: true),
+                    FormField(label: "Strengths and Challenges", type: .longText, isRequired: true)
+                ]),
+                FormSection(title: "Interest Alignment", fields: [
+                    FormField(label: "How do current academic subjects align with interests?", type: .rating, isRequired: true),
+                    FormField(label: "Additional notes", type: .longText, isRequired: false)
+                ])
+            ],
+            createdAt: Date(),
+            updatedAt: Date(),
+            isActive: true,
+            category: "Assessment"
+        ),
+        FormTemplate(
+            name: "TMI Plan Feedback",
+            templateDescription: "Collect feedback from students on their TMI plans to measure effectiveness and make adjustments as needed.",
+            sections: [
+                FormSection(title: "Plan Evaluation", fields: [
+                    FormField(label: "How helpful has your TMI plan been?", type: .rating, isRequired: true),
+                    FormField(label: "What aspects of your TMI plan have been most beneficial?", type: .longText, isRequired: true),
+                    FormField(label: "What improvements would you suggest?", type: .longText, isRequired: true)
+                ]),
+                FormSection(title: "Future Goals", fields: [
+                    FormField(label: "What additional interests would you like to explore?", type: .longText, isRequired: false),
+                    FormField(label: "How can we better support your academic journey?", type: .longText, isRequired: false)
+                ])
+            ],
+            createdAt: Date(),
+            updatedAt: Date(),
+            isActive: true,
+            category: "Feedback"
+        ),
+        FormTemplate(
+            name: "Behavior Tracking Form",
+            templateDescription: "Document student behavior patterns to identify triggers and develop appropriate intervention strategies.",
+            sections: [
+                FormSection(title: "Behavior Observation", fields: [
+                    FormField(label: "Date and Time", type: .date, isRequired: true),
+                    FormField(label: "Setting/Location", type: .text, isRequired: true),
+                    FormField(label: "Observed Behavior", type: .longText, isRequired: true),
+                    FormField(label: "Apparent Triggers", type: .multipleChoice, isRequired: true, options: ["Academic Frustration", "Peer Interaction", "Environmental Factors", "Unknown", "Other"])
+                ]),
+                FormSection(title: "Intervention", fields: [
+                    FormField(label: "Strategies Applied", type: .multipleChoice, isRequired: true, options: ["Redirection", "Break Time", "Discussion", "Reflection Activity", "Other"]),
+                    FormField(label: "Outcome", type: .longText, isRequired: true)
+                ])
+            ],
+            createdAt: Date(),
+            updatedAt: Date(),
+            isActive: false,
+            category: "Assessment"
+        )]
+    }
+    
+    func addTemplate(_ template: FormTemplate) {
+        formTemplates.append(template)
     }
 }
 
@@ -77,45 +160,17 @@ struct FormStoreCell: View {
     }
 }
 
-struct FormStoreCardView: View {
-    var template: FormTemplate
+struct TagView: View {
+    let title: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            WebImage(url: URL(string: template.imageName ?? ""))
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(height: 200)
-                .cornerRadius(15)
-                .clipped()
-
-            Text(template.name)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
-
-            Text(template.templateDescription)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .lineLimit(3)
-
-            HStack {
-                if let category = template.category {
-                    TagView(title: category)
-                }
-
-                Spacer()
-
-                if let isFree = template.isFree, !isFree {
-                    Image(systemName: "lock.fill")
-                        .foregroundColor(.secondary)
-                }
-            }
+        HStack {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
     }
 }
 

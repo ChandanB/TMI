@@ -1,7 +1,7 @@
 import SwiftUI
 import FirebaseFirestore
 
-struct AddStudentView: View {
+struct LegacyAddStudentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     

@@ -2,7 +2,7 @@
 
 import SwiftUI
 
-struct StudentDetailView: View {
+struct LegacyStudentDetailView: View {
     let student: Student
     
     var body: some View {

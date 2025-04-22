@@ -1,5 +1,5 @@
 //
-//  ActivityRow.swift
+//  DashboardActivityRow.swift
 //  PathFinder
 //
 //  Created by Chandan Brown on 9/10/24.
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ActivityRow: View {
+struct LegacyActivityRow: View {
     let activity: RecentActivity
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovered = false
@@ -69,7 +69,7 @@ struct ActivityRow: View {
 }
 
 #Preview {
-    ActivityRow(activity: RecentActivity.sampleActivity)
+    LegacyActivityRow(activity: RecentActivity.sampleActivity)
         .padding()
         .background(Color.gray.opacity(0.1))
 }

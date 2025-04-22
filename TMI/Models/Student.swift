@@ -307,8 +307,8 @@ extension Student {
             name: "John Doe",
             grade: "10",
             dateOfBirth: Date(),
-            interests: interests,
-            hobbies: hobbies,
+            interests: [],
+            hobbies: [],
             surveyResults: surveyResults,
             academicPerformance: academicPerformance,
             engagementHistory: engagementHistory,
@@ -323,8 +323,8 @@ extension Student {
                 name: "John Doe",
                 grade: "10",
                 dateOfBirth: Date(),
-                interests: Interest.sampleInterests,
-                hobbies: Hobby.sampleHobbies,
+                interests: [],
+                hobbies: [],
                 surveyResults: [
                     SurveyResult(
                         id: "survey1",
@@ -356,8 +356,8 @@ extension Student {
                 name: "Jane Smith",
                 grade: "11",
                 dateOfBirth: Date(),
-                interests: [Interest.sampleInterests[0]],
-                hobbies: [Hobby.sampleHobbies[1]],
+                interests: [],
+                hobbies: [],
                 engagementHistory: [
                     EngagementRecord(
                         date: Date().addingTimeInterval(-45 * 24 * 60 * 60),
@@ -380,8 +380,8 @@ extension Student {
                 name: "Alice Johnson",
                 grade: "9",
                 dateOfBirth: Date(),
-                interests: [Interest.sampleInterests[2]],
-                hobbies: [Hobby.sampleHobbies[2]],
+                interests: [],
+                hobbies: [],
                 engagementHistory: [
                     EngagementRecord(
                         date: Date().addingTimeInterval(-60 * 24 * 60 * 60),
@@ -404,8 +404,8 @@ extension Student {
                 name: "Michael Chen",
                 grade: "12",
                 dateOfBirth: Date(),
-                tmiPlans: [TMIPlan.samplePlan], interests: [Interest.sampleInterests[1], Interest.sampleInterests[3]],
-                hobbies: [Hobby.sampleHobbies[0], Hobby.sampleHobbies[3]],
+                tmiPlans: [],
+                hobbies: [],
                 engagementHistory: [
                     EngagementRecord(
                         date: Date().addingTimeInterval(-90 * 24 * 60 * 60),
@@ -428,8 +428,8 @@ extension Student {
                 name: "Emma Rodriguez",
                 grade: "10",
                 dateOfBirth: Date(),
-                interests: [Interest.sampleInterests[4], Interest.sampleInterests[2]],
-                hobbies: [Hobby.sampleHobbies[4]],
+                interests: [],
+                hobbies: [],
                 engagementHistory: [
                     EngagementRecord(
                         date: Date().addingTimeInterval(-45 * 24 * 60 * 60),

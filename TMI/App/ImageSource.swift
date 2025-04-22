@@ -7,6 +7,8 @@
 
 import UIKit
 import Combine
+import FirebaseStorage
+
 
 /// Represents an image that can come from either a URL or a direct UIImage
 /// Used for flexible image handling throughout the app
@@ -266,6 +268,100 @@ public func convertImagesToData(images: [ImageSource], quality: CGFloat = 0.8) a
     }
     
     return result
+}
+
+// MARK: - Firebase Storage Extensions
+
+extension ImageSource {
+    /// Error types specific to image upload operations
+    public enum UploadError: Error {
+        case invalidImage
+        case uploadFailed(Error)
+        case urlRetrievalFailed
+    }
+    
+    /// Upload the image to Firebase Storage in the specified path
+    /// - Parameters:
+    ///   - storagePath: The path inside Firebase Storage where the image should be saved
+    ///   - metadata: Optional metadata for the upload
+    ///   - quality: JPEG compression quality for the upload (0.0 to 1.0)
+    /// - Returns: The download URL of the uploaded image
+    public func uploadToFirebaseStorage(
+        storagePath: String,
+        metadata: [String: Any]? = nil,
+        quality: CGFloat = 0.7
+    ) async throws -> URL {
+        // For remote URLs, we're already done - just return the existing URL
+        if case .url(let urlString) = self, let url = URL(string: urlString) {
+            return url
+        }
+        
+        // For local images, we need to upload them
+        if case .image(let image) = self {
+            // Convert image to data
+            let imageData: Data
+            if image.hasAlphaChannel {
+                guard let data = image.pngData() else {
+                    throw UploadError.invalidImage
+                }
+                imageData = data
+            } else {
+                guard let data = image.jpegData(compressionQuality: quality) else {
+                    throw UploadError.invalidImage
+                }
+                imageData = data
+            }
+            
+            // Create a unique filename using UUID
+            let filename = "\(UUID().uuidString).\(image.hasAlphaChannel ? "png" : "jpg")"
+            let fullPath = "\(storagePath)/\(filename)"
+            
+            // Get storage reference
+            let storageRef = FirebaseManager.shared.storage.reference().child(fullPath)
+            
+            // Set metadata if provided
+            var storageMetadata: StorageMetadata?
+            if let metadata = metadata {
+                storageMetadata = StorageMetadata()
+                metadata.forEach { key, value in
+                    storageMetadata?.customMetadata?[key] = value as? String
+                }
+            }
+            
+            // Upload the image
+            do {
+                _ = try await storageRef.putDataAsync(imageData, metadata: storageMetadata)
+                
+                // Get the download URL
+                let downloadURL = try await storageRef.downloadURL()
+                return downloadURL
+            } catch {
+                throw UploadError.uploadFailed(error)
+            }
+        }
+        
+        throw UploadError.invalidImage
+    }
+    
+    /// Upload an image to Firebase Storage as a profile image
+    /// - Parameters:
+    ///   - userId: The user ID to associate with the profile image
+    ///   - quality: JPEG compression quality (0.0 to 1.0)
+    /// - Returns: The download URL of the uploaded image
+    public func uploadAsProfileImage(userId: String, quality: CGFloat = 0.7) async throws -> URL {
+        let path = "\(FirestoreConstants.profileImages)/\(userId)"
+        return try await uploadToFirebaseStorage(storagePath: path, quality: quality)
+    }
+    
+    /// Upload an image to Firebase Storage for a content post
+    /// - Parameters:
+    ///   - contentId: The content ID to associate with the image
+    ///   - quality: JPEG compression quality (0.0 to 1.0)
+    /// - Returns: The download URL of the uploaded image
+    public func uploadAsContentImage(contentId: String, quality: CGFloat = 0.7) async throws -> URL {
+        let path = "\(FirestoreConstants.contentImages)/\(contentId)"
+        return try await uploadToFirebaseStorage(storagePath: path, quality: quality)
+    }
 }
 
 // MARK: - UIImage Extensions

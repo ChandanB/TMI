@@ -16,10 +16,9 @@ final class Interest: Identifiable, Hashable, Codable, Sendable {
     }
     
     // MARK: - Firebase Integration
-    @DocumentID var firestoreID: String?
+    @DocumentID var id: String?
     
     // MARK: - Core Properties
-    var id: UUID
     var name: String
     var category: [InterestCategory]
     var description: String?
@@ -41,8 +40,7 @@ final class Interest: Identifiable, Hashable, Codable, Sendable {
     
     // MARK: - Initializers
     init(
-        id: UUID = UUID(),
-        firestoreID: String? = nil,
+        id: String? = nil,
         name: String,
         category: [InterestCategory],
         description: String? = nil,
@@ -59,7 +57,6 @@ final class Interest: Identifiable, Hashable, Codable, Sendable {
         schemaVersion: Int = 1
     ) {
         self.id = id
-        self.firestoreID = firestoreID
         self.name = name
         self.category = category
         self.description = description
@@ -91,8 +88,7 @@ final class Interest: Identifiable, Hashable, Codable, Sendable {
     required init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        id = try container.decode(UUID.self, forKey: .id)
-        firestoreID = try container.decodeIfPresent(String.self, forKey: .firestoreID)
+        id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         category = try container.decode([InterestCategory].self, forKey: .category)
         description = try container.decodeIfPresent(String.self, forKey: .description)
@@ -113,7 +109,6 @@ final class Interest: Identifiable, Hashable, Codable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         
         try container.encode(id, forKey: .id)
-        try container.encodeIfPresent(firestoreID, forKey: .firestoreID)
         try container.encode(name, forKey: .name)
         try container.encode(category, forKey: .category)
         try container.encodeIfPresent(description, forKey: .description)
@@ -163,8 +158,7 @@ final class Interest: Identifiable, Hashable, Codable, Sendable {
         }
         
         return Interest(
-            id: UUID(uuidString: data["id"] as? String ?? UUID().uuidString) ?? UUID(),
-            firestoreID: id,
+            id: id,
             name: name,
             category: categories,
             description: data["description"] as? String,
@@ -195,7 +189,7 @@ final class Interest: Identifiable, Hashable, Codable, Sendable {
     /// Convert to Firestore data dictionary
     func toFirestoreData() -> [String: Any] {
         var data: [String: Any] = [
-            "id": id.uuidString,
+            "id": id ?? UUID().uuidString,
             "name": name,
             "category": category.map { $0.rawValue },
             "academicRelevance": academicRelevance.map { $0.rawValue },

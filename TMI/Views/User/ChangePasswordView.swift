@@ -18,16 +18,8 @@ struct PasswordChangeData: Equatable {
 }
 
 // MARK: - Environment Key
-
-struct ChangePasswordStateModelKey: EnvironmentKey {
-    static let defaultValue: ChangePasswordStateModel = ChangePasswordStateModel()
-}
-
 extension EnvironmentValues {
-    var changePasswordStateModel: ChangePasswordStateModel {
-        get { self[ChangePasswordStateModelKey.self] }
-        set { self[ChangePasswordStateModelKey.self] = newValue }
-    }
+    @Entry var changePasswordStateModel: ChangePasswordStateModel = ChangePasswordStateModel()
 }
 
 // MARK: - State Model

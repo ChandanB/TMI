@@ -11,5 +11,6 @@ struct ProgressData: Identifiable {
     let id = UUID()
     let date: String
     let progress: Double
+    let target: Double
 }
 

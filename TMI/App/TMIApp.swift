@@ -28,7 +28,7 @@ struct TMIApp: App {
             ContentView()
                 .environment(\.authStateModel, AuthStateModel())
                 .environment(\.dashboardStateModel, DashboardStateModel())
-                .preferredColorScheme(.light)
+                .preferredColorScheme(.dark)
         }
     }
 }
@@ -45,6 +45,8 @@ struct ContentView: View {
                 AuthenticationView()
             }
         }
+        .foregroundColor(.white)
+        .foregroundStyle(.white)
         .onAppear {
             // Check authentication status when the app appears
             if !authStateModel.isLoggedIn {

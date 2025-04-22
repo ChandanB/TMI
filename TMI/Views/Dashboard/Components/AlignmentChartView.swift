@@ -1,5 +1,5 @@
 //
-//  AlignmentChartView.swift
+//  DashboardAlignmentChartView.swift
 //  TMI
 //
 //  Created by Chandan Brown on 4/20/25.
@@ -11,7 +11,7 @@ import Charts
 
 // MARK: - Alignment Chart View
 
-struct AlignmentChartView: View {
+struct LegacyAlignmentChartView: View {
     @Environment(\.dashboardStateModel) private var stateModel
     let alignmentData: [AlignmentData]
     

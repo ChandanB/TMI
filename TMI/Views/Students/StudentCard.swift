@@ -2,7 +2,7 @@
 
 import SwiftUI
 
-struct StudentCard: View {
+struct LegacyStudentCard: View {
     let student: Student
 
     var body: some View {

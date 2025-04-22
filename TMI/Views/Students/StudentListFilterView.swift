@@ -2,7 +2,7 @@
 
 import SwiftUI
 
-struct StudentListFilterView: View {
+struct LegacyStudentListFilterView: View {
     @Binding var selectedOption: FilterOption
     @Environment(\.dismiss) var dismiss
     

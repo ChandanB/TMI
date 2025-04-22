@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct StatCard: View {
+struct LegacyStatCard: View {
     let title: String
     let value: String
     let icon: String

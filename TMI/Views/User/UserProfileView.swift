@@ -23,16 +23,8 @@ struct UserProfileData: Equatable {
 }
 
 // MARK: - Environment Key
-
-struct UserProfileStateModelKey: EnvironmentKey {
-    static let defaultValue: UserProfileStateModel = UserProfileStateModel()
-}
-
 extension EnvironmentValues {
-    var userProfileStateModel: UserProfileStateModel {
-        get { self[UserProfileStateModelKey.self] }
-        set { self[UserProfileStateModelKey.self] = newValue }
-    }
+    @Entry var userProfileStateModel: UserProfileStateModel = UserProfileStateModel()
 }
 
 // MARK: - State Model

@@ -24,7 +24,7 @@ extension Color {
 
 #if DEBUG
 extension Color {
-    static let debugTMIPrimary = Color(light: #colorLiteral(red: 0.0653751418, green: 0.004413233139, blue: 0.238399297, alpha: 1), dark: #colorLiteral(red: 0.7058569789, green: 0.6915217638, blue: 0.8136684895, alpha: 1))
+    static let debugTMIPrimary = Color(light: #colorLiteral(red: 0.0653751418, green: 0.004413233139, blue: 0.238399297, alpha: 1), dark: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1))
     static let debugTMISecondary = Color(light: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1), dark: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1))
     static let debugTMIBackground = Color(light: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1), dark: #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1))
     static let debugTMIText = Color(light: #colorLiteral(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006, alpha: 1), dark: #colorLiteral(red: 0.8498495817, green: 0.9484829307, blue: 0.9581733346, alpha: 1))

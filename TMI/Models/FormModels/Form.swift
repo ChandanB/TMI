@@ -5,6 +5,7 @@
 //  Created by Chandan Brown on 9/14/24.
 //
 
+import SwiftUI
 import SwiftData
 import Foundation
 import CoreTransferable
@@ -29,6 +30,7 @@ struct FormSection: Codable, Identifiable, Transferable {
     var title: String
     var fields: [FormField]
     var location: CGPoint?
+    var description: String?
     
     static var transferRepresentation: some TransferRepresentation {
         CodableRepresentation(contentType: .formSection)
@@ -49,6 +51,9 @@ struct FormField: Codable, Identifiable, Transferable {
     var isRequired: Bool
     var validationRules: [ValidationRule] = []
     var options: [String]?
+    
+    var placeholder: String?
+    var defaultValue: AnyCodable?
 
     init(id: String? = nil, label: String, type: FieldType, isRequired: Bool, validationRules: [ValidationRule] = [], options: [String]? = nil) {
         self.id = id
@@ -75,6 +80,17 @@ struct FormTemplate: Codable, Identifiable {
     var imageName: String?
     var category: String?
     var isFree: Bool?
+    var author: String?
+    var uses: Int = 0
+    var tags: [String] = []
+    
+    /// New hex color string (e.g. "#FF5733") stored in Firestore
+    var colorHex: String?
+    
+    // Computed helper to turn the hex into a SwiftUI Color
+    var themeColor: Color {
+        Color(colorHex ?? "#FFFFFF")
+    }
     
     init(
         id: String? = nil,
@@ -86,7 +102,11 @@ struct FormTemplate: Codable, Identifiable {
         isActive: Bool,
         imageName: String? = nil,
         category: String? = nil,
-        isFree: Bool? = nil
+        isFree: Bool? = nil,
+        author: String? = nil,
+        uses: Int = 0,
+        tags: [String] = [],
+        colorHex: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -98,6 +118,28 @@ struct FormTemplate: Codable, Identifiable {
         self.imageName = imageName
         self.category = category
         self.isFree = isFree
+        self.author = author
+        self.uses = uses
+        self.tags = tags
+        self.colorHex = colorHex
+    }
+
+    // Ensure Firestore encodes/decodes the new field
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case templateDescription
+        case sections
+        case createdAt
+        case updatedAt
+        case isActive
+        case imageName
+        case category
+        case isFree
+        case author
+        case uses
+        case tags
+        case colorHex
     }
 }
 

@@ -33,6 +33,7 @@ struct FormPreviewView: View {
 
 
 struct DynamicFormFieldPreview: View {
+    @Environment(\.dynamicFormStateModel) var stateModel
     let field: FormField
     
     var body: some View {
@@ -98,6 +99,37 @@ struct DynamicFormFieldPreview: View {
             .frame(maxWidth: .infinity)
             .background(Color.gray.opacity(0.2))
             .cornerRadius(10)
+        case .rating:
+            // tappable star‐rating from 1…5
+            if let key = field.id {
+                let binding = Binding<Int>(
+                  get: { stateModel.formData[key]?.value as? Int ?? 0 },
+                  set: { stateModel.formData[key] = AnyCodable($0) }
+                )
+                HStack(spacing: 4) {
+                  ForEach(1...5, id: \.self) { star in
+                    Image(systemName: star <= binding.wrappedValue ? "star.fill" : "star")
+                      .foregroundColor(.yellow)
+                      .onTapGesture { binding.wrappedValue = star }
+                  }
+                }
+            }
+        case .table:
+            // placeholder until you wire up a proper grid editor
+            Text("Table input not supported yet")
+              .foregroundColor(.white.opacity(0.7))
+
+        case .signature:
+            // placeholder "canvas" — swap in your PencilKit or signature‐capture view
+            if let sigKey = field.id {
+                let sigBinding = Binding<Data>(
+                  get: { stateModel.formData[sigKey]?.value as? Data ?? Data() },
+                  set: { stateModel.formData[sigKey] = AnyCodable($0) }
+                )
+    //            SignaturePadView(drawingData: sigBinding)
+    //              .frame(height: 200)
+    //              .border(Color.white.opacity(0.5))
+            }
         }
     }
 }

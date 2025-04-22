@@ -35,33 +35,6 @@ class FormCreationViewModel {
     }
 }
 
-struct FormCreationView: View {
-    @Bindable var viewModel = FormCreationViewModel()
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section(header: Text("New Form Details")) {
-                    TextField("Name", text: $viewModel.name)
-                    TextField("Description", text: $viewModel.description)
-                    Toggle("Active", isOn: $viewModel.isActive)
-                }
-                Button("Create") {
-                    viewModel.createTemplate { success, error in
-                        // Handle the response, such as showing an error alert or confirming success.
-                        // Dismiss the view if successful or show error feedback.
-                    }
-                }
-            }
-            .navigationTitle("Create New Form")
-            .navigationBarItems(
-                leading: Button("Cancel") {
-                    // Handle cancel action, e.g., dismiss the view.
-                }
-            )
-        }
-    }
-}
 
 #Preview {
     FormCreationView()

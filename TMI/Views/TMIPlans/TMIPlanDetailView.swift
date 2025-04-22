@@ -5,184 +5,730 @@ import Charts
 
 struct TMIPlanDetailView: View {
     let plan: TMIPlan
-
+    
+    // Animation states
+    @State private var headerAppeared = false
+    @State private var chartAppeared = false
+    @State private var contentAppeared = false
+    @State private var isChartExpanded = false
+    
+    // UI States
+    @State private var selectedChartTimeFrame: ChartTimeFrame = .monthly
+    @State private var showingEditSheet = false
+    @State private var showingDeleteAlert = false
+    
+    enum ChartTimeFrame: String, CaseIterable, Identifiable {
+        case weekly = "Weekly"
+        case monthly = "Monthly"
+        case yearly = "Yearly"
+        
+        var id: String { self.rawValue }
+    }
+    
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                headerView
-                progressChartView
-                insightsSection
-                associatedStudentsView
-                interestsAndHobbiesSection
-                notesSection
-                Spacer()
+        ZStack {
+            // Background
+            planDetailBackgroundView
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header View
+                    enhancedHeaderView
+                        .padding(.top, 16)
+                        .padding(.horizontal, 20)
+                        .offset(y: headerAppeared ? 0 : -20)
+                        .opacity(headerAppeared ? 1 : 0)
+                    
+                    // Quick Stats
+                    enhancedQuickStatsView
+                        .padding(.horizontal, 20)
+                        .offset(y: headerAppeared ? 0 : -10)
+                        .opacity(headerAppeared ? 1 : 0)
+                    
+                    // Progress Chart
+                    enhancedProgressChartView
+                        .padding(.horizontal, 20)
+                        .offset(y: chartAppeared ? 0 : 30)
+                        .opacity(chartAppeared ? 1 : 0)
+                    
+                    // Content sections
+                    Group {
+                        enhancedInsightsSection
+                        enhancedStudentsSection
+                        enhancedInterestsAndHobbiesSection
+                        enhancedGoalsSection
+                        enhancedNotesSection
+                    }
+                    .padding(.horizontal, 20)
+                    .offset(y: contentAppeared ? 0 : 40)
+                    .opacity(contentAppeared ? 1 : 0)
+                }
+                .padding(.bottom, 40)
             }
-            .padding()
         }
-        .background(Color.tmiBackground.ignoresSafeArea())
-        .navigationTitle("TMI Plan Details")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("TMI Plan Details")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(action: {
+                        showingEditSheet = true
+                    }) {
+                        Label("Edit Plan", systemImage: "pencil")
+                    }
+                    
+                    Button(action: {
+                        // Export action
+                    }) {
+                        Label("Export Plan", systemImage: "square.and.arrow.up")
+                    }
+                    
+                    Divider()
+                    
+                    Button(role: .destructive, action: {
+                        showingDeleteAlert = true
+                    }) {
+                        Label("Delete Plan", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white)
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditSheet) {
+            Text("Edit Plan View")
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .alert("Delete TMI Plan", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                // Delete action
+            }
+        } message: {
+            Text("Are you sure you want to delete this TMI plan? This action cannot be undone.")
+        }
+        .onAppear {
+            animateViews()
+        }
+        .preferredColorScheme(.dark)
     }
-
+    
+    private func animateViews() {
+        withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
+            headerAppeared = true
+        }
+        
+        withAnimation(.easeOut(duration: 0.5).delay(0.3)) {
+            chartAppeared = true
+        }
+        
+        withAnimation(.easeOut(duration: 0.5).delay(0.5)) {
+            contentAppeared = true
+        }
+    }
+    
+    // MARK: - Background
+    
+    private var planDetailBackgroundView: some View {
+        ZStack {
+            // Base gradient
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.08, green: 0.08, blue: 0.15),
+                    Color(red: 0.14, green: 0.14, blue: 0.25)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
+            // Animated blobs with model color influence
+            ModelBackgroundBlob(color: modelColor)
+        }
+    }
+    
     // MARK: - Header View
-
-    private var headerView: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(plan.model.rawValue)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(Color.tmiPrimary)
-                Text("Created on \(formattedDate(plan.creationDate))")
-                    .font(.subheadline)
-                    .foregroundColor(Color.tmiSecondary)
+    
+    private var enhancedHeaderView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
+                // Model badge
+                VStack(alignment: .leading, spacing: 8) {
+                    ZStack {
+                        // Icon badge
+                        Circle()
+                            .fill(modelColor.opacity(0.15))
+                            .frame(width: 60, height: 60)
+                        
+                        Image(systemName: modelIcon)
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundColor(modelColor)
+                    }
+                    
+                    // Model name and creation date
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(plan.model.rawValue)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text("Created on \(formattedDate(plan.creationDate))")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+                
+                Spacer()
+                
+                // Progress circle
+                ZStack {
+                    Circle()
+                        .stroke(
+                            Color.white.opacity(0.1),
+                            lineWidth: 8
+                        )
+                        .frame(width: 80, height: 80)
+                    
+                    Circle()
+                        .trim(from: 0, to: CGFloat(min(plan.progress, 1.0)))
+                        .stroke(
+                            LinearGradient(
+                                colors: [modelColor, modelColor.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                        )
+                        .frame(width: 80, height: 80)
+                        .rotationEffect(.degrees(-90))
+                    
+                    VStack(spacing: 2) {
+                        Text("\(Int(plan.progress * 100))%")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text(progressStatus)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                }
             }
-            Spacer()
-            Menu {
-                Button("Edit Plan") { /* Implement edit functionality */ }
-                Button("Delete Plan", role: .destructive) { /* Implement delete functionality */ }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title)
-                    .foregroundColor(Color.tmiPrimary)
-            }
+            
+            // Description
+            Text(plan.model.description)
+                .font(.system(size: 15))
+                .foregroundColor(.white.opacity(0.8))
+                .padding(.top, 8)
         }
     }
-
+    
+    // MARK: - Quick Stats View
+    
+    private var enhancedQuickStatsView: some View {
+        HStack(spacing: 15) {
+            // Last updated
+            DetailStat(
+                title: "Last Updated",
+                value: timeAgo(from: plan.lastUpdated),
+                icon: "calendar",
+                color: .blue
+            )
+            
+            // Student count
+            DetailStat(
+                title: "Students",
+                value: "\(plan.students.count)",
+                icon: "person.3",
+                color: .green
+            )
+            
+            // Interest count
+            DetailStat(
+                title: "Interests",
+                value: "\(plan.interests.count)",
+                icon: "heart",
+                color: .pink
+            )
+        }
+    }
+    
     // MARK: - Progress Chart View
-
-    private var progressChartView: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text("Progress Overview")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(Color.tmiText)
-
-            Chart {
-                ForEach(progressData) { dataPoint in
-                    LineMark(
-                        x: .value("Date", dataPoint.date),
-                        y: .value("Progress", dataPoint.progress)
-                    )
-                    .foregroundStyle(Color.tmiPrimary.gradient)
-                    .lineStyle(StrokeStyle(lineWidth: 3))
-
-                    AreaMark(
-                        x: .value("Date", dataPoint.date),
-                        y: .value("Progress", dataPoint.progress)
-                    )
-                    .foregroundStyle(Color.tmiPrimary.opacity(0.1).gradient)
+    
+    private var enhancedProgressChartView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with time frame selector
+            HStack {
+                Text("Progress Tracking")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                // Time frame selector
+                HStack(spacing: 0) {
+                    ForEach(ChartTimeFrame.allCases) { timeFrame in
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedChartTimeFrame = timeFrame
+                            }
+                        } label: {
+                            Text(timeFrame.rawValue)
+                                .font(.system(size: 12, weight: selectedChartTimeFrame == timeFrame ? .semibold : .regular))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .foregroundColor(selectedChartTimeFrame == timeFrame ? .white : .white.opacity(0.6))
+                                .background(
+                                    selectedChartTimeFrame == timeFrame ?
+                                    Capsule().fill(modelColor.opacity(0.3)) : nil
+                                )
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.05))
+                )
             }
-            .chartYScale(domain: 0...1)
-            .frame(height: 250)
-            .background(Color.tmiSecondary.opacity(0.1))
-            .cornerRadius(15)
+            
+            // Chart
+            VStack {
+                enhancedProgressChart
+                    .frame(height: isChartExpanded ? 300 : 200)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isChartExpanded)
+                    .gesture(
+                        TapGesture()
+                            .onEnded { _ in
+                                withAnimation {
+                                    isChartExpanded.toggle()
+                                }
+                            }
+                    )
+                
+                // Chart legend
+                HStack(spacing: 20) {
+                    // Current period text
+                    Text(chartPeriodText)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    Spacer()
+                    
+                    // Legend items
+                    HStack(spacing: 16) {
+                        legendItem(color: modelColor, label: "Progress")
+                        legendItem(color: .gray.opacity(0.5), label: "Target")
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+            }
+            .padding(.top, 8)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.03))
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.ultraThinMaterial)
+                            .opacity(0.3)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
         }
     }
-
+    
+    private var enhancedProgressChart: some View {
+        Chart {
+            // Ideal progress line
+            ForEach(progressData) { dataPoint in
+                LineMark(
+                    x: .value("Date", dataPoint.date),
+                    y: .value("Target", dataPoint.target)
+                )
+                .foregroundStyle(Color.gray.opacity(0.5))
+                .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
+                .symbol {
+                    Circle()
+                        .fill(Color.gray.opacity(0.5))
+                        .frame(width: 6, height: 6)
+                }
+            }
+            
+            // Actual progress line
+            ForEach(progressData) { dataPoint in
+                LineMark(
+                    x: .value("Date", dataPoint.date),
+                    y: .value("Progress", dataPoint.progress)
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [modelColor, modelColor.opacity(0.7)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .lineStyle(StrokeStyle(lineWidth: 3))
+                .symbol {
+                    Circle()
+                        .fill(modelColor)
+                        .frame(width: 8, height: 8)
+                }
+            }
+            
+            // Progress area fill
+            ForEach(progressData) { dataPoint in
+                AreaMark(
+                    x: .value("Date", dataPoint.date),
+                    y: .value("Progress", dataPoint.progress)
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [modelColor.opacity(0.3), modelColor.opacity(0.0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+            }
+        }
+        .chartYScale(domain: 0...1)
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [5, 5]))
+                    .foregroundStyle(Color.white.opacity(0.2))
+                
+                if let doubleValue = value.as(Double.self) {
+                    AxisValueLabel {
+                        Text("\(Int(doubleValue * 100))%")
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [5, 5]))
+                    .foregroundStyle(Color.white.opacity(0.1))
+                
+                AxisValueLabel {
+                    if let stringValue = value.as(String.self) {
+                        Text(stringValue)
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+            }
+        }
+    }
+    
+    private func legendItem(color: Color, label: String) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+            
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.7))
+        }
+    }
+    
     // MARK: - Insights Section
-
-    private var insightsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Key Insights")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(Color.tmiText)
-
-            VStack(alignment: .leading, spacing: 8) {
-                InsightRow(title: "Current Progress", value: "\(Int(plan.progress * 100))%")
-                InsightRow(title: "Last Updated", value: formattedDate(plan.lastUpdated))
-                InsightRow(title: "Engagement Trend", value: engagementTrend())
+    
+    private var enhancedInsightsSection: some View {
+        DetailSection(title: "Insights") {
+            VStack(spacing: 16) {
+                // Engagement trend
+                DetailRow(
+                    icon: trendIcon,
+                    title: "Engagement Trend",
+                    value: engagementTrend(),
+                    valueColor: trendColor
+                )
+                
+                // Last milestone
+                DetailRow(
+                    icon: "flag.fill",
+                    title: "Last Milestone",
+                    value: "Week 4 Review"
+                )
+                
+                // Next action
+                DetailRow(
+                    icon: "arrow.right.circle.fill",
+                    title: "Next Action",
+                    value: "Schedule Progress Review"
+                )
             }
+            .padding(.vertical, 8)
         }
-        .padding()
-        .background(Color.tmiSecondary.opacity(0.1))
-        .cornerRadius(15)
     }
-
-    // MARK: - Associated Students View
-
-    private var associatedStudentsView: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text("Associated Students")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(Color.tmiText)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 15) {
-                    ForEach(plan.students) { student in
-                        StudentCard(student: student)
-                            .padding()
+    
+    // MARK: - Students Section
+    
+    private var enhancedStudentsSection: some View {
+        DetailSection(title: "Associated Students") {
+            VStack(alignment: .leading, spacing: 16) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(plan.students) { student in
+                            StudentDetailCard(student: student)
+                        }
                     }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 8)
                 }
             }
         }
     }
-
+    
     // MARK: - Interests and Hobbies Section
-
-    private var interestsAndHobbiesSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text("Interests & Hobbies")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(Color.tmiText)
-
-            if plan.interests.isEmpty && plan.hobbies.isEmpty {
-                Text("No interests or hobbies specified.")
-                    .font(.body)
-                    .foregroundColor(Color.tmiSecondary)
-            } else {
+    
+    private var enhancedInterestsAndHobbiesSection: some View {
+        DetailSection(title: "Interests & Hobbies") {
+            VStack(alignment: .leading, spacing: 20) {
                 if !plan.interests.isEmpty {
-                    Text("Interests")
-                        .font(.headline)
-                        .foregroundColor(Color.tmiText)
-                    WrapView(items: plan.interests.map { $0.name }) { item in
-                        TagView(title: item)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Interests")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        WrapView(items: plan.interests) { interest in
+                            InterestTag(interest: interest)
+                        }
                     }
                 }
-
+                
                 if !plan.hobbies.isEmpty {
-                    Text("Hobbies")
-                        .font(.headline)
-                        .foregroundColor(Color.tmiText)
-                    WrapView(items: plan.hobbies.map { $0.name }) { item in
-                        TagView(title: item)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Hobbies")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        WrapView(items: plan.hobbies) { hobby in
+                            HobbyTag(hobby: hobby)
+                        }
                     }
+                }
+                
+                if plan.interests.isEmpty && plan.hobbies.isEmpty {
+                    Text("No interests or hobbies associated with this plan.")
+                        .font(.system(size: 15))
+                        .foregroundColor(.white.opacity(0.6))
+                        .padding(.vertical, 8)
                 }
             }
         }
     }
-
-    // MARK: - Notes Section
-
-    private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text("Notes")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(Color.tmiText)
-
-            if plan.notes.isEmpty {
-                Text("No notes added.")
-                    .font(.body)
-                    .foregroundColor(Color.tmiSecondary)
-            } else {
-                Text(plan.notes)
-                    .font(.body)
-                    .foregroundColor(Color.tmiText)
+    
+    // MARK: - Goals Section
+    
+    private var enhancedGoalsSection: some View {
+        DetailSection(title: "Goals & Objectives") {
+            VStack(alignment: .leading, spacing: 16) {
+                if plan.goals.isEmpty {
+                    Text("No goals defined for this plan.")
+                        .font(.system(size: 15))
+                        .foregroundColor(.white.opacity(0.6))
+                        .padding(.vertical, 8)
+                } else {
+                    ForEach(plan.goals) { goal in
+                        GoalCard(goal: goal)
+                    }
+                }
+                
+                Button {
+                    // Add goal action
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 14))
+                        
+                        Text("Add New Goal")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 14)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.1))
+                    )
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .padding(.top, 4)
             }
         }
     }
-
+    
+    // MARK: - Notes Section
+    
+    private var enhancedNotesSection: some View {
+        DetailSection(title: "Notes") {
+            VStack(alignment: .leading, spacing: 16) {
+                if plan.notes.isEmpty {
+                    Text("No notes added to this plan.")
+                        .font(.system(size: 15))
+                        .foregroundColor(.white.opacity(0.6))
+                        .padding(.vertical, 8)
+                } else {
+                    Text(plan.notes)
+                        .font(.system(size: 15))
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineSpacing(4)
+                        .padding(.vertical, 8)
+                }
+                
+                Button {
+                    // Add notes action
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 14))
+                        
+                        Text("Add Notes")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 14)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.1))
+                    )
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .padding(.top, 4)
+            }
+        }
+    }
+    
+    // MARK: - Helper Properties
+    
+    private var modelIcon: String {
+        switch plan.model {
+        case .chaseYourSpace:
+            return "rocket.fill"
+        case .acknowledgeInterests:
+            return "heart.fill"
+        case .alignYourMind:
+            return "brain.head.profile.fill"
+        case .directAndCorrect:
+            return "arrow.up.forward.circle.fill"
+        case .bullyToBoss:
+            return "person.fill.badge.plus"
+        case .meekToProtector:
+            return "person.fill.turn.up"
+        }
+    }
+    
+    private var modelColor: Color {
+        switch plan.model {
+        case .chaseYourSpace:
+            return .blue
+        case .acknowledgeInterests:
+            return .pink
+        case .alignYourMind:
+            return .purple
+        case .directAndCorrect:
+            return .orange
+        case .bullyToBoss:
+            return .red
+        case .meekToProtector:
+            return .green
+        }
+    }
+    
+    private var progressStatus: String {
+        if plan.progress >= 1.0 {
+            return "Completed"
+        } else if plan.progress >= 0.75 {
+            return "Final Stage"
+        } else if plan.progress >= 0.5 {
+            return "Halfway"
+        } else if plan.progress >= 0.25 {
+            return "Initial Stage"
+        } else {
+            return "Just Started"
+        }
+    }
+    
+    private var trendIcon: String {
+        let trend = engagementTrend()
+        if trend == "Improving" {
+            return "arrow.up.right.circle.fill"
+        } else if trend == "Declining" {
+            return "arrow.down.right.circle.fill"
+        } else {
+            return "arrow.right.circle.fill"
+        }
+    }
+    
+    private var trendColor: Color {
+        let trend = engagementTrend()
+        if trend == "Improving" {
+            return .green
+        } else if trend == "Declining" {
+            return .red
+        } else {
+            return .orange
+        }
+    }
+    
+    private var chartPeriodText: String {
+        switch selectedChartTimeFrame {
+        case .weekly:
+            return "Past 8 weeks"
+        case .monthly:
+            return "Past 6 months"
+        case .yearly:
+            return "Past 12 months"
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
     private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         return formatter.string(from: date)
     }
-
+    
+    private func timeAgo(from date: Date) -> String {
+        let calendar = Calendar.current
+        let now = Date()
+        let components = calendar.dateComponents([.day, .hour, .minute], from: date, to: now)
+        
+        if let day = components.day, day > 0 {
+            return day == 1 ? "Yesterday" : "\(day) days ago"
+        } else if let hour = components.hour, hour > 0 {
+            return "\(hour) hour\(hour == 1 ? "" : "s") ago"
+        } else if let minute = components.minute, minute > 0 {
+            return "\(minute) minute\(minute == 1 ? "" : "s") ago"
+        } else {
+            return "Just now"
+        }
+    }
+    
     private func engagementTrend() -> String {
         let values = progressData.map { $0.progress }
         if values.first! < values.last! {
@@ -193,185 +739,420 @@ struct TMIPlanDetailView: View {
             return "Stable"
         }
     }
-
+    
     private var progressData: [ProgressData] {
+        switch selectedChartTimeFrame {
+        case .weekly:
+            return weeklyProgressData
+        case .monthly:
+            return monthlyProgressData
+        case .yearly:
+            return yearlyProgressData
+        }
+    }
+    
+    private var weeklyProgressData: [ProgressData] {
         return [
-            ProgressData(date: "Week 1", progress: 0.2),
-            ProgressData(date: "Week 2", progress: 0.35),
-            ProgressData(date: "Week 3", progress: 0.5),
-            ProgressData(date: "Week 4", progress: 0.65),
-            ProgressData(date: "Week 5", progress: plan.progress)
+            ProgressData(date: "Week 1", progress: 0.2, target: 0.2),
+            ProgressData(date: "Week 2", progress: 0.3, target: 0.35),
+            ProgressData(date: "Week 3", progress: 0.45, target: 0.5),
+            ProgressData(date: "Week 4", progress: 0.55, target: 0.65),
+            ProgressData(date: "Week 5", progress: 0.62, target: 0.75),
+            ProgressData(date: "Week 6", progress: 0.68, target: 0.85),
+            ProgressData(date: "Week 7", progress: 0.78, target: 0.92),
+            ProgressData(date: "Week 8", progress: plan.progress, target: 1.0)
+        ]
+    }
+    
+    private var monthlyProgressData: [ProgressData] {
+        return [
+            ProgressData(date: "Jan", progress: 0.1, target: 0.15),
+            ProgressData(date: "Feb", progress: 0.25, target: 0.3),
+            ProgressData(date: "Mar", progress: 0.4, target: 0.45),
+            ProgressData(date: "Apr", progress: 0.6, target: 0.6),
+            ProgressData(date: "May", progress: 0.75, target: 0.8),
+            ProgressData(date: "Jun", progress: plan.progress, target: 1.0)
+        ]
+    }
+    
+    private var yearlyProgressData: [ProgressData] {
+        return [
+            ProgressData(date: "Q1", progress: 0.3, target: 0.25),
+            ProgressData(date: "Q2", progress: 0.6, target: 0.5),
+            ProgressData(date: "Q3", progress: 0.8, target: 0.75),
+            ProgressData(date: "Q4", progress: plan.progress, target: 1.0)
         ]
     }
 }
 
-// MARK: - Custom Components
-struct InsightRow: View {
-    let title: String
-    let value: String
 
+// MARK: - Supporting Views
+
+struct ModelBackgroundBlob: View {
+    var color: Color
+    
+    @State private var animateBlob1 = false
+    @State private var animateBlob2 = false
+    
     var body: some View {
-        HStack {
-            Text(title)
-                .font(.headline)
-                .foregroundColor(Color.tmiText)
-            Spacer()
-            Text(value)
-                .font(.subheadline)
-                .foregroundColor(Color.tmiSecondary)
+        ZStack {
+            // Blob 1
+            Ellipse()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            color.opacity(0.3),
+                            color.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 300, height: 300)
+                .offset(x: animateBlob1 ? -30 : -130, y: animateBlob1 ? -100 : -60)
+                .rotationEffect(Angle(degrees: animateBlob1 ? 30 : 0))
+                .blur(radius: 60)
+                .animation(
+                    Animation.easeInOut(duration: 8)
+                        .repeatForever(autoreverses: true),
+                    value: animateBlob1
+                )
+            
+            // Blob 2
+            Ellipse()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.blue.opacity(0.2),
+                            Color.purple.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 250, height: 250)
+                .offset(x: animateBlob2 ? 100 : 160, y: animateBlob2 ? 300 : 250)
+                .rotationEffect(Angle(degrees: animateBlob2 ? -20 : 0))
+                .blur(radius: 60)
+                .animation(
+                    Animation.easeInOut(duration: 10)
+                        .repeatForever(autoreverses: true),
+                    value: animateBlob2
+                )
+        }
+        .onAppear {
+            animateBlob1 = true
+            animateBlob2 = true
         }
     }
 }
 
-struct SectionHeader: View {
-    let title: String
-
+struct DetailSection<Content: View>: View {
+    var title: String
+    @ViewBuilder var content: () -> Content
+    
     var body: some View {
-        Text(title)
-            .font(.title2)
-            .bold()
-            .foregroundColor(.white)
+        VStack(alignment: .leading, spacing: 16) {
+            Text(title)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.white)
+            
+            content()
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.03))
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(.ultraThinMaterial)
+                                .opacity(0.3)
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        }
+    }
+}
+
+struct DetailStat: View {
+    var title: String
+    var value: String
+    var icon: String
+    var color: Color
+    
+    @State private var isAnimated = false
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.1))
+                    .frame(width: 40, height: 40)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(color)
+            }
+            
+            Text(value)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+            
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.3)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 
 struct DetailRow: View {
-    let icon: String
-    let title: String
-    let value: String
-
+    var icon: String
+    var title: String
+    var value: String
+    var valueColor: Color = .white
+    
     var body: some View {
-        HStack {
+        HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundColor(.white)
+                .font(.system(size: 16))
+                .foregroundColor(valueColor)
+                .frame(width: 24)
+            
             Text(title)
-                .font(.headline)
-                .foregroundColor(.white)
+                .font(.system(size: 15))
+                .foregroundColor(.white.opacity(0.8))
+            
             Spacer()
+            
             Text(value)
-                .font(.body)
-                .foregroundColor(.white.opacity(0.9))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(valueColor)
         }
     }
 }
 
-struct ProgressBar: View {
-    let progress: Double   // Value between 0 and 1
-    var showPercentage: Bool = false
-
+struct StudentDetailCard: View {
+    var student: Student
+    
+    @State private var isHovered = false
+    
     var body: some View {
-        VStack(alignment: .leading) {
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .frame(height: 10)
-                    .foregroundColor(Color.white.opacity(0.3))
-                Capsule()
-                    .frame(width: progressWidth, height: 10)
-                    .foregroundColor(progressColor)
-                    .animation(.easeInOut(duration: 0.3), value: progress)
+        VStack(spacing: 12) {
+            // Avatar
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                student.avatarColor == .blue ? Color.blue :
+                                student.avatarColor == .green ? Color.green :
+                                student.avatarColor == .orange ? Color.orange :
+                                student.avatarColor == .purple ? Color.purple :
+                                student.avatarColor == .teal ? Color.teal :
+                                student.avatarColor == .pink ? Color.pink :
+                                Color.indigo,
+                                Color.black.opacity(0.2)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 60, height: 60)
+                
+                Text(student.initials)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
             }
-            if showPercentage {
-                Text("\(Int(progress * 100))% Complete")
-                    .font(.subheadline)
+            
+            // Name & details
+            VStack(spacing: 4) {
+                Text(student.name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Text("Grade \(student.grade)")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            
+            // Engagement badge
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(engagementColor)
+                    .frame(width: 8, height: 8)
+                
+                Text("\(Int(student.engagementScore * 100))% Engaged")
+                    .font(.system(size: 12))
                     .foregroundColor(.white.opacity(0.9))
             }
         }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.05))
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.3)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .scaleEffect(isHovered ? 1.03 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
-
-    private var progressWidth: CGFloat {
-        // Assuming a default width of 300 for calculation; adjust as needed
-        return CGFloat(300 * progress)
-    }
-
-    private var progressColor: Color {
-        switch progress {
-        case 0..<0.3:
-            return .red
-        case 0.3..<0.7:
-            return .yellow
-        default:
+    
+    private var engagementColor: Color {
+        if student.engagementScore >= 0.7 {
             return .green
+        } else if student.engagementScore >= 0.4 {
+            return .orange
+        } else {
+            return .red
         }
     }
 }
 
-struct AvatarView: View {
-    let student: Student
-
+struct InterestTag: View {
+    var interest: Interest
+    
     var body: some View {
-        ZStack {
-            if let avatarImage = studentAvatar {
-                avatarImage
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 40, height: 40)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                    .shadow(radius: 3)
-            } else {
-                Text(student.initials)
-                    .font(.title)
-                    .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.blue)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                    .shadow(radius: 3)
-            }
+        HStack(spacing: 6) {
+            Image(systemName: interest.iconName)
+                .font(.system(size: 12))
+                .foregroundColor(interest.color)
+            
+            Text(interest.name)
+                .font(.system(size: 13))
+                .foregroundColor(.white)
         }
-        
-    }
-
-    private var studentAvatar: Image? {
-        // Implement avatar retrieval if available
-        return nil
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(interest.color.opacity(0.15))
+        )
+        .overlay(
+            Capsule()
+                .stroke(interest.color.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 
-struct TagView: View {
-    let title: String
-
+struct HobbyTag: View {
+    var hobby: Hobby
+    
     var body: some View {
-        Text(title)
-            .font(.subheadline)
-            .foregroundColor(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color.white.opacity(0.2))
-            .cornerRadius(15)
+        HStack(spacing: 6) {
+            Image(systemName: hobby.iconName)
+                .font(.system(size: 12))
+                .foregroundColor(hobby.color)
+            
+            Text(hobby.name)
+                .font(.system(size: 13))
+                .foregroundColor(.white)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(hobby.color.opacity(0.15))
+        )
+        .overlay(
+            Capsule()
+                .stroke(hobby.color.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 
-struct WrapView<Content: View>: View {
-    let items: [String]
-    let content: (String) -> Content
-
-    @State private var totalHeight = CGFloat.zero
-
+struct WrapView<T: Identifiable, Content: View>: View {
+    let items: [T]
+    let content: (T) -> Content
+    
+    @State private var totalHeight: CGFloat = .zero
+    
     var body: some View {
         GeometryReader { geometry in
-            self.generateContent(in: geometry)
+            generateContent(in: geometry)
         }
         .frame(height: totalHeight)
     }
-
+    
     private func generateContent(in geometry: GeometryProxy) -> some View {
         var width = CGFloat.zero
         var height = CGFloat.zero
-
+        
         return ZStack(alignment: .topLeading) {
-            ForEach(items, id: \.self) { item in
+            ForEach(items) { item in
                 content(item)
+                    .padding(.trailing, 8)
+                    .padding(.bottom, 8)
                     .alignmentGuide(.leading) { dimension in
                         if (abs(width - dimension.width) > geometry.size.width) {
                             width = 0
                             height -= dimension.height
                         }
                         let result = width
-                        width -= dimension.width
+                        if item.id == items.last?.id {
+                            width = 0
+                        } else {
+                            width -= dimension.width
+                        }
                         return result
                     }
                     .alignmentGuide(.top) { _ in
                         let result = height
+                        if item.id == items.last?.id {
+                            height = 0
+                        }
                         return result
                     }
             }
@@ -379,77 +1160,118 @@ struct WrapView<Content: View>: View {
         .background(
             GeometryReader { geometry in
                 Color.clear.onAppear {
-                    self.totalHeight = abs(height)
+                    totalHeight = geometry.size.height
                 }
             }
         )
     }
 }
 
-struct FlowLayout<Content: View>: View {
-    let items: [String]
-    let content: (String) -> Content
-
-    @State private var totalHeight: CGFloat = .zero
-
-    var body: some View {
-        GeometryReader { geometry in
-            self.generateContent(in: geometry)
-        }
-        .frame(height: totalHeight)
+struct GoalCard: View {
+    var goal: Goal
+    
+    @State private var isHovered = false
+    
+    // Helper computed property to check completion status
+    private var isCompleted: Bool {
+        return goal.status == .completed
     }
-
-    private func generateContent(in geometry: GeometryProxy) -> some View {
-        var width = CGFloat.zero
-        var height = CGFloat.zero
-
-        return ZStack(alignment: .topLeading) {
-            ForEach(items, id: \.self) { item in
-                content(item)
-                    .padding([.horizontal, .vertical], 4)
-                    .alignmentGuide(.leading, computeValue: { dimension in
-                        if abs(width - dimension.width) > geometry.size.width {
-                            width = 0
-                            height -= dimension.height
-                        }
-                        let result = width
-                        if item == items.last {
-                            width = 0
-                        } else {
-                            width -= dimension.width
-                        }
-                        return result
-                    })
-                    .alignmentGuide(.top, computeValue: { _ in
-                        let result = height
-                        if item == items.last {
-                            height = 0
-                        }
-                        return result
-                    })
+    
+    var body: some View {
+        let cardContent = VStack(alignment: .leading, spacing: 12) {
+            goalHeaderView
+            
+            // Description
+            if !goal.description.isEmpty {
+                Text(goal.description)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(3)
             }
         }
-        .background(viewHeightReader($totalHeight))
+        .padding(16)
+        
+        let backgroundShape = RoundedRectangle(cornerRadius: 12)
+            .fill(Color.white.opacity(0.05))
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.3)
+            )
+        
+        let overlayGradient = isCompleted ?
+            LinearGradient(
+                colors: [Color.green.opacity(0.4), Color.green.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ) :
+            LinearGradient(
+                colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        
+        return cardContent
+            .background(backgroundShape)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(overlayGradient, lineWidth: 1)
+            )
+            .scaleEffect(isHovered ? 1.02 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+            .onHover { hovering in
+                isHovered = hovering
+            }
     }
-
-    private func viewHeightReader(_ binding: Binding<CGFloat>) -> some View {
-        GeometryReader { geometry in
-            Color.clear
-                .preference(key: ViewHeightKey.self, value: geometry.size.height)
+    
+    private var goalHeaderView: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(goal.description)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                if let dueDate = goal.dueDate {
+                    Text(formattedDate(dueDate))
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
+            
+            Spacer()
+            
+            completionBadge
         }
-        .onPreferenceChange(ViewHeightKey.self) { binding.wrappedValue = $0 }
     }
-
-    private struct ViewHeightKey: PreferenceKey {
-        static var defaultValue: CGFloat {
-            return 0
-        }
-
-        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-            value = max(value, nextValue())
-        }
+    
+    private var completionBadge: some View {
+        Text(goal.status.rawValue)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(isCompleted ? .green : .orange)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(isCompleted ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+            )
+    }
+    
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return "Due: \(formatter.string(from: date))"
     }
 }
+
+struct TMIGoal: Identifiable {
+    let id = UUID()
+    let title: String
+    let description: String
+    let dueDate: Date
+    let isCompleted: Bool
+}
+
+// MARK: - Preview
 
 #Preview {
     TMIPlanDetailView(plan: TMIPlan.samplePlan)

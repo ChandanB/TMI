@@ -155,6 +155,9 @@ enum FieldType: String, Codable, CaseIterable {
     case phoneNumber
     case url
     case file
+    case rating = "Rating"
+    case table = "Table"
+    case signature = "Signature"
     case allCases
     
     var requiresOptions: Bool {
@@ -205,6 +208,12 @@ enum FieldType: String, Codable, CaseIterable {
             return "File Upload Field"
         case .allCases:
             return "All Field"
+        case .rating:
+            return "Rating"
+        case .table:
+            return "Table"
+        case .signature:
+            return "Signature"
         }
     }
 }
@@ -214,3 +223,43 @@ extension UTType {
     static var sectionField: UTType { UTType(exportedAs: "com.example.sectionField") }
 }
 
+extension FieldType {
+    var iconName: String {
+        switch self {
+        case .text:
+            return "textformat"
+        case .longText:
+            return "text.alignleft"
+        case .number:
+            return "number"
+        case .date:
+            return "calendar"
+        case .time:
+            return "clock"
+        case .dateTime:
+            return "calendar.badge.clock"
+        case .email:
+            return "envelope"
+        case .phoneNumber:
+            return "phone"
+        case .url:
+            return "link"
+        case .multipleChoice:
+            return "list.bullet.circle"
+        case .checkbox:
+            return "checkmark.square"
+        case .dropdown:
+            return "arrowtriangle.down.circle"
+        case .rating:
+            return "star"
+        case .file:
+            return "doc.badge.plus"
+        case .table:
+            return "tablecells"
+        case .signature:
+            return "signature"
+        case .allCases:
+            return "questionmark.circle"  // fallback for any “catch‐all” case
+        }
+    }
+}

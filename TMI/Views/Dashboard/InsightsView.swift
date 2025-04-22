@@ -8,7 +8,7 @@
 import SwiftUI
 import Charts
 
-struct InsightsView: View {
+struct LegacyInsightsView: View {
     @State private var selectedInsight: InsightType = .performance
     @State private var timeFrame: TimeFrame = .month
     @State private var isInsightSelectorExpanded = false
@@ -914,5 +914,5 @@ let tmiEffectivenessData: [TMIEffectivenessData] = [
 ]
 
 #Preview {
-    InsightsView()
+    LegacyInsightsView()
 }
