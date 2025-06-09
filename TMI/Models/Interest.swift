@@ -5,7 +5,7 @@ import SwiftUI
 import SwiftData
 import FirebaseFirestore
 
-final class Interest: Identifiable, Hashable, Codable, Sendable {
+final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
     // MARK: - Equatable Implementation
     static func == (lhs: Interest, rhs: Interest) -> Bool {
         return lhs.id == rhs.id

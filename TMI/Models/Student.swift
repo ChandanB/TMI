@@ -247,8 +247,6 @@ struct SurveyResult: Codable, Hashable, Identifiable {
 
 extension Student {
     static var sampleStudent: Student {
-        let interests = Interest.sampleInterests
-        let hobbies = Hobby.sampleHobbies
         let surveyResults = [
             SurveyResult(
                 id: "survey1",
