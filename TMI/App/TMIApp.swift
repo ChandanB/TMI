@@ -55,3 +55,10 @@ struct ContentView: View {
         }
     }
 }
+
+
+#Preview {
+    ContentView()
+        .environment(\.authStateModel, AuthStateModel())
+        .environment(\.dashboardStateModel, DashboardStateModel())
+}

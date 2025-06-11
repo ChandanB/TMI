@@ -9,18 +9,6 @@ import FirebaseAuth
 import Observation
 import SwiftUI
 
-// MARK: - User Profile Data Model
-
-struct UserProfileData: Equatable {
-  var displayName: String = ""
-  var email: String = ""
-  var role: String = "student"
-  var isEmailVerified: Bool = false
-
-  // For email update
-  var newEmail: String = ""
-  var currentPassword: String = ""
-}
 
 // MARK: - Environment Key
 extension EnvironmentValues {

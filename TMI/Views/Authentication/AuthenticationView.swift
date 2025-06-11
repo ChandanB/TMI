@@ -221,6 +221,8 @@ struct AuthenticationView: View {
   @Environment(\.authStateModel) var stateModel
   @State private var showingRegistration = false
   @State private var showingForgotPassword = false
+  @State private var showingRoleSelection = false
+  @State private var showingSupportResources = false
   @Environment(\.dismiss) private var dismiss
   @FocusState private var focusedField: Field?
   @State private var appearAnimation = false
@@ -345,13 +347,13 @@ struct AuthenticationView: View {
                   value: animateButtons
                 )
 
-                // Error Message
+                // Enhanced Error Message with Trauma-Informed Design
                 if let errorMessage = stateModel.errorMessage {
-                  Text(errorMessage)
-                    .font(.system(size: 14))
-                    .foregroundColor(Color.red.opacity(0.9))
-                    .padding(.horizontal)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                  TraumaInformedErrorView(
+                    message: errorMessage,
+                    showingSupportResources: $showingSupportResources
+                  )
+                  .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
 
                 // Login Button - Using unified TMIButton
@@ -371,15 +373,30 @@ struct AuthenticationView: View {
                   value: animateButtons
                 )
 
-                // Sign Up Link
-                Button(action: {
-                  showingRegistration = true
-                }) {
-                  Text("Don't have an account? ")
-                    .foregroundColor(.white.opacity(0.7))
-                    + Text("Sign Up")
-                    .foregroundColor(Color.tmiSecondary)
-                    .fontWeight(.semibold)
+                // Enhanced Sign Up Section
+                VStack(spacing: 12) {
+                  Button(action: {
+                    showingRoleSelection = true
+                  }) {
+                    Text("Don't have an account? ")
+                      .foregroundColor(.white.opacity(0.7))
+                      + Text("Create Account")
+                      .foregroundColor(Color.tmiSecondary)
+                      .fontWeight(.semibold)
+                  }
+
+                  // Support Resources Button
+                  Button(action: {
+                    showingSupportResources = true
+                  }) {
+                    HStack(spacing: 6) {
+                      Image(systemName: "heart.circle")
+                        .font(.system(size: 14))
+                      Text("Need Help or Support?")
+                        .font(.system(size: 14))
+                    }
+                    .foregroundColor(Color.tmiSecondary.opacity(0.8))
+                  }
                 }
                 .padding(.top, 10)
                 .opacity(animateButtons ? 1.0 : 0)
@@ -413,6 +430,14 @@ struct AuthenticationView: View {
       .navigationBarTitleDisplayMode(.inline)
       .sheet(isPresented: $showingRegistration) {
         RegistrationView()
+          .preferredColorScheme(.dark)
+      }
+      .sheet(isPresented: $showingRoleSelection) {
+        RoleSelectionView()
+          .preferredColorScheme(.dark)
+      }
+      .sheet(isPresented: $showingSupportResources) {
+        SupportResourcesView()
           .preferredColorScheme(.dark)
       }
       .alert("Reset Password", isPresented: $showingForgotPassword) {
@@ -471,6 +496,214 @@ struct AuthenticationView: View {
   private func authenticate() {
     Task {
       await stateModel.signIn()
+    }
+  }
+}
+
+// MARK: - Trauma-Informed Error View
+
+struct TraumaInformedErrorView: View {
+  let message: String
+  @Binding var showingSupportResources: Bool
+
+  var body: some View {
+    TMIGlassCard(style: .error) {
+      VStack(spacing: 16) {
+        // Gentle, non-threatening icon
+        Image(systemName: "heart.circle")
+          .font(.system(size: 32))
+          .foregroundColor(Color.tmiSecondary)
+
+        // Gentle error message
+        Text(message)
+          .font(.system(size: 14))
+          .foregroundColor(.white.opacity(0.9))
+          .multilineTextAlignment(.center)
+
+        // Reassuring message
+        Text("You're safe. Take your time, and try again when you're ready.")
+          .font(.system(size: 12))
+          .foregroundColor(.white.opacity(0.7))
+          .multilineTextAlignment(.center)
+
+        // Support options
+        HStack(spacing: 16) {
+          Button(action: {
+            showingSupportResources = true
+          }) {
+            HStack(spacing: 4) {
+              Image(systemName: "heart")
+              Text("Get Support")
+            }
+            .font(.system(size: 12))
+            .foregroundColor(Color.tmiSecondary)
+          }
+
+          Button(action: {
+            // Clear error (would be handled by state model)
+          }) {
+            Text("I'm Ready to Try Again")
+              .font(.system(size: 12))
+              .foregroundColor(.white.opacity(0.8))
+          }
+        }
+        .padding(.top, 8)
+      }
+      .padding(.vertical, 8)
+    }
+    .padding(.horizontal, 20)
+  }
+}
+
+// MARK: - Support Resources View
+
+struct SupportResourcesView: View {
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    NavigationView {
+      ZStack {
+        TMIBackgroundView(variant: .auth)
+
+        ScrollView {
+          VStack(spacing: 20) {
+            // Header
+            VStack(spacing: 12) {
+              Image(systemName: "heart.circle.fill")
+                .font(.system(size: 40))
+                .foregroundColor(Color.tmiSecondary)
+
+              Text("We're Here to Help")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(.white)
+
+              Text(
+                "Your safety and wellbeing are our top priorities. Here are some resources that might help."
+              )
+              .font(.system(size: 16))
+              .foregroundColor(.white.opacity(0.8))
+              .multilineTextAlignment(.center)
+              .padding(.horizontal, 30)
+            }
+            .padding(.top, 20)
+
+            // Support resources
+            LazyVStack(spacing: 16) {
+              SupportResourceCard(
+                icon: "message.circle",
+                title: "Chat Support",
+                description: "Get real-time help from our support team",
+                action: {}
+              )
+
+              SupportResourceCard(
+                icon: "phone.circle",
+                title: "Call Support",
+                description: "Speak directly with someone who can help",
+                action: {}
+              )
+
+              SupportResourceCard(
+                icon: "questionmark.circle",
+                title: "Help Center",
+                description: "Find answers to common questions",
+                action: {}
+              )
+
+              SupportResourceCard(
+                icon: "person.2.circle",
+                title: "Crisis Support",
+                description: "24/7 crisis support and resources",
+                isEmergency: true,
+                action: {}
+              )
+
+              SupportResourceCard(
+                icon: "envelope.circle",
+                title: "Email Support",
+                description: "Send us a detailed message about your issue",
+                action: {}
+              )
+            }
+            .padding(.horizontal, 20)
+
+            Spacer(minLength: 40)
+          }
+        }
+      }
+      .navigationTitle("Support Resources")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button("Done") {
+            dismiss()
+          }
+          .foregroundColor(Color.tmiSecondary)
+        }
+      }
+    }
+  }
+}
+
+// MARK: - Support Resource Card
+
+struct SupportResourceCard: View {
+  let icon: String
+  let title: String
+  let description: String
+  let isEmergency: Bool
+  let action: () -> Void
+
+  init(
+    icon: String, title: String, description: String, isEmergency: Bool = false,
+    action: @escaping () -> Void
+  ) {
+    self.icon = icon
+    self.title = title
+    self.description = description
+    self.isEmergency = isEmergency
+    self.action = action
+  }
+
+  var body: some View {
+    Button(action: action) {
+      TMIGlassCard(style: .form) {
+        HStack(spacing: 16) {
+          Image(systemName: icon)
+            .font(.system(size: 24))
+            .foregroundColor(isEmergency ? .red : Color.tmiSecondary)
+
+          VStack(alignment: .leading, spacing: 4) {
+            HStack {
+              Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+
+              if isEmergency {
+                Text("URGENT")
+                  .font(.system(size: 10, weight: .bold))
+                  .padding(.horizontal, 6)
+                  .padding(.vertical, 2)
+                  .background(Color.red)
+                  .foregroundColor(.white)
+                  .cornerRadius(4)
+              }
+
+              Spacer()
+            }
+
+            Text(description)
+              .font(.system(size: 14))
+              .foregroundColor(.white.opacity(0.8))
+              .multilineTextAlignment(.leading)
+          }
+
+          Image(systemName: "arrow.right")
+            .font(.system(size: 14))
+            .foregroundColor(.white.opacity(0.6))
+        }
+        .padding(.horizontal, 4)
+      }
     }
   }
 }

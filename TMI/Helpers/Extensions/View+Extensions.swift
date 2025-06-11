@@ -83,10 +83,18 @@ extension View {
 
 extension UIApplication {
     func endEditing(_ force: Bool) {
-        self.windows
-            .filter{$0.isKeyWindow}
-            .first?
-            .endEditing(force)
+        if #available(iOS 15.0, *) {
+            UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }?
+                .endEditing(force)
+        } else {
+            self.windows
+                .filter { $0.isKeyWindow }
+                .first?
+                .endEditing(force)
+        }
     }
 }
 

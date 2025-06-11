@@ -39,16 +39,41 @@ extension FirebaseManager {
     }
     
     func addFormTemplateToUserCollection(formTemplateId: String, userId: String) async throws {
-        var user: TMIUser = try await FIREBASE_MANAGER.fetchDocument(inCollection: .users, withId: userId)
-        var formTemplates = user.formTemplates
-        if !formTemplates.contains(formTemplateId) {
-            formTemplates.append(formTemplateId)
-            user.formTemplates = formTemplates
-            try await updateDocument(inCollection: FirestoreCollection.users, document: user)
-        } else if user.formTemplates == [] {
-            user.formTemplates = [formTemplateId]
-            try await updateDocument(inCollection: FirestoreCollection.users, document: user)
+        let user: TMIUser = try await FIREBASE_MANAGER.fetchDocument(inCollection: .users, withId: userId)
+        let currentTemplates = user.profileData.formTemplates
+        var updatedTemplates = currentTemplates
+        if !updatedTemplates.contains(formTemplateId) {
+            updatedTemplates.append(formTemplateId)
         }
+        let updatedProfileData = UserProfileData(
+            displayName: user.profileData.displayName,
+            firstName: user.profileData.firstName,
+            lastName: user.profileData.lastName,
+            dateOfBirth: user.profileData.dateOfBirth,
+            profileImageURL: user.profileData.profileImageURL,
+            preferredLanguage: user.profileData.preferredLanguage,
+            timezone: user.profileData.timezone,
+            darkModeEnabled: user.profileData.darkModeEnabled,
+            accessibilitySettings: user.profileData.accessibilitySettings,
+            emergencyContacts: user.profileData.emergencyContacts,
+            associatedStudentIds: user.profileData.associatedStudentIds,
+            formTemplates: updatedTemplates,
+            institutionalInfo: user.profileData.institutionalInfo,
+            guardianshipInfo: user.profileData.guardianshipInfo
+        )
+        let updatedUser = TMIUser(
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            institutionID: user.institutionID,
+            verificationStatus: user.verificationStatus,
+            privacySettings: user.privacySettings,
+            consentRecords: user.consentRecords,
+            profileData: updatedProfileData,
+            createdAt: user.createdAt,
+            lastActive: user.lastActive
+        )
+        try await updateDocument(inCollection: FirestoreCollection.users, document: updatedUser)
     }
 }
 
@@ -104,5 +129,3 @@ struct FormFieldValidator {
         return phonePredicate.evaluate(with: phoneNumber)
     }
 }
-
-

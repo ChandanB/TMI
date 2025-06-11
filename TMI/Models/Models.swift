@@ -52,9 +52,9 @@ func binding<T>(_ stateModel: BaseStateModel<T, IdentifiableError>, _ key: Strin
     )
 }
 
-func binding<T, V>(_ stateModel: BaseStateModel<T, IdentifiableError>, _ key: String) -> Binding<V> where V: Equatable {
+func binding<T, V>(_ stateModel: BaseStateModel<T, IdentifiableError>, _ key: String, defaultValue: V) -> Binding<V> where V: Equatable {
     Binding(
-        get: { stateModel.ui.get(key) ?? (false as! V) },
+        get: { stateModel.ui.get(key) ?? defaultValue },
         set: { stateModel.ui.set(key, value: $0) }
     )
 }
@@ -67,13 +67,7 @@ func optionalBinding<T, V>(_ stateModel: BaseStateModel<T, IdentifiableError>, _
     )
 }
 
-// For values with a default
-func binding<T, V>(_ stateModel: BaseStateModel<T, IdentifiableError>, _ key: String, defaultValue: V) -> Binding<V> where V: Equatable {
-    Binding(
-        get: { stateModel.ui.get(key) ?? defaultValue },
-        set: { stateModel.ui.set(key, value: $0) }
-    )
-}
+
 
 struct AlignmentData: Identifiable, Equatable {
     var id = UUID()

@@ -68,7 +68,6 @@ struct TMIPlan: Codable, Identifiable, Hashable {
 
 extension TMIPlan {
     static var samplePlan: TMIPlan {
-        let student = Student.sampleStudent
         return TMIPlan(
             student: Student.sampleStudents[0],
             students: Student.sampleStudents,
