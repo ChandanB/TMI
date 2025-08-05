@@ -39,6 +39,8 @@ struct TMIUser: Codable, Identifiable {
   var isActive: Bool
   var emergencyContacts: [EmergencyContact]
   
+  var formTemplates: [String] = []
+  
   // Legacy compatibility
   var legacyRole: String {
     return role.rawValue
@@ -65,7 +67,8 @@ struct TMIUser: Codable, Identifiable {
     lastLoginAt: Date? = nil,
     lastActivityAt: Date? = nil,
     isActive: Bool = true,
-    emergencyContacts: [EmergencyContact] = []
+    emergencyContacts: [EmergencyContact] = [],
+    formTemplates: [String] = []
   ) {
     self.id = id
     self.userID = userID
@@ -88,6 +91,7 @@ struct TMIUser: Codable, Identifiable {
     self.lastActivityAt = lastActivityAt
     self.isActive = isActive
     self.emergencyContacts = emergencyContacts
+    self.formTemplates = formTemplates
   }
 
   enum CodingKeys: String, CodingKey {
@@ -112,6 +116,7 @@ struct TMIUser: Codable, Identifiable {
     case lastActivityAt
     case isActive
     case emergencyContacts
+    case formTemplates
   }
   
   init(from decoder: Decoder) throws {
@@ -137,6 +142,7 @@ struct TMIUser: Codable, Identifiable {
     lastActivityAt = try container.decodeIfPresent(Date.self, forKey: .lastActivityAt)
     isActive = try container.decode(Bool.self, forKey: .isActive)
     emergencyContacts = try container.decode([EmergencyContact].self, forKey: .emergencyContacts)
+    formTemplates = try container.decodeIfPresent([String].self, forKey: .formTemplates) ?? []
   }
   
   func encode(to encoder: Encoder) throws {
@@ -162,6 +168,7 @@ struct TMIUser: Codable, Identifiable {
     try container.encodeIfPresent(lastActivityAt, forKey: .lastActivityAt)
     try container.encode(isActive, forKey: .isActive)
     try container.encode(emergencyContacts, forKey: .emergencyContacts)
+    try container.encode(formTemplates, forKey: .formTemplates)
   }
 }
 

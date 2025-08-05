@@ -1,3 +1,4 @@
+import FirebaseAuth
 import FirebaseFirestore
 import Foundation
 import Observation
@@ -8,10 +9,19 @@ import SwiftUI
 @Observable
 class StudentListViewModel {
   var students: [Student] = []
-  private var db = Firestore.firestore()
+  private var db = FirebaseManager.shared.firestore
+
+  private var userStudentsCollection: CollectionReference? {
+    guard let uid = Auth.auth().currentUser?.uid else {
+      print("Error: User not logged in.")
+      return nil
+    }
+    return db.collection("users").document(uid).collection("students")
+  }
 
   func fetchStudents() {
-    db.collection("students").getDocuments { (querySnapshot, error) in
+    guard let collection = userStudentsCollection else { return }
+    collection.getDocuments { (querySnapshot, error) in
       if let error = error {
         print("Error getting students: \(error.localizedDescription)")
       } else {
@@ -23,18 +33,22 @@ class StudentListViewModel {
     }
   }
 
-  func addStudent(_ student: Student) {
+  func addStudent(_ student: Student) async -> Bool {
+    guard let collection = userStudentsCollection else { return false }
     do {
-      let _ = try db.collection("students").addDocument(from: student)
+      _ = try collection.addDocument(from: student)
       fetchStudents()  // Refresh the list after adding
+      return true
     } catch {
       print("Error adding student: \(error.localizedDescription)")
+      return false
     }
   }
 
   func deleteStudent(_ student: Student) {
     guard let id = student.id else { return }
-    db.collection("students").document(id).delete { error in
+    guard let collection = userStudentsCollection else { return }
+    collection.document(id).delete { error in
       if let error = error {
         print("Error deleting student: \(error.localizedDescription)")
       } else {
@@ -159,11 +173,18 @@ struct StudentListView: View {
           }
         }
         .sheet(isPresented: $showingAddStudent) {
-          AddStudentView()
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(30)
-            .presentationSizing(.page)
+          AddStudentView { newStudent in
+            Task {
+              let success = await viewModel.addStudent(newStudent)
+              if success {
+                viewModel.fetchStudents()
+              }
+            }
+          }
+          .presentationDetents([.medium, .large])
+          .presentationDragIndicator(.visible)
+          .presentationCornerRadius(30)
+          .presentationSizing(.page)
         }
         .sheet(isPresented: $showingFilterSheet) {
           StudentListFilterView(selectedOption: $selectedFilterOption)
@@ -614,7 +635,10 @@ struct AddStudentView: View {
   @State private var name = ""
   @State private var grade = ""
   @State private var studentID = ""
+  @State private var dateOfBirth = Date()
   @State private var isSubmitting = false
+
+  var onStudentAdded: ((Student) -> Void)?
 
   var body: some View {
     NavigationStack {
@@ -645,17 +669,29 @@ struct AddStudentView: View {
               text: $studentID,
               keyboardType: .numberPad
             )
+            
+            DatePicker("Date of Birth", selection: $dateOfBirth, displayedComponents: .date)
+              .datePickerStyle(.compact)
+              .accentColor(.tmiSecondary)
+              .padding(.bottom, 10)
 
             // Submit button
             Button {
-              // Add student logic
+              // Construct new Student and call completion closure
+              guard !name.isEmpty, !grade.isEmpty, !studentID.isEmpty else { return }
               isSubmitting = true
-
-              // Simulate submission
-              DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                isSubmitting = false
-                dismiss()
-              }
+              let newStudent = Student(
+                id: nil,
+                name: name,
+                grade: grade,
+                dateOfBirth: dateOfBirth,
+                tmiPlans: [], studentID: studentID,
+                interests: [],
+                hobbies: [],
+                photoURL: nil
+              )
+              onStudentAdded?(newStudent)
+              dismiss()
             } label: {
               HStack {
                 if isSubmitting {
@@ -904,6 +940,7 @@ struct StudentDetailView: View {
   @Environment(\.dismiss) private var dismiss
 
   @State private var tabSelection = 0
+  @State private var showingNewPlanSheet = false
 
   var body: some View {
     NavigationStack {
@@ -913,6 +950,17 @@ struct StudentDetailView: View {
         ScrollView {
           VStack(spacing: 24) {
             profileHeader
+
+            Button(action: { showingNewPlanSheet = true }) {
+              Label("Create TMI Plan", systemImage: "plus.square.on.square")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 16).fill(Color.tmiSecondary))
+                .shadow(color: Color.tmiSecondary.opacity(0.3), radius: 10, x: 0, y: 5)
+            }
+            .padding(.top, 8)
+
             StudentListTabPicker(selection: $tabSelection)
               .padding(.horizontal, 20)
             tabContent
@@ -923,6 +971,12 @@ struct StudentDetailView: View {
       .navigationTitle("Student Details")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar { toolbarMenu }
+      .sheet(isPresented: $showingNewPlanSheet) {
+        NewTMIPlanView(preselectedStudent: student)
+          .presentationDetents([.medium, .large])
+          .presentationDragIndicator(.visible)
+          .presentationCornerRadius(30)
+      }
     }
     .preferredColorScheme(.dark)
   }
@@ -1084,7 +1138,7 @@ struct StudentDetailView: View {
           message: "Create a TMI plan to start tracking the student's progress",
           buttonTitle: "Create TMI Plan",
           action: {
-            // Create plan action
+            showingNewPlanSheet = true
           }
         )
       } else {
@@ -1317,3 +1371,4 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
 #Preview {
   StudentListView()
 }
+

@@ -40,38 +40,33 @@ extension FirebaseManager {
     
     func addFormTemplateToUserCollection(formTemplateId: String, userId: String) async throws {
         let user: TMIUser = try await FIREBASE_MANAGER.fetchDocument(inCollection: .users, withId: userId)
-        let currentTemplates = user.profileData.formTemplates
-        var updatedTemplates = currentTemplates
+        var updatedTemplates = user.formTemplates
         if !updatedTemplates.contains(formTemplateId) {
             updatedTemplates.append(formTemplateId)
         }
-        let updatedProfileData = UserProfileData(
-            displayName: user.profileData.displayName,
-            firstName: user.profileData.firstName,
-            lastName: user.profileData.lastName,
-            dateOfBirth: user.profileData.dateOfBirth,
-            profileImageURL: user.profileData.profileImageURL,
-            preferredLanguage: user.profileData.preferredLanguage,
-            timezone: user.profileData.timezone,
-            darkModeEnabled: user.profileData.darkModeEnabled,
-            accessibilitySettings: user.profileData.accessibilitySettings,
-            emergencyContacts: user.profileData.emergencyContacts,
-            associatedStudentIds: user.profileData.associatedStudentIds,
-            formTemplates: updatedTemplates,
-            institutionalInfo: user.profileData.institutionalInfo,
-            guardianshipInfo: user.profileData.guardianshipInfo
-        )
         let updatedUser = TMIUser(
             id: user.id,
+            userID: user.userID,
+            displayName: user.displayName,
             email: user.email,
+            isEmailVerified: user.isEmailVerified,
             role: user.role,
+            dateOfBirth: user.dateOfBirth,
             institutionID: user.institutionID,
+            institutionName: user.institutionName,
             verificationStatus: user.verificationStatus,
-            privacySettings: user.privacySettings,
             consentRecords: user.consentRecords,
-            profileData: updatedProfileData,
+            parentalConsentStatus: user.parentalConsentStatus,
+            ageVerificationStatus: user.ageVerificationStatus,
+            privacySettings: user.privacySettings,
+            permissions: user.permissions,
+            dataClassificationAccess: user.dataClassificationAccess,
             createdAt: user.createdAt,
-            lastActive: user.lastActive
+            lastLoginAt: user.lastLoginAt,
+            lastActivityAt: user.lastActivityAt,
+            isActive: user.isActive,
+            emergencyContacts: user.emergencyContacts,
+            formTemplates: updatedTemplates
         )
         try await updateDocument(inCollection: FirestoreCollection.users, document: updatedUser)
     }
@@ -129,3 +124,4 @@ struct FormFieldValidator {
         return phonePredicate.evaluate(with: phoneNumber)
     }
 }
+

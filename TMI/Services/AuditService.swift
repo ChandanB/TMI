@@ -451,7 +451,7 @@ final class AuditService {
 
 class DeviceInfoProvider {
   func getCurrentDeviceInfo() async -> DeviceInfo {
-    return DeviceInfo(
+      return await DeviceInfo(
       deviceType: .iPhone,  // Would detect actual device type
       operatingSystem: "iOS",
       osVersion: "17.0",  // Would get actual version

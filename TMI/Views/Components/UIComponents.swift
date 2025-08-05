@@ -19,7 +19,7 @@ struct PremiumGlassTabBar: View {
 
   // Show only the important tabs to avoid crowding on smaller screens
   private let displayedTabs: [MainTabView.Tab] = [
-    .dashboard, .students, .tmiPlans, .surveys, .settings,
+    .dashboard, .students, .tmiPlans, .settings,
   ]
 
   var body: some View {
@@ -109,8 +109,8 @@ struct PremiumGlassTabBar: View {
   private func shortTabLabel(for tab: MainTabView.Tab) -> String {
     switch tab {
     case .tmiPlans: return "Plans"
-    case .interestsAndHobbies: return "Interests"
-    case .careerExplorer: return "Careers"
+//    case .interestsAndHobbies: return "Interests"
+//    case .careerExplorer: return "Careers"
     default: return tab.rawValue.capitalized
     }
   }
@@ -120,10 +120,10 @@ struct PremiumGlassTabBar: View {
     case .dashboard: return "square.grid.2x2.fill"
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
-    case .interestsAndHobbies: return "heart.fill"
-    case .surveys: return "list.clipboard.fill"
-    case .resources: return "book.fill"
-    case .careerExplorer: return "briefcase.fill"
+//    case .interestsAndHobbies: return "heart.fill"
+//    case .surveys: return "list.clipboard.fill"
+//    case .resources: return "book.fill"
+//    case .careerExplorer: return "briefcase.fill"
     case .settings: return "gear"
     }
   }
@@ -219,8 +219,8 @@ struct PremiumSidebarList: View {
   private func tabLabel(for tab: MainTabView.Tab) -> String {
     switch tab {
     case .tmiPlans: return "TMI Plans"
-    case .interestsAndHobbies: return "Interests & Hobbies"
-    case .careerExplorer: return "Career Explorer"
+//    case .interestsAndHobbies: return "Interests & Hobbies"
+//    case .careerExplorer: return "Career Explorer"
     default: return tab.rawValue.capitalized
     }
   }
@@ -230,10 +230,10 @@ struct PremiumSidebarList: View {
     case .dashboard: return "square.grid.2x2.fill"
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
-    case .interestsAndHobbies: return "heart.fill"
-    case .surveys: return "list.clipboard.fill"
-    case .resources: return "book.fill"
-    case .careerExplorer: return "briefcase.fill"
+//    case .interestsAndHobbies: return "heart.fill"
+//    case .surveys: return "list.clipboard.fill"
+//    case .resources: return "book.fill"
+//    case .careerExplorer: return "briefcase.fill"
     case .settings: return "gear"
     }
   }

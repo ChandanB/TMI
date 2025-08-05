@@ -597,6 +597,14 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
         return
       }
 
+      // Seed initial data for new educators (sample students, interests, hobbies)
+      // This ensures viable educator onboarding.
+      do {
+        try await firebaseManager.seedInitialEducatorDataIfNeeded()
+      } catch {
+        // Optional: Log or handle seeding error silently
+      }
+
       // All checks passed - user is authenticated
       currentUser = user
       userRole = user.role
@@ -656,6 +664,8 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
   }
 
   func updateInstitutionCode(_ code: String) {
+    // Institution code is optional and NOT required to complete registration.
+    // Users may enter it if they wish, but registration proceeds regardless.
     institutionCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
     registrationData.institutionCode = code
   }
@@ -668,12 +678,12 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
   private func updateRequiredConsents(for role: UserRole) {
     requiredConsents = [.dataCollection]
 
-    if role.isEducator {
+    if [.teacher, .counselor, .administrator, .admin, .socialWorker].contains(role) {
       requiredConsents.append(.ferpa)
     }
 
     if role == .counselor || role == .socialWorker {
-      requiredConsents.append(.traumaAssessment)
+      requiredConsents.append(.traumaInformedSupport)
     }
 
     // COPPA consent is added based on age, not role
@@ -819,6 +829,7 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
       return .emailVerification
     case .emailVerification:
       if role.requiresInstitutionalAffiliation {
+        // Proceed to institutionVerification regardless of institutionCode presence
         return .institutionVerification
       } else if role == .socialWorker {
         return .credentialVerification
@@ -826,6 +837,7 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
         return .basicInfo
       }
     case .institutionVerification:
+      // Proceed to next step even if institutionCode is empty - institution code is optional.
       if role == .socialWorker {
         return .credentialVerification
       } else {
@@ -917,6 +929,9 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
     return age >= 4 && age <= 120  // Reasonable age range
   }
 
+  // Note: Institution code validation not enforced. This is a product decision:
+  // users may optionally enter their institution code, but registration does not require it.
+
   // MARK: - Consent Methods
 
   func grantConsent(_ consentType: ConsentType, digitalSignature: String? = nil) async {
@@ -924,8 +939,7 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
 
     let consentRecord = ConsentRecord(
       consentType: consentType,
-      version: "1.0",  // Would be dynamic
-      grantedBy: userID,
+      version: "1.0",
       digitalSignature: digitalSignature
     )
 
@@ -939,7 +953,7 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
     if hasAllRequiredConsents {
       consentStatus = .granted
       if case .loaded(.awaitingConsent) = state {
-          await updateState(.loaded(.authenticated(currentUser!)))
+        await updateState(.loaded(.authenticated(currentUser!)))
       }
     }
 
@@ -947,12 +961,12 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
   }
 
   func revokeConsent(_ consentType: ConsentType) async {
-      guard (currentUser?.id) != nil else { return }
+    guard (currentUser?.id) != nil else { return }
 
     // Mark consent as revoked
     if let index = grantedConsents.firstIndex(where: { $0.consentType == consentType && $0.isValid }
     ) {
-        let updatedConsent = grantedConsents[index]
+      let updatedConsent = grantedConsents[index]
       // Would update the consent record in place or create a revocation record
       grantedConsents[index] = updatedConsent
     }
@@ -999,12 +1013,12 @@ enum ConsentStatus {
   case expired
 }
 
-enum ParentalConsentStatus {
-  case notRequired
-  case required
-  case pending
-  case granted
-  case denied
+enum ParentalConsentStatus: String, Codable {
+  case notRequired = "not_required"
+  case required = "required"
+  case pending = "pending"
+  case granted = "granted"
+  case denied = "denied"
 }
 
 enum PrivacyLevel {
@@ -1031,9 +1045,19 @@ enum SecurityLevel {
 struct RegistrationData {
   var selectedRole: UserRole?
   var dateOfBirth: Date?
+  /// Institution code is optional; users may enter it, but it is not required to complete registration.
   var institutionCode: String?
   var guardianEmail: String?
   var emergencyContacts: [EmergencyContact] = []
   var privacySettings: PrivacySettings?
   var mfaEnabled: Bool = false
+}
+
+// MARK: - UserRole Guardian Helper
+
+extension UserRole {
+  /// Returns true if the role is a parent or legal guardian.
+  var isGuardian: Bool {
+    self == .parent || self == .legalGuardian
+  }
 }

@@ -18,13 +18,24 @@ struct RoleSelectionView: View {
   @State private var selectedRole: UserRole?
   @State private var showingAgeVerification = false
   @State private var institutionCode = ""
+  @State private var selectedInstitution: Institution? = nil
   @State private var appearAnimation = false
   @State private var showingInfoSheet = false
+  @State private var showingRegistrationView = false
   @Environment(\.dismiss) private var dismiss
 
   // Animation states for role cards
   @State private var animateCards = false
   @State private var animateButtons = false
+
+  /// Closure called when registration is complete, passing selected role and institution
+  let onRegistrationComplete: ((UserRole?, Institution?) -> Void)?
+
+  // Registration step state removed to simplify flow and avoid multiple sheets
+
+  init(onRegistrationComplete: ((UserRole?, Institution?) -> Void)? = nil) {
+    self.onRegistrationComplete = onRegistrationComplete
+  }
 
   var body: some View {
     ZStack {
@@ -37,7 +48,7 @@ struct RoleSelectionView: View {
             .frame(minHeight: 40)
 
           // Trauma-informed welcome section
-          TraumaInformedWelcomeSection()
+          TraumaInformedWelcomeSection(showingInfoSheet: $showingInfoSheet)
             .opacity(appearAnimation ? 1.0 : 0)
             .offset(y: appearAnimation ? 0 : 20)
             .animation(
@@ -58,7 +69,10 @@ struct RoleSelectionView: View {
 
           // Institution verification section (when applicable)
           if let role = selectedRole, role.requiresInstitutionalAffiliation {
-            InstitutionVerificationSection(code: $institutionCode)
+            InstitutionVerificationSection(
+              code: $institutionCode,
+              selectedInstitution: $selectedInstitution
+            )
               .opacity(animateButtons ? 1.0 : 0)
               .offset(y: animateButtons ? 0 : 20)
               .animation(
@@ -101,6 +115,17 @@ struct RoleSelectionView: View {
     .sheet(isPresented: $showingAgeVerification) {
       AgeVerificationView(selectedRole: selectedRole!)
         .preferredColorScheme(.dark)
+        .onDisappear {
+          // After age verification, proceed to registration
+          showingRegistrationView = true
+          // Notify about registration start
+          onRegistrationComplete?(selectedRole, selectedInstitution)
+        }
+    }
+    // Present the RegistrationView sheet with selected context
+    .sheet(isPresented: $showingRegistrationView) {
+      RegistrationView()
+        .preferredColorScheme(.dark)
     }
     .onAppear {
       // Trigger animations
@@ -141,26 +166,54 @@ struct RoleSelectionView: View {
 
     switch role.requiredVerification {
     case .ageVerification:
+      // Show age verification sheet
       showingAgeVerification = true
+
     case .institutionalEmail:
-      // Navigate to institution verification
-      break
+      // Always allow progress, initiate background verification if institutionCode or selectedInstitution present
+      if !institutionCode.isEmpty || selectedInstitution != nil {
+        Task {
+          await verifyInstitutionInBackground()
+        }
+      }
+      // Transition directly to registration
+      showingRegistrationView = true
+      // Notify about registration start
+      onRegistrationComplete?(selectedRole, selectedInstitution)
+
     case .professionalCredentials:
-      // Navigate to credential verification
-      break
+      // Transition directly to registration
+      showingRegistrationView = true
+      // Notify about registration start
+      onRegistrationComplete?(selectedRole, selectedInstitution)
+
     case .guardianConsent:
-      // Navigate to guardian consent flow
-      break
+      // Transition directly to registration
+      showingRegistrationView = true
+      // Notify about registration start
+      onRegistrationComplete?(selectedRole, selectedInstitution)
+
     case .none:
-      // Navigate to basic info
-      break
+      // Transition directly to registration
+      showingRegistrationView = true
+      // Notify about registration start
+      onRegistrationComplete?(selectedRole, selectedInstitution)
     }
+  }
+
+  private func verifyInstitutionInBackground() async {
+    // Simulate background verification with delay
+    print("Starting background institution verification...")
+    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds delay
+    print("Institution verification completed.")
   }
 }
 
 // MARK: - Trauma-Informed Welcome Section
 
 struct TraumaInformedWelcomeSection: View {
+  @Binding var showingInfoSheet: Bool
+
   var body: some View {
     VStack(spacing: 16) {
       // Safe, welcoming icon
@@ -188,7 +241,7 @@ struct TraumaInformedWelcomeSection: View {
         .padding(.horizontal, 20)
 
         Button(action: {
-          // Show information sheet
+          showingInfoSheet = true
         }) {
           HStack(spacing: 4) {
             Image(systemName: "info.circle")
@@ -299,6 +352,7 @@ struct RoleSelectionCard: View {
 
 struct InstitutionVerificationSection: View {
   @Binding var code: String
+  @Binding var selectedInstitution: Institution?
   @State private var showingInstitutionSearch = false
 
   var body: some View {
@@ -326,7 +380,16 @@ struct InstitutionVerificationSection: View {
         TMITextField(
           icon: "number",
           placeholder: "Institution Code",
-          text: $code,
+          text: Binding(
+            get: {
+              selectedInstitution?.name ?? code
+            },
+            set: { newValue in
+              // If user edits manual entry, clear selectedInstitution
+              selectedInstitution = nil
+              code = newValue
+            }
+          ),
           keyboardType: .default
         )
 
@@ -345,8 +408,14 @@ struct InstitutionVerificationSection: View {
     }
     .padding(.horizontal, 20)
     .sheet(isPresented: $showingInstitutionSearch) {
-      InstitutionSearchView()
+      InstitutionSearchView(selectedInstitution: $selectedInstitution)
         .preferredColorScheme(.dark)
+        .onDisappear {
+          // When institution is selected, update code accordingly
+          if let selected = selectedInstitution {
+            code = selected.name
+          }
+        }
     }
   }
 }
@@ -401,8 +470,11 @@ struct AgeVerificationView: View {
               )
               .datePickerStyle(.wheel)
               .colorScheme(.dark)
-              .onChange(of: dateOfBirth) { _, newValue in
+              .onChange(of: dateOfBirth) { newValue in
                 validateAge(newValue)
+              }
+              .onAppear {
+                validateAge(dateOfBirth)
               }
 
               if isValidAge {
@@ -471,8 +543,9 @@ struct AgeVerificationView: View {
 // MARK: - Institution Search View
 
 struct InstitutionSearchView: View {
+  @Binding var selectedInstitution: Institution?
   @State private var searchText = ""
-  @State private var institutions: [Institution] = sampleInstitutions
+  @State private var institutions: [Institution] = InstitutionSearchView.sampleInstitutions
   @Environment(\.dismiss) private var dismiss
 
   var body: some View {
@@ -495,7 +568,7 @@ struct InstitutionSearchView: View {
             LazyVStack(spacing: 12) {
               ForEach(filteredInstitutions, id: \.id) { institution in
                 InstitutionCard(institution: institution) {
-                  // Select institution
+                  selectedInstitution = institution
                   dismiss()
                 }
               }

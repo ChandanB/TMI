@@ -18,8 +18,11 @@ struct MainTabView: View {
   @State private var tabBarVisible = false
 
   enum Tab: String, CaseIterable, Identifiable {
-    case dashboard, students, tmiPlans, interestsAndHobbies, surveys, resources, careerExplorer,
-      settings
+    case dashboard, students, tmiPlans
+    /*
+    case interestsAndHobbies, surveys, resources, careerExplorer,
+    */
+    case settings
     var id: Self { self }
   }
 
@@ -160,6 +163,7 @@ struct MainTabView: View {
       StudentListView()
     case .tmiPlans:
       TMIPlanListView(tmiPlans: TMIPlan.samplePlans)
+    /*
     case .interestsAndHobbies:
       InterestsAndHobbiesView(interests: [], hobbies: [])
     case .surveys:
@@ -168,6 +172,7 @@ struct MainTabView: View {
       ResourcesView()
     case .careerExplorer:
       CareerExplorerView()
+    */
     case .settings:
       SettingsView()
     }
@@ -176,8 +181,10 @@ struct MainTabView: View {
   func tabLabel(for tab: Tab) -> String {
     switch tab {
     case .tmiPlans: return "TMI Plans"
+    /*
     case .interestsAndHobbies: return "Interests & Hobbies"
     case .careerExplorer: return "Career Explorer"
+    */
     default: return tab.rawValue.capitalized
     }
   }
@@ -187,10 +194,12 @@ struct MainTabView: View {
     case .dashboard: return "square.grid.2x2.fill"
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
+    /*
     case .interestsAndHobbies: return "heart.fill"
     case .surveys: return "list.clipboard.fill"
     case .resources: return "book.fill"
     case .careerExplorer: return "briefcase.fill"
+    */
     case .settings: return "gear"
     }
   }
@@ -205,3 +214,4 @@ struct MainTabView: View {
 #Preview("iPad") {
   MainTabView()
 }
+

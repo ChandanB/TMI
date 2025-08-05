@@ -94,6 +94,43 @@ extension FirebaseManager {
 
     try await firestore.collection("users").document(currentUser.uid).updateData(data)
   }
+  
+  // MARK: - Educator Data Seeding
+  /// Seeds sample students, interests, and hobbies for a newly authenticated educator if missing.
+  func seedInitialEducatorDataIfNeeded() async throws {
+    guard let userID = auth.currentUser?.uid else { return }
+    let studentsCollection = firestore.collection("users").document(userID).collection("students")
+    let studentSnapshot = try await studentsCollection.limit(to: 1).getDocuments()
+    
+    // Seed only if no students found
+    if studentSnapshot.isEmpty {
+      // Seed sample students
+      let students = Student.sampleStudents
+      for student in students {
+        let studentID = student.id ?? UUID().uuidString
+        var studentWithID = student
+        studentWithID.id = studentID
+        let doc = studentsCollection.document(studentID)
+        try await doc.setData(studentWithID.toFirestoreData())
+      }
+      
+      // Seed interests
+      let interestsCollection = firestore.collection("users").document(userID).collection("interests")
+      let interests = Interest.sampleInterests
+      for interest in interests {
+        let doc = interestsCollection.document(interest.id ?? UUID().uuidString)
+        try await doc.setData(interest.toFirestoreData())
+      }
+      
+      // Seed hobbies
+      let hobbiesCollection = firestore.collection("users").document(userID).collection("hobbies")
+      let hobbies = Hobby.sampleHobbies
+      for hobby in hobbies {
+        let doc = hobbiesCollection.document(hobby.id.uuidString)
+        try await doc.setData(hobby.toFirestoreData())
+      }
+    }
+  }
 }
 
 // MARK: - Error Handling
@@ -110,4 +147,50 @@ extension FirebaseManager {
     case documentDoesNotExist
     case unknownError
   }
+}
+
+// MARK: - Firestore Encoding for Student
+extension Student {
+    func toFirestoreData() -> [String: Any] {
+        var data: [String: Any] = [
+            "id": id ?? UUID().uuidString,
+            "name": name,
+            "grade": grade,
+            "dateOfBirth": dateOfBirth.timeIntervalSince1970,
+        ]
+        if let studentID = studentID { data["studentID"] = studentID }
+        if let photoURL = photoURL { data["photoURL"] = photoURL.absoluteString }
+        if let tmiPlans = tmiPlans { data["tmiPlans"] = tmiPlans.map { $0.id } }
+        if !interests.isEmpty { data["interests"] = interests.map { $0.id ?? "" } }
+        if !hobbies.isEmpty { data["hobbies"] = hobbies.map { $0.id.uuidString } }
+        if let surveyResults = surveyResults { data["surveyResults"] = surveyResults.map { $0.id } }
+        if let academicPerformance = academicPerformance {
+            data["academicPerformance"] = [
+                "gpa": academicPerformance.gpa as Any,
+                "strengths": academicPerformance.strengths,
+                "areasForImprovement": academicPerformance.areasForImprovement
+            ]
+        }
+        if let engagementHistory = engagementHistory {
+            data["engagementHistory"] = engagementHistory.map { [
+                "date": $0.date.timeIntervalSince1970,
+                "score": $0.score,
+                "source": $0.source.rawValue,
+                "notes": $0.notes ?? ""
+            ] }
+        }
+        if let notes = notes {
+            data["notes"] = notes.map { [
+                "id": $0.id.uuidString,
+                "date": $0.date.timeIntervalSince1970,
+                "author": $0.author,
+                "content": $0.content,
+                "category": $0.category.rawValue
+            ] }
+        }
+        if let lastInteractionDate = lastInteractionDate {
+            data["lastInteractionDate"] = lastInteractionDate.timeIntervalSince1970
+        }
+        return data
+    }
 }

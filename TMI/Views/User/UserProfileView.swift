@@ -49,7 +49,7 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
     }
 
     // Initialize profile data with Auth data
-    var profileData = UserProfileData()
+    var profileData = UserProfileData(displayName: user.displayName ?? "")
     profileData.email = user.email ?? ""
     profileData.displayName = user.displayName ?? ""
     profileData.isEmailVerified = user.isEmailVerified

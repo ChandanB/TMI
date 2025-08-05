@@ -4,6 +4,8 @@ import FirebaseFirestore
 import SwiftUI
 
 struct NewTMIPlanView: View {
+  var preselectedStudent: Student? = nil
+  
   @Environment(\.dismiss) private var dismiss
 
   // State for selection
@@ -25,6 +27,11 @@ struct NewTMIPlanView: View {
   @State private var navigationAppeared = false
 
   private let totalSteps = 4
+  
+  init(preselectedStudent: Student? = nil) {
+    self.preselectedStudent = preselectedStudent
+    _selectedStudent = State(initialValue: preselectedStudent)
+  }
 
   var body: some View {
     ZStack {
@@ -992,3 +999,4 @@ struct HobbySelectionCard: View {
 #Preview {
   NewTMIPlanView()
 }
+

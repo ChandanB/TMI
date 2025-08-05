@@ -53,9 +53,9 @@ extension FirebaseManager {
         guard let user = Auth.auth().currentUser else {
             throw NSError(domain: "AuthenticationError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No user is currently signed in."])
         }
-        
-        try await user.updateEmail(to: newEmail)
-        
+
+        try await user.sendEmailVerification(beforeUpdatingEmail: newEmail)
+
         // Update email in Firestore as well
         try await firestore.collection("users").document(user.uid).updateData([
             "email": newEmail
