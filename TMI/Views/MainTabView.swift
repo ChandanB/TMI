@@ -8,22 +8,53 @@
 import SwiftUI
 
 struct MainTabView: View {
-  @State private var selectedTab: Tab = .dashboard
+  @State private var selectedTab: Tab = .students
   @State private var columnVisibility = NavigationSplitViewVisibility.automatic
   @Environment(\.horizontalSizeClass) private var sizeClass
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.authStateModel) private var authStateModel
 
   // Animation state
-  @State private var previousTab: Tab = .dashboard
+  @State private var previousTab: Tab = .students
   @State private var tabBarVisible = false
 
   enum Tab: String, CaseIterable, Identifiable {
-    case dashboard, students, tmiPlans
-    /*
-    case interestsAndHobbies, surveys, resources, careerExplorer,
-    */
-    case settings
+    case students, tmiPlans
     var id: Self { self }
+    
+    // Define which roles can access each tab - MVP focuses on educators
+    var allowedRoles: Set<UserRole> {
+      switch self {
+      case .students:
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker]
+      case .tmiPlans:
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker]
+      }
+    }
+    
+    // Check if tab is accessible by current user role
+    func isAccessible(for role: UserRole?) -> Bool {
+      guard let role = role else { return false }
+      return allowedRoles.contains(role)
+    }
+  }
+  
+  // Computed property to get tabs accessible to current user
+  var availableTabs: [Tab] {
+    let currentRole = authStateModel.currentUser?.role
+    return Tab.allCases.filter { tab in
+      tab.isAccessible(for: currentRole)
+      
+      // Future enhancement: Additional verification checks could be added here
+      // For example:
+      // && (!tab.requiresAdvancedVerification || authStateModel.currentUser?.canAccessAdvancedFeatures() == true)
+      // This would hide tabs requiring additional verification until the user completes it
+    }
+  }
+  
+  // Default tab for MVP - always starts with students
+  var defaultTab: Tab {
+    return .students
   }
 
   var body: some View {
@@ -53,6 +84,11 @@ struct MainTabView: View {
     .foregroundColor(.white)
     .foregroundStyle(.white)
     .onAppear {
+      // Set appropriate default tab for user role
+      if availableTabs.contains(defaultTab) && selectedTab != defaultTab {
+        selectedTab = defaultTab
+      }
+      
       // Animate tab bar appearance
       withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.3)) {
         tabBarVisible = true
@@ -66,7 +102,7 @@ struct MainTabView: View {
     ZStack(alignment: .bottom) {
       // Tab Content Area - each view will provide its own navigation title
       TabView(selection: $selectedTab) {
-        ForEach(Tab.allCases) { tab in
+        ForEach(availableTabs, id: \.id) { tab in
           destinationView(for: tab)
             .tag(tab)
         }
@@ -79,7 +115,8 @@ struct MainTabView: View {
       // Custom Tab Bar
       PremiumGlassTabBar(
         selectedTab: $selectedTab,
-        previousTab: $previousTab
+        previousTab: $previousTab,
+        availableTabs: availableTabs
       )
       .offset(y: tabBarVisible ? 0 : 100)
     }
@@ -142,7 +179,7 @@ struct MainTabView: View {
           .padding(.vertical, 20)
 
           // Navigation Menu
-          PremiumSidebarList(selectedTab: $selectedTab)
+          PremiumSidebarList(selectedTab: $selectedTab, availableTabs: availableTabs)
             .padding(.top, 10)
         }
       }
@@ -157,50 +194,24 @@ struct MainTabView: View {
   @ViewBuilder
   func destinationView(for tab: Tab) -> some View {
     switch tab {
-    case .dashboard:
-      DashboardView()
     case .students:
       StudentListView()
     case .tmiPlans:
-      TMIPlanListView(tmiPlans: TMIPlan.samplePlans)
-    /*
-    case .interestsAndHobbies:
-      InterestsAndHobbiesView(interests: [], hobbies: [])
-    case .surveys:
-      FormsAndSurveysView()
-    case .resources:
-      ResourcesView()
-    case .careerExplorer:
-      CareerExplorerView()
-    */
-    case .settings:
-      SettingsView()
+      TMIPlanListView()
     }
   }
 
   func tabLabel(for tab: Tab) -> String {
     switch tab {
+    case .students: return "Students"
     case .tmiPlans: return "TMI Plans"
-    /*
-    case .interestsAndHobbies: return "Interests & Hobbies"
-    case .careerExplorer: return "Career Explorer"
-    */
-    default: return tab.rawValue.capitalized
     }
   }
 
   func iconName(for tab: Tab) -> String {
     switch tab {
-    case .dashboard: return "square.grid.2x2.fill"
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
-    /*
-    case .interestsAndHobbies: return "heart.fill"
-    case .surveys: return "list.clipboard.fill"
-    case .resources: return "book.fill"
-    case .careerExplorer: return "briefcase.fill"
-    */
-    case .settings: return "gear"
     }
   }
 }

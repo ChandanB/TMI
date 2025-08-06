@@ -1,5 +1,6 @@
+
 //
-//  EnhancedAuthStateModel.swift
+//  AuthStateModel.swift
 //  TMI
 //
 //  Created by Chandan Brown on 9/14/24.
@@ -10,6 +11,12 @@ import FirebaseFirestore
 import Foundation
 import Observation
 import SwiftUI
+
+// Simple Field enum for compatibility with AuthenticationView
+enum Field: Hashable {
+  case email  
+  case password
+}
 
 // MARK: - Enhanced Authentication State
 
@@ -368,10 +375,15 @@ enum SuspensionReason: String, CaseIterable, Equatable {
   }
 }
 
-// MARK: - Enhanced Auth State Model
+// MARK: - Environment Key
+extension EnvironmentValues {
+  @Entry var authStateModel: AuthStateModel = AuthStateModel()
+}
+
+// MARK: - Auth State Model
 
 @Observable
-final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, IdentifiableError> {
+final class AuthStateModel: BaseStateModel<EnhancedAuthenticationState, IdentifiableError> {
 
   // MARK: - Dependencies
   private let firebaseManager: FirebaseManager
@@ -566,62 +578,124 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
     )
   }
 
-  @MainActor
-  private func loadUserProfile(for userID: String) async {
-    do {
-      // Load user profile from Firestore
-      let userDoc = try await firebaseManager.firestore
-        .collection("users")
-        .document(userID)
-        .getDocument()
-
-      guard let userData = userDoc.data() else {
-        // User authenticated but no profile - start registration
-        updateState(.loaded(.registering(.basicInfo)))
-        return
-      }
-
-      let user = try Firestore.Decoder().decode(TMIUser.self, from: userData)
-
-      // Check verification status
-      if !user.verificationStatus.isValid {
-        updateState(.loaded(.verifying(user.role.requiredVerification)))
-        return
-      }
-
-      // Check consent status
-      if !user.hasValidConsent {
-        let requiredConsent =
-          user.requiresParentalConsent ? ConsentType.coppa : ConsentType.dataCollection
-        updateState(.loaded(.awaitingConsent(requiredConsent)))
-        return
-      }
-
-      // Seed initial data for new educators (sample students, interests, hobbies)
-      // This ensures viable educator onboarding.
-      do {
-        try await firebaseManager.seedInitialEducatorDataIfNeeded()
-      } catch {
-        // Optional: Log or handle seeding error silently
-      }
-
-      // All checks passed - user is authenticated
-      currentUser = user
-      userRole = user.role
-      updateState(.loaded(.authenticated(user)))
-
-      await logAuditEvent(.login, result: .success)
-
-    } catch {
-      updateState(
-        .loaded(
-          .error(
-            AuthenticationError(
-              type: .serverError,
-              message: "Failed to load user profile: \(error.localizedDescription)"
-            ))))
+    @MainActor
+    private func loadUserProfile(for userID: String) async {
+        do {
+            // Load user profile from Firestore
+            let userDoc: DocumentSnapshot
+            do {
+                userDoc = try await firebaseManager.firestore
+                    .collection("users")
+                    .document(userID)
+                    .getDocument()
+            } catch {
+                print("[AuthStateModel] Firestore fetch failed for userID=\(userID):", error, String(describing: type(of: error)))
+                updateState(
+                    .loaded(
+                        .error(
+                            AuthenticationError(
+                                type: .serverError,
+                                message: "Firestore fetch failed: \(error.localizedDescription)"
+                            ))))
+                return
+            }
+            
+            guard let userData = userDoc.data() else {
+                print("[AuthStateModel] No user data found for userID=\(userID). Document exists: \(userDoc.exists)")
+                // User authenticated but no profile - start registration
+                updateState(.loaded(.registering(.basicInfo)))
+                return
+            }
+            
+            var user: TMIUser
+            do {
+                user = try Firestore.Decoder().decode(TMIUser.self, from: userData)
+            } catch {
+                print("[AuthStateModel] Decoding TMIUser failed for userID=\(userID):", error, String(describing: type(of: error)), "Raw data:", userData)
+                updateState(
+                    .loaded(
+                        .error(
+                            AuthenticationError(
+                                type: .serverError,
+                                message: "Failed to decode user profile: \(error.localizedDescription)"
+                            ))))
+                return
+            }
+            
+            // Sync email verification status from Firebase Auth
+            if let firebaseUser = Auth.auth().currentUser {
+                user.isEmailVerified = firebaseUser.isEmailVerified
+                user.verificationStatus.isEmailVerified = firebaseUser.isEmailVerified
+                
+                print("[AuthStateModel] Synced email verification status for userID=\(userID): \(firebaseUser.isEmailVerified)")
+                
+                // Update Firestore document if email verification status changed
+                if user.isEmailVerified != (userData["isEmailVerified"] as? Bool ?? false) {
+                    Task {
+                        do {
+                            try await firebaseManager.firestore
+                                .collection("users")
+                                .document(userID)
+                                .updateData([
+                                    "isEmailVerified": user.isEmailVerified,
+                                    "verificationStatus.isEmailVerified": user.isEmailVerified
+                                ])
+                            print("[AuthStateModel] Updated email verification status in Firestore for userID=\(userID)")
+                        } catch {
+                            print("[AuthStateModel] Failed to update email verification status in Firestore for userID=\(userID):", error)
+                        }
+                    }
+                }
+            }
+            
+            // Note: We don't block login based on verification status anymore.
+            // Verification is checked when accessing specific features within the app.
+            // If Firebase Auth allowed them in, they can access the basic app.
+            if !user.verificationStatus.isValid {
+                print("[AuthStateModel] User has minimal verification for userID=\(userID). Verification status:", user.verificationStatus)
+                print("[AuthStateModel] User can access app, but some features may require additional verification")
+            }
+            
+            // Check consent status - only block for critical missing consent
+            if user.requiresParentalConsent && !user.hasValidConsent {
+                print("[AuthStateModel] Minor user missing parental consent for userID=\(userID)")
+                updateState(.loaded(.awaitingConsent(.coppa)))
+                return
+            }
+            
+            // Log consent status but don't block access for basic data collection consent
+            if !user.hasValidConsent {
+                print("[AuthStateModel] User may need additional consent for some features, userID=\(userID)")
+            }
+            
+            // Seed initial data for new educators (sample students, interests, hobbies)
+            // This ensures viable educator onboarding.
+            do {
+                try await firebaseManager.seedInitialEducatorDataIfNeeded()
+            } catch {
+                print("[AuthStateModel] Seeding initial educator data failed for userID=\(userID):", error)
+                // Optional: Log or handle seeding error silently
+            }
+            
+            // All checks passed - user is authenticated
+            currentUser = user
+            userRole = user.role
+            print("[AuthStateModel] Successfully loaded user profile for userID=\(userID). Role: \(user.role)")
+            updateState(.loaded(.authenticated(user)))
+            
+            await logAuditEvent(.login, result: .success)
+            
+        } catch {
+            print("[AuthStateModel] Unexpected error in loadUserProfile(for:) for userID=\(userID):", error, String(describing: type(of: error)))
+            updateState(
+                .loaded(
+                    .error(
+                        AuthenticationError(
+                            type: .serverError,
+                            message: "Failed to load user profile: \(error.localizedDescription)"
+                        ))))
+        }
     }
-  }
 
   // MARK: - Form Field Methods
 
@@ -722,7 +796,7 @@ final class EnhancedAuthStateModel: BaseStateModel<EnhancedAuthenticationState, 
     updateState(.loaded(.authenticating))
 
     do {
-      try await firebaseManager.signIn(email: email, password: password)
+      try await firebaseManager.signIn(withEmail: email, password: password)
       // Firebase auth listener will handle the rest
       clearCredentials()
     } catch {
@@ -1004,6 +1078,27 @@ enum AuthField: Hashable {
   case confirmPassword
   case institutionCode
   case guardianEmail
+}
+
+// MARK: - Simple Field Support for AuthenticationView
+extension AuthStateModel {
+  // Support simple Field enum used in AuthenticationView
+  var simpleFocusedField: Field? {
+    get {
+      switch focusedField {
+      case .email: return .email
+      case .password: return .password
+      default: return nil
+      }
+    }
+    set {
+      switch newValue {
+      case .email: focusedField = .email
+      case .password: focusedField = .password
+      case .none: focusedField = nil
+      }
+    }
+  }
 }
 
 enum ConsentStatus {

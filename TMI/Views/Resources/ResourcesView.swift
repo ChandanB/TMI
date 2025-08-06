@@ -10,7 +10,7 @@ struct Resource: Identifiable, Codable {
   let category: ResourceCategory
   let url: String
   let createdAt: Date
-  let updatedAt: Date
+  var updatedAt: Date
   let tags: [String]
   let recommendedFor: [String]
   var isFeatured: Bool = false
@@ -1504,3 +1504,4 @@ extension View {
 #Preview {
   ResourcesView()
 }
+

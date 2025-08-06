@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // User document: only the authenticated user can access their own document
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+
+      // MVP Sub-collections: Students and TMI Plans
+      match /students/{studentId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+      
+      match /tmiPlans/{planId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+      
+      // Sample data collections (needed for MVP functionality)
+      match /interests/{interestId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+      
+      match /hobbies/{hobbyId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+    }
+  }
+}

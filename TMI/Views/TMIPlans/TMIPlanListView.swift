@@ -1,9 +1,75 @@
 // TMIPlanListView.swift
 
+import FirebaseAuth
+import FirebaseFirestore
+import Foundation
+import Observation
 import SwiftUI
 
+// MARK: - TMI Plan List View Model
+
+@Observable
+class TMIPlanListViewModel {
+  var tmiPlans: [TMIPlan] = []
+  var isLoading = false
+  private var db = FirebaseManager.shared.firestore
+
+  private var userPlansCollection: CollectionReference? {
+    guard let uid = Auth.auth().currentUser?.uid else {
+      print("Error: User not logged in.")
+      return nil
+    }
+    return db.collection("users").document(uid).collection("tmiPlans")
+  }
+
+  @MainActor
+  func fetchPlans() async {
+    guard let collection = userPlansCollection else { return }
+    
+    isLoading = true
+    
+    do {
+      let querySnapshot = try await collection.getDocuments()
+      tmiPlans = querySnapshot.documents.compactMap { document -> TMIPlan? in
+        try? document.data(as: TMIPlan.self)
+      }
+      print("Fetched \(tmiPlans.count) TMI plans")
+    } catch {
+      print("Error getting TMI plans: \(error.localizedDescription)")
+    }
+    
+    isLoading = false
+  }
+
+  func addPlan(_ plan: TMIPlan) async -> Bool {
+    guard let collection = userPlansCollection else { return false }
+    
+    do {
+      _ = try collection.addDocument(from: plan)
+      await fetchPlans() // Refresh the list after adding
+      return true
+    } catch {
+      print("Error adding TMI plan: \(error.localizedDescription)")
+      return false
+    }
+  }
+
+  func deletePlan(_ plan: TMIPlan) {
+    guard let id = plan.id, let collection = userPlansCollection else { return }
+    
+    Task {
+      do {
+        try await collection.document(id).delete()
+        await fetchPlans() // Refresh the list after deleting
+      } catch {
+        print("Error deleting TMI plan: \(error.localizedDescription)")
+      }
+    }
+  }
+}
+
 struct TMIPlanListView: View {
-  @State var tmiPlans: [TMIPlan]
+  @State private var viewModel = TMIPlanListViewModel()
   @State private var showingNewPlanSheet = false
   @State private var searchText = ""
   @State private var showingFilterSheet = false
@@ -45,7 +111,12 @@ struct TMIPlanListView: View {
                 .offset(y: searchAppeared ? 0 : -20)
                 .opacity(searchAppeared ? 1 : 0)
 
-              if filteredPlans.isEmpty {
+              if viewModel.isLoading {
+                ProgressView()
+                  .scaleEffect(1.5)
+                  .frame(maxWidth: .infinity, minHeight: 200)
+                  .foregroundColor(.white)
+              } else if filteredPlans.isEmpty {
                 enhancedEmptyStateView
                   .offset(y: plansAppeared ? 0 : 20)
                   .opacity(plansAppeared ? 1 : 0)
@@ -107,10 +178,17 @@ struct TMIPlanListView: View {
           }
         }
         .sheet(isPresented: $showingNewPlanSheet) {
-          NewTMIPlanView()
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(30)
+          NewTMIPlanView { newPlan in
+            Task {
+              let success = await viewModel.addPlan(newPlan)
+              if success {
+                showingNewPlanSheet = false
+              }
+            }
+          }
+          .presentationDetents([.large])
+          .presentationDragIndicator(.visible)
+          .presentationCornerRadius(30)
         }
         .sheet(isPresented: $showingFilterSheet) {
           PlanFilterView(selectedFilter: $selectedFilter)
@@ -123,6 +201,9 @@ struct TMIPlanListView: View {
     .preferredColorScheme(.dark)
     .onAppear {
       animateViews()
+      Task {
+        await viewModel.fetchPlans()
+      }
     }
   }
 
@@ -380,7 +461,7 @@ struct TMIPlanListView: View {
   // MARK: - Filtering Logic
 
   private var filteredPlans: [TMIPlan] {
-    tmiPlans.filter { plan in
+    viewModel.tmiPlans.filter { plan in
       (searchText.isEmpty || plan.model.rawValue.localizedCaseInsensitiveContains(searchText)
         || planContainsStudentName(plan, searchText))
         && (selectedFilter == .all || matchesFilter(plan: plan))
@@ -634,5 +715,5 @@ struct TMIPlanFilterOptionCard: View {
 }
 
 #Preview {
-  TMIPlanListView(tmiPlans: TMIPlan.samplePlans)
+  TMIPlanListView()
 }

@@ -97,6 +97,7 @@ struct TMIUser: Codable, Identifiable {
   enum CodingKeys: String, CodingKey {
     case id
     case userID
+    case uid // Legacy field name support
     case displayName
     case email
     case isEmailVerified
@@ -122,26 +123,47 @@ struct TMIUser: Codable, Identifiable {
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     id = try container.decodeIfPresent(String.self, forKey: .id)
-    userID = try container.decode(String.self, forKey: .userID)
-    displayName = try container.decode(String.self, forKey: .displayName)
-    email = try container.decode(String.self, forKey: .email)
-    isEmailVerified = try container.decode(Bool.self, forKey: .isEmailVerified)
+    
+    // Try both userID and uid fields for backward compatibility
+    if let userIDValue = try container.decodeIfPresent(String.self, forKey: .userID) {
+      userID = userIDValue
+    } else if let uidValue = try container.decodeIfPresent(String.self, forKey: .uid) {
+      userID = uidValue
+    } else {
+      throw DecodingError.keyNotFound(
+        CodingKeys.userID,
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Missing both 'userID' and 'uid' fields"
+        )
+      )
+    }
+    // Extract role first to use for defaults
     role = try container.decode(UserRole.self, forKey: .role)
+    
+    // Basic fields with reasonable defaults
+    displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? "User"
+    email = try container.decode(String.self, forKey: .email)
+    isEmailVerified = try container.decodeIfPresent(Bool.self, forKey: .isEmailVerified) ?? false
     dateOfBirth = try container.decodeIfPresent(Date.self, forKey: .dateOfBirth)
     institutionID = try container.decodeIfPresent(String.self, forKey: .institutionID)
     institutionName = try container.decodeIfPresent(String.self, forKey: .institutionName)
-    verificationStatus = try container.decode(VerificationStatus.self, forKey: .verificationStatus)
-    consentRecords = try container.decode([ConsentRecord].self, forKey: .consentRecords)
-    parentalConsentStatus = try container.decode(ParentalConsentStatus.self, forKey: .parentalConsentStatus)
-    ageVerificationStatus = try container.decode(AgeVerificationStatus.self, forKey: .ageVerificationStatus)
-    privacySettings = try container.decode(PrivacySettings.self, forKey: .privacySettings)
-    permissions = try container.decode(Set<Permission>.self, forKey: .permissions)
-    dataClassificationAccess = try container.decode(Set<DataClassification>.self, forKey: .dataClassificationAccess)
-    createdAt = try container.decode(Date.self, forKey: .createdAt)
+    
+    // Complex fields with defaults
+    verificationStatus = try container.decodeIfPresent(VerificationStatus.self, forKey: .verificationStatus) ?? VerificationStatus()
+    consentRecords = try container.decodeIfPresent([ConsentRecord].self, forKey: .consentRecords) ?? []
+    parentalConsentStatus = try container.decodeIfPresent(ParentalConsentStatus.self, forKey: .parentalConsentStatus) ?? .notRequired
+    ageVerificationStatus = try container.decodeIfPresent(AgeVerificationStatus.self, forKey: .ageVerificationStatus) ?? .notRequired
+    privacySettings = try container.decodeIfPresent(PrivacySettings.self, forKey: .privacySettings) ?? PrivacySettings()
+    permissions = try container.decodeIfPresent(Set<Permission>.self, forKey: .permissions) ?? role.defaultPermissions
+    dataClassificationAccess = try container.decodeIfPresent(Set<DataClassification>.self, forKey: .dataClassificationAccess) ?? role.defaultDataAccess
+    
+    // Date fields with defaults  
+    createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     lastLoginAt = try container.decodeIfPresent(Date.self, forKey: .lastLoginAt)
     lastActivityAt = try container.decodeIfPresent(Date.self, forKey: .lastActivityAt)
-    isActive = try container.decode(Bool.self, forKey: .isActive)
-    emergencyContacts = try container.decode([EmergencyContact].self, forKey: .emergencyContacts)
+    isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+    emergencyContacts = try container.decodeIfPresent([EmergencyContact].self, forKey: .emergencyContacts) ?? []
     formTemplates = try container.decodeIfPresent([String].self, forKey: .formTemplates) ?? []
   }
   
@@ -404,7 +426,23 @@ struct VerificationStatus: Codable {
   var isGuardianConsentVerified: Bool = false
   
   var isValid: Bool {
-    return isEmailVerified // Minimum requirement
+    return isEmailVerified // Minimum requirement for all users
+  }
+  
+  func isValidForRole(_ role: UserRole) -> Bool {
+    // Email verification is always required
+    guard isEmailVerified else { return false }
+    // Role-specific verification requirements
+    switch role {
+    case .student:
+      return true // Email verification is sufficient for students
+    case .teacher, .counselor, .administrator, .admin:
+      return isInstitutionVerified || isEmailVerified // Institution or email verification
+    case .socialWorker:
+      return isCredentialsVerified || isEmailVerified // Credentials or email verification  
+    case .parent, .legalGuardian:
+      return isGuardianConsentVerified || isEmailVerified // Guardian consent or email verification
+    }
   }
 }
 
@@ -664,6 +702,37 @@ extension TMIUser {
   
   func canAccess(_ dataClassification: DataClassification) -> Bool {
     return dataClassificationAccess.contains(dataClassification)
+  }
+  
+  // MARK: - Feature Access Methods
+  
+  /// Check if user can access advanced features requiring full verification
+  func canAccessAdvancedFeatures() -> Bool {
+    return verificationStatus.isValidForRole(role)
+  }
+  
+  /// Check if user can access sensitive data features
+  func canAccessSensitiveData() -> Bool {
+    switch role {
+    case .student, .parent, .legalGuardian:
+      return verificationStatus.isEmailVerified
+    case .teacher, .counselor, .administrator, .admin:
+      return verificationStatus.isEmailVerified && verificationStatus.isInstitutionVerified
+    case .socialWorker:
+      return verificationStatus.isEmailVerified && verificationStatus.isCredentialsVerified
+    }
+  }
+  
+  /// Check if user can create or manage other users' data
+  func canManageUserData() -> Bool {
+    guard verificationStatus.isEmailVerified else { return false }
+    
+    switch role {
+    case .student, .parent, .legalGuardian:
+      return false // Can only manage their own data
+    case .teacher, .counselor, .administrator, .admin, .socialWorker:
+      return canAccessAdvancedFeatures()
+    }
   }
   
   mutating func grantConsent(_ consentType: ConsentType, version: String, digitalSignature: String? = nil, ipAddress: String? = nil) {

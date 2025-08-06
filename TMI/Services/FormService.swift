@@ -40,34 +40,10 @@ extension FirebaseManager {
     
     func addFormTemplateToUserCollection(formTemplateId: String, userId: String) async throws {
         let user: TMIUser = try await FIREBASE_MANAGER.fetchDocument(inCollection: .users, withId: userId)
-        var updatedTemplates = user.formTemplates
-        if !updatedTemplates.contains(formTemplateId) {
-            updatedTemplates.append(formTemplateId)
+        var updatedUser = user
+        if !updatedUser.formTemplates.contains(formTemplateId) {
+            updatedUser.formTemplates.append(formTemplateId)
         }
-        let updatedUser = TMIUser(
-            id: user.id,
-            userID: user.userID,
-            displayName: user.displayName,
-            email: user.email,
-            isEmailVerified: user.isEmailVerified,
-            role: user.role,
-            dateOfBirth: user.dateOfBirth,
-            institutionID: user.institutionID,
-            institutionName: user.institutionName,
-            verificationStatus: user.verificationStatus,
-            consentRecords: user.consentRecords,
-            parentalConsentStatus: user.parentalConsentStatus,
-            ageVerificationStatus: user.ageVerificationStatus,
-            privacySettings: user.privacySettings,
-            permissions: user.permissions,
-            dataClassificationAccess: user.dataClassificationAccess,
-            createdAt: user.createdAt,
-            lastLoginAt: user.lastLoginAt,
-            lastActivityAt: user.lastActivityAt,
-            isActive: user.isActive,
-            emergencyContacts: user.emergencyContacts,
-            formTemplates: updatedTemplates
-        )
         try await updateDocument(inCollection: FirestoreCollection.users, document: updatedUser)
     }
 }
@@ -124,4 +100,3 @@ struct FormFieldValidator {
         return phonePredicate.evaluate(with: phoneNumber)
     }
 }
-

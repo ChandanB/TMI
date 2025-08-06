@@ -36,7 +36,7 @@ class StudentListViewModel {
   func addStudent(_ student: Student) async -> Bool {
     guard let collection = userStudentsCollection else { return false }
     do {
-      _ = try collection.addDocument(from: student)
+      _ = try await collection.addDocument(data: student.toFirestoreData())
       fetchStudents()  // Refresh the list after adding
       return true
     } catch {
@@ -650,20 +650,20 @@ struct AddStudentView: View {
         ScrollView {
           VStack(spacing: 24) {
             // Form content
-            GlassTextField(
+            TMITextField(
               icon: "person.fill",
               placeholder: "Student Name",
               text: $name
             )
 
-            GlassTextField(
+            TMITextField(
               icon: "number",
               placeholder: "Grade Level",
               text: $grade,
               keyboardType: .numberPad
             )
 
-            GlassTextField(
+            TMITextField(
               icon: "barcode",
               placeholder: "Student ID",
               text: $studentID,
@@ -685,7 +685,8 @@ struct AddStudentView: View {
                 name: name,
                 grade: grade,
                 dateOfBirth: dateOfBirth,
-                tmiPlans: [], studentID: studentID,
+                tmiPlans: [],
+                studentID: studentID,
                 interests: [],
                 hobbies: [],
                 photoURL: nil
@@ -1037,7 +1038,7 @@ struct StudentDetailView: View {
       divider
       statView(
         title: "Interests",
-        value: "\(student.interests.count ?? 0)",
+        value: "\(student.interests.count)",
         color: .blue)
     }
     .padding(16)
@@ -1276,84 +1277,7 @@ struct StudentListTabPicker: View {
   }
 }
 
-// MARK: - Glass TextField
-
-struct GlassTextField: View {
-  var icon: String
-  var placeholder: String
-  @Binding var text: String
-  var keyboardType: UIKeyboardType = .default
-  var isSecure: Bool = false
-
-  @FocusState private var isFocused: Bool
-
-  var body: some View {
-    HStack(spacing: 12) {
-      Image(systemName: icon)
-        .foregroundColor(isFocused ? Color.tmiSecondary : .white.opacity(0.6))
-        .frame(width: 24)
-        .animation(.easeOut(duration: 0.2), value: isFocused)
-
-      if isSecure {
-        SecureField("", text: $text)
-          .placeholder(
-            when: text.isEmpty,
-            content: {
-              Text(placeholder).foregroundColor(.white.opacity(0.6))
-            }
-          )
-          .focused($isFocused)
-          .foregroundColor(.white)
-          .autocorrectionDisabled()
-          .textInputAutocapitalization(.never)
-          .keyboardType(keyboardType)
-      } else {
-        TextField("", text: $text)
-          .placeholder(
-            when: text.isEmpty,
-            content: {
-              Text(placeholder).foregroundColor(.white.opacity(0.6))
-            }
-          )
-          .focused($isFocused)
-          .foregroundColor(.white)
-          .autocorrectionDisabled()
-          .textInputAutocapitalization(.never)
-          .keyboardType(keyboardType)
-      }
-    }
-    .padding(.vertical, 16)
-    .padding(.horizontal, 20)
-    .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(Color.black.opacity(0.2))
-        .background(
-          RoundedRectangle(cornerRadius: 12)
-            .fill(.ultraThinMaterial)
-            .opacity(0.3)
-        )
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 12)
-        .stroke(
-          isFocused
-            ? LinearGradient(
-              colors: [Color.tmiSecondary.opacity(0.8)],
-              startPoint: .topLeading,
-              endPoint: .bottomTrailing
-            )
-            : LinearGradient(
-              colors: [.white.opacity(0.3), .clear],
-              startPoint: .topLeading,
-              endPoint: .bottomTrailing
-            ),
-          lineWidth: 1
-        )
-        .animation(.easeInOut(duration: 0.2), value: isFocused)
-    )
-  }
-}
+// MARK: - Using TMITextField from unified components
 
 // MARK: - Animated Blob View
 

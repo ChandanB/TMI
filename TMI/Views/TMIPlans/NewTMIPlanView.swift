@@ -1,10 +1,12 @@
 // NewTMIPlanView.swift
 
+import FirebaseAuth
 import FirebaseFirestore
 import SwiftUI
 
 struct NewTMIPlanView: View {
   var preselectedStudent: Student? = nil
+  var onPlanCreated: ((TMIPlan) -> Void)? = nil
   
   @Environment(\.dismiss) private var dismiss
 
@@ -14,6 +16,12 @@ struct NewTMIPlanView: View {
   @State private var selectedInterests: [Interest] = []
   @State private var selectedHobbies: [Hobby] = []
   @State private var notes: String = ""
+
+  // Data state
+  @State private var students: [Student] = []
+  @State private var interests: [Interest] = []
+  @State private var hobbies: [Hobby] = []
+  @State private var isLoadingData = false
 
   // UI state
   @State private var currentStep = 0
@@ -28,8 +36,9 @@ struct NewTMIPlanView: View {
 
   private let totalSteps = 4
   
-  init(preselectedStudent: Student? = nil) {
+  init(preselectedStudent: Student? = nil, onPlanCreated: ((TMIPlan) -> Void)? = nil) {
     self.preselectedStudent = preselectedStudent
+    self.onPlanCreated = onPlanCreated
     _selectedStudent = State(initialValue: preselectedStudent)
   }
 
@@ -112,6 +121,9 @@ struct NewTMIPlanView: View {
     .preferredColorScheme(.dark)
     .onAppear {
       animateViews()
+      Task {
+        await fetchAllData()
+      }
     }
   }
 
@@ -216,17 +228,30 @@ struct NewTMIPlanView: View {
 
   @ViewBuilder
   private var enhancedStepContent: some View {
-    switch currentStep {
-    case 0:
-      enhancedSelectStudentView
-    case 1:
-      enhancedSelectModelView
-    case 2:
-      enhancedSelectInterestsView
-    case 3:
-      enhancedSelectHobbiesView
-    default:
-      EmptyView()
+    if isLoadingData {
+      VStack(spacing: 16) {
+        ProgressView()
+          .scaleEffect(1.5)
+          .foregroundColor(.white)
+        
+        Text("Loading data...")
+          .font(.system(size: 16))
+          .foregroundColor(.white.opacity(0.7))
+      }
+      .frame(maxWidth: .infinity, minHeight: 200)
+    } else {
+      switch currentStep {
+      case 0:
+        enhancedSelectStudentView
+      case 1:
+        enhancedSelectModelView
+      case 2:
+        enhancedSelectInterestsView
+      case 3:
+        enhancedSelectHobbiesView
+      default:
+        EmptyView()
+      }
     }
   }
 
@@ -239,7 +264,7 @@ struct NewTMIPlanView: View {
 
       ScrollView {
         VStack(spacing: 12) {
-          ForEach(fetchStudents()) { student in
+          ForEach(students) { student in
             StudentSelectionCard(
               student: student,
               isSelected: selectedStudent?.id == student.id,
@@ -305,7 +330,7 @@ struct NewTMIPlanView: View {
 
       ScrollView {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-          ForEach(fetchInterests()) { interest in
+          ForEach(interests) { interest in
             InterestSelectionCard(
               interest: interest,
               isSelected: selectedInterests.contains(interest),
@@ -348,7 +373,7 @@ struct NewTMIPlanView: View {
 
       ScrollView {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-          ForEach(fetchHobbies()) { hobby in
+          ForEach(hobbies) { hobby in
             HobbySelectionCard(
               hobby: hobby,
               isSelected: selectedHobbies.contains(hobby),
@@ -530,67 +555,106 @@ struct NewTMIPlanView: View {
 
   private func savePlan() {
     guard let student = selectedStudent, let model = selectedModel else { return }
+    guard let uid = Auth.auth().currentUser?.uid else {
+      alertMessage = "Unable to save plan: Not authenticated"
+      showingAlert = true
+      return
+    }
 
     isCreatingPlan = true
-
-    // Simulate network delay
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-      let newPlan = TMIPlan(
-        id: UUID().uuidString,
-        student: student,
-        students: [student],
-        model: model,
-        interests: selectedInterests,
-        hobbies: selectedHobbies,
-        creationDate: Date(),
-        lastUpdated: Date(),
-        goals: [],
-        progress: 0.0,
-        notes: notes
-      )
-
-      isCreatingPlan = false
-      dismiss()
-    }
-  }
-
-  private func fetchStudents() -> [Student] {
-    return Student.sampleStudents
-  }
-
-  private func fetchInterests() -> [Interest] {
-    if let student = selectedStudent {
-      // Combine student's interests with sample interests
-      var allInterests = Interest.sampleInterests
-
-      // Add student's interests if not already in the list
-      for interest in student.interests {
-        if !allInterests.contains(interest) {
-          allInterests.append(interest)
+    
+    Task {
+      do {
+        let newPlan = TMIPlan(
+          id: nil, // Let Firestore generate the ID
+          student: student,
+          students: [student],
+          model: model,
+          interests: selectedInterests,
+          hobbies: selectedHobbies,
+          creationDate: Date(),
+          lastUpdated: Date(),
+          goals: [],
+          progress: 0.0,
+          notes: notes
+        )
+        
+        let db = FirebaseManager.shared.firestore
+        let collection = db.collection("users").document(uid).collection("tmiPlans")
+        
+        _ = try collection.addDocument(from: newPlan)
+        
+        await MainActor.run {
+          isCreatingPlan = false
+          onPlanCreated?(newPlan)
+          dismiss()
+        }
+      } catch {
+        await MainActor.run {
+          isCreatingPlan = false
+          alertMessage = "Failed to save plan: \(error.localizedDescription)"
+          showingAlert = true
         }
       }
-
-      return allInterests
     }
-    return Interest.sampleInterests
   }
 
-  private func fetchHobbies() -> [Hobby] {
-    if let student = selectedStudent {
-      // Combine student's hobbies with sample hobbies
-      var allHobbies = Hobby.sampleHobbies
+  // MARK: - Data Fetching Functions
 
-      // Add student's hobbies if not already in the list
-      for hobby in student.hobbies {
-        if !allHobbies.contains(hobby) {
-          allHobbies.append(hobby)
-        }
-      }
-
-      return allHobbies
+  @MainActor
+  private func fetchAllData() async {
+    guard let uid = Auth.auth().currentUser?.uid else { 
+      print("No authenticated user found")
+      return 
     }
-    return Hobby.sampleHobbies
+    
+    isLoadingData = true
+    let db = FirebaseManager.shared.firestore
+    
+    async let studentsTask = fetchStudentsFromFirestore(db: db, uid: uid)
+    async let interestsTask = fetchInterestsFromFirestore(db: db, uid: uid)
+    async let hobbiesTask = fetchHobbiesFromFirestore(db: db, uid: uid)
+    
+    do {
+      students = try await studentsTask
+      interests = try await interestsTask
+      hobbies = try await hobbiesTask
+      print("Fetched \(students.count) students, \(interests.count) interests, \(hobbies.count) hobbies")
+    } catch {
+      print("Error fetching data: \(error.localizedDescription)")
+      // Fall back to sample data if Firebase fails
+      students = Student.comprehensiveSampleStudents
+      interests = Interest.expandedSampleInterests
+      hobbies = Hobby.expandedSampleHobbies
+    }
+    
+    isLoadingData = false
   }
+
+  private func fetchStudentsFromFirestore(db: Firestore, uid: String) async throws -> [Student] {
+    let collection = db.collection("users").document(uid).collection("students")
+    let querySnapshot = try await collection.getDocuments()
+    return querySnapshot.documents.compactMap { document -> Student? in
+      try? document.data(as: Student.self)
+    }
+  }
+
+  private func fetchInterestsFromFirestore(db: Firestore, uid: String) async throws -> [Interest] {
+    let collection = db.collection("users").document(uid).collection("interests")
+    let querySnapshot = try await collection.getDocuments()
+    return querySnapshot.documents.compactMap { document -> Interest? in
+      Interest.fromFirestore(id: document.documentID, data: document.data())
+    }
+  }
+
+  private func fetchHobbiesFromFirestore(db: Firestore, uid: String) async throws -> [Hobby] {
+    let collection = db.collection("users").document(uid).collection("hobbies")
+    let querySnapshot = try await collection.getDocuments()
+    return querySnapshot.documents.compactMap { document -> Hobby? in
+      Hobby.fromFirestore(id: document.documentID, data: document.data())
+    }
+  }
+
 
   private func toggleSelection<T: Identifiable & Equatable>(of item: T, in array: inout [T]) {
     if let index = array.firstIndex(of: item) {

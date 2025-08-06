@@ -10,11 +10,6 @@ import Observation
 import SwiftUI
 
 
-// MARK: - Environment Key
-extension EnvironmentValues {
-  @Entry var userProfileStateModel: UserProfileStateModel = UserProfileStateModel()
-}
-
 // MARK: - State Model
 
 @Observable
@@ -30,42 +25,58 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
 
     // Initialize UI state
     ui.set("isChangingEmail", value: false)
-
-    // Load user data on initialization
-    Task { @MainActor in
-      await fetch()
-    }
   }
 
   // MARK: - Data Fetching
 
   @MainActor
   override func fetch() async {
+    print("[UserProfileStateModel] Starting fetch")
     updateState(.loading)
 
     guard let user = Auth.auth().currentUser else {
-      handleError(FirebaseError.authError("Not logged in"), userFriendlyMessage: "Not logged in")
+      print("[UserProfileStateModel] No authenticated user found")
+      let error = ErrorHandlingHelper.handleError(
+        FirebaseError.authError("Not logged in"), 
+        userFriendlyMessage: "Not logged in"
+      )
+      updateState(.error(error))
       return
     }
 
+    print("[UserProfileStateModel] Found authenticated user: \(user.uid)")
+
     // Initialize profile data with Auth data
-    var profileData = UserProfileData(displayName: user.displayName ?? "")
+    var profileData = UserProfileData(displayName: user.displayName ?? "User")
     profileData.email = user.email ?? ""
-    profileData.displayName = user.displayName ?? ""
+    profileData.displayName = user.displayName ?? "User"
     profileData.isEmailVerified = user.isEmailVerified
 
     do {
       // Load user profile from Firestore
+      print("[UserProfileStateModel] Attempting to load Firestore profile")
       if let userData = try await firebaseManager.getCurrentUserProfile() {
+        print("[UserProfileStateModel] Found Firestore profile data: \(userData)")
         profileData.displayName = userData["displayName"] as? String ?? profileData.displayName
         profileData.role = userData["role"] as? String ?? "student"
 
+        print("[UserProfileStateModel] Successfully loaded profile for: \(profileData.displayName)")
         updateState(.loaded(profileData))
       } else {
-        handleError(FirebaseError.documentNotFound, userFriendlyMessage: "User profile not found")
+        print("[UserProfileStateModel] No Firestore profile found, using Auth data only")
+        // Use Auth data if no Firestore profile exists
+        updateState(.loaded(profileData))
       }
     } catch {
-      handleError(error, userFriendlyMessage: "Failed to load profile")
+      print("[UserProfileStateModel] Error loading profile: \(error)")
+      
+      // If Firestore fails, still show the user profile with Auth data
+      print("[UserProfileStateModel] Falling back to Auth data due to Firestore error")
+      updateState(.loaded(profileData))
+      
+      // Show a warning but don't fail completely
+      ui.alertMessage = "Some profile features may be limited due to a connection issue"
+      ui.isShowingAlert = true
     }
   }
 
@@ -80,9 +91,11 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
   @MainActor
   func updateProfile() async {
     guard let profileData = state.value else {
-      handleError(
+      let error = ErrorHandlingHelper.handleError(
         FirebaseError.missingData("No profile data to update"),
-        userFriendlyMessage: "No profile data to update")
+        userFriendlyMessage: "No profile data to update"
+      )
+      updateState(.error(error))
       return
     }
 
@@ -108,23 +121,28 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
       // Refresh data to ensure we have the latest
       await fetch()
     } catch {
-      handleError(error, userFriendlyMessage: "Failed to update profile")
+      let handledError = ErrorHandlingHelper.handleError(error, userFriendlyMessage: "Failed to update profile")
+      updateState(.error(handledError))
     }
   }
 
   @MainActor
   func updateEmail() async {
     guard let profileData = state.value else {
-      handleError(
+      let error = ErrorHandlingHelper.handleError(
         FirebaseError.missingData("No profile data available"),
-        userFriendlyMessage: "No profile data available")
+        userFriendlyMessage: "No profile data available"
+      )
+      updateState(.error(error))
       return
     }
 
     guard !profileData.newEmail.isEmpty, !profileData.currentPassword.isEmpty else {
-      handleError(
+      let error = ErrorHandlingHelper.handleError(
         FirebaseError.missingData("Please fill in all fields"),
-        userFriendlyMessage: "Please fill in all fields")
+        userFriendlyMessage: "Please fill in all fields"
+      )
+      updateState(.error(error))
       return
     }
 
@@ -152,7 +170,8 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
       ui.alertMessage = "Email updated successfully"
       ui.isShowingAlert = true
     } catch {
-      handleError(error, userFriendlyMessage: "Failed to update email")
+      let handledError = ErrorHandlingHelper.handleError(error, userFriendlyMessage: "Failed to update email")
+      updateState(.error(handledError))
     }
   }
 
@@ -170,7 +189,8 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
       // Refresh to get updated verification status
       await fetch()
     } catch {
-      handleError(error, userFriendlyMessage: "Failed to send verification email")
+      let handledError = ErrorHandlingHelper.handleError(error, userFriendlyMessage: "Failed to send verification email")
+      updateState(.error(handledError))
     }
   }
 
@@ -179,7 +199,8 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
     do {
       try firebaseManager.signOut()
     } catch {
-      handleError(error, userFriendlyMessage: "Failed to sign out")
+      let handledError = ErrorHandlingHelper.handleError(error, userFriendlyMessage: "Failed to sign out")
+      updateState(.error(handledError))
     }
   }
 
@@ -219,7 +240,7 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
 //
 
 struct UserProfileView: View {
-  @Environment(\.userProfileStateModel) private var stateModel
+  @State private var stateModel = UserProfileStateModel()
   @Environment(\.dismiss) private var dismiss
 
   var body: some View {
@@ -300,6 +321,14 @@ struct UserProfileView: View {
       }
     }
     .preferredColorScheme(.dark)
+    .onAppear {
+      // Only fetch if we haven't loaded data yet
+      if case .idle = stateModel.state {
+        Task {
+          await stateModel.fetch()
+        }
+      }
+    }
   }
 
   @ViewBuilder

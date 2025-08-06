@@ -9,22 +9,8 @@ import Foundation
 import FirebaseAuth
 
 extension FirebaseManager {
-    func signIn(email: String, password: String) async throws {
-        try await Auth.auth().signIn(withEmail: email, password: password)
-    }
-    
-    func signUp(email: String, password: String) async throws {
-        let uid = try await signUp(withEmail: email, password: password)
-        print("User created with ID: \(uid)")
-    }
-    
-    func signOut() throws {
-        try Auth.auth().signOut()
-    }
-    
-    func resetPassword(email: String) async throws {
-        try await Auth.auth().sendPasswordReset(withEmail: email)
-    }
+    // Note: Core authentication methods (signIn, signUp, signOut, resetPassword) 
+    // are now implemented in the main FirebaseManager class with enhanced error handling
     
     func deleteAccount() async throws {
         guard let user = Auth.auth().currentUser else {
