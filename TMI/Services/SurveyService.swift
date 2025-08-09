@@ -31,7 +31,7 @@ class SurveyService {
       .document(currentUser.uid)
       .collection(FirestoreCollection.surveys.rawValue)
     
-    try await collection.document(surveyID).setData(from: surveyToSave)
+    try collection.document(surveyID).setData(from: surveyToSave)
     return surveyID
   }
   
@@ -51,7 +51,7 @@ class SurveyService {
       .document(currentUser.uid)
       .collection(FirestoreCollection.surveys.rawValue)
     
-    try await collection.document(surveyID).setData(from: surveyToSave)
+    try collection.document(surveyID).setData(from: surveyToSave)
     return surveyID
   }
   
@@ -196,7 +196,7 @@ class SurveyService {
       .collection(FirestoreCollection.surveys.rawValue)
       .document(surveyID)
     
-    try await document.setData(from: survey, merge: true)
+    try document.setData(from: survey, merge: true)
   }
   
   // MARK: - Update Survey Question Answer
@@ -220,7 +220,7 @@ class SurveyService {
     // Update the specific question's answer
     if let questionIndex = survey.questions.firstIndex(where: { $0.id == questionID }) {
       survey.questions[questionIndex].answer = answer
-      try await document.setData(from: survey)
+      try document.setData(from: survey)
     } else {
       throw SurveyServiceError.questionNotFound
     }

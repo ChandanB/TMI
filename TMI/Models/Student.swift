@@ -166,6 +166,108 @@ struct Student: Codable, Identifiable, Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
+    
+    // MARK: - Firestore Conversion
+    
+    func toFirestoreData() -> [String: Any] {
+        var data: [String: Any] = [
+            "name": name,
+            "grade": grade,
+            "dateOfBirth": dateOfBirth.timeIntervalSince1970
+        ]
+        
+        // Optional properties
+        if let studentID = studentID {
+            data["studentID"] = studentID
+        }
+        
+        if let photoURL = photoURL {
+            data["photoURL"] = photoURL.absoluteString
+        }
+        
+        if let lastInteractionDate = lastInteractionDate {
+            data["lastInteractionDate"] = lastInteractionDate.timeIntervalSince1970
+        }
+        
+        // Convert interests to basic data
+        data["interests"] = interests.map { interest in
+            [
+                "id": interest.id ?? "",
+                "name": interest.name
+            ]
+        }
+        
+        // Convert hobbies to basic data
+        data["hobbies"] = hobbies.map { hobby in
+            [
+                "id": hobby.id.uuidString,
+                "name": hobby.name
+            ]
+        }
+        
+        // Convert survey results
+        if let surveyResults = surveyResults {
+            data["surveyResults"] = surveyResults.map { surveyResult in
+                [
+                    "id": surveyResult.id,
+                    "surveyName": surveyResult.surveyName,
+                    "date": surveyResult.date.timeIntervalSince1970,
+                    "isComplete": surveyResult.isComplete,
+                    "responses": surveyResult.responses.map { response in
+                        [
+                            "questionID": response.questionID,
+                            "question": response.question,
+                            "answer": response.answer
+                        ]
+                    }
+                ]
+            }
+        }
+        
+        // Convert academic performance
+        if let academicPerformance = academicPerformance {
+            data["academicPerformance"] = [
+                "gpa": academicPerformance.gpa as Any,
+                "subjects": academicPerformance.subjects.map { subject in
+                    [
+                        "name": subject.name,
+                        "grade": subject.grade,
+                        "score": subject.score,
+                        "interestAlignment": subject.interestAlignment
+                    ]
+                },
+                "strengths": academicPerformance.strengths,
+                "areasForImprovement": academicPerformance.areasForImprovement
+            ]
+        }
+        
+        // Convert engagement history
+        if let engagementHistory = engagementHistory {
+            data["engagementHistory"] = engagementHistory.map { record in
+                [
+                    "date": record.date.timeIntervalSince1970,
+                    "score": record.score,
+                    "source": record.source.rawValue,
+                    "notes": record.notes as Any
+                ]
+            }
+        }
+        
+        // Convert notes
+        if let notes = notes {
+            data["notes"] = notes.map { note in
+                [
+                    "id": note.id.uuidString,
+                    "date": note.date.timeIntervalSince1970,
+                    "author": note.author,
+                    "content": note.content,
+                    "category": note.category.rawValue
+                ]
+            }
+        }
+        
+        return data
+    }
 }
 
 // MARK: - Supporting Types
@@ -315,137 +417,8 @@ extension Student {
         )
     }
     
+    
     static var sampleStudents: [Student] {
-        return [
-            Student(
-                name: "John Doe",
-                grade: "10",
-                dateOfBirth: Date(),
-                interests: [],
-                hobbies: [],
-                surveyResults: [
-                    SurveyResult(
-                        id: "survey1",
-                        surveyName: "Interest Assessment",
-                        date: Date().addingTimeInterval(-7 * 24 * 60 * 60),
-                        isComplete: true,
-                        responses: []
-                    )
-                ],
-                engagementHistory: [
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-30 * 24 * 60 * 60),
-                        score: 0.65,
-                        source: .teacherInput
-                    ),
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-15 * 24 * 60 * 60),
-                        score: 0.72,
-                        source: .survey
-                    ),
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-7 * 24 * 60 * 60),
-                        score: 0.78,
-                        source: .activityCompletion
-                    )
-                ]
-            ),
-            Student(
-                name: "Jane Smith",
-                grade: "11",
-                dateOfBirth: Date(),
-                interests: [],
-                hobbies: [],
-                engagementHistory: [
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-45 * 24 * 60 * 60),
-                        score: 0.82,
-                        source: .teacherInput
-                    ),
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-30 * 24 * 60 * 60),
-                        score: 0.85,
-                        source: .survey
-                    ),
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-15 * 24 * 60 * 60),
-                        score: 0.80,
-                        source: .activityCompletion
-                    )
-                ]
-            ),
-            Student(
-                name: "Alice Johnson",
-                grade: "9",
-                dateOfBirth: Date(),
-                interests: [],
-                hobbies: [],
-                engagementHistory: [
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-60 * 24 * 60 * 60),
-                        score: 0.45,
-                        source: .teacherInput
-                    ),
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-30 * 24 * 60 * 60),
-                        score: 0.52,
-                        source: .survey
-                    ),
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-15 * 24 * 60 * 60),
-                        score: 0.58,
-                        source: .activityCompletion
-                    )
-                ]
-            ),
-            Student(
-                name: "Michael Chen",
-                grade: "12",
-                dateOfBirth: Date(),
-                tmiPlans: [],
-                hobbies: [],
-                engagementHistory: [
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-90 * 24 * 60 * 60),
-                        score: 0.70,
-                        source: .teacherInput
-                    ),
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-60 * 24 * 60 * 60),
-                        score: 0.75,
-                        source: .survey
-                    ),
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-30 * 24 * 60 * 60),
-                        score: 0.90,
-                        source: .activityCompletion
-                    )
-                ]
-            ),
-            Student(
-                name: "Emma Rodriguez",
-                grade: "10",
-                dateOfBirth: Date(),
-                interests: [],
-                hobbies: [],
-                engagementHistory: [
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-45 * 24 * 60 * 60),
-                        score: 0.30,
-                        source: .teacherInput
-                    ),
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-30 * 24 * 60 * 60),
-                        score: 0.25,
-                        source: .survey
-                    ),
-                    EngagementRecord(
-                        date: Date().addingTimeInterval(-15 * 24 * 60 * 60),
-                        score: 0.20,
-                        source: .activityCompletion
-                    )
-                ]
-            )
-        ]
+        return comprehensiveSampleStudents
     }
 }

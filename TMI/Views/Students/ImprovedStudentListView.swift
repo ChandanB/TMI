@@ -1,0 +1,389 @@
+//
+//  ImprovedStudentListView.swift
+//  TMI
+//
+//  Created by Chandan Brown on 8/7/25.
+//
+
+import SwiftUI
+
+struct ImprovedStudentListView: View {
+    @State private var stateModel = StudentListStateModel()
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    
+    // Animation states
+    @State private var headerAppeared = false
+    @State private var searchBarAppeared = false
+    @State private var gridAppeared = false
+    @State private var actionBarAppeared = false
+    
+    var body: some View {
+        ZStack {
+            // Background
+            TMIBackgroundView(variant: .default)
+                .ignoresSafeArea()
+            
+            NavigationStack {
+                VStack(spacing: 0) {
+                    // Search and filter bar
+                    searchAndFilterBar
+                        .padding(.top, 10)
+                        .padding(.horizontal)
+                        .opacity(searchBarAppeared ? 1 : 0)
+                        .offset(y: searchBarAppeared ? 0 : -20)
+                    
+                    // Main content
+                    mainContent
+                        .opacity(gridAppeared ? 1 : 0)
+                    
+                    // Quick action bar
+                    quickActionBar
+                        .opacity(actionBarAppeared ? 1 : 0)
+                        .offset(y: actionBarAppeared ? 0 : 100)
+                }
+            }
+            .navigationTitle("Students")
+            .foregroundColor(.white)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    filterMenu
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $stateModel.showingAddStudent) {
+            ImprovedAddStudentView { student in
+                // Handle student added
+                Task {
+                    await stateModel.addStudent(student)
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(30)
+        }
+        .sheet(item: $stateModel.selectedStudent) { student in
+            StudentDetailView(student: student)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(30)
+        }
+        .task {
+            await stateModel.fetch()
+        }
+        .onAppear {
+            // Animated appearance
+            withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
+                headerAppeared = true
+            }
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.2)) {
+                searchBarAppeared = true
+            }
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.3)) {
+                gridAppeared = true
+            }
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.4)) {
+                actionBarAppeared = true
+            }
+            
+            // Refresh data when view appears (e.g., returning from another tab)
+            Task {
+                await stateModel.fetch()
+            }
+        }
+    }
+    
+    // MARK: - Search and Filter Bar
+    
+    private var searchAndFilterBar: some View {
+        TMITextField(
+            icon: "magnifyingglass",
+            placeholder: "Search students",
+            text: $stateModel.searchText
+        )
+    }
+    
+    // MARK: - Filter Menu
+    
+    private var filterMenu: some View {
+        Menu {
+            ForEach(FilterOption.allCases) { option in
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        stateModel.selectedFilterOption = option
+                    }
+                }) {
+                    Label(
+                        option.rawValue,
+                        systemImage: option == stateModel.selectedFilterOption ? "checkmark.circle.fill" : "circle"
+                    )
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if stateModel.selectedFilterOption != .all {
+                    Text(stateModel.selectedFilterOption.rawValue)
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                }
+                
+                Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(.white)
+                    .symbolRenderingMode(.hierarchical)
+            }
+            .padding(6)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(stateModel.selectedFilterOption == .all ? Color.clear : Color.tmiSecondary.opacity(0.3))
+            )
+        }
+    }
+    
+    // MARK: - Main Content
+    
+    @ViewBuilder
+    private var mainContent: some View {
+        Group {
+            switch stateModel.state {
+            case .idle:
+                EmptyView()
+                
+            case .loading:
+                loadingView
+                
+            case .loaded:
+                if stateModel.students.isEmpty {
+                    emptyState
+                } else {
+                    studentContent
+                }
+                
+            case .error(let error):
+                errorView(error)
+            }
+        }
+    }
+    
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .foregroundColor(.white)
+            
+            Text("Loading students...")
+                .font(.system(size: 16))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    private func errorView(_ error: IdentifiableError) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 50))
+                .foregroundColor(.orange)
+            
+            Text("Error Loading Students")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.white)
+            
+            Text(error.message)
+                .font(.system(size: 16))
+                .foregroundColor(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            
+            TMIButton(
+                text: "Retry",
+                style: .secondary,
+                action: {
+                    Task {
+                        await stateModel.fetch()
+                    }
+                }
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+    
+    private var emptyState: some View {
+        VStack(spacing: 24) {
+            // Empty illustration
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [Color.tmiSecondary.opacity(0.2), Color.clear]),
+                            center: .center,
+                            startRadius: 1,
+                            endRadius: 100
+                        )
+                    )
+                    .frame(width: 200, height: 200)
+                
+                Image(systemName: "person.3.fill")
+                    .font(.system(size: 80))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .padding(.top, 60)
+            
+            Text("No students available")
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .foregroundColor(.white)
+            
+            Text("Add your first student to get started with TMI")
+                .font(.system(size: 16))
+                .foregroundColor(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            
+            TMIButton(
+                text: "Add Student",
+                icon: "person.badge.plus",
+                style: .primary,
+                action: {
+                    stateModel.showAddStudent()
+                }
+            )
+            .padding(.top, 10)
+            
+            Spacer()
+        }
+        .frame(minHeight: 500)
+        .padding(.horizontal)
+    }
+    
+    private var studentContent: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // Stats summary
+                statsSummary
+                
+                // Grid layout
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: sizeClass == .compact ? 160 : 200), spacing: 20)],
+                    spacing: 20
+                ) {
+                    ForEach(stateModel.filteredStudents) { student in
+                        StudentCard(student: student)
+                            .onTapGesture {
+                                stateModel.selectStudent(student)
+                            }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 100)  // Extra padding for action bar
+            }
+            .padding(.top, 20)
+        }
+        .scrollIndicators(.hidden)
+    }
+    
+    private var statsSummary: some View {
+        HStack(spacing: 20) {
+            StudentStatCard(
+                title: "Total",
+                value: "\(stateModel.filteredStudents.count)",
+                icon: "person.3.fill",
+                color: .blue
+            )
+            
+            StudentStatCard(
+                title: "With TMI Plans",
+                value: "\(stateModel.filteredStudents.filter { $0.tmiPlans?.isEmpty == false }.count)",
+                icon: "doc.text.fill",
+                color: .orange
+            )
+            
+            StudentStatCard(
+                title: "High Engagement",
+                value: "\(stateModel.filteredStudents.filter { $0.engagementScore >= 0.7 }.count)",
+                icon: "chart.line.uptrend.xyaxis.circle.fill",
+                color: .green
+            )
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Quick Action Bar
+    
+    private var quickActionBar: some View {
+        VStack(spacing: 0) {
+            // Divider with gradient
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [.clear, .white.opacity(0.1), .clear],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 1)
+            
+            // Action buttons
+            HStack(spacing: 20) {
+                // Add Student Button
+                StudentListActionButton(
+                    icon: "person.badge.plus",
+                    title: "Add Student",
+                    action: {
+                        stateModel.showAddStudent()
+                    }
+                )
+                
+                // Bulk Actions Button
+                StudentListActionButton(
+                    icon: "person.crop.rectangle.stack.fill",
+                    title: "Bulk Actions",
+                    action: {
+                        // Implement bulk actions
+                    }
+                )
+                
+                // Export Button
+                StudentListActionButton(
+                    icon: "square.and.arrow.up",
+                    title: "Export",
+                    action: {
+                        // Implement export
+                    }
+                )
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .fill(Color.black.opacity(0.2))
+                    .background(
+                        RoundedRectangle(cornerRadius: 30, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .opacity(0.8)
+                    )
+                    .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 10)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.white.opacity(0.5), .clear, .white.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.5
+                    )
+            )
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
+        }
+        .frame(maxHeight: .infinity, alignment: .bottom)
+        .ignoresSafeArea(.keyboard)
+    }
+}
+
+#Preview {
+    ImprovedStudentListView()
+}

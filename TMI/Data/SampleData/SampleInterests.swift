@@ -12,7 +12,6 @@ extension Interest {
         return [
             // MARK: - Technology & Computer Science
             Interest(
-                id: "int_001",
                 name: "Robotics & Engineering",
                 category: [.technology, .science],
                 description: "Building, programming, and controlling robotic systems",
@@ -35,7 +34,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_002",
                 name: "Computer Programming",
                 category: [.technology],
                 description: "Writing code, developing software, and creating digital solutions",
@@ -58,7 +56,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_003",
                 name: "Video Game Design",
                 category: [.technology, .arts, .entertainment],
                 description: "Creating interactive digital games and virtual experiences",
@@ -81,7 +78,6 @@ extension Interest {
             
             // MARK: - Creative Arts & Expression
             Interest(
-                id: "int_004",
                 name: "Creative Writing & Storytelling",
                 category: [.literature, .arts],
                 description: "Writing original stories, poems, scripts, and creative non-fiction",
@@ -103,7 +99,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_005",
                 name: "Visual Arts & Design",
                 category: [.arts],
                 description: "Creating visual art through various mediums including digital and traditional methods",
@@ -125,7 +120,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_006",
                 name: "Music Production & Performance",
                 category: [.music, .technology],
                 description: "Creating, recording, editing, and performing music using various instruments and technology",
@@ -147,7 +141,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_007",
                 name: "Drama & Theater Arts",
                 category: [.arts, .entertainment],
                 description: "Acting, directing, and participating in theatrical productions",
@@ -170,7 +163,6 @@ extension Interest {
             
             // MARK: - Sports & Physical Activities
             Interest(
-                id: "int_008",
                 name: "Team Sports & Athletics",
                 category: [.sports],
                 description: "Participating in organized team sports like basketball, soccer, football, volleyball",
@@ -193,7 +185,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_009",
                 name: "Individual Sports & Fitness",
                 category: [.sports, .wellness],
                 description: "Personal fitness activities like running, swimming, martial arts, weightlifting",
@@ -216,7 +207,6 @@ extension Interest {
             
             // MARK: - Science & Discovery
             Interest(
-                id: "int_010",
                 name: "Environmental Science & Conservation",
                 category: [.science, .outdoors, .socialCauses],
                 description: "Studying ecosystems, climate, and working to protect natural environments",
@@ -239,7 +229,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_011",
                 name: "Medical Science & Healthcare",
                 category: [.science, .wellness, .socialCauses],
                 description: "Learning about human health, medical procedures, and healthcare careers",
@@ -261,7 +250,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_012",
                 name: "Space Science & Astronomy",
                 category: [.science, .technology],
                 description: "Studying celestial bodies, space exploration, and astronomical phenomena",
@@ -284,7 +272,6 @@ extension Interest {
             
             // MARK: - Social Causes & Leadership
             Interest(
-                id: "int_013",
                 name: "Community Service & Volunteering",
                 category: [.socialCauses, .leadership],
                 description: "Organizing and participating in community service projects and volunteer work",
@@ -306,7 +293,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_014",
                 name: "Student Government & Leadership",
                 category: [.leadership, .socialCauses],
                 description: "Participating in student government, organizing school events, and leading initiatives",
@@ -329,7 +315,6 @@ extension Interest {
             
             // MARK: - Hands-On & Technical Skills
             Interest(
-                id: "int_015",
                 name: "Automotive Technology & Repair",
                 category: [.technology, .crafts],
                 description: "Learning about car mechanics, automotive systems, and vehicle repair",
@@ -351,7 +336,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_016",
                 name: "Construction & Architecture",
                 category: [.crafts, .technology, .arts],
                 description: "Designing and building structures, learning construction techniques and architectural principles",
@@ -374,7 +358,6 @@ extension Interest {
             
             // MARK: - Business & Entrepreneurship
             Interest(
-                id: "int_017",
                 name: "Entrepreneurship & Business",
                 category: [.leadership, .technology],
                 description: "Starting businesses, learning about economics, marketing, and financial management",
@@ -397,7 +380,6 @@ extension Interest {
             
             // MARK: - Gaming & Digital Culture
             Interest(
-                id: "int_018",
                 name: "Competitive Gaming & Esports",
                 category: [.entertainment, .technology, .sports],
                 description: "Competitive video gaming, game strategy analysis, and esports participation",
@@ -420,7 +402,6 @@ extension Interest {
             
             // MARK: - Cultural & Language Interests
             Interest(
-                id: "int_019",
                 name: "World Languages & Cultures",
                 category: [.academics, .socialCauses],
                 description: "Learning foreign languages and exploring different cultures around the world",
@@ -442,7 +423,6 @@ extension Interest {
             ),
             
             Interest(
-                id: "int_020",
                 name: "History & Genealogy Research",
                 category: [.academics, .socialCauses],
                 description: "Researching historical events, family history, and cultural heritage",

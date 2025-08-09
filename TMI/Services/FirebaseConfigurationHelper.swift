@@ -18,19 +18,17 @@ class FirebaseConfigurationHelper {
   
   /// Checks if Firebase services are properly configured
   func checkFirebaseConfiguration() -> FirebaseConfigurationStatus {
-    guard let app = FirebaseApp.app() else {
+      guard FirebaseApp.app() != nil else {
       return .notConfigured
     }
     
     // Check Auth service availability
     do {
       let _ = Auth.auth()
-    } catch {
-      return .configurationError("Firebase Auth not available: \(error.localizedDescription)")
     }
     
     // Check Firestore service availability by attempting a simple operation
-    let firestore = Firestore.firestore()
+      _ = Firestore.firestore()
     
     // Return configured for now - actual connectivity issues will be handled in real-time
     // The app will detect database and App Check issues during actual operations
@@ -130,7 +128,6 @@ class FirebaseConfigurationHelper {
   /// Enables offline mode with enhanced caching
   func enableOfflineMode() {
     let settings = FirestoreSettings()
-    settings.isPersistenceEnabled = true
     settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: 100 * 1024 * 1024)) // 100MB
     Firestore.firestore().settings = settings
     

@@ -12,7 +12,6 @@ extension Student {
         return [
             // MARK: - High Engagement Students
             Student(
-                id: "student_001",
                 name: "Alex Chen",
                 grade: "10",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -15, to: Date()) ?? Date(),
@@ -74,7 +73,6 @@ extension Student {
             
             // MARK: - Creative Arts Student
             Student(
-                id: "student_002",
                 name: "Maria Rodriguez",
                 grade: "11",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -16, to: Date()) ?? Date(),
@@ -138,7 +136,6 @@ extension Student {
             
             // MARK: - Sports-Focused Student
             Student(
-                id: "student_003",
                 name: "Jordan Williams",
                 grade: "12",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -17, to: Date()) ?? Date(),
@@ -202,7 +199,6 @@ extension Student {
             
             // MARK: - Struggling Student - Needs TMI Support
             Student(
-                id: "student_004",
                 name: "Taylor Johnson",
                 grade: "9",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -14, to: Date()) ?? Date(),
@@ -267,7 +263,6 @@ extension Student {
             
             // MARK: - Science-Focused Student
             Student(
-                id: "student_005",
                 name: "Aisha Patel",
                 grade: "11",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -16, to: Date()) ?? Date(),
@@ -331,7 +326,6 @@ extension Student {
             
             // MARK: - Introverted Student - Needs Confidence Building
             Student(
-                id: "student_006",
                 name: "Sam Peterson",
                 grade: "10",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -15, to: Date()) ?? Date(),
@@ -395,7 +389,6 @@ extension Student {
             
             // MARK: - Leadership-Focused Student
             Student(
-                id: "student_007",
                 name: "Marcus Thompson",
                 grade: "12",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -17, to: Date()) ?? Date(),
@@ -459,7 +452,6 @@ extension Student {
             
             // MARK: - At-Risk Student - Behavioral Challenges
             Student(
-                id: "student_008",
                 name: "Devon Smith",
                 grade: "11",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -16, to: Date()) ?? Date(),

@@ -30,7 +30,7 @@ class ResourceService {
       .document(currentUser.uid)
       .collection(FirestoreCollection.resources.rawValue)
     
-    try await collection.document(resourceID).setData(from: resourceToSave)
+    try collection.document(resourceID).setData(from: resourceToSave)
     return resourceID
   }
   
@@ -229,7 +229,7 @@ class ResourceService {
     resource.isFeatured.toggle()
     resource.updatedAt = Date()
     
-    try await document.setData(from: resource)
+    try document.setData(from: resource)
   }
   
   // MARK: - Delete Resource

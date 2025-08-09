@@ -12,11 +12,15 @@ struct MainTabView: View {
   @State private var columnVisibility = NavigationSplitViewVisibility.automatic
   @Environment(\.horizontalSizeClass) private var sizeClass
   @Environment(\.colorScheme) private var colorScheme
-  @Environment(\.authStateModel) private var authStateModel
+  @Environment(\.simpleAuthStateModel) private var authStateModel
 
   // Animation state
   @State private var previousTab: Tab = .students
   @State private var tabBarVisible = false
+  
+  // Sheet state
+  @State private var showingUserProfile = false
+  @State private var showingSignOutConfirmation = false
 
   enum Tab: String, CaseIterable, Identifiable {
     case students, tmiPlans
@@ -83,6 +87,22 @@ struct MainTabView: View {
     .preferredColorScheme(.dark)
     .foregroundColor(.white)
     .foregroundStyle(.white)
+    .sheet(isPresented: $showingUserProfile) {
+      UserProfileView()
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(30)
+    }
+    .alert("Sign Out", isPresented: $showingSignOutConfirmation) {
+      Button("Sign Out", role: .destructive) {
+        Task {
+          await authStateModel.handleLogout()
+        }
+      }
+      Button("Cancel", role: .cancel) { }
+    } message: {
+      Text("Are you sure you want to sign out?")
+    }
     .onAppear {
       // Set appropriate default tab for user role
       if availableTabs.contains(defaultTab) && selectedTab != defaultTab {
@@ -100,11 +120,42 @@ struct MainTabView: View {
 
   var enhancedIOSTabView: some View {
     ZStack(alignment: .bottom) {
-      // Tab Content Area - each view will provide its own navigation title
+      // Tab Content Area with navigation
       TabView(selection: $selectedTab) {
         ForEach(availableTabs, id: \.id) { tab in
-          destinationView(for: tab)
-            .tag(tab)
+          NavigationStack {
+            destinationView(for: tab)
+              .toolbar {
+                ToolbarItem(placement: .principal) {
+                  Text(tabLabel(for: tab))
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                  Menu {
+                    Button {
+                      showingUserProfile = true
+                    } label: {
+                      Label("Profile", systemImage: "person.crop.circle")
+                    }
+                    
+                    Divider()
+                    
+                    Button(role: .destructive) {
+                      showingSignOutConfirmation = true
+                    } label: {
+                      Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                  } label: {
+                    Image(systemName: "person.crop.circle.fill")
+                      .font(.system(size: 22))
+                      .foregroundColor(.white)
+                  }
+                }
+              }
+          }
+          .tag(tab)
         }
       }
       .safeAreaInset(edge: .bottom) {
@@ -174,6 +225,27 @@ struct MainTabView: View {
               .foregroundColor(.white)
 
             Spacer()
+            
+            // User menu button
+            Menu {
+              Button {
+                showingUserProfile = true
+              } label: {
+                Label("Profile", systemImage: "person.crop.circle")
+              }
+              
+              Divider()
+              
+              Button(role: .destructive) {
+                showingSignOutConfirmation = true
+              } label: {
+                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+              }
+            } label: {
+              Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: 20))
+                .foregroundColor(.white)
+            }
           }
           .padding(.horizontal, 16)
           .padding(.vertical, 20)
@@ -184,7 +256,16 @@ struct MainTabView: View {
         }
       }
     } detail: {
-      destinationView(for: selectedTab)
+      NavigationStack {
+        destinationView(for: selectedTab)
+          .toolbar {
+            ToolbarItem(placement: .principal) {
+              Text(tabLabel(for: selectedTab))
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+            }
+          }
+      }
     }
     .navigationSplitViewStyle(.balanced)
   }
@@ -195,7 +276,7 @@ struct MainTabView: View {
   func destinationView(for tab: Tab) -> some View {
     switch tab {
     case .students:
-      StudentListView()
+      ImprovedStudentListView()
     case .tmiPlans:
       TMIPlanListView()
     }

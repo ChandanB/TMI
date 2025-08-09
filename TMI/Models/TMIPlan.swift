@@ -64,6 +64,52 @@ struct TMIPlan: Codable, Identifiable, Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
+    
+    // MARK: - Firestore Conversion
+    
+    func toFirestoreData() -> [String: Any] {
+        var data: [String: Any] = [
+            "model": model.rawValue,
+            "creationDate": creationDate.timeIntervalSince1970,
+            "lastUpdated": lastUpdated.timeIntervalSince1970,
+            "progress": progress,
+            "notes": notes
+        ]
+        
+        // Convert student to basic data (just ID and name to avoid circular references)
+        data["student"] = [
+            "id": student.id ?? "",
+            "name": student.name,
+            "grade": student.grade
+        ]
+        
+        // Convert students array
+        data["students"] = students.map { student in
+            return [
+                "id": student.id ?? "",
+                "name": student.name,
+                "grade": student.grade
+            ]
+        }
+        
+        // Convert interests and hobbies to IDs
+        data["interests"] = interests.map { $0.id ?? "" }
+        data["hobbies"] = hobbies.map { $0.id.uuidString }
+        
+        // Convert goals
+        data["goals"] = goals.map { goal in
+            return [
+                "id": goal.id.uuidString,
+                "description": goal.description,
+                "status": goal.status.rawValue,
+                "progress": goal.progress,
+                "notes": goal.notes as Any,
+                "dueDate": goal.dueDate?.timeIntervalSince1970 as Any
+            ]
+        }
+        
+        return data
+    }
 }
 
 extension TMIPlan {

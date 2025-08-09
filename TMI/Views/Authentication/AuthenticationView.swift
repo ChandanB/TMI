@@ -6,7 +6,7 @@ import Observation
 import SwiftUI
 
 struct AuthenticationView: View {
-  @Environment(\.authStateModel) var stateModel
+  @Environment(\.simpleAuthStateModel) var stateModel
   @State private var showingRegistration = false
   @State private var showingForgotPassword = false
   @State private var showingRoleSelection = false
@@ -73,7 +73,7 @@ struct AuthenticationView: View {
                   placeholder: "Email",
                   text: Binding(
                     get: { stateModel.email },
-                    set: { stateModel.updateEmail($0) }
+                    set: { stateModel.email = $0 }
                   ),
                   keyboardType: .emailAddress,
                   onSubmit: {
@@ -95,7 +95,7 @@ struct AuthenticationView: View {
                   placeholder: "Password",
                   text: Binding(
                     get: { stateModel.password },
-                    set: { stateModel.updatePassword($0) }
+                    set: { stateModel.password = $0 }
                   ),
                   isSecure: true,
                   onSubmit: {
@@ -144,10 +144,10 @@ struct AuthenticationView: View {
                   text: "Log In",
                   icon: "arrow.right",
                   style: .primary,
-                  isLoading: stateModel.isAuthenticating,
+                  isLoading: stateModel.isLoading,
                   action: authenticate
                 )
-                .disabled(stateModel.isAuthenticating)
+                .disabled(stateModel.isLoading)
                 .padding(.top, 10)
                 .opacity(animateButtons ? 1.0 : 0)
                 .animation(
@@ -224,28 +224,23 @@ struct AuthenticationView: View {
           .preferredColorScheme(.dark)
       }
       .alert("Reset Password", isPresented: $showingForgotPassword) {
-        TextField(
-          "Email",
-          text: Binding(
-            get: { stateModel.email },
-            set: { stateModel.updateEmail($0) }
-          )
-        )
+        TextField("Email", text: Binding(
+          get: { stateModel.email },
+          set: { stateModel.email = $0 }
+        ))
         .keyboardType(.emailAddress)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
 
         Button("Cancel", role: .cancel) {}
         Button("Reset") {
-          Task {
-            await stateModel.resetPassword()
-          }
+          // TODO: Implement password reset in SimpleAuthStateModel
         }
       } message: {
         Text("Enter your email address and we'll send you a link to reset your password.")
       }
-      .onChange(of: stateModel.isLoggedIn) { _, isLoggedIn in
-        if isLoggedIn {
+      .onChange(of: stateModel.isAuthenticated) { _, isAuthenticated in
+        if isAuthenticated {
           dismiss()
         }
       }
@@ -278,7 +273,7 @@ struct AuthenticationView: View {
 
   private func authenticate() {
     Task {
-      await stateModel.signIn()
+      await stateModel.handleLogin()
     }
   }
 }

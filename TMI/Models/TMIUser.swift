@@ -10,7 +10,7 @@ import Foundation
 
 // MARK: - Enhanced TMI User Model
 
-struct TMIUser: Codable, Identifiable {
+struct TMIUser: Codable, Identifiable, Equatable {
   @DocumentID var id: String?
   let userID: String
   var displayName: String
@@ -191,6 +191,30 @@ struct TMIUser: Codable, Identifiable {
     try container.encode(isActive, forKey: .isActive)
     try container.encode(emergencyContacts, forKey: .emergencyContacts)
     try container.encode(formTemplates, forKey: .formTemplates)
+  }
+  
+  // MARK: - Convenience Properties for SimpleAuthStateModel
+  
+  var profileCreatedDate: Date { createdAt }
+  var lastLoginDate: Date? { lastLoginAt }
+  
+  // Simplified initializer for basic user creation
+  init(id: String, email: String, displayName: String, role: UserRole, profileCreatedDate: Date, lastLoginDate: Date? = nil) {
+    self.init(
+      id: id,
+      userID: id,
+      displayName: displayName,
+      email: email,
+      role: role,
+      createdAt: profileCreatedDate,
+      lastLoginAt: lastLoginDate
+    )
+  }
+  
+  // MARK: - Equatable
+  
+  static func == (lhs: TMIUser, rhs: TMIUser) -> Bool {
+    return lhs.id == rhs.id && lhs.userID == rhs.userID
   }
 }
 

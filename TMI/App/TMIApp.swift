@@ -26,7 +26,7 @@ struct TMIApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(\.authStateModel, AuthStateModel())
+                .environment(\.simpleAuthStateModel, SimpleAuthStateModel())
                 .environment(\.dashboardStateModel, DashboardStateModel())
                 .preferredColorScheme(.dark)
         }
@@ -34,12 +34,12 @@ struct TMIApp: App {
 }
 
 struct ContentView: View {
-    @Environment(\.authStateModel) var authStateModel
+    @Environment(\.simpleAuthStateModel) var authStateModel
     @State private var isShowingAuthentication = false
     
     var body: some View {
         Group {
-            if authStateModel.isLoggedIn {
+            if authStateModel.isAuthenticated {
                 MainTabView()
             } else {
                 AuthenticationView()
@@ -49,7 +49,7 @@ struct ContentView: View {
         .foregroundStyle(.white)
         .onAppear {
             // Check authentication status when the app appears
-            if !authStateModel.isLoggedIn {
+            if !authStateModel.isAuthenticated {
                 isShowingAuthentication = true
             }
         }
@@ -59,6 +59,6 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .environment(\.authStateModel, AuthStateModel())
+        .environment(\.simpleAuthStateModel, SimpleAuthStateModel())
         .environment(\.dashboardStateModel, DashboardStateModel())
 }

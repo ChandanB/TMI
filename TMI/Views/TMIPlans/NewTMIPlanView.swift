@@ -555,11 +555,6 @@ struct NewTMIPlanView: View {
 
   private func savePlan() {
     guard let student = selectedStudent, let model = selectedModel else { return }
-    guard let uid = Auth.auth().currentUser?.uid else {
-      alertMessage = "Unable to save plan: Not authenticated"
-      showingAlert = true
-      return
-    }
 
     isCreatingPlan = true
     
@@ -579,14 +574,12 @@ struct NewTMIPlanView: View {
           notes: notes
         )
         
-        let db = FirebaseManager.shared.firestore
-        let collection = db.collection("users").document(uid).collection("tmiPlans")
-        
-        _ = try collection.addDocument(from: newPlan)
+        let planService = TMIPlanService()
+        let savedPlan = try await planService.addPlan(newPlan)
         
         await MainActor.run {
           isCreatingPlan = false
-          onPlanCreated?(newPlan)
+          onPlanCreated?(savedPlan)
           dismiss()
         }
       } catch {
@@ -603,22 +596,31 @@ struct NewTMIPlanView: View {
 
   @MainActor
   private func fetchAllData() async {
-    guard let uid = Auth.auth().currentUser?.uid else { 
-      print("No authenticated user found")
-      return 
-    }
-    
     isLoadingData = true
-    let db = FirebaseManager.shared.firestore
-    
-    async let studentsTask = fetchStudentsFromFirestore(db: db, uid: uid)
-    async let interestsTask = fetchInterestsFromFirestore(db: db, uid: uid)
-    async let hobbiesTask = fetchHobbiesFromFirestore(db: db, uid: uid)
     
     do {
-      students = try await studentsTask
+      // Use StudentService for consistent student fetching
+      let studentService = StudentService()
+      students = try await studentService.fetchStudents()
+      
+      // Fetch interests and hobbies using the existing logic
+      guard let uid = Auth.auth().currentUser?.uid else { 
+        print("No authenticated user found")
+        students = Student.comprehensiveSampleStudents
+        interests = Interest.expandedSampleInterests
+        hobbies = Hobby.expandedSampleHobbies
+        isLoadingData = false
+        return 
+      }
+      
+      let db = FirebaseManager.shared.firestore
+      
+      async let interestsTask = fetchInterestsFromFirestore(db: db, uid: uid)
+      async let hobbiesTask = fetchHobbiesFromFirestore(db: db, uid: uid)
+      
       interests = try await interestsTask
       hobbies = try await hobbiesTask
+      
       print("Fetched \(students.count) students, \(interests.count) interests, \(hobbies.count) hobbies")
     } catch {
       print("Error fetching data: \(error.localizedDescription)")
@@ -629,14 +631,6 @@ struct NewTMIPlanView: View {
     }
     
     isLoadingData = false
-  }
-
-  private func fetchStudentsFromFirestore(db: Firestore, uid: String) async throws -> [Student] {
-    let collection = db.collection("users").document(uid).collection("students")
-    let querySnapshot = try await collection.getDocuments()
-    return querySnapshot.documents.compactMap { document -> Student? in
-      try? document.data(as: Student.self)
-    }
   }
 
   private func fetchInterestsFromFirestore(db: Firestore, uid: String) async throws -> [Interest] {

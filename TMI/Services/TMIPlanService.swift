@@ -2,249 +2,214 @@
 //  TMIPlanService.swift
 //  TMI
 //
-//  Created by Chandan Brown on 9/13/24.
+//  Created by Chandan Brown on 8/7/25.
 //
 
-import Foundation
-import FirebaseFirestore
 import FirebaseAuth
+import FirebaseFirestore
+import Foundation
+import Observation
 
+/// Service for managing TMI Plan data operations with Firestore
+@Observable
 class TMIPlanService {
-  static let shared = TMIPlanService()
-  private let firestore = FIRESTORE_DATABASE
-  
-  private init() {}
-  
-  // MARK: - Create TMI Plan
-  func createTMIPlan(_ plan: TMIPlan) async throws -> String {
-    guard let currentUser = Auth.auth().currentUser else {
-      throw TMIPlanServiceError.userNotAuthenticated
-    }
+    private let db = Firestore.firestore()
     
-    let planID = plan.id ?? UUID().uuidString
-    var planToSave = plan
-    planToSave.id = planID
-    
-    let collection = firestore
-      .collection(FirestoreCollection.users.rawValue)
-      .document(currentUser.uid)
-      .collection(FirestoreCollection.tmiPlans.rawValue)
-    
-    try await collection.document(planID).setData(from: planToSave)
-    return planID
-  }
-  
-  // MARK: - Fetch TMI Plan
-  func fetchTMIPlan(id: String) async throws -> TMIPlan {
-    guard let currentUser = Auth.auth().currentUser else {
-      throw TMIPlanServiceError.userNotAuthenticated
-    }
-    
-    let document = firestore
-      .collection(FirestoreCollection.users.rawValue)
-      .document(currentUser.uid)
-      .collection(FirestoreCollection.tmiPlans.rawValue)
-      .document(id)
-    
-    let snapshot = try await document.getDocument()
-    
-    guard snapshot.exists else {
-      throw TMIPlanServiceError.planNotFound
-    }
-    
-    return try snapshot.data(as: TMIPlan.self)
-  }
-  
-  // MARK: - Fetch All TMI Plans
-  func fetchAllTMIPlans() async throws -> [TMIPlan] {
-    guard let currentUser = Auth.auth().currentUser else {
-      throw TMIPlanServiceError.userNotAuthenticated
-    }
-    
-    let collection = firestore
-      .collection(FirestoreCollection.users.rawValue)
-      .document(currentUser.uid)
-      .collection(FirestoreCollection.tmiPlans.rawValue)
-    
-    let snapshot = try await collection
-      .order(by: "lastUpdated", descending: true)
-      .getDocuments()
-    
-    return try snapshot.documents.compactMap { document in
-      try document.data(as: TMIPlan.self)
-    }
-  }
-  
-  // MARK: - Fetch TMI Plans for Student
-  func fetchTMIPlans(for studentID: String) async throws -> [TMIPlan] {
-    guard let currentUser = Auth.auth().currentUser else {
-      throw TMIPlanServiceError.userNotAuthenticated
-    }
-    
-    let collection = firestore
-      .collection(FirestoreCollection.users.rawValue)
-      .document(currentUser.uid)
-      .collection(FirestoreCollection.tmiPlans.rawValue)
-    
-    let snapshot = try await collection
-      .whereField("student.id", isEqualTo: studentID)
-      .order(by: "lastUpdated", descending: true)
-      .getDocuments()
-    
-    return try snapshot.documents.compactMap { document in
-      try document.data(as: TMIPlan.self)
-    }
-  }
-  
-  // MARK: - Update TMI Plan
-  func updateTMIPlan(_ plan: TMIPlan) async throws {
-    guard let currentUser = Auth.auth().currentUser else {
-      throw TMIPlanServiceError.userNotAuthenticated
-    }
-    
-    guard let planID = plan.id else {
-      throw TMIPlanServiceError.invalidPlanID
-    }
-    
-    var updatedPlan = plan
-    updatedPlan.lastUpdated = Date()
-    
-    let document = firestore
-      .collection(FirestoreCollection.users.rawValue)
-      .document(currentUser.uid)
-      .collection(FirestoreCollection.tmiPlans.rawValue)
-      .document(planID)
-    
-    try await document.setData(from: updatedPlan, merge: true)
-  }
-  
-  // MARK: - Update TMI Plan Progress
-  func updateTMIPlanProgress(planID: String, progress: Double, notes: String? = nil) async throws {
-    guard let currentUser = Auth.auth().currentUser else {
-      throw TMIPlanServiceError.userNotAuthenticated
-    }
-    
-    let document = firestore
-      .collection(FirestoreCollection.users.rawValue)
-      .document(currentUser.uid)
-      .collection(FirestoreCollection.tmiPlans.rawValue)
-      .document(planID)
-    
-    var updateData: [String: Any] = [
-      "progress": progress,
-      "lastUpdated": FieldValue.serverTimestamp()
-    ]
-    
-    if let notes = notes {
-      updateData["notes"] = notes
-    }
-    
-    try await document.updateData(updateData)
-  }
-  
-  // MARK: - Delete TMI Plan
-  func deleteTMIPlan(id: String) async throws {
-    guard let currentUser = Auth.auth().currentUser else {
-      throw TMIPlanServiceError.userNotAuthenticated
-    }
-    
-    let document = firestore
-      .collection(FirestoreCollection.users.rawValue)
-      .document(currentUser.uid)
-      .collection(FirestoreCollection.tmiPlans.rawValue)
-      .document(id)
-    
-    try await document.delete()
-  }
-  
-  // MARK: - Listen to TMI Plans Changes
-  func listenToTMIPlans(completion: @escaping (Result<[TMIPlan], Error>) -> Void) -> ListenerRegistration? {
-    guard let currentUser = Auth.auth().currentUser else {
-      completion(.failure(TMIPlanServiceError.userNotAuthenticated))
-      return nil
-    }
-    
-    let collection = firestore
-      .collection(FirestoreCollection.users.rawValue)
-      .document(currentUser.uid)
-      .collection(FirestoreCollection.tmiPlans.rawValue)
-    
-    return collection
-      .order(by: "lastUpdated", descending: true)
-      .addSnapshotListener { snapshot, error in
-        if let error = error {
-          completion(.failure(error))
-          return
+    /// Get the user-scoped TMI plans collection
+    private var userPlansCollection: CollectionReference? {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            print("[TMIPlanService] Error: User not logged in")
+            return nil
         }
-        
-        guard let documents = snapshot?.documents else {
-          completion(.success([]))
-          return
+        return db.collection("users").document(uid).collection("tmiPlans")
+    }
+    
+    /// Fetch all TMI plans for the current user
+    func fetchPlans() async throws -> [TMIPlan] {
+        guard let collection = userPlansCollection else {
+            throw TMIPlanServiceError.userNotAuthenticated
         }
         
         do {
-          let plans = try documents.compactMap { document in
-            try document.data(as: TMIPlan.self)
-          }
-          completion(.success(plans))
+            print("[TMIPlanService] Fetching TMI plans...")
+            let querySnapshot = try await collection.getDocuments()
+            
+            let plans = querySnapshot.documents.compactMap { document -> TMIPlan? in
+                do {
+                    var plan = try document.data(as: TMIPlan.self)
+                    // Ensure the plan has the document ID set
+                    if plan.id == nil {
+                        plan.id = document.documentID
+                    }
+                    return plan
+                } catch {
+                    print("[TMIPlanService] Failed to decode TMI plan document \(document.documentID): \(error)")
+                    return nil
+                }
+            }
+            
+            print("[TMIPlanService] Successfully fetched \(plans.count) TMI plans")
+            return plans
         } catch {
-          completion(.failure(error))
+            print("[TMIPlanService] Error fetching TMI plans: \(error)")
+            throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
         }
-      }
-  }
-  
-  // MARK: - Completion-based methods for backward compatibility
-  func createTMIPlan(_ plan: TMIPlan, completion: @escaping (Result<Void, Error>) -> Void) {
-    Task {
-      do {
-        _ = try await createTMIPlan(plan)
-        completion(.success(()))
-      } catch {
-        completion(.failure(error))
-      }
     }
-  }
-  
-  func fetchTMIPlan(id: String, completion: @escaping (Result<TMIPlan, Error>) -> Void) {
-    Task {
-      do {
-        let plan = try await fetchTMIPlan(id: id)
-        completion(.success(plan))
-      } catch {
-        completion(.failure(error))
-      }
+    
+    /// Add a new TMI plan to Firestore
+    func addPlan(_ plan: TMIPlan) async throws -> TMIPlan {
+        guard let collection = userPlansCollection else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+        
+        do {
+            print("[TMIPlanService] Adding TMI plan: \(plan.model.rawValue)")
+            
+            // Convert plan to Firestore data (without ID)
+            let data = plan.toFirestoreData()
+            
+            // Add the document and get the reference
+            let documentRef = try await collection.addDocument(data: data)
+            
+            print("[TMIPlanService] TMI plan added with ID: \(documentRef.documentID)")
+            
+            // Return the plan with the generated ID
+            var savedPlan = plan
+            savedPlan.id = documentRef.documentID
+            
+            return savedPlan
+        } catch {
+            print("[TMIPlanService] Error adding TMI plan: \(error)")
+            throw TMIPlanServiceError.saveFailed(error.localizedDescription)
+        }
     }
-  }
+    
+    /// Update an existing TMI plan in Firestore
+    func updatePlan(_ plan: TMIPlan) async throws -> TMIPlan {
+        guard let planId = plan.id else {
+            throw TMIPlanServiceError.invalidPlanId
+        }
+        
+        guard let collection = userPlansCollection else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+        
+        do {
+            print("[TMIPlanService] Updating TMI plan: \(plan.model.rawValue)")
+            
+            var updatedPlan = plan
+            updatedPlan.lastUpdated = Date() // Update the lastUpdated timestamp
+            
+            let data = updatedPlan.toFirestoreData()
+            try await collection.document(planId).updateData(data)
+            
+            print("[TMIPlanService] TMI plan updated successfully")
+            return updatedPlan
+        } catch {
+            print("[TMIPlanService] Error updating TMI plan: \(error)")
+            throw TMIPlanServiceError.updateFailed(error.localizedDescription)
+        }
+    }
+    
+    /// Delete a TMI plan from Firestore
+    func deletePlan(_ plan: TMIPlan) async throws {
+        guard let planId = plan.id else {
+            throw TMIPlanServiceError.invalidPlanId
+        }
+        
+        guard let collection = userPlansCollection else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+        
+        do {
+            print("[TMIPlanService] Deleting TMI plan: \(plan.model.rawValue)")
+            try await collection.document(planId).delete()
+            print("[TMIPlanService] TMI plan deleted successfully")
+        } catch {
+            print("[TMIPlanService] Error deleting TMI plan: \(error)")
+            throw TMIPlanServiceError.deleteFailed(error.localizedDescription)
+        }
+    }
+    
+    /// Get a specific TMI plan by ID
+    func getPlan(by id: String) async throws -> TMIPlan? {
+        guard let collection = userPlansCollection else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+        
+        do {
+            print("[TMIPlanService] Fetching TMI plan with ID: \(id)")
+            let document = try await collection.document(id).getDocument()
+            
+            if document.exists {
+                var plan = try document.data(as: TMIPlan.self)
+                plan.id = document.documentID
+                return plan
+            } else {
+                return nil
+            }
+        } catch {
+            print("[TMIPlanService] Error fetching TMI plan: \(error)")
+            throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
+        }
+    }
+    
+    /// Get plans for a specific student
+    func getPlansForStudent(_ studentId: String) async throws -> [TMIPlan] {
+        guard let collection = userPlansCollection else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+        
+        do {
+            print("[TMIPlanService] Fetching TMI plans for student: \(studentId)")
+            let querySnapshot = try await collection
+                .whereField("student.id", isEqualTo: studentId)
+                .getDocuments()
+            
+            let plans = querySnapshot.documents.compactMap { document -> TMIPlan? in
+                do {
+                    var plan = try document.data(as: TMIPlan.self)
+                    plan.id = document.documentID
+                    return plan
+                } catch {
+                    print("[TMIPlanService] Failed to decode TMI plan document \(document.documentID): \(error)")
+                    return nil
+                }
+            }
+            
+            print("[TMIPlanService] Successfully fetched \(plans.count) TMI plans for student")
+            return plans
+        } catch {
+            print("[TMIPlanService] Error fetching TMI plans for student: \(error)")
+            throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
+        }
+    }
 }
 
-// MARK: - Error Handling
-extension TMIPlanService {
-  enum TMIPlanServiceError: Error, LocalizedError {
+// MARK: - Error Types
+
+enum TMIPlanServiceError: Error, LocalizedError {
     case userNotAuthenticated
-    case planNotFound
-    case invalidPlanID
-    case saveFailed(String)
+    case invalidPlanId
     case fetchFailed(String)
+    case saveFailed(String)
     case updateFailed(String)
     case deleteFailed(String)
     
     var errorDescription: String? {
-      switch self {
-      case .userNotAuthenticated:
-        return "User must be authenticated to access TMI plans"
-      case .planNotFound:
-        return "TMI plan not found"
-      case .invalidPlanID:
-        return "Invalid TMI plan ID provided"
-      case .saveFailed(let message):
-        return "Failed to save TMI plan: \(message)"
-      case .fetchFailed(let message):
-        return "Failed to fetch TMI plan: \(message)"
-      case .updateFailed(let message):
-        return "Failed to update TMI plan: \(message)"
-      case .deleteFailed(let message):
-        return "Failed to delete TMI plan: \(message)"
-      }
+        switch self {
+        case .userNotAuthenticated:
+            return "User is not authenticated"
+        case .invalidPlanId:
+            return "TMI Plan ID is invalid or missing"
+        case .fetchFailed(let message):
+            return "Failed to fetch TMI plans: \(message)"
+        case .saveFailed(let message):
+            return "Failed to save TMI plan: \(message)"
+        case .updateFailed(let message):
+            return "Failed to update TMI plan: \(message)"
+        case .deleteFailed(let message):
+            return "Failed to delete TMI plan: \(message)"
+        }
     }
-  }
 }

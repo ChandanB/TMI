@@ -9,6 +9,8 @@ import SwiftUI
 @Observable
 class StudentListViewModel {
   var students: [Student] = []
+  var isLoading = false
+  var errorMessage: String?
   private var db = FirebaseManager.shared.firestore
 
   private var userStudentsCollection: CollectionReference? {
@@ -19,41 +21,64 @@ class StudentListViewModel {
     return db.collection("users").document(uid).collection("students")
   }
 
-  func fetchStudents() {
+  @MainActor
+  func fetchStudents() async {
     guard let collection = userStudentsCollection else { return }
-    collection.getDocuments { (querySnapshot, error) in
-      if let error = error {
-        print("Error getting students: \(error.localizedDescription)")
-      } else {
-        self.students =
-          querySnapshot?.documents.compactMap { document -> Student? in
-            try? document.data(as: Student.self)
-          } ?? []
+    
+    isLoading = true
+    errorMessage = nil
+    
+    do {
+      let querySnapshot = try await collection.getDocuments()
+      students = querySnapshot.documents.compactMap { document -> Student? in
+        try? document.data(as: Student.self)
       }
+      print("Fetched \(students.count) students")
+    } catch {
+      print("Error getting students: \(error.localizedDescription)")
+      errorMessage = "Failed to load students: \(error.localizedDescription)"
     }
+    
+    isLoading = false
   }
 
+  @MainActor
   func addStudent(_ student: Student) async -> Bool {
-    guard let collection = userStudentsCollection else { return false }
+    guard let collection = userStudentsCollection else { 
+      errorMessage = "Unable to access student collection"
+      return false 
+    }
+    
     do {
       _ = try await collection.addDocument(data: student.toFirestoreData())
-      fetchStudents()  // Refresh the list after adding
+      await fetchStudents()  // Refresh the list after adding
       return true
     } catch {
       print("Error adding student: \(error.localizedDescription)")
+      errorMessage = "Failed to add student: \(error.localizedDescription)"
       return false
     }
   }
 
-  func deleteStudent(_ student: Student) {
-    guard let id = student.id else { return }
-    guard let collection = userStudentsCollection else { return }
-    collection.document(id).delete { error in
-      if let error = error {
-        print("Error deleting student: \(error.localizedDescription)")
-      } else {
-        self.fetchStudents()  // Refresh the list after deleting
-      }
+  @MainActor
+  func deleteStudent(_ student: Student) async -> Bool {
+    guard let id = student.id else { 
+      errorMessage = "Cannot delete student: Invalid student ID"
+      return false 
+    }
+    guard let collection = userStudentsCollection else { 
+      errorMessage = "Unable to access student collection"
+      return false 
+    }
+    
+    do {
+      try await collection.document(id).delete()
+      await fetchStudents()  // Refresh the list after deleting
+      return true
+    } catch {
+      print("Error deleting student: \(error.localizedDescription)")
+      errorMessage = "Failed to delete student: \(error.localizedDescription)"
+      return false
     }
   }
 }
@@ -177,7 +202,10 @@ struct StudentListView: View {
             Task {
               let success = await viewModel.addStudent(newStudent)
               if success {
-                viewModel.fetchStudents()
+                showingAddStudent = false
+              } else {
+                // Error will be shown in the main view via viewModel.errorMessage
+                showingAddStudent = false
               }
             }
           }
@@ -201,7 +229,9 @@ struct StudentListView: View {
             .presentationSizing(.page)
         }
         .onAppear {
-          viewModel.fetchStudents()
+          Task {
+            await viewModel.fetchStudents()
+          }
 
           // Animated appearance
           withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
@@ -249,7 +279,47 @@ struct StudentListView: View {
   private var enhancedStudentGrid: some View {
     ScrollView {
       VStack(spacing: 24) {
-        if viewModel.students.isEmpty {
+        if viewModel.isLoading {
+          VStack(spacing: 16) {
+            ProgressView()
+              .scaleEffect(1.5)
+              .foregroundColor(.white)
+            
+            Text("Loading students...")
+              .font(.system(size: 16))
+              .foregroundColor(.white.opacity(0.7))
+          }
+          .frame(maxWidth: .infinity, minHeight: 200)
+        } else if let errorMessage = viewModel.errorMessage {
+          VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+              .font(.system(size: 50))
+              .foregroundColor(.orange)
+            
+            Text("Error Loading Students")
+              .font(.system(size: 20, weight: .semibold))
+              .foregroundColor(.white)
+            
+            Text(errorMessage)
+              .font(.system(size: 16))
+              .foregroundColor(.white.opacity(0.7))
+              .multilineTextAlignment(.center)
+              .padding(.horizontal, 40)
+            
+            Button("Retry") {
+              Task {
+                await viewModel.fetchStudents()
+              }
+            }
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(Color.tmiSecondary)
+            .cornerRadius(12)
+          }
+          .frame(maxWidth: .infinity, minHeight: 200)
+        } else if viewModel.students.isEmpty {
           enhancedEmptyState
         } else {
           // Stats summary
@@ -637,8 +707,15 @@ struct AddStudentView: View {
   @State private var studentID = ""
   @State private var dateOfBirth = Date()
   @State private var isSubmitting = false
+  @State private var validationMessage = ""
 
   var onStudentAdded: ((Student) -> Void)?
+  
+  private var isFormInvalid: Bool {
+    name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+    grade.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+    studentID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
 
   var body: some View {
     NavigationStack {
@@ -674,25 +751,54 @@ struct AddStudentView: View {
               .datePickerStyle(.compact)
               .accentColor(.tmiSecondary)
               .padding(.bottom, 10)
+            
+            // Validation message
+            if !validationMessage.isEmpty {
+              Text(validationMessage)
+                .font(.system(size: 14))
+                .foregroundColor(.red)
+                .padding(.horizontal)
+                .multilineTextAlignment(.center)
+            }
 
             // Submit button
             Button {
-              // Construct new Student and call completion closure
-              guard !name.isEmpty, !grade.isEmpty, !studentID.isEmpty else { return }
+              // Validate inputs
+              validationMessage = ""
               isSubmitting = true
+              
+              if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                validationMessage = "Please enter a student name"
+                isSubmitting = false
+                return
+              }
+              
+              if grade.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                validationMessage = "Please enter a grade level"
+                isSubmitting = false
+                return
+              }
+              
+              if studentID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                validationMessage = "Please enter a student ID"
+                isSubmitting = false
+                return
+              }
+              
+              // Construct new Student and call completion closure
               let newStudent = Student(
                 id: nil,
-                name: name,
-                grade: grade,
+                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                grade: grade.trimmingCharacters(in: .whitespacesAndNewlines),
                 dateOfBirth: dateOfBirth,
                 tmiPlans: [],
-                studentID: studentID,
+                studentID: studentID.trimmingCharacters(in: .whitespacesAndNewlines),
                 interests: [],
                 hobbies: [],
                 photoURL: nil
               )
               onStudentAdded?(newStudent)
-              dismiss()
+              // Don't dismiss here - let the parent handle it
             } label: {
               HStack {
                 if isSubmitting {
@@ -715,11 +821,9 @@ struct AddStudentView: View {
               .cornerRadius(14)
               .shadow(color: Color.tmiSecondary.opacity(0.3), radius: 10, x: 0, y: 5)
             }
-            .disabled(isSubmitting || name.isEmpty || grade.isEmpty || studentID.isEmpty)
-            .opacity((name.isEmpty || grade.isEmpty || studentID.isEmpty) ? 0.7 : 1.0)
-            .animation(
-              .easeInOut(duration: 0.2), value: name.isEmpty || grade.isEmpty || studentID.isEmpty
-            )
+            .disabled(isSubmitting || isFormInvalid)
+            .opacity(isFormInvalid ? 0.7 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: isFormInvalid)
             .padding(.top, 10)
           }
           .padding(24)
