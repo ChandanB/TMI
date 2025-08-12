@@ -9,9 +9,17 @@ import Foundation
 
 struct EngagementData: Identifiable, Equatable {
     let id = UUID()
-    let day: String
+    let day: String?
     let week: String
     let engagement: Double
+    let engagementLevel: Double
+    
+    init(day: String? = nil, week: String, engagement: Double = 0.0, engagementLevel: Double? = nil) {
+        self.day = day
+        self.week = week
+        self.engagement = engagement
+        self.engagementLevel = engagementLevel ?? engagement
+    }
 }
 
 extension EngagementData {

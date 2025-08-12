@@ -217,6 +217,19 @@ struct DynamicFormFieldView: View {
               selection: binding(String.self, for: id),
               options: field.options ?? []
             )
+            
+          case .rating:
+            RatingField(
+              label: field.label,
+              rating: binding(Int.self, for: id),
+              maxRating: 5
+            )
+            
+          case .table:
+            TableField(
+              label: field.label,
+              data: binding([String: String].self, for: id)
+            )
 
           case .url:
             ZLHNTextField(
@@ -440,3 +453,186 @@ struct DynamicFormView: View {
         .ignoresSafeArea()
     }
 }
+
+// MARK: - Form Field Components
+
+
+struct RatingField: View {
+    let label: String
+    @Binding var rating: Int
+    let maxRating: Int
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                ForEach(1...maxRating, id: \.self) { star in
+                    Button {
+                        rating = star
+                    } label: {
+                        Image(systemName: star <= rating ? "star.fill" : "star")
+                            .font(.system(size: 20))
+                            .foregroundColor(star <= rating ? .yellow : .white.opacity(0.4))
+                    }
+                }
+                
+                Spacer()
+                
+                if rating > 0 {
+                    Text("\(rating)/\(maxRating)")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+        }
+    }
+}
+
+struct TableField: View {
+    let label: String
+    @Binding var data: [String: String]
+    @State private var showingEditor = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                showingEditor = true
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Edit \(label)")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                        
+                        Text("\(data.count) entries")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14))
+                        .foregroundColor(.tmiSecondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.white.opacity(0.05))
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .sheet(isPresented: $showingEditor) {
+            TableEditorView(data: $data, label: label)
+        }
+    }
+}
+
+struct TableEditorView: View {
+    @Binding var data: [String: String]
+    let label: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var newKey = ""
+    @State private var newValue = ""
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    // Add new entry
+                    VStack(spacing: 12) {
+                        HStack {
+                            ZLHNTextField(placeholder: "Key", text: $newKey)
+                            ZLHNTextField(placeholder: "Value", text: $newValue)
+                        }
+                        
+                        TMIButton(text: "Add Entry", style: .secondary) {
+                            if !newKey.isEmpty && !newValue.isEmpty {
+                                data[newKey] = newValue
+                                newKey = ""
+                                newValue = ""
+                            }
+                        }
+                        .disabled(newKey.isEmpty || newValue.isEmpty)
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white.opacity(0.05))
+                    )
+                    
+                    // Existing entries
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(Array(data.keys.sorted()), id: \.self) { key in
+                                HStack {
+                                    Text(key)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.white)
+                                    
+                                    Spacer()
+                                    
+                                    Text(data[key] ?? "")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.white.opacity(0.8))
+                                    
+                                    Button {
+                                        data.removeValue(forKey: key)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.red)
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.white.opacity(0.05))
+                                )
+                            }
+                        }
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle(label)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(.white)
+                }
+            }
+        }
+    }
+}
+
+struct ProgressIndicator: View {
+    let current: Int
+    let total: Int
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text("Step \(current) of \(total)")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+                
+                Spacer()
+                
+                Text("\(Int(Double(current) / Double(total) * 100))%")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            
+            ProgressView(value: Double(current), total: Double(total))
+                .progressViewStyle(LinearProgressViewStyle(tint: .tmiSecondary))
+                .scaleEffect(y: 0.5)
+        }
+    }
+}
+

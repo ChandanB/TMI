@@ -10,14 +10,11 @@ enum InterestsAndHobbiesItemType: String, CaseIterable, Identifiable {
 }
 
 struct InterestsAndHobbiesView: View {
-  @State var interests: [Interest]
-  @State var hobbies: [Hobby]
+  @State private var stateModel = InterestsAndHobbiesStateModel()
   @State private var showingAddSheet = false
   @State private var newItemType: InterestsAndHobbiesItemType = .interest
   @State private var newItemName = ""
-  @State private var searchText = ""
   @State private var isSearchFocused = false
-  @State private var selectedSegment: Segment = .interests
 
   // Animation states
   @State private var headerAppeared = false
@@ -26,12 +23,6 @@ struct InterestsAndHobbiesView: View {
   @State private var gridAppeared = false
   @State private var fabAppeared = false
 
-  enum Segment: String, CaseIterable, Identifiable {
-    case interests = "Interests"
-    case hobbies = "Hobbies"
-
-    var id: String { self.rawValue }
-  }
 
   var body: some View {
     ZStack {
@@ -58,16 +49,24 @@ struct InterestsAndHobbiesView: View {
                 .offset(y: segmentAppeared ? 0 : 10)
                 .opacity(segmentAppeared ? 1 : 0)
 
-              // Stats summary
-              itemStatsView
-                .padding(.horizontal, 20)
-                .offset(y: segmentAppeared ? 0 : 10)
-                .opacity(segmentAppeared ? 1 : 0)
+              // Loading state
+              if stateModel.isLoading {
+                ProgressView()
+                  .scaleEffect(1.5)
+                  .foregroundColor(.white)
+                  .padding(.vertical, 40)
+              } else {
+                // Stats summary
+                itemStatsView
+                  .padding(.horizontal, 20)
+                  .offset(y: segmentAppeared ? 0 : 10)
+                  .opacity(segmentAppeared ? 1 : 0)
 
-              enhancedItemsGridView
-                .padding(.horizontal, 20)
-                .offset(y: gridAppeared ? 0 : 30)
-                .opacity(gridAppeared ? 1 : 0)
+                enhancedItemsGridView
+                  .padding(.horizontal, 20)
+                  .offset(y: gridAppeared ? 0 : 30)
+                  .opacity(gridAppeared ? 1 : 0)
+              }
             }
             .padding(.bottom, 100)
           }
@@ -139,6 +138,9 @@ struct InterestsAndHobbiesView: View {
       }
     }
     .preferredColorScheme(.dark)
+    .task {
+      await stateModel.fetch()
+    }
     .onAppear {
       animateViews()
     }
@@ -178,12 +180,12 @@ struct InterestsAndHobbiesView: View {
 
   private var enhancedHeaderView: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text(selectedSegment == .interests ? "Your Interests" : "Your Hobbies")
+      Text(stateModel.selectedSegment == .interests ? "Your Interests" : "Your Hobbies")
         .font(.system(size: 32, weight: .bold, design: .rounded))
         .foregroundColor(.white)
 
       Text(
-        selectedSegment == .interests
+        stateModel.selectedSegment == .interests
           ? "Explore and manage your academic and personal interests"
           : "Discover and track your favorite pastimes and activities"
       )
@@ -197,20 +199,20 @@ struct InterestsAndHobbiesView: View {
 
   private var enhancedSearchBar: some View {
     ZStack(alignment: .leading) {
-      if searchText.isEmpty && !isSearchFocused {
+      if stateModel.searchText.isEmpty && !isSearchFocused {
         HStack(spacing: 6) {
           Image(systemName: "magnifyingglass")
             .font(.system(size: 16, weight: .medium))
             .foregroundColor(.white.opacity(0.5))
 
-          Text(selectedSegment == .interests ? "Search interests" : "Search hobbies")
+          Text(stateModel.selectedSegment == .interests ? "Search interests" : "Search hobbies")
             .font(.system(size: 16))
             .foregroundColor(.white.opacity(0.5))
         }
         .padding(.leading, 12)
       }
 
-      TextField("", text: $searchText)
+      TextField("", text: $stateModel.searchText)
         .font(.system(size: 16))
         .padding(12)
         .foregroundColor(.white)
@@ -255,18 +257,18 @@ struct InterestsAndHobbiesView: View {
 
   private var enhancedSegmentedControl: some View {
     HStack(spacing: 0) {
-      ForEach(Segment.allCases) { segment in
+      ForEach(InterestsAndHobbiesStateModel.ViewSegment.allCases) { segment in
         Button {
           withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            selectedSegment = segment
+            stateModel.selectedSegment = segment
           }
         } label: {
           VStack(spacing: 8) {
             Text(segment.rawValue)
-              .font(.system(size: 16, weight: selectedSegment == segment ? .semibold : .medium))
-              .foregroundColor(selectedSegment == segment ? .white : .white.opacity(0.6))
+              .font(.system(size: 16, weight: stateModel.selectedSegment == segment ? .semibold : .medium))
+              .foregroundColor(stateModel.selectedSegment == segment ? .white : .white.opacity(0.6))
 
-            if selectedSegment == segment {
+            if stateModel.selectedSegment == segment {
               RoundedRectangle(cornerRadius: 2)
                 .fill(segmentColor)
                 .frame(height: 3)
@@ -300,24 +302,24 @@ struct InterestsAndHobbiesView: View {
   private var itemStatsView: some View {
     HStack(spacing: 15) {
       ItemStatCard(
-        icon: selectedSegment == .interests ? "heart.fill" : "gamecontroller.fill",
-        count: selectedSegment == .interests ? filteredInterests.count : filteredHobbies.count,
+        icon: stateModel.selectedSegment == .interests ? "heart.fill" : "gamecontroller.fill",
+        count: stateModel.selectedSegment == .interests ? stateModel.filteredInterests.count : stateModel.filteredHobbies.count,
         label: "Total",
         color: segmentColor
       )
 
       ItemStatCard(
         icon: "chart.bar.fill",
-        count: selectedSegment == .interests
-          ? categoryCount(from: filteredInterests.map { $0.category.first ?? .academics })
-          : categoryCount(from: filteredHobbies.map { $0.category.first ?? .sports }),
+        count: stateModel.selectedSegment == .interests
+          ? categoryCount(from: stateModel.filteredInterests.map { $0.category.first ?? .academics })
+          : categoryCount(from: stateModel.filteredHobbies.map { $0.category.first ?? .sports }),
         label: "Categories",
         color: segmentColor
       )
 
       ItemStatCard(
         icon: "person.fill",
-        count: selectedSegment == .interests ? 5 : 3,  // This would be dynamic in a real app
+        count: stateModel.selectedSegment == .interests ? 5 : 3,  // This would be dynamic in a real app
         label: "Students",
         color: segmentColor
       )
@@ -332,8 +334,8 @@ struct InterestsAndHobbiesView: View {
 
   private var enhancedItemsGridView: some View {
     VStack {
-      if (selectedSegment == .interests && filteredInterests.isEmpty)
-        || (selectedSegment == .hobbies && filteredHobbies.isEmpty)
+      if (stateModel.selectedSegment == .interests && stateModel.filteredInterests.isEmpty)
+        || (stateModel.selectedSegment == .hobbies && stateModel.filteredHobbies.isEmpty)
       {
         emptyStateView
       } else {
@@ -341,9 +343,9 @@ struct InterestsAndHobbiesView: View {
           columns: [GridItem(.adaptive(minimum: 150), spacing: 20)],
           spacing: 20
         ) {
-          if selectedSegment == .interests {
-            ForEach(filteredInterests) { interest in
-              NavigationLink(destination: EnhancedInterestDetailView(interest: interest)) {
+          if stateModel.selectedSegment == .interests {
+            ForEach(stateModel.filteredInterests) { interest in
+              NavigationLink(destination: InterestDetailView(interest: interest)) {
                 EnhancedItemCardView(
                   title: interest.name,
                   icon: interest.iconName,
@@ -354,7 +356,7 @@ struct InterestsAndHobbiesView: View {
               .buttonStyle(ScaleButtonStyle())
             }
           } else {
-            ForEach(filteredHobbies) { hobby in
+            ForEach(stateModel.filteredHobbies) { hobby in
               NavigationLink(destination: EnhancedHobbyDetailView(hobby: hobby)) {
                 EnhancedItemCardView(
                   title: hobby.name,
@@ -389,17 +391,17 @@ struct InterestsAndHobbiesView: View {
           .frame(width: 200, height: 200)
           .blur(radius: 10)
 
-        Image(systemName: selectedSegment == .interests ? "heart.slash" : "gamecontroller.fill")
+        Image(systemName: stateModel.selectedSegment == .interests ? "heart.slash" : "gamecontroller.fill")
           .font(.system(size: 70))
           .foregroundColor(.white.opacity(0.7))
       }
 
-      Text(selectedSegment == .interests ? "No Interests Found" : "No Hobbies Found")
+      Text(stateModel.selectedSegment == .interests ? "No Interests Found" : "No Hobbies Found")
         .font(.system(size: 24, weight: .bold, design: .rounded))
         .foregroundColor(.white)
 
       Text(
-        selectedSegment == .interests
+        stateModel.selectedSegment == .interests
           ? "Add your first interest to start tracking student alignments"
           : "Add your first hobby to start exploring student activities"
       )
@@ -415,7 +417,7 @@ struct InterestsAndHobbiesView: View {
           Image(systemName: "plus.circle.fill")
             .font(.system(size: 18, weight: .semibold))
 
-          Text(selectedSegment == .interests ? "Add Interest" : "Add Hobby")
+          Text(stateModel.selectedSegment == .interests ? "Add Interest" : "Add Hobby")
             .font(.system(size: 16, weight: .semibold))
         }
         .padding(.horizontal, 24)
@@ -445,38 +447,27 @@ struct InterestsAndHobbiesView: View {
   @Namespace private var namespace
 
   private var segmentColor: Color {
-    selectedSegment == .interests ? .pink : .green
-  }
-
-  // MARK: - Filtering
-
-  private var filteredInterests: [Interest] {
-    interests.filter { $0.name.localizedCaseInsensitiveContains(searchText) || searchText.isEmpty }
-  }
-
-  private var filteredHobbies: [Hobby] {
-    hobbies.filter { $0.name.localizedCaseInsensitiveContains(searchText) || searchText.isEmpty }
+    stateModel.selectedSegment == .interests ? .pink : .green
   }
 
   // MARK: - Data Manipulation
 
   private func addItem() {
-    withAnimation {
+    Task {
       if newItemType == .interest {
         let newInterest = Interest(
           name: newItemName,
           category: [.academics]
         )
-        interests.append(newInterest)
+        await stateModel.addInterest(newInterest)
       } else {
         let newHobby = Hobby(
           name: newItemName,
           category: [.sports]
         )
-        hobbies.append(newHobby)
+        await stateModel.addHobby(newHobby)
       }
       newItemName = ""
-      showingAddSheet = false
     }
   }
 }
@@ -1016,184 +1007,118 @@ struct IconSelectionButton: View {
 
 // MARK: - Detail Views
 
-struct EnhancedInterestDetailView: View {
-  let interest: Interest
 
-  @State private var headerAppeared = false
-  @State private var contentAppeared = false
 
-  var body: some View {
-    ZStack {
-      // Background
-      LinearGradient(
-        gradient: Gradient(colors: [
-          Color(red: 0.08, green: 0.08, blue: 0.15),
-          Color(red: 0.14, green: 0.14, blue: 0.25),
-        ]),
-        startPoint: .top,
-        endPoint: .bottom
-      )
-      .ignoresSafeArea()
+// MARK: - Supporting Detail Views
 
-      // Animated blob
-      InterestDetailBlob(color: interest.color)
-
-      ScrollView {
-        VStack(spacing: 24) {
-          // Header
-          VStack(spacing: 16) {
-            ZStack {
-              Circle()
-                .fill(interest.color.opacity(0.15))
-                .frame(width: 100, height: 100)
-
-              Image(systemName: interest.iconName)
-                .font(.system(size: 40))
-                .foregroundColor(interest.color)
-            }
-
-            VStack(spacing: 8) {
-              Text(interest.name)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+struct StudentPreviewCard: View {
+    let student: Student
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Avatar
+            Text(student.initials)
+                .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white)
-
-              Text(interest.category.first?.rawValue ?? "General")
-                .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.7))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .background(
-                  Capsule()
-                    .fill(interest.color.opacity(0.15))
-                )
+                .frame(width: 32, height: 32)
+                .background(color.opacity(0.3))
+                .clipShape(Circle())
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(student.name)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                
+                Text("Grade \(student.grade) • \(Int(student.engagementScore * 100))% engaged")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.7))
             }
-          }
-          .padding(.top, 40)
-          .offset(y: headerAppeared ? 0 : -30)
-          .opacity(headerAppeared ? 1 : 0)
-
-          // Stats
-          HStack(spacing: 20) {
-            DetailStatCard(
-              value: "32",
-              label: "Students",
-              icon: "person.2.fill",
-              color: interest.color
-            )
-
-            DetailStatCard(
-              value: "78%",
-              label: "Engagement",
-              icon: "chart.line.uptrend.xyaxis.fill",
-              color: interest.color
-            )
-
-            DetailStatCard(
-              value: "5",
-              label: "TMI Plans",
-              icon: "doc.fill",
-              color: interest.color
-            )
-          }
-          .padding(.horizontal, 20)
-          .offset(y: contentAppeared ? 0 : 30)
-          .opacity(contentAppeared ? 1 : 0)
-
-          // Content
-          VStack(spacing: 20) {
-            // Related activities
-            IHDetailSection(title: "Related Activities", color: interest.color) {
-              Text(
-                "Activities related to this interest will be displayed here. "
-                  + "Connect activities to this interest to help align TMI plans with student interests."
-              )
-              .font(.system(size: 15))
-              .foregroundColor(.white.opacity(0.8))
-              .padding(.vertical, 12)
-            }
-
-            // Connected TMI Plans
-            IHDetailSection(title: "Connected TMI Plans", color: interest.color) {
-              Text(
-                "TMI plans that involve this interest will be shown here. "
-                  + "Create new plans or connect existing ones to track student progress."
-              )
-              .font(.system(size: 15))
-              .foregroundColor(.white.opacity(0.8))
-              .padding(.vertical, 12)
-            }
-
-            // Student Alignment
-            IHDetailSection(title: "Student Alignment", color: interest.color) {
-              Text(
-                "Students who have expressed this interest will appear here. "
-                  + "Track alignment between interests and academic performance."
-              )
-              .font(.system(size: 15))
-              .foregroundColor(.white.opacity(0.8))
-              .padding(.vertical, 12)
-            }
-          }
-          .padding(.horizontal, 20)
-          .offset(y: contentAppeared ? 0 : 50)
-          .opacity(contentAppeared ? 1 : 0)
+            
+            Spacer()
         }
-        .padding(.bottom, 40)
-      }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.05))
+        )
     }
-    .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-      ToolbarItem(placement: .principal) {
-        Text("Interest Details")
-          .font(.system(size: 18, weight: .bold, design: .rounded))
-          .foregroundColor(.white)
-      }
-
-      ToolbarItem(placement: .navigationBarTrailing) {
-        Menu {
-          Button(action: {
-            // Edit action
-          }) {
-            Label("Edit Interest", systemImage: "pencil")
-          }
-
-          Button(action: {
-            // Connect student action
-          }) {
-            Label("Connect Student", systemImage: "person.badge.plus")
-          }
-
-          Divider()
-
-          Button(
-            role: .destructive,
-            action: {
-              // Delete action
-            }
-          ) {
-            Label("Delete Interest", systemImage: "trash")
-          }
-        } label: {
-          Image(systemName: "ellipsis.circle")
-            .font(.system(size: 22))
-            .foregroundColor(.white)
-        }
-      }
-    }
-    .onAppear {
-      withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
-        headerAppeared = true
-      }
-
-      withAnimation(.easeOut(duration: 0.5).delay(0.4)) {
-        contentAppeared = true
-      }
-    }
-  }
 }
+
+struct TMIPlanPreviewCard: View {
+    let plan: TMIPlan
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Plan Icon
+            Image(systemName: "doc.text.fill")
+                .font(.system(size: 16))
+                .foregroundColor(color)
+                .frame(width: 32, height: 32)
+                .background(color.opacity(0.15))
+                .clipShape(Circle())
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(plan.model.rawValue)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                
+                Text("Created \(plan.creationDate.formatted(.relative(presentation: .numeric)))")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            
+            Spacer()
+            
+            // Status indicator
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14))
+                .foregroundColor(.green)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.05))
+        )
+    }
+}
+
+struct InsightRow: View {
+    let icon: String
+    let title: String
+    let value: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(color)
+                .frame(width: 20)
+            
+            Text(title)
+                .font(.system(size: 14))
+                .foregroundColor(.white.opacity(0.8))
+            
+            Spacer()
+            
+            Text(value)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white)
+        }
+    }
+}
+
+// MARK: - EnhancedHobbyDetailView
 
 struct EnhancedHobbyDetailView: View {
   let hobby: Hobby
+  @State private var associatedStudents: [Student] = []
+  @State private var connectedTMIPlans: [TMIPlan] = []
+  @State private var isLoading = false
 
   @State private var headerAppeared = false
   @State private var contentAppeared = false
@@ -1216,103 +1141,20 @@ struct EnhancedHobbyDetailView: View {
 
       ScrollView {
         VStack(spacing: 24) {
-          // Header
-          VStack(spacing: 16) {
-            ZStack {
-              Circle()
-                .fill(hobby.color.opacity(0.15))
-                .frame(width: 100, height: 100)
+          headerView
+            .padding(.top, 40)
+            .offset(y: headerAppeared ? 0 : -30)
+            .opacity(headerAppeared ? 1 : 0)
 
-              Image(systemName: hobby.iconName)
-                .font(.system(size: 40))
-                .foregroundColor(hobby.color)
-            }
+          statsView
+            .padding(.horizontal, 20)
+            .offset(y: contentAppeared ? 0 : 30)
+            .opacity(contentAppeared ? 1 : 0)
 
-            VStack(spacing: 8) {
-              Text(hobby.name)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-
-              Text(hobby.category.first?.rawValue ?? "General")
-                .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.7))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .background(
-                  Capsule()
-                    .fill(hobby.color.opacity(0.15))
-                )
-            }
-          }
-          .padding(.top, 40)
-          .offset(y: headerAppeared ? 0 : -30)
-          .opacity(headerAppeared ? 1 : 0)
-
-          // Stats
-          HStack(spacing: 20) {
-            DetailStatCard(
-              value: "24",
-              label: "Students",
-              icon: "person.2.fill",
-              color: hobby.color
-            )
-
-            DetailStatCard(
-              value: "65%",
-              label: "Engagement",
-              icon: "chart.line.uptrend.xyaxis.fill",
-              color: hobby.color
-            )
-
-            DetailStatCard(
-              value: "3",
-              label: "TMI Plans",
-              icon: "doc.fill",
-              color: hobby.color
-            )
-          }
-          .padding(.horizontal, 20)
-          .offset(y: contentAppeared ? 0 : 30)
-          .opacity(contentAppeared ? 1 : 0)
-
-          // Content
-          VStack(spacing: 20) {
-            // Related activities
-            IHDetailSection(title: "Related Activities", color: hobby.color) {
-              Text(
-                "Activities related to this hobby will be displayed here. "
-                  + "Connect activities to this hobby to help align TMI plans with student interests."
-              )
-              .font(.system(size: 15))
-              .foregroundColor(.white.opacity(0.8))
-              .padding(.vertical, 12)
-            }
-
-            // Connected TMI Plans
-            IHDetailSection(title: "Connected TMI Plans", color: hobby.color) {
-              Text(
-                "TMI plans that involve this hobby will be shown here. "
-                  + "Create new plans or connect existing ones to track student progress."
-              )
-              .font(.system(size: 15))
-              .foregroundColor(.white.opacity(0.8))
-              .padding(.vertical, 12)
-            }
-
-            // Student Engagement
-            IHDetailSection(title: "Student Engagement", color: hobby.color) {
-              Text(
-                "Students who participate in this hobby will appear here. "
-                  + "Track engagement and connections to academic performance."
-              )
-              .font(.system(size: 15))
-              .foregroundColor(.white.opacity(0.8))
-              .padding(.vertical, 12)
-            }
-          }
-          .padding(.horizontal, 20)
-          .offset(y: contentAppeared ? 0 : 50)
-          .opacity(contentAppeared ? 1 : 0)
+          contentSections
+            .padding(.horizontal, 20)
+            .offset(y: contentAppeared ? 0 : 50)
+            .opacity(contentAppeared ? 1 : 0)
         }
         .padding(.bottom, 40)
       }
@@ -1363,6 +1205,98 @@ struct EnhancedHobbyDetailView: View {
 
       withAnimation(.easeOut(duration: 0.5).delay(0.4)) {
         contentAppeared = true
+      }
+    }
+  }
+
+  private var headerView: some View {
+    VStack(spacing: 16) {
+      ZStack {
+        Circle()
+          .fill(hobby.color.opacity(0.15))
+          .frame(width: 100, height: 100)
+
+        Image(systemName: hobby.iconName)
+          .font(.system(size: 40))
+          .foregroundColor(hobby.color)
+      }
+
+      VStack(spacing: 8) {
+        Text(hobby.name)
+          .font(.system(size: 28, weight: .bold, design: .rounded))
+          .foregroundColor(.white)
+
+        Text(hobby.category.first?.rawValue ?? "General")
+          .font(.system(size: 16))
+          .foregroundColor(.white.opacity(0.7))
+          .padding(.horizontal, 16)
+          .padding(.vertical, 6)
+          .background(
+            Capsule()
+              .fill(hobby.color.opacity(0.15))
+          )
+      }
+    }
+  }
+
+  private var statsView: some View {
+    HStack(spacing: 20) {
+      DetailStatCard(
+        value: "24",
+        label: "Students",
+        icon: "person.2.fill",
+        color: hobby.color
+      )
+
+      DetailStatCard(
+        value: "65%",
+        label: "Engagement",
+        icon: "chart.line.uptrend.xyaxis.fill",
+        color: hobby.color
+      )
+
+      DetailStatCard(
+        value: "3",
+        label: "TMI Plans",
+        icon: "doc.fill",
+        color: hobby.color
+      )
+    }
+  }
+
+  private var contentSections: some View {
+    VStack(spacing: 20) {
+      // Related activities
+      IHDetailSection(title: "Related Activities", color: hobby.color) {
+        Text(
+          "Activities related to this hobby will be displayed here. "
+            + "Connect activities to this hobby to help align TMI plans with student interests."
+        )
+        .font(.system(size: 15))
+        .foregroundColor(.white.opacity(0.8))
+        .padding(.vertical, 12)
+      }
+
+      // Connected TMI Plans
+      IHDetailSection(title: "Connected TMI Plans", color: hobby.color) {
+        Text(
+          "TMI plans that involve this hobby will be shown here. "
+            + "Create new plans or connect existing ones to track student progress."
+        )
+        .font(.system(size: 15))
+        .foregroundColor(.white.opacity(0.8))
+        .padding(.vertical, 12)
+      }
+
+      // Student Engagement
+      IHDetailSection(title: "Student Engagement", color: hobby.color) {
+        Text(
+          "Students who participate in this hobby will appear here. "
+            + "Track engagement and connections to academic performance."
+        )
+        .font(.system(size: 15))
+        .foregroundColor(.white.opacity(0.8))
+        .padding(.vertical, 12)
       }
     }
   }
@@ -1541,8 +1475,6 @@ struct IHDetailSection<Content: View>: View {
 // MARK: - Preview
 
 #Preview {
-  InterestsAndHobbiesView(
-    interests: [],
-    hobbies: []
-  )
+  InterestsAndHobbiesView()
 }
+

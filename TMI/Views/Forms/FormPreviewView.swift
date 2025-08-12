@@ -64,22 +64,33 @@ struct DynamicFormFieldPreview: View {
                 .keyboardType(.numberPad)
             
         case .date:
-            DatePickerView(label: "Date", date: .constant(Date()), displayedComponents: .date)
+            DatePicker("Date", selection: .constant(Date()), displayedComponents: .date)
+                .labelsHidden()
+                .disabled(true)
             
         case .time:
-            DatePickerView(label: "Time", date: .constant(Date()), displayedComponents: .hourAndMinute)
+            DatePicker("Time", selection: .constant(Date()), displayedComponents: .hourAndMinute)
+                .labelsHidden()
+                .disabled(true)
             
         case .dateTime:
-            DatePickerView(label: field.label, date: .constant(Date()), displayedComponents: [.date, .hourAndMinute])
+            DatePicker(field.label, selection: .constant(Date()), displayedComponents: [.date, .hourAndMinute])
+                .labelsHidden()
+                .disabled(true)
             
         case .checkbox:
             Toggle(field.label, isOn: .constant(false))
             
         case .multipleChoice:
-            MultipleChoiceField(label: field.label, selectedOptions: .constant([""]), options: field.options ?? [])
+            // Use a local @State binding to resolve ambiguous MultipleChoiceField initializer.
+            if let options = field.options {
+                PreviewMultipleChoiceField(label: field.label, options: options)
+            } else {
+                EmptyView()
+            }
             
         case .dropdown:
-            DropdownField(label: field.label, selection: .constant(""), options: field.options ?? [])
+            PreviewDropdownField(label: field.label, options: field.options ?? [])
             
         case .url:
             ZLHNTextField(placeholder: "Enter \(field.label)", text: .constant(""))
@@ -131,6 +142,93 @@ struct DynamicFormFieldPreview: View {
     //              .border(Color.white.opacity(0.5))
             }
         }
+    }
+}
+
+struct PreviewMultipleChoiceField: View {
+    let label: String
+    let options: [String]
+    @State private var selectedOptions: [String] = []
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(label)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+            ForEach(options, id: \.self) { option in
+                Button(action: {
+                    if selectedOptions.contains(option) {
+                        selectedOptions.removeAll { $0 == option }
+                    } else {
+                        selectedOptions.append(option)
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: selectedOptions.contains(option) ? "checkmark.square.fill" : "square")
+                            .foregroundColor(selectedOptions.contains(option) ? .blue : .gray)
+                        Text(option)
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+    }
+}
+
+struct PreviewDropdownField: View {
+    let label: String
+    let options: [String]
+    @State private var selection: String = ""
+    @State private var isExpanded: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text(label)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+                .padding(.bottom, 2)
+            Button(action: {
+                isExpanded.toggle()
+            }) {
+                HStack {
+                    Text(selection.isEmpty ? "Select" : selection)
+                        .foregroundColor(selection.isEmpty ? .gray : .primary)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .foregroundColor(.gray)
+                }
+                .padding(8)
+                .background(Color(.systemGray6))
+                .cornerRadius(5)
+            }
+            .buttonStyle(PlainButtonStyle())
+            if isExpanded {
+                VStack(spacing: 0) {
+                    ForEach(options, id: \.self) { option in
+                        Button(action: {
+                            selection = option
+                            isExpanded = false
+                        }) {
+                            HStack {
+                                Text(option)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                            }
+                            .padding(8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .background(Color(.systemGray5))
+                .cornerRadius(5)
+                .shadow(radius: 2)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 

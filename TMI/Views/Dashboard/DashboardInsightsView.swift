@@ -11,6 +11,7 @@ import SwiftUI
 
 struct DashboardInsightsView: View {
   @Environment(\.dismiss) private var dismiss
+  let dashboardData: DashboardData
 
   var body: some View {
     ZStack {
@@ -60,22 +61,22 @@ struct DashboardInsightsView: View {
 
               HStack(spacing: 16) {
                 StatCircle(
-                  value: "78%",
+                  value: "\(Int(surveyCompletionRate * 100))%",
                   title: "Survey\nCompletion",
                   color: .green,
                   icon: "chart.bar.fill"
                 )
 
                 StatCircle(
-                  value: "65%",
-                  title: "Interest\nAlignment",
+                  value: "\(Int(planAlignmentRate * 100))%", 
+                  title: "Plan\nAlignment",
                   color: Color.tmiSecondary,
                   icon: "person.fill.checkmark"
                 )
 
                 StatCircle(
-                  value: "82%",
-                  title: "Plan\nEffectiveness",
+                  value: "\(Int(planEffectiveness * 100))%",
+                  title: "Plan\nEffectiveness", 
                   color: .orange,
                   icon: "star.fill"
                 )
@@ -91,10 +92,10 @@ struct DashboardInsightsView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundColor(.white)
 
-              ForEach(InsightRecommendation.sampleRecommendations) { recommendation in
+              ForEach(recommendations) { recommendation in
                 RecommendationRow(recommendation: recommendation)
 
-                if recommendation.id != InsightRecommendation.sampleRecommendations.last!.id {
+                if recommendation.id != recommendations.last!.id {
                   Divider()
                     .background(Color.white.opacity(0.1))
                 }
@@ -157,4 +158,96 @@ struct DashboardInsightsView: View {
     }
     .preferredColorScheme(.dark)
   }
+  
+  // MARK: - Computed Properties
+  
+  private var surveyCompletionRate: Double {
+    guard dashboardData.totalStudents > 0 else { return 0.0 }
+    return Double(dashboardData.surveysCompleted) / Double(dashboardData.totalStudents)
+  }
+  
+  private var planAlignmentRate: Double {
+    guard dashboardData.totalStudents > 0 else { return 0.0 }
+    return Double(dashboardData.plansAligned) / Double(dashboardData.totalStudents)
+  }
+  
+  private var planEffectiveness: Double {
+    // Calculate plan effectiveness based on plans vs students ratio and activity
+    let planRatio = dashboardData.totalStudents > 0 ? 
+      Double(dashboardData.activeTMIPlans) / Double(dashboardData.totalStudents) : 0.0
+    let activityBonus = dashboardData.recentActivities.count > 0 ? 0.15 : 0.0
+    return min(1.0, planRatio * 0.8 + activityBonus)
+  }
+  
+  private var recommendations: [InsightRecommendation] {
+    var recs: [InsightRecommendation] = []
+    
+    // Survey completion recommendations
+    if surveyCompletionRate < 0.7 {
+      let missingCount = dashboardData.totalStudents - dashboardData.surveysCompleted
+      recs.append(InsightRecommendation(
+        title: "Increase survey completion rate",
+        description: "\(missingCount) students haven't completed their interest surveys. Consider sending reminder notifications.",
+        icon: "bell.fill",
+        color: .orange
+      ))
+    }
+    
+    // Plan alignment recommendations
+    if planAlignmentRate < 0.6 {
+      let unalignedCount = dashboardData.totalStudents - dashboardData.plansAligned
+      recs.append(InsightRecommendation(
+        title: "Improve plan alignment",
+        description: "\(unalignedCount) students need aligned TMI plans. Schedule individual meetings to assess their needs.",
+        icon: "person.2.fill",
+        color: .blue
+      ))
+    }
+    
+    // Interest identification recommendations
+    if dashboardData.interestsIdentified < dashboardData.totalStudents * 2 {
+      recs.append(InsightRecommendation(
+        title: "Expand interest exploration",
+        description: "Students show limited interest diversity. Consider organizing career exploration workshops.",
+        icon: "lightbulb.fill",
+        color: .yellow
+      ))
+    }
+    
+    // Recent activity recommendations
+    if dashboardData.recentActivities.count < 3 {
+      recs.append(InsightRecommendation(
+        title: "Boost student engagement",
+        description: "Low recent activity detected. Plan interactive sessions to re-engage students.",
+        icon: "chart.line.uptrend.xyaxis",
+        color: .green
+      ))
+    }
+    
+    // Positive recommendations
+    if surveyCompletionRate > 0.8 && planAlignmentRate > 0.7 {
+      recs.append(InsightRecommendation(
+        title: "Excellent progress!",
+        description: "High completion and alignment rates. Consider expanding to advanced tracking features.",
+        icon: "star.fill",
+        color: .teal
+      ))
+    }
+    
+    return Array(recs.prefix(3)) // Limit to 3 recommendations
+  }
+}
+
+// MARK: - Preview
+
+#Preview {
+  DashboardInsightsView(dashboardData: DashboardData(
+    engagementData: [],
+    totalStudents: 25,
+    activeTMIPlans: 18,
+    interestsIdentified: 50,
+    surveysCompleted: 20,
+    plansAligned: 15,
+    recentActivities: []
+  ))
 }

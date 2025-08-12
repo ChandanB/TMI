@@ -108,9 +108,10 @@ struct FormStoreView: View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 20) {
                 ForEach(viewModel.formTemplates) { template in
-                    CustomNavigationLink(destination: FormTemplateDetailView(template: template)) {
+                    NavigationLink(destination: FormTemplateDetailView(template: template)) {
                         FormStoreCardView(template: template)
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding(.horizontal)
@@ -160,58 +161,58 @@ struct FormStoreCell: View {
     }
 }
 
-struct TagView: View {
-    let title: String
+// MARK: - Helper Views
+struct StatItem: View {
+    let icon: String
+    let value: String
+    let label: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(.tmiSecondary)
+            Text(value)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.7))
+        }
+    }
+}
 
+struct SectionPreviewRow: View {
+    let section: FormSection
+    let index: Int
+    
     var body: some View {
         HStack {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+            Text("\(index).")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.tmiSecondary)
+                .frame(width: 30, alignment: .leading)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(section.title)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                
+                Text("\(section.fields.count) fields")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.5))
         }
+        .padding(.vertical, 8)
     }
 }
 
 #Preview {
     FormStoreView()
 }
-
-//struct FormTemplateDetailView: View {
-//    var template: FormTemplate
-//    @State private var isAddingTemplate = false
-//
-//    var body: some View {
-//        FormPreviewView(template: template)
-//            .navigationTitle(template.name)
-//            .navigationBarTitleDisplayMode(.inline)
-//            .toolbar {
-//                ToolbarItem(placement: .navigationBarTrailing) {
-//                    Button(action: {
-//                        Task {
-//                            await saveTemplateToMyCollection()
-//                        }
-//                    }) {
-//                        if isAddingTemplate {
-//                            ProgressView()
-//                        } else {
-//                            Text("Add")
-//                        }
-//                    }
-//                    .disabled(isAddingTemplate)
-//                }
-//            }
-//    }
-//    
-//    private func saveTemplateToMyCollection() async {
-//        isAddingTemplate = true
-////        do {
-////            guard let userId = try await FIREBASE_MANAGER.fetchCurrentUser().id else { return }
-////            try await FIREBASE_MANAGER.addFormTemplateToUserCollection(formTemplateId: template.id ?? "", userId: userId)
-////            isAddingTemplate = false
-////        } catch {
-////            isAddingTemplate = false
-////        }
-//    }
-//}

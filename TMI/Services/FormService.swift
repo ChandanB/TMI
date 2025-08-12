@@ -6,12 +6,52 @@
 //
 
 import Firebase
+import FirebaseAuth
 
 extension FirebaseManager {
-    // MARK: Save Form Template
+    // MARK: - Form Template Management
+    
+    /// Fetches all available form templates
+    func fetchFormTemplates() async throws -> [FormTemplate] {
+        return try await fetchDocuments(inCollection: .formTemplates)
+    }
+    
+    /// Fetches user's form templates
+    func fetchUserFormTemplates(userId: String) async throws -> [FormTemplate] {
+        let user: TMIUser = try await fetchDocument(inCollection: .users, withId: userId)
+        let templateIds = user.formTemplates
+        
+        var templates: [FormTemplate] = []
+        for templateId in templateIds {
+            do {
+                let template: FormTemplate = try await fetchDocument(inCollection: .formTemplates, withId: templateId)
+                templates.append(template)
+            } catch {
+                print("Failed to fetch template \(templateId): \(error)")
+            }
+        }
+        return templates
+    }
+    
+    /// Creates a new form template
+    func createFormTemplate(_ template: FormTemplate) async throws -> FormTemplate {
+        try await createDocument(inCollection: .formTemplates, document: template)
+        return template
+    }
+    
+    /// Updates an existing form template
+    func updateFormTemplate(_ template: FormTemplate) async throws {
+        try await updateDocument(inCollection: .formTemplates, document: template)
+    }
+    
+    // MARK: - Form Submission Management
+    
+    /// Handles form submission with proper validation
     func handleFormSubmission(formId: String, submissionData: [String: AnyCodable]) async throws {
-        let template: FormTemplate = DefaultFormTemplates.camperRegistrationFormTemplate
+        // Fetch the actual template for validation
+        let template: FormTemplate = try await fetchDocument(inCollection: .formTemplates, withId: formId)
 
+        // Validate submission data against template
         for section in template.sections {
             for field in section.fields {
                 guard let fieldID = field.id else { continue }
@@ -26,31 +66,124 @@ extension FirebaseManager {
                 if let validator = FormFieldValidator.validators[field.type], !validator(submittedValue) {
                     throw ValidationError.invalidDataType(fieldID)
                 }
+                
+                // Validate against field-specific rules
+                for rule in field.validationRules {
+                    try validateFieldRule(value: submittedValue, rule: rule, fieldId: fieldID)
+                }
             }
         }
 
-        let submission = FormSubmission(formId: formId, data: submissionData, submissionDate: Date())
+        // Create submission with metadata
+        var submission = FormSubmission(formId: formId, data: submissionData, submissionDate: Date())
+        
+        // Add current user context if available
+        if let user = Auth.auth().currentUser {
+            submission.data["submittedBy"] = AnyCodable(user.uid)
+        }
+        
         try await createDocument(inCollection: .formSubmissions, document: submission)
+        
+        // Update template usage counter
+        var updatedTemplate = template
+        updatedTemplate.uses += 1
+        try await updateDocument(inCollection: .formTemplates, document: updatedTemplate)
     }
     
-    func addFormToUserCollection(userId: String, formId: String) async throws {
-        let userMyFormsRef = FirestoreCollection.users.reference().document(userId).collection("myForms")
-        try await userMyFormsRef.document(formId).setData(["formId": formId, "addedOn": Timestamp(date: Date())])
+    /// Fetches form submissions for a specific form
+    func fetchFormSubmissions(formId: String) async throws -> [FormSubmission] {
+        let query = FirestoreCollection.formSubmissions.reference()
+            .whereField("formId", isEqualTo: formId)
+            .order(by: "submissionDate", descending: true)
+        
+        let snapshot = try await query.getDocuments()
+        return snapshot.documents.compactMap { try? $0.data(as: FormSubmission.self) }
     }
     
+    /// Fetches form submissions by a specific user
+    func fetchUserFormSubmissions(userId: String) async throws -> [FormSubmission] {
+        let query = FirestoreCollection.formSubmissions.reference()
+            .whereField("data.submittedBy", isEqualTo: userId)
+            .order(by: "submissionDate", descending: true)
+        
+        let snapshot = try await query.getDocuments()
+        return snapshot.documents.compactMap { try? $0.data(as: FormSubmission.self) }
+    }
+    
+    /// Fetches form submissions for a specific student (useful for tracking student progress)
+    func fetchStudentFormSubmissions(studentId: String) async throws -> [FormSubmission] {
+        let query = FirestoreCollection.formSubmissions.reference()
+            .whereField("data.studentId", isEqualTo: studentId)
+            .order(by: "submissionDate", descending: true)
+        
+        let snapshot = try await query.getDocuments()
+        return snapshot.documents.compactMap { try? $0.data(as: FormSubmission.self) }
+    }
+    
+    // MARK: - Form Template Collection Management
+    
+    /// Adds a form template to user's collection
     func addFormTemplateToUserCollection(formTemplateId: String, userId: String) async throws {
-        let user: TMIUser = try await FIREBASE_MANAGER.fetchDocument(inCollection: .users, withId: userId)
+        let user: TMIUser = try await fetchDocument(inCollection: .users, withId: userId)
         var updatedUser = user
+        
         if !updatedUser.formTemplates.contains(formTemplateId) {
             updatedUser.formTemplates.append(formTemplateId)
+            try await updateDocument(inCollection: .users, document: updatedUser)
         }
-        try await updateDocument(inCollection: FirestoreCollection.users, document: updatedUser)
     }
+    
+    /// Removes a form template from user's collection
+    func removeFormTemplateFromUserCollection(formTemplateId: String, userId: String) async throws {
+        let user: TMIUser = try await fetchDocument(inCollection: .users, withId: userId)
+        var updatedUser = user
+        
+        updatedUser.formTemplates.removeAll { $0 == formTemplateId }
+        try await updateDocument(inCollection: .users, document: updatedUser)
+    }
+    
+    // MARK: - Validation Helper
+    
+    private func validateFieldRule(value: AnyCodable, rule: ValidationRule, fieldId: String) throws {
+        switch rule.rule {
+        case .minLength:
+            if let string = value.value as? String,
+               let minLength = rule.value?.value as? Int,
+               string.count < minLength {
+                throw ValidationError.validationFailed(fieldId, rule.message)
+            }
+        case .maxLength:
+            if let string = value.value as? String,
+               let maxLength = rule.value?.value as? Int,
+               string.count > maxLength {
+                throw ValidationError.validationFailed(fieldId, rule.message)
+            }
+        case .minValue:
+            if let number = value.value as? Double,
+               let minValue = rule.value?.value as? Double,
+               number < minValue {
+                throw ValidationError.validationFailed(fieldId, rule.message)
+            }
+        case .maxValue:
+            if let number = value.value as? Double,
+               let maxValue = rule.value?.value as? Double,
+               number > maxValue {
+                throw ValidationError.validationFailed(fieldId, rule.message)
+            }
+        // case .custom:
+            // Custom validation would be implemented based on specific requirements
+            // break
+        default:
+            break
+        }
+    }
+
 }
 
 enum ValidationError: Error, LocalizedError {
     case missingRequiredField(String)
     case invalidDataType(String)
+    case validationFailed(String, String)
     
     var errorDescription: String? {
         switch self {
@@ -58,6 +191,8 @@ enum ValidationError: Error, LocalizedError {
             return "Missing required field: \(fieldId)"
         case .invalidDataType(let fieldId):
             return "Invalid data type for field: \(fieldId)"
+        case .validationFailed(let fieldId, let message):
+            return "Validation failed for field \(fieldId): \(message)"
         }
     }
 }

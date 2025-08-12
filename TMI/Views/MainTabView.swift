@@ -23,16 +23,28 @@ struct MainTabView: View {
   @State private var showingSignOutConfirmation = false
 
   enum Tab: String, CaseIterable, Identifiable {
-    case students, tmiPlans
+    case dashboard, students, tmiPlans, forms, careerExplorer, interests, resources, settings
     var id: Self { self }
     
     // Define which roles can access each tab - MVP focuses on educators
     var allowedRoles: Set<UserRole> {
       switch self {
+      case .dashboard:
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian]
       case .students:
         return [.teacher, .counselor, .administrator, .admin, .socialWorker]
       case .tmiPlans:
         return [.teacher, .counselor, .administrator, .admin, .socialWorker]
+      case .forms:
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker]
+      case .careerExplorer:
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .student]
+      case .interests:
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .student]
+      case .resources:
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian]
+      case .settings:
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .student]
       }
     }
     
@@ -56,9 +68,9 @@ struct MainTabView: View {
     }
   }
   
-  // Default tab for MVP - always starts with students
+  // Default tab for MVP - always starts with dashboard
   var defaultTab: Tab {
-    return .students
+    return .dashboard
   }
 
   var body: some View {
@@ -275,24 +287,48 @@ struct MainTabView: View {
   @ViewBuilder
   func destinationView(for tab: Tab) -> some View {
     switch tab {
+    case .dashboard:
+      DashboardView()
     case .students:
-      ImprovedStudentListView()
+      StudentListView()
     case .tmiPlans:
       TMIPlanListView()
+    case .forms:
+      FormsAndSurveysView()
+    case .careerExplorer:
+      CareerExplorerView()
+    case .interests:
+        InterestsAndHobbiesView()
+    case .resources:
+      ResourcesView()
+    case .settings:
+      SettingsView()
     }
   }
 
   func tabLabel(for tab: Tab) -> String {
     switch tab {
+    case .dashboard: return "Dashboard"
     case .students: return "Students"
     case .tmiPlans: return "TMI Plans"
+    case .forms: return "Forms & Surveys"
+    case .careerExplorer: return "Career Explorer"
+    case .interests: return "Interests & Hobbies"
+    case .resources: return "Resources"
+    case .settings: return "Settings"
     }
   }
 
   func iconName(for tab: Tab) -> String {
     switch tab {
+    case .dashboard: return "chart.bar.fill"
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
+    case .forms: return "list.clipboard.fill"
+    case .careerExplorer: return "briefcase.fill"
+    case .interests: return "heart.fill"
+    case .resources: return "books.vertical.fill"
+    case .settings: return "gearshape.fill"
     }
   }
 }

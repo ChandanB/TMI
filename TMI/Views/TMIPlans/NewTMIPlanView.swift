@@ -121,9 +121,7 @@ struct NewTMIPlanView: View {
     .preferredColorScheme(.dark)
     .onAppear {
       animateViews()
-      Task {
-        await fetchAllData()
-      }
+      Task { await fetchAllData() }
     }
   }
 
@@ -1052,9 +1050,6 @@ struct HobbySelectionCard: View {
   }
 }
 
-// MARK: - Preview
-
 #Preview {
   NewTMIPlanView()
 }
-

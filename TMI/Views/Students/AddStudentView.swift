@@ -1,297 +1,426 @@
-import FirebaseFirestore
+//
+//  ImprovedAddStudentView.swift
+//  TMI
+//
+//  Created by Chandan Brown on 8/7/25.
+//
+
 import SwiftUI
+import Observation
 
-struct LegacyAddStudentView: View {
-  @Environment(\.dismiss) private var dismiss
-  @Environment(\.colorScheme) private var colorScheme
-
-  @State private var name = ""
-  @State private var grade = ""
-  @State private var dateOfBirth = Date()
-  @State private var interests: [Interest] = []
-  @State private var avatar: Image?
-  @State private var isShowingImagePicker = false
-  @State private var inputImage: UIImage?
-  @State private var currentStep = 0
-  @Environment(\.horizontalSizeClass) private var sizeClass
-
-  private let steps = ["Basic Info", "Interests", "Avatar"]
-
-  var body: some View {
-    NavigationStack {
-      VStack(spacing: 20) {
-        stepIndicator
-
-        TabView(selection: $currentStep) {
-          basicInfoView.tag(0)
-          interestsView.tag(1)
-          avatarView.tag(2)
-        }
-        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-        .animation(.easeInOut, value: currentStep)
-
-        navigationButtons
-
-        if sizeClass == .regular {
-          Spacer(minLength: 200)
-        }
-      }
-      .background(Color.tmiBackground.ignoresSafeArea())
-      .navigationTitle("Add New Student")
-      .navigationBarItems(leading: Button("Cancel") { dismiss() })
-      .alert(isPresented: $showAlert) {
-        Alert(
-          title: Text("Missing Information"), message: Text(alertMessage),
-          dismissButton: .default(Text("OK")))
-      }
-    }
-  }
-
-  private var stepIndicator: some View {
-    HStack {
-      ForEach(0..<steps.count, id: \.self) { index in
-        Circle()
-          .fill(index <= currentStep ? Color.tmiPrimary : Color.gray.opacity(0.3))
-          .frame(width: 10, height: 10)
-        if index < steps.count - 1 {
-          Rectangle()
-            .fill(index < currentStep ? Color.tmiPrimary : Color.gray.opacity(0.3))
-            .frame(height: 2)
-        }
-      }
-    }
-    .padding(.horizontal)
-  }
-
-  private var basicInfoView: some View {
-    VStack(spacing: 20) {
-      FloatingTextField(placeholder: "Full Name", text: $name)
-      FloatingTextField(placeholder: "Grade", text: $grade)
-      DatePicker("Date of Birth", selection: $dateOfBirth, displayedComponents: .date)
-        .datePickerStyle(GraphicalDatePickerStyle())
-        .padding()
-        .background(Color.tmiSecondary.opacity(0.1))
-        .cornerRadius(10)
-    }
-    .padding()
-  }
-
-  private var interestsView: some View {
-    VStack(spacing: 20) {
-      Text("What are the student's interests?")
-        .font(.headline)
-
-      ScrollView {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 10) {
-          ForEach(Interest.sampleInterests) { interest in
-            InterestButton(interest: interest, isSelected: interests.contains(interest)) {
-              if interests.contains(interest) {
-                interests.removeAll { $0 == interest }
-              } else {
-                interests.append(interest)
-              }
+struct AddStudentView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var stateModel = AddStudentStateModel()
+    
+    let onStudentAdded: (Student) -> Void
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // Background
+                TMIBackgroundView(variant: .default)
+                    .ignoresSafeArea()
+                
+                // Content
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Header
+                        VStack(spacing: 8) {
+                            Image(systemName: "person.badge.plus")
+                                .font(.system(size: 50))
+                                .foregroundColor(.tmiSecondary)
+                                .padding(.top, 20)
+                            
+                            Text("Add New Student")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                            
+                            Text("Enter the student's basic information")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.7))
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.bottom, 10)
+                        
+                        // Form
+                        TMIGlassCard(style: .default) {
+                            VStack(spacing: 20) {
+                                // Name field
+                                TMITextField(
+                                    icon: "person.fill",
+                                    placeholder: "Student Name",
+                                    text: $stateModel.name
+                                )
+                                
+                                // Grade field
+                                TMITextField(
+                                    icon: "number.square",
+                                    placeholder: "Grade Level",
+                                    text: $stateModel.grade
+                                )
+                                
+                                // Student ID field
+                                TMITextField(
+                                    icon: "barcode",
+                                    placeholder: "Student ID (optional)",
+                                    text: $stateModel.studentID
+                                )
+                                
+                                // Date of Birth
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Label("Date of Birth", systemImage: "calendar")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.9))
+                                    
+                                    DatePicker(
+                                        "Date of Birth",
+                                        selection: $stateModel.dateOfBirth,
+                                        in: Calendar.current.date(byAdding: .year, value: -25, to: Date())!...Calendar.current.date(byAdding: .year, value: -3, to: Date())!,
+                                        displayedComponents: .date
+                                    )
+                                    .datePickerStyle(.compact)
+                                    .accentColor(.tmiSecondary)
+                                    .labelsHidden()
+                                }
+                                .padding(.vertical, 8)
+                                
+                                // Interests Section
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Label("Interests (\(stateModel.selectedInterestCount))", systemImage: "heart")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.9))
+                                    
+                                    Button(action: {
+                                        stateModel.showInterestPicker()
+                                    }) {
+                                        HStack {
+                                            Text(stateModel.interests.isEmpty ? "Add interests" : stateModel.interests.map { $0.name }.joined(separator: ", "))
+                                                .foregroundColor(stateModel.interests.isEmpty ? .white.opacity(0.6) : .white)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.white.opacity(0.6))
+                                                .font(.system(size: 14))
+                                        }
+                                        .padding(16)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(Color.white.opacity(0.05))
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .fill(.ultraThinMaterial)
+                                                        .opacity(0.3)
+                                                )
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(
+                                                    LinearGradient(
+                                                        colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ),
+                                                    lineWidth: 1
+                                                )
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                
+                                // Hobbies Section
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Label("Hobbies (\(stateModel.selectedHobbyCount))", systemImage: "gamecontroller")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.9))
+                                    
+                                    Button(action: {
+                                        stateModel.showHobbyPicker()
+                                    }) {
+                                        HStack {
+                                            Text(stateModel.hobbies.isEmpty ? "Add hobbies" : stateModel.hobbies.map { $0.name }.joined(separator: ", "))
+                                                .foregroundColor(stateModel.hobbies.isEmpty ? .white.opacity(0.6) : .white)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.white.opacity(0.6))
+                                                .font(.system(size: 14))
+                                        }
+                                        .padding(16)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(Color.white.opacity(0.05))
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .fill(.ultraThinMaterial)
+                                                        .opacity(0.3)
+                                                )
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(
+                                                    LinearGradient(
+                                                        colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ),
+                                                    lineWidth: 1
+                                                )
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        
+                        // Error message
+                        if let errorMessage = stateModel.errorMessage {
+                            TMIGlassCard(style: .error) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .foregroundColor(.orange)
+                                        .font(.system(size: 20))
+                                    
+                                    Text(errorMessage)
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.white)
+                                        .multilineTextAlignment(.leading)
+                                    
+                                    Spacer()
+                                }
+                            }
+                        }
+                        
+                        // Submit button
+                        TMIButton(
+                            text: "Add Student",
+                            icon: "person.badge.plus",
+                            style: .primary,
+                            isLoading: stateModel.isLoading,
+                            action: {
+                                Task {
+                                    await stateModel.addStudent { student in
+                                        onStudentAdded(student)
+                                        dismiss()
+                                    }
+                                }
+                            }
+                        )
+                        .disabled(stateModel.isLoading || !stateModel.isFormValid)
+                        .opacity(stateModel.isFormValid ? 1.0 : 0.7)
+                        .animation(.easeInOut(duration: 0.2), value: stateModel.isFormValid)
+                        
+                        Spacer(minLength: 50)
+                    }
+                    .padding(.horizontal, 24)
+                }
             }
-          }
+            .navigationTitle("Add Student")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
         }
-        .padding()
-      }
-    }
-    .padding()
-  }
-
-  private var avatarView: some View {
-    VStack(spacing: 20) {
-      Text("Add a profile picture")
-        .font(.headline)
-
-      if let avatar = avatar {
-        avatar
-          .resizable()
-          .scaledToFill()
-          .frame(width: 200, height: 200)
-          .clipShape(Circle())
-          .overlay(Circle().stroke(Color.tmiPrimary, lineWidth: 4))
-      } else {
-        Image(systemName: "person.circle.fill")
-          .resizable()
-          .scaledToFit()
-          .frame(width: 200, height: 200)
-          .foregroundColor(.gray)
-      }
-
-      Button("Choose Photo") {
-        isShowingImagePicker = true
-      }
-      .buttonStyle(PrimaryButtonStyle())
-    }
-    .padding()
-    .sheet(isPresented: $isShowingImagePicker, onDismiss: loadImage) {
-      ImagePicker(image: $inputImage)
-    }
-  }
-
-  private var navigationButtons: some View {
-    HStack {
-      if currentStep > 0 {
-        Button("Back") {
-          currentStep -= 1
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $stateModel.showingInterestPicker) {
+            InterestSelectionView(
+                selectedInterests: $stateModel.interests,
+                onDismiss: {
+                    stateModel.hideInterestPicker()
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
-        .buttonStyle(SecondaryButtonStyle())
-      }
-
-      Spacer()
-
-      if currentStep < steps.count - 1 {
-        Button("Next") {
-          if validateCurrentStep() {
-            currentStep += 1
-          }
+        .sheet(isPresented: $stateModel.showingHobbyPicker) {
+            HobbySelectionView(
+                selectedHobbies: $stateModel.hobbies,
+                onDismiss: {
+                    stateModel.hideHobbyPicker()
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
-        .buttonStyle(PrimaryButtonStyle())
-      } else {
-        Button("Save") {
-          if validateCurrentStep() {
-            addStudent()
-            dismiss()
-          }
+    }
+}
+
+// MARK: - Interest Selection View
+struct InterestSelectionView: View {
+    @Binding var selectedInterests: [Interest]
+    let onDismiss: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                TMIBackgroundView(variant: .default)
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
+                        ForEach(Interest.sampleInterests) { interest in
+                            InterestPickerCard(
+                                interest: interest,
+                                isSelected: selectedInterests.contains(interest),
+                                onTap: { toggleInterest(interest) }
+                            )
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Select Interests")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        onDismiss()
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
         }
-        .buttonStyle(PrimaryButtonStyle())
-      }
+        .preferredColorScheme(.dark)
     }
-    .padding()
-  }
-
-  private func addStudent() {
-    let newStudent = Student(
-      name: name,
-      grade: grade,
-      dateOfBirth: dateOfBirth,
-      interests: interests,
-      hobbies: []
-    )
-    // Save the new student to Firestore or local storage
-  }
-
-  private func loadImage() {
-    guard let inputImage = inputImage else { return }
-    avatar = Image(uiImage: inputImage)
-  }
-
-  @State private var showAlert = false
-  @State private var alertMessage = ""
-
-  private func validateCurrentStep() -> Bool {
-    switch currentStep {
-    case 0:
-      if name.isEmpty || grade.isEmpty {
-        alertMessage = "Please fill in all fields."
-        showAlert = true
-        return false
-      }
-    case 1:
-      if interests.isEmpty {
-        alertMessage = "Please select at least one interest."
-        showAlert = true
-        return false
-      }
-    default:
-      break
+    
+    private func toggleInterest(_ interest: Interest) {
+        if selectedInterests.contains(interest) {
+            selectedInterests.removeAll { $0.id == interest.id }
+        } else {
+            selectedInterests.append(interest)
+        }
     }
-    return true
-  }
 }
 
-struct FloatingTextField: View {
-  let placeholder: String
-  @Binding var text: String
-
-  var body: some View {
-    ZStack(alignment: .leading) {
-      Text(placeholder)
-        .foregroundColor(text.isEmpty ? Color.gray : Color.tmiPrimary)
-        .offset(y: text.isEmpty ? 0 : -25)
-        .scaleEffect(text.isEmpty ? 1 : 0.8, anchor: .leading)
-      TextField("", text: $text)
+// MARK: - Hobby Selection View
+struct HobbySelectionView: View {
+    @Binding var selectedHobbies: [Hobby]
+    let onDismiss: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                TMIBackgroundView(variant: .default)
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
+                        ForEach(Hobby.sampleHobbies) { hobby in
+                            HobbyPickerCard(
+                                hobby: hobby,
+                                isSelected: selectedHobbies.contains(hobby),
+                                onTap: { toggleHobby(hobby) }
+                            )
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Select Hobbies")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        onDismiss()
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
-    .padding(.top, 15)
-    .animation(.default, value: text)
-  }
-}
-
-struct InterestButton: View {
-  let interest: Interest
-  let isSelected: Bool
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      Text(interest.name)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(isSelected ? Color.tmiPrimary : Color.gray.opacity(0.2))
-        .foregroundColor(isSelected ? .white : .primary)
-        .cornerRadius(15)
+    
+    private func toggleHobby(_ hobby: Hobby) {
+        if selectedHobbies.contains(hobby) {
+            selectedHobbies.removeAll { $0.id == hobby.id }
+        } else {
+            selectedHobbies.append(hobby)
+        }
     }
-  }
 }
 
-struct PrimaryButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .padding()
-      .background(Color.tmiPrimary)
-      .foregroundColor(.white)
-      .cornerRadius(10)
-      .scaleEffect(configuration.isPressed ? 0.95 : 1)
-  }
-}
-
-struct SecondaryButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .padding()
-      .background(Color.gray.opacity(0.2))
-      .foregroundColor(.primary)
-      .cornerRadius(10)
-      .scaleEffect(configuration.isPressed ? 0.95 : 1)
-  }
-}
-
-struct ImagePicker: UIViewControllerRepresentable {
-  @Binding var image: UIImage?
-  @Environment(\.presentationMode) var presentationMode
-
-  func makeUIViewController(context: Context) -> UIImagePickerController {
-    let picker = UIImagePickerController()
-    picker.delegate = context.coordinator
-    return picker
-  }
-
-  func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-
-  func makeCoordinator() -> Coordinator {
-    Coordinator(self)
-  }
-
-  class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
-    let parent: ImagePicker
-
-    init(_ parent: ImagePicker) {
-      self.parent = parent
+// MARK: - Picker Cards
+struct InterestPickerCard: View {
+    let interest: Interest
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 12) {
+                Image(systemName: interest.iconName)
+                    .font(.system(size: 30))
+                    .foregroundColor(isSelected ? .tmiSecondary : .white.opacity(0.7))
+                
+                Text(interest.name)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(isSelected ? 0.1 : 0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                isSelected ? Color.tmiSecondary : Color.white.opacity(0.2),
+                                lineWidth: isSelected ? 2 : 1
+                            )
+                    )
+            )
+            .scaleEffect(isSelected ? 1.05 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        }
+        .buttonStyle(.plain)
     }
+}
 
-    func imagePickerController(
-      _ picker: UIImagePickerController,
-      didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
-    ) {
-      if let uiImage = info[.originalImage] as? UIImage {
-        parent.image = uiImage
-      }
-      parent.presentationMode.wrappedValue.dismiss()
+struct HobbyPickerCard: View {
+    let hobby: Hobby
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 12) {
+                Image(systemName: hobby.iconName)
+                    .font(.system(size: 30))
+                    .foregroundColor(isSelected ? .tmiSecondary : .white.opacity(0.7))
+                
+                Text(hobby.name)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(isSelected ? 0.1 : 0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                isSelected ? Color.tmiSecondary : Color.white.opacity(0.2),
+                                lineWidth: isSelected ? 2 : 1
+                            )
+                    )
+            )
+            .scaleEffect(isSelected ? 1.05 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        }
+        .buttonStyle(.plain)
     }
-  }
 }
 
-#Preview {
-  AddStudentView()
-}

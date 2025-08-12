@@ -111,6 +111,12 @@ struct PremiumGlassTabBar: View {
     switch tab {
     case .students: return "Students"
     case .tmiPlans: return "Plans"
+    case .dashboard: return "Dashboard"
+    case .forms: return "Forms"
+    case .careerExplorer: return "Careers"
+    case .interests: return "Interests"
+    case .resources: return "Resources"
+    case .settings: return "Settings"
     }
   }
 
@@ -118,6 +124,12 @@ struct PremiumGlassTabBar: View {
     switch tab {
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
+    case .dashboard: return "chart.bar.fill"
+    case .forms: return "list.clipboard.fill"
+    case .careerExplorer: return "briefcase.fill"
+    case .interests: return "heart.fill"
+    case .resources: return "books.vertical.fill"
+    case .settings: return "gearshape.fill"
     }
   }
 }
@@ -214,6 +226,12 @@ struct PremiumSidebarList: View {
     switch tab {
     case .students: return "Students"
     case .tmiPlans: return "TMI Plans"
+    case .dashboard: return "Dashboard"
+    case .forms: return "Forms & Surveys"
+    case .careerExplorer: return "Career Explorer"
+    case .interests: return "Interests & Hobbies"
+    case .resources: return "Resources"
+    case .settings: return "Settings"
     }
   }
 
@@ -221,6 +239,12 @@ struct PremiumSidebarList: View {
     switch tab {
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
+    case .dashboard: return "chart.bar.fill"
+    case .forms: return "list.clipboard.fill"
+    case .careerExplorer: return "briefcase.fill"
+    case .interests: return "heart.fill"
+    case .resources: return "books.vertical.fill"
+    case .settings: return "gearshape.fill"
     }
   }
 }

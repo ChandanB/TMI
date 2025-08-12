@@ -1,19 +1,26 @@
 import SwiftUI
 
 struct CareerExplorerView: View {
-  @State private var careers: [Career] = Career.sampleCareers
+  @State private var careers: [Career] = []
+  @State private var trendingCareers: [Career] = []
   @State private var searchText = ""
   @State private var selectedField: String?
   @State private var isFilterSheetPresented = false
   @State private var salaryFilter: ClosedRange<Double> = 30000...150000
   @State private var selectedSkills: Set<String> = []
   @State private var animateCards = false
+  @State private var isLoading = false
+  @State private var error: Error?
+  @State private var careerStatistics: CareerStatistics?
+  @State private var showTrendingSection = true
 
   // Animation states
   @State private var headerAppeared = false
   @State private var filtersAppeared = false
   @State private var searchAppeared = false
   @State private var statsAppeared = false
+
+  private let careerService = CareerService.shared
 
   // Get all unique skills across careers
   private var allSkills: [String] {
@@ -36,7 +43,8 @@ struct CareerExplorerView: View {
             .opacity(searchAppeared ? 1 : 0)
             .offset(y: searchAppeared ? 0 : -20)
             .animation(
-              .spring(response: 0.6, dampingFraction: 0.7).delay(0.2), value: searchAppeared)
+              .spring(response: 0.6, dampingFraction: 0.7).delay(0.2),
+              value: searchAppeared)
 
           // Enhanced career field picker
           enhancedCareerFieldPicker
@@ -44,26 +52,42 @@ struct CareerExplorerView: View {
             .opacity(filtersAppeared ? 1 : 0)
             .offset(y: filtersAppeared ? 0 : -15)
             .animation(
-              .spring(response: 0.6, dampingFraction: 0.7).delay(0.3), value: filtersAppeared)
+              .spring(response: 0.6, dampingFraction: 0.7).delay(0.3),
+              value: filtersAppeared)
 
           ZStack {
             // Main content with glass morphism effect
             ScrollView {
               VStack(alignment: .leading, spacing: 16) {
-                if !filteredCareers.isEmpty {
+                if isLoading {
+                  // Loading state
+                  loadingView
+                } else if !filteredCareers.isEmpty {
+                  // Trending careers section (only show if not filtering)
+                  if showTrendingSection && searchText.isEmpty
+                    && selectedField == nil && selectedSkills.isEmpty
+                  {
+                    trendingCareersSection
+                  }
+
                   // Career statistics summary with enhanced design
                   enhancedCareerStatsSummary
                     .opacity(statsAppeared ? 1 : 0)
                     .offset(y: statsAppeared ? 0 : 15)
                     .animation(
-                      .spring(response: 0.6, dampingFraction: 0.7).delay(0.4), value: statsAppeared)
+                      .spring(response: 0.6, dampingFraction: 0.7).delay(0.4),
+                      value: statsAppeared)
 
                   // Career grid with enhanced cards
-                  LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 16)], spacing: 20)
-                  {
+                  LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 170), spacing: 16)],
+                    spacing: 20
+                  ) {
                     ForEach(filteredCareers.indices, id: \.self) { index in
                       let career = filteredCareers[index]
-                      NavigationLink(destination: CareerDetailView(career: career)) {
+                      NavigationLink(
+                        destination: CareerDetailView(career: career)
+                      ) {
                         PremiumCareerCard(career: career)
                           .scaleEffect(animateCards ? 1 : 0.9)
                           .opacity(animateCards ? 1 : 0)
@@ -72,6 +96,15 @@ struct CareerExplorerView: View {
                               .delay(Double(index % 6) * 0.05 + 0.2),
                             value: animateCards
                           )
+                          .onTapGesture {
+                            Task {
+                              try? await careerService
+                                .trackCareerExploration(
+                                  career: career,
+                                  action: .viewed
+                                )
+                            }
+                          }
                       }
                     }
                   }
@@ -132,7 +165,9 @@ struct CareerExplorerView: View {
                 .background(
                   Circle()
                     .fill(
-                      hasActiveFilters ? Color.tmiSecondary.opacity(0.3) : Color.white.opacity(0.1)
+                      hasActiveFilters
+                        ? Color.tmiSecondary.opacity(0.3)
+                        : Color.white.opacity(0.1)
                     )
                     .background(
                       Circle()
@@ -143,7 +178,9 @@ struct CareerExplorerView: View {
                 .overlay(
                   Circle()
                     .stroke(
-                      hasActiveFilters ? Color.tmiSecondary.opacity(0.5) : Color.white.opacity(0.2),
+                      hasActiveFilters
+                        ? Color.tmiSecondary.opacity(0.5)
+                        : Color.white.opacity(0.2),
                       lineWidth: 1
                     )
                 )
@@ -164,6 +201,9 @@ struct CareerExplorerView: View {
         .presentationCornerRadius(30)
       }
       .preferredColorScheme(.dark)
+      .task {
+        await loadCareerData()
+      }
       .onAppear {
         // Animate elements sequentially when view appears
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -186,10 +226,88 @@ struct CareerExplorerView: View {
           animateCards = true
         }
       }
+      .refreshable {
+        await loadCareerData(forceRefresh: true)
+      }
     }
   }
 
-  // Note: BackgroundAnimationView and NoiseTextureView replaced with unified TMIBackgroundView
+  // MARK: - Data Loading
+
+  @MainActor
+  private func loadCareerData(forceRefresh: Bool = false) async {
+    isLoading = true
+    error = nil
+
+    do {
+      async let careersLoad = careerService.fetchAllCareers(forceRefresh: forceRefresh)
+      async let trendingLoad = careerService.fetchTrendingCareers()
+      async let statisticsLoad = careerService.getCareerStatistics()
+
+      careers = try await careersLoad
+      trendingCareers = try await trendingLoad
+      careerStatistics = try await statisticsLoad
+    } catch {
+      self.error = error
+      // Fallback to sample data
+      careers = Career.sampleCareers
+      trendingCareers = Array(Career.sampleCareers.prefix(5))
+    }
+
+    isLoading = false
+  }
+
+  // MARK: - UI Components
+
+  // Loading view
+  private var loadingView: some View {
+    VStack(spacing: 20) {
+      ProgressView()
+        .scaleEffect(1.5)
+        .tint(.white)
+
+      Text("Discovering careers...")
+        .font(.headline)
+        .foregroundColor(.white)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(.top, 60)
+  }
+
+  // Trending careers section
+  private var trendingCareersSection: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack {
+        Image(systemName: "flame.fill")
+          .foregroundColor(.tmiSecondary)
+
+        Text("Trending Careers")
+          .font(.system(size: 18, weight: .bold))
+          .foregroundColor(.white)
+
+        Spacer()
+
+        Button("See All") {
+          // Action to see all trending careers
+        }
+        .font(.caption)
+        .foregroundColor(.tmiSecondary)
+      }
+
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 12) {
+          ForEach(trendingCareers, id: \.id) { career in
+            NavigationLink(destination: CareerDetailView(career: career)) {
+              TrendingCareerCard(career: career)
+            }
+          }
+        }
+        .padding(.horizontal, 20)
+      }
+      .padding(.horizontal, -20)
+    }
+    .padding(.bottom, 8)
+  }
 
   // MARK: - Enhanced Search Bar
 
@@ -199,6 +317,18 @@ struct CareerExplorerView: View {
       placeholder: "Search careers...",
       text: $searchText
     )
+    .onChange(of: searchText) { _, newValue in
+      // Perform real-time search
+      if !newValue.isEmpty {
+        Task {
+          // Add debouncing for search
+          try? await Task.sleep(nanoseconds: 300_000_000)  // 300ms
+          if searchText == newValue {  // Check if search text hasn't changed
+            // Could add live search results here
+          }
+        }
+      }
+    }
   }
 
   // MARK: - Enhanced Career Field Picker
@@ -270,6 +400,39 @@ struct CareerExplorerView: View {
                 .lineLimit(1)
             }
           }
+
+          // Show additional statistics if available
+          if let stats = careerStatistics {
+            HStack(spacing: 16) {
+              VStack(alignment: .leading, spacing: 2) {
+                Text("\(stats.uniqueFields)")
+                  .font(.system(size: 16, weight: .semibold))
+                  .foregroundColor(.white)
+                Text("Fields")
+                  .font(.system(size: 12))
+                  .foregroundColor(.white.opacity(0.7))
+              }
+
+              VStack(alignment: .leading, spacing: 2) {
+                Text("$\(Int(stats.averageSalary/1000))k")
+                  .font(.system(size: 16, weight: .semibold))
+                  .foregroundColor(.white)
+                Text("Avg Salary")
+                  .font(.system(size: 12))
+                  .foregroundColor(.white.opacity(0.7))
+              }
+
+              VStack(alignment: .leading, spacing: 2) {
+                Text("\(stats.highGrowthCareers)")
+                  .font(.system(size: 16, weight: .semibold))
+                  .foregroundColor(.green)
+                Text("High Growth")
+                  .font(.system(size: 12))
+                  .foregroundColor(.white.opacity(0.7))
+              }
+            }
+            .padding(.top, 4)
+          }
         }
 
         Spacer()
@@ -281,9 +444,11 @@ struct CareerExplorerView: View {
               .font(.system(size: 12))
               .foregroundColor(.white.opacity(0.7))
 
-            Text("$\(Int(salaryFilter.lowerBound)/1000)k-$\(Int(salaryFilter.upperBound)/1000)k")
-              .font(.system(size: 14, weight: .semibold))
-              .foregroundColor(.white)
+            Text(
+              "$\(Int(salaryFilter.lowerBound)/1000)k-$\(Int(salaryFilter.upperBound)/1000)k"
+            )
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.white)
           }
           .padding(.horizontal, 14)
           .padding(.vertical, 8)
@@ -309,7 +474,9 @@ struct CareerExplorerView: View {
         Circle()
           .fill(
             RadialGradient(
-              gradient: Gradient(colors: [Color.tmiSecondary.opacity(0.3), Color.clear]),
+              gradient: Gradient(colors: [
+                Color.tmiSecondary.opacity(0.3), Color.clear,
+              ]),
               center: .center,
               startRadius: 1,
               endRadius: 100
@@ -671,7 +838,8 @@ struct CareerCardBackground: View {
       )
       .scaleEffect(isHovered ? 1.03 : 1.0)
       .shadow(
-        color: isHovered ? Color.tmiSecondary.opacity(0.3) : Color.clear, radius: 10, x: 0, y: 5
+        color: isHovered ? Color.tmiSecondary.opacity(0.3) : Color.clear, radius: 10, x: 0,
+        y: 5
       )
       .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
   }
@@ -875,7 +1043,8 @@ struct FilterActionButton: View {
   let action: () -> Void
 
   init(
-    title: String, iconName: String? = nil, isPrimary: Bool = false, action: @escaping () -> Void
+    title: String, iconName: String? = nil, isPrimary: Bool = false,
+    action: @escaping () -> Void
   ) {
     self.title = title
     self.iconName = iconName
@@ -915,7 +1084,8 @@ struct FilterActionButton: View {
       .foregroundColor(.white)
       .cornerRadius(isPrimary ? 16 : 0)
       .shadow(
-        color: isPrimary ? Color.tmiSecondary.opacity(0.4) : Color.clear, radius: 8, x: 0, y: 4)
+        color: isPrimary ? Color.tmiSecondary.opacity(0.4) : Color.clear, radius: 8, x: 0,
+        y: 4)
     }
     .buttonStyle(ScaleButtonStyle())
   }
@@ -1319,12 +1489,14 @@ struct EnhancedRangeSlider: View {
   }
 
   private func lowerThumbPosition(in geometry: GeometryProxy) -> CGFloat {
-    let position = (range.lowerBound - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound)
+    let position =
+      (range.lowerBound - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound)
     return position * geometry.size.width
   }
 
   private func upperThumbPosition(in geometry: GeometryProxy) -> CGFloat {
-    let position = (range.upperBound - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound)
+    let position =
+      (range.upperBound - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound)
     return position * geometry.size.width
   }
 
@@ -1353,6 +1525,91 @@ struct EnhancedRangeSlider: View {
     // Ensure the upper bound doesn't go below the lower bound and stays within bounds
     if newUpperBound > range.lowerBound + 10000 && newUpperBound <= bounds.upperBound {
       range = range.lowerBound...min(newUpperBound, bounds.upperBound)
+    }
+  }
+}
+
+// MARK: - Trending Career Card
+
+struct TrendingCareerCard: View {
+  let career: Career
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Image(systemName: getFieldIcon(field: career.field))
+          .font(.system(size: 16))
+          .foregroundColor(.tmiSecondary)
+
+        Spacer()
+
+        // Growth indicator
+        HStack(spacing: 4) {
+          Image(systemName: "arrow.up.right")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(.green)
+
+          Text("+\(Int(career.growthRate * 100))%")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(.green)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(
+          Capsule()
+            .fill(Color.green.opacity(0.1))
+        )
+      }
+
+      Text(career.title)
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundColor(.white)
+        .lineLimit(2)
+        .multilineTextAlignment(.leading)
+
+      Text(career.field)
+        .font(.system(size: 12))
+        .foregroundColor(.white.opacity(0.7))
+
+      HStack {
+        Text("$\(Int(career.salaryRange.lowerBound/1000))k+")
+          .font(.system(size: 12, weight: .medium))
+          .foregroundColor(.tmiSecondary)
+
+        Spacer()
+
+        Image(systemName: "arrow.right")
+          .font(.system(size: 10))
+          .foregroundColor(.white.opacity(0.5))
+      }
+    }
+    .padding(12)
+    .frame(width: 140, height: 120)
+    .background(
+      RoundedRectangle(cornerRadius: 12)
+        .fill(Color.white.opacity(0.05))
+        .background(
+          RoundedRectangle(cornerRadius: 12)
+            .fill(.ultraThinMaterial)
+            .opacity(0.8)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 12)
+            .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+        )
+    )
+  }
+
+  private func getFieldIcon(field: String) -> String {
+    switch field {
+    case "Technology": return "desktopcomputer"
+    case "Healthcare": return "heart.text.square"
+    case "Education": return "book"
+    case "Business": return "briefcase"
+    case "Engineering": return "gearshape.2"
+    case "Arts": return "paintpalette"
+    case "Science": return "atom"
+    default: return "star"
     }
   }
 }

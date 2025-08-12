@@ -737,45 +737,161 @@ struct TMIPlanDetailView: View {
   private var progressData: [ProgressData] {
     switch selectedChartTimeFrame {
     case .weekly:
-      return weeklyProgressData
+      return generateWeeklyProgressData()
     case .monthly:
-      return monthlyProgressData
+      return generateMonthlyProgressData()
     case .yearly:
-      return yearlyProgressData
+      return generateYearlyProgressData()
     }
   }
-
-  private var weeklyProgressData: [ProgressData] {
-    return [
-      ProgressData(date: "Week 1", progress: 0.2, target: 0.2),
-      ProgressData(date: "Week 2", progress: 0.3, target: 0.35),
-      ProgressData(date: "Week 3", progress: 0.45, target: 0.5),
-      ProgressData(date: "Week 4", progress: 0.55, target: 0.65),
-      ProgressData(date: "Week 5", progress: 0.62, target: 0.75),
-      ProgressData(date: "Week 6", progress: 0.68, target: 0.85),
-      ProgressData(date: "Week 7", progress: 0.78, target: 0.92),
-      ProgressData(date: "Week 8", progress: plan.progress, target: 1.0),
-    ]
+  
+  // MARK: - Progress Data Generation
+  
+  private func generateWeeklyProgressData() -> [ProgressData] {
+    let startDate = plan.creationDate
+    let weeksElapsed = weeksFromDate(startDate)
+    let currentProgress = plan.progress
+    
+    var data: [ProgressData] = []
+    let maxWeeks = max(8, weeksElapsed + 1)
+    
+    for week in 1...maxWeeks {
+      let weekDate = Calendar.current.date(byAdding: .weekOfYear, value: week - 1, to: startDate) ?? startDate
+      let isCurrentWeek = week == weeksElapsed + 1
+      let isFuture = week > weeksElapsed + 1
+      
+      let progress = calculateProgressForPeriod(
+        current: currentProgress,
+        totalPeriods: maxWeeks,
+        currentPeriod: week,
+        planStartDate: startDate
+      )
+      
+      let target = Double(week) / Double(maxWeeks)
+      
+      data.append(ProgressData(
+        date: "Week \(week)",
+        progress: isFuture ? target * 0.9 : progress, // Future weeks show projected progress
+        target: target
+      ))
+    }
+    
+    return data
   }
-
-  private var monthlyProgressData: [ProgressData] {
-    return [
-      ProgressData(date: "Jan", progress: 0.1, target: 0.15),
-      ProgressData(date: "Feb", progress: 0.25, target: 0.3),
-      ProgressData(date: "Mar", progress: 0.4, target: 0.45),
-      ProgressData(date: "Apr", progress: 0.6, target: 0.6),
-      ProgressData(date: "May", progress: 0.75, target: 0.8),
-      ProgressData(date: "Jun", progress: plan.progress, target: 1.0),
-    ]
+  
+  private func generateMonthlyProgressData() -> [ProgressData] {
+    let startDate = plan.creationDate
+    let monthsElapsed = monthsFromDate(startDate)
+    let currentProgress = plan.progress
+    
+    let calendar = Calendar.current
+    var data: [ProgressData] = []
+    let maxMonths = max(6, monthsElapsed + 1)
+    
+    for month in 1...maxMonths {
+      let monthDate = calendar.date(byAdding: .month, value: month - 1, to: startDate) ?? startDate
+      let monthName = DateFormatter().shortMonthSymbols[calendar.component(.month, from: monthDate) - 1]
+      let isFuture = month > monthsElapsed + 1
+      
+      let progress = calculateProgressForPeriod(
+        current: currentProgress,
+        totalPeriods: maxMonths,
+        currentPeriod: month,
+        planStartDate: startDate
+      )
+      
+      let target = Double(month) / Double(maxMonths)
+      
+      data.append(ProgressData(
+        date: monthName,
+        progress: isFuture ? target * 0.85 : progress,
+        target: target
+      ))
+    }
+    
+    return data
   }
-
-  private var yearlyProgressData: [ProgressData] {
-    return [
-      ProgressData(date: "Q1", progress: 0.3, target: 0.25),
-      ProgressData(date: "Q2", progress: 0.6, target: 0.5),
-      ProgressData(date: "Q3", progress: 0.8, target: 0.75),
-      ProgressData(date: "Q4", progress: plan.progress, target: 1.0),
-    ]
+  
+  private func generateYearlyProgressData() -> [ProgressData] {
+    let startDate = plan.creationDate
+    let quarterStart = Calendar.current.dateInterval(of: .quarter, for: startDate)?.start ?? startDate
+    let quartersElapsed = quartersFromDate(quarterStart)
+    let currentProgress = plan.progress
+    
+    var data: [ProgressData] = []
+    let maxQuarters = 4
+    
+    for quarter in 1...maxQuarters {
+      let isFuture = quarter > quartersElapsed + 1
+      
+      let progress = calculateProgressForPeriod(
+        current: currentProgress,
+        totalPeriods: maxQuarters,
+        currentPeriod: quarter,
+        planStartDate: startDate
+      )
+      
+      let target = Double(quarter) / Double(maxQuarters)
+      
+      data.append(ProgressData(
+        date: "Q\(quarter)",
+        progress: isFuture ? target * 0.8 : progress,
+        target: target
+      ))
+    }
+    
+    return data
+  }
+  
+  // MARK: - Helper Methods
+  
+  private func calculateProgressForPeriod(current: Double, totalPeriods: Int, currentPeriod: Int, planStartDate: Date) -> Double {
+    let timeBasedProgress = Double(currentPeriod - 1) / Double(totalPeriods - 1)
+    
+    // Factor in engagement score and goal completion
+    let engagementFactor = plan.student.engagementScore
+    let goalCompletionFactor = calculateGoalCompletionRate()
+    let interestAlignmentFactor = calculateInterestAlignment()
+    
+    // Weighted combination of factors
+    let calculatedProgress = (
+      timeBasedProgress * 0.4 +
+      current * 0.3 +
+      engagementFactor * 0.15 +
+      goalCompletionFactor * 0.1 +
+      interestAlignmentFactor * 0.05
+    )
+    
+    return min(1.0, max(0.0, calculatedProgress))
+  }
+  
+  private func calculateGoalCompletionRate() -> Double {
+    guard !plan.goals.isEmpty else { return 0.5 }
+    let completedGoals = plan.goals.filter { $0.status == .completed }
+    return Double(completedGoals.count) / Double(plan.goals.count)
+  }
+  
+  private func calculateInterestAlignment() -> Double {
+    // Higher alignment score if student has more interests that match the plan
+    let alignmentScore = min(Double(plan.interests.count) / 3.0, 1.0)
+    return alignmentScore
+  }
+  
+  private func weeksFromDate(_ date: Date) -> Int {
+    let calendar = Calendar.current
+    let components = calendar.dateComponents([.weekOfYear], from: date, to: Date())
+    return max(0, components.weekOfYear ?? 0)
+  }
+  
+  private func monthsFromDate(_ date: Date) -> Int {
+    let calendar = Calendar.current
+    let components = calendar.dateComponents([.month], from: date, to: Date())
+    return max(0, components.month ?? 0)
+  }
+  
+  private func quartersFromDate(_ date: Date) -> Int {
+    let monthsElapsed = monthsFromDate(date)
+    return monthsElapsed / 3
   }
 }
 

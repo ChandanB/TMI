@@ -13,13 +13,13 @@ struct CareerDetailView: View {
   @State private var isShowingRelatedCareers = false
   @State private var animateContent = false
   @State private var showSchoolFinder = false
+  @State private var relatedCareers: [Career] = []
+  @State private var isBookmarked = false
+  @State private var isLoading = false
+  @State private var error: Error?
   @Environment(\.presentationMode) var presentationMode
 
-  // Sample related careers - in a real app, this would be generated dynamically
-  private var relatedCareers: [Career] {
-    Career.sampleCareers.filter { $0.field == career.field && $0.title != career.title }.prefix(3)
-      .map { $0 }
-  }
+  private let careerService = CareerService.shared
 
   // Sample progress data - in a real app, this would come from user data
   private let progressData: [(String, Double)] = [
@@ -68,11 +68,13 @@ struct CareerDetailView: View {
               .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
 
               // Related careers section
-              relatedCareersSection
-                .opacity(animateContent ? 1 : 0)
-                .offset(y: animateContent ? 0 : 20)
-                .animation(
-                  .spring(response: 0.5, dampingFraction: 0.8).delay(0.3), value: animateContent)
+              if !relatedCareers.isEmpty {
+                relatedCareersSection
+                  .opacity(animateContent ? 1 : 0)
+                  .offset(y: animateContent ? 0 : 20)
+                  .animation(
+                    .spring(response: 0.5, dampingFraction: 0.8).delay(0.3), value: animateContent)
+              }
             }
             .padding(.top, 20)
           }
@@ -89,17 +91,27 @@ struct CareerDetailView: View {
 
         ToolbarItem(placement: .navigationBarTrailing) {
           Button(action: {
-            // Action to add to favorites or saved careers
+            Task {
+              await toggleBookmark()
+            }
           }) {
-            Image(systemName: "bookmark")
+            Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
               .foregroundColor(.tmiPrimary)
           }
         }
       }
     }
+    .task {
+      await loadCareerData()
+    }
     .onAppear {
       withAnimation(.easeOut(duration: 0.6)) {
         animateContent = true
+      }
+      
+      // Track career view
+      Task {
+        try? await careerService.trackCareerExploration(career: career, action: .viewed)
       }
     }
     .sheet(isPresented: $showSchoolFinder) {
@@ -497,6 +509,10 @@ struct CareerDetailView: View {
         }
 
         Button(action: {
+          // Track skills exploration
+          Task {
+            try? await careerService.trackCareerExploration(career: career, action: .exploredSkills)
+          }
           // Action to take personality assessment
         }) {
           HStack {
@@ -635,6 +651,11 @@ struct CareerDetailView: View {
 
         Button(action: {
           showSchoolFinder = true
+          
+          // Track education exploration
+          Task {
+            try? await careerService.trackCareerExploration(career: career, action: .exploredEducation)
+          }
         }) {
           Text("Find More Schools")
             .font(.headline)
@@ -664,6 +685,12 @@ struct CareerDetailView: View {
       // Career pathway visualization
       VStack(alignment: .leading, spacing: 12) {
         sectionHeader(title: "Career Progression", icon: "arrow.up.right")
+          .onAppear {
+            // Track pathway exploration
+            Task {
+              try? await careerService.trackCareerExploration(career: career, action: .exploredPathway)
+            }
+          }
 
         // Career path visualization
         VStack(spacing: 0) {
@@ -806,6 +833,13 @@ struct CareerDetailView: View {
 
         Button(action: {
           isShowingRelatedCareers.toggle()
+          
+          // Track related careers exploration
+          if isShowingRelatedCareers {
+            Task {
+              try? await careerService.trackCareerExploration(career: career, action: .searchedRelated)
+            }
+          }
         }) {
           Text(isShowingRelatedCareers ? "Show Less" : "View All")
             .font(.subheadline)
@@ -1080,6 +1114,50 @@ struct CareerDetailView: View {
         color: .green
       ),
     ]
+  }
+  
+  // MARK: - Data Loading Functions
+  
+  @MainActor
+  private func loadCareerData() async {
+    isLoading = true
+    
+    do {
+      // Load related careers
+      relatedCareers = try await careerService.getRelatedCareers(to: career, limit: 3)
+      
+      // Check if career is bookmarked
+      let bookmarks = try await careerService.fetchCareerBookmarks()
+      isBookmarked = bookmarks.contains { $0.careerTitle == career.title }
+      
+    } catch {
+      self.error = error
+      // Fallback to sample data
+      relatedCareers = Career.sampleCareers.filter { 
+        $0.field == career.field && $0.title != career.title 
+      }.prefix(3).map { $0 }
+    }
+    
+    isLoading = false
+  }
+  
+  @MainActor
+  private func toggleBookmark() async {
+    do {
+      if isBookmarked {
+        try await careerService.removeCareerBookmark(careerTitle: career.title)
+        isBookmarked = false
+      } else {
+        try await careerService.saveCareerBookmark(career: career)
+        isBookmarked = true
+        
+        // Track bookmark action
+        try? await careerService.trackCareerExploration(career: career, action: .bookmarked)
+      }
+    } catch {
+      // Handle error silently for now
+      print("Failed to toggle bookmark: \(error)")
+    }
   }
 }
 

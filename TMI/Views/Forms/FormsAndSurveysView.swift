@@ -945,7 +945,7 @@ struct DynamicFieldView: View {
 
 // MARK: - Progress Indicator
 
-struct ProgressIndicator: View {
+struct FormsProgressIndicator: View {
   var current: Int
   var total: Int
 

@@ -118,14 +118,13 @@ struct Resource: Identifiable, Codable {
 // MARK: - Main View
 
 struct ResourcesView: View {
-  @State private var resources: [Resource] = Resource.sampleResources
-  @State private var showingAddResource = false
-  @State private var searchText = ""
-  @State private var selectedCategory: Resource.ResourceCategory?
-
+  // State Model
+  @State private var stateModel = ResourcesStateModel()
+  
   // Animation states
   @State private var isLoaded = false
-  @State private var showSearchBar = false
+
+  private var showSearchBar: Bool { true }
 
   var body: some View {
     ZStack {
@@ -194,7 +193,7 @@ struct ResourcesView: View {
               TMIButton(
                 text: "plus",
                 style: .floating,
-                action: { showingAddResource = true }
+                action: { stateModel.showingAddResource = true }
               )
               .padding(24)
               .opacity(isLoaded ? 1 : 0)
@@ -211,7 +210,7 @@ struct ResourcesView: View {
           ToolbarItem(placement: .navigationBarTrailing) {
             Menu {
               Button(action: {
-                showingAddResource = true
+                stateModel.showingAddResource = true
               }) {
                 Label("Add Resource", systemImage: "plus")
               }
@@ -234,12 +233,19 @@ struct ResourcesView: View {
             }
           }
         }
-        .sheet(isPresented: $showingAddResource) {
-          AddResourceView(resources: $resources)
+        .sheet(isPresented: $stateModel.showingAddResource) {
+          AddResourceView(onResourceAdded: { resource in
+            Task {
+              await stateModel.addResource(resource)
+            }
+          })
         }
       }
     }
     .onAppear {
+      Task {
+        await stateModel.fetch()
+      }
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
         withAnimation {
           isLoaded = true
@@ -261,7 +267,7 @@ struct ResourcesView: View {
     TMITextField(
       icon: "magnifyingglass",
       placeholder: "Search resources",
-      text: $searchText
+      text: $stateModel.searchText
     )
     .padding(.horizontal, 20)
     .padding(.vertical, 10)
@@ -280,11 +286,11 @@ struct ResourcesView: View {
           CategoryButton(
             title: "All",
             icon: "square.grid.2x2.fill",
-            isSelected: selectedCategory == nil,
+            isSelected: stateModel.selectedCategory == nil,
             color: .blue
           ) {
             withAnimation {
-              selectedCategory = nil
+              stateModel.selectedCategory = nil
             }
           }
 
@@ -292,11 +298,11 @@ struct ResourcesView: View {
             CategoryButton(
               title: category.rawValue.capitalized,
               icon: category.icon,
-              isSelected: selectedCategory == category,
+              isSelected: stateModel.selectedCategory == category,
               color: category.color
             ) {
               withAnimation {
-                selectedCategory = category
+                stateModel.selectedCategory = category
               }
             }
           }
@@ -309,7 +315,7 @@ struct ResourcesView: View {
   // MARK: - Featured Resources
 
   private var hasFeaturedResources: Bool {
-    resources.contains(where: { $0.isFeatured })
+    stateModel.resources.contains(where: { $0.isFeatured })
   }
 
   private var featuredResourcesSection: some View {
@@ -321,7 +327,7 @@ struct ResourcesView: View {
 
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 16) {
-          ForEach(resources.filter { $0.isFeatured }) { resource in
+          ForEach(stateModel.featuredResources) { resource in
             NavigationLink(destination: ResourceDetailView(resource: resource)) {
               FeaturedResourceCard(resource: resource)
                 .frame(width: 300, height: 180)
@@ -388,7 +394,7 @@ struct ResourcesView: View {
         .font(.system(size: 22, weight: .semibold, design: .rounded))
         .foregroundColor(.white)
 
-      if searchText.isEmpty && selectedCategory == nil {
+      if stateModel.searchText.isEmpty && stateModel.selectedCategory == nil {
         Text("Add your first resource to build your library")
           .font(.system(size: 16))
           .foregroundColor(.white.opacity(0.7))
@@ -396,7 +402,7 @@ struct ResourcesView: View {
           .padding(.horizontal, 40)
 
         Button {
-          showingAddResource = true
+          stateModel.showingAddResource = true
         } label: {
           HStack {
             Image(systemName: "plus")
@@ -422,8 +428,8 @@ struct ResourcesView: View {
           .padding(.horizontal, 40)
 
         Button {
-          searchText = ""
-          selectedCategory = nil
+          stateModel.searchText = ""
+          stateModel.selectedCategory = nil
         } label: {
           HStack {
             Image(systemName: "arrow.clockwise")
@@ -450,16 +456,7 @@ struct ResourcesView: View {
   // MARK: - Filtered Resources
 
   private var filteredResources: [Resource] {
-    resources.filter { resource in
-      let matchesSearch =
-        searchText.isEmpty || resource.title.lowercased().contains(searchText.lowercased())
-        || resource.description.lowercased().contains(searchText.lowercased())
-        || resource.tags.contains { $0.lowercased().contains(searchText.lowercased()) }
-
-      let matchesCategory = selectedCategory == nil || resource.category == selectedCategory
-
-      return matchesSearch && matchesCategory
-    }
+    stateModel.filteredResources
   }
 }
 
@@ -727,337 +724,10 @@ struct ResourceCard: View {
   }
 }
 
-// MARK: - Resource Detail View
-
-struct ResourceDetailView: View {
-  let resource: Resource
-
-  @State private var animateContent = false
-  @State private var showingWeb = false
-
-  var body: some View {
-    ZStack {
-      // Background
-      resourceBackgroundView
-
-      ScrollView {
-        VStack(spacing: 24) {
-          // Header card
-          resourceHeader
-            .padding(.horizontal, 20)
-            .opacity(animateContent ? 1 : 0)
-            .offset(y: animateContent ? 0 : -20)
-            .animation(
-              .spring(response: 0.5, dampingFraction: 0.7).delay(0.1), value: animateContent)
-
-          // Description section
-          VStack(alignment: .leading, spacing: 16) {
-            Text("About this Resource")
-              .font(.system(size: 20, weight: .semibold))
-              .foregroundColor(.white)
-
-            Text(resource.description)
-              .font(.system(size: 16))
-              .foregroundColor(.white.opacity(0.8))
-              .fixedSize(horizontal: false, vertical: true)
-
-            Divider()
-              .background(Color.white.opacity(0.2))
-
-            // Open Resource button
-            Button {
-              showingWeb = true
-            } label: {
-              HStack {
-                Image(systemName: "globe")
-                Text("Open Resource")
-              }
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 16)
-              .background(
-                RoundedRectangle(cornerRadius: 12)
-                  .fill(resource.category.color)
-              )
-              .foregroundColor(.white)
-            }
-            .sheet(isPresented: $showingWeb) {
-              // This would be a WebView in a real app
-              VStack {
-                Text("Web view for: \(resource.url)")
-                  .padding()
-
-                Button("Close") {
-                  showingWeb = false
-                }
-                .padding()
-              }
-              .presentationDetents([.medium, .large])
-            }
-          }
-          .padding(20)
-          .background(
-            RoundedRectangle(cornerRadius: 16)
-              .fill(Color.white.opacity(0.02))
-              .background(
-                RoundedRectangle(cornerRadius: 16)
-                  .fill(.ultraThinMaterial)
-                  .opacity(0.3)
-              )
-          )
-          .overlay(
-            RoundedRectangle(cornerRadius: 16)
-              .stroke(
-                LinearGradient(
-                  colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                  startPoint: .topLeading,
-                  endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
-              )
-          )
-          .padding(.horizontal, 20)
-          .opacity(animateContent ? 1 : 0)
-          .offset(y: animateContent ? 0 : 20)
-          .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: animateContent)
-
-          // Tags and metadata
-          VStack(alignment: .leading, spacing: 20) {
-            // Tags section
-            VStack(alignment: .leading, spacing: 12) {
-              Text("Tags")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
-
-              ResourcesFlowLayout(spacing: 8) {
-                ForEach(resource.tags, id: \.self) { tag in
-                  Text(tag)
-                    .font(.system(size: 14))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                      RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.1))
-                    )
-                    .foregroundColor(.white)
-                }
-              }
-            }
-
-            Divider()
-              .background(Color.white.opacity(0.2))
-
-            // Recommended for section
-            VStack(alignment: .leading, spacing: 12) {
-              Text("Recommended For")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
-
-              VStack(alignment: .leading, spacing: 8) {
-                ForEach(resource.recommendedFor, id: \.self) { role in
-                  HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                      .foregroundColor(resource.category.color)
-
-                    Text(role)
-                      .font(.system(size: 16))
-                      .foregroundColor(.white)
-                  }
-                }
-              }
-            }
-
-            Divider()
-              .background(Color.white.opacity(0.2))
-
-            // Date info
-            VStack(alignment: .leading, spacing: 12) {
-              Text("Resource Information")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
-
-              HStack(spacing: 8) {
-                Image(systemName: "calendar")
-                  .foregroundColor(.white.opacity(0.6))
-
-                Text("Created")
-                  .foregroundColor(.white.opacity(0.6))
-
-                Spacer()
-
-                Text("\(resource.createdAt, formatter: dateFormatter)")
-                  .foregroundColor(.white)
-              }
-
-              HStack(spacing: 8) {
-                Image(systemName: "arrow.clockwise")
-                  .foregroundColor(.white.opacity(0.6))
-
-                Text("Last Updated")
-                  .foregroundColor(.white.opacity(0.6))
-
-                Spacer()
-
-                Text("\(resource.updatedAt, formatter: dateFormatter)")
-                  .foregroundColor(.white)
-              }
-            }
-          }
-          .padding(20)
-          .background(
-            RoundedRectangle(cornerRadius: 16)
-              .fill(Color.white.opacity(0.02))
-              .background(
-                RoundedRectangle(cornerRadius: 16)
-                  .fill(.ultraThinMaterial)
-                  .opacity(0.3)
-              )
-          )
-          .overlay(
-            RoundedRectangle(cornerRadius: 16)
-              .stroke(
-                LinearGradient(
-                  colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                  startPoint: .topLeading,
-                  endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
-              )
-          )
-          .padding(.horizontal, 20)
-          .opacity(animateContent ? 1 : 0)
-          .offset(y: animateContent ? 0 : 20)
-          .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.3), value: animateContent)
-
-          Spacer(minLength: 40)
-        }
-        .padding(.top, 20)
-      }
-    }
-    .navigationTitle(resource.title)
-    .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-      ToolbarItem(placement: .navigationBarTrailing) {
-        Menu {
-          Button(action: {
-            // Share action
-          }) {
-            Label("Share Resource", systemImage: "square.and.arrow.up")
-          }
-
-          Button(action: {
-            // Open in browser
-            showingWeb = true
-          }) {
-            Label("Open in Browser", systemImage: "safari")
-          }
-
-          Divider()
-
-          Button(action: {
-            // Bookmark
-          }) {
-            Label("Add to Bookmarks", systemImage: "bookmark")
-          }
-        } label: {
-          Image(systemName: "ellipsis")
-            .font(.system(size: 20))
-            .foregroundColor(.white)
-        }
-      }
-    }
-    .onAppear {
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-        withAnimation {
-          animateContent = true
-        }
-      }
-    }
-  }
-
-  private var resourceBackgroundView: some View {
-    TMIBackgroundView(variant: .default)
-  }
-
-  private var resourceHeader: some View {
-    VStack(spacing: 20) {
-      // Category icon
-      ZStack {
-        Circle()
-          .fill(resource.category.color.opacity(0.2))
-          .frame(width: 80, height: 80)
-
-        Image(systemName: resource.category.icon)
-          .font(.system(size: 36))
-          .foregroundColor(resource.category.color)
-      }
-
-      VStack(spacing: 10) {
-        // Category pill
-        Text(resource.category.rawValue.capitalized)
-          .font(.system(size: 14, weight: .semibold))
-          .padding(.horizontal, 16)
-          .padding(.vertical, 8)
-          .background(
-            Capsule()
-              .fill(resource.category.color.opacity(0.2))
-          )
-          .foregroundColor(resource.category.color)
-
-        // Title
-        Text(resource.title)
-          .font(.system(size: 24, weight: .bold))
-          .foregroundColor(.white)
-          .multilineTextAlignment(.center)
-      }
-    }
-    .padding(24)
-    .frame(maxWidth: .infinity)
-    .background(
-      RoundedRectangle(cornerRadius: 16)
-        .fill(
-          LinearGradient(
-            stops: [
-              .init(color: resource.category.color.opacity(0.3), location: 0),
-              .init(color: resource.category.color.opacity(0.1), location: 1),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-          )
-        )
-        .background(
-          RoundedRectangle(cornerRadius: 16)
-            .fill(.ultraThinMaterial)
-            .opacity(0.3)
-        )
-        .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: 8)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 16)
-        .stroke(
-          LinearGradient(
-            colors: [
-              resource.category.color.opacity(0.5), .clear, resource.category.color.opacity(0.2),
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          ),
-          lineWidth: 1
-        )
-    )
-  }
-
-  private var dateFormatter: DateFormatter {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .medium
-    formatter.timeStyle = .none
-    return formatter
-  }
-}
-
 // MARK: - Add Resource View
 
 struct AddResourceView: View {
-  @Binding var resources: [Resource]
+  let onResourceAdded: (Resource) -> Void
   @Environment(\.dismiss) private var dismiss
 
   @State private var title = ""
@@ -1191,7 +861,7 @@ struct AddResourceView: View {
       },
       isFeatured: isFeatured
     )
-    resources.append(newResource)
+    onResourceAdded(newResource)
     dismiss()
   }
 }
@@ -1504,4 +1174,3 @@ extension View {
 #Preview {
   ResourcesView()
 }
-
