@@ -266,7 +266,7 @@ struct RegistrationView: View {
 
     Task {
       do {
-        try await FIREBASE_MANAGER.signUp(withEmail: email, password: password)
+        let _ = try await FIREBASE_MANAGER.signUp(withEmail: email, password: password)
         isRegistering = false
         dismiss()
       } catch {

@@ -406,8 +406,8 @@ struct TMIGlassCard<Content: View>: View {
     let yOffset = (yPercent - 0.5) * 2.0  // Range: -1 to 1
 
     // Quadrant-based shadow intensity
-    let quadrantX = xPercent > 0.5 ? 1.0 : -1.0
-    let quadrantY = yPercent > 0.5 ? 1.0 : -1.0
+    let _ = xPercent > 0.5 ? 1.0 : -1.0
+    let _ = yPercent > 0.5 ? 1.0 : -1.0
 
     // Distance from center affects shadow strength
     let centerX = abs(xPercent - 0.5) * 2.0  // 0 to 1

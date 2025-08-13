@@ -133,7 +133,7 @@ struct DynamicFormFieldPreview: View {
         case .signature:
             // placeholder "canvas" — swap in your PencilKit or signature‐capture view
             if let sigKey = field.id {
-                let sigBinding = Binding<Data>(
+                let _ = Binding<Data>(
                   get: { stateModel.formData[sigKey]?.value as? Data ?? Data() },
                   set: { stateModel.formData[sigKey] = AnyCodable($0) }
                 )

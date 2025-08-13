@@ -132,42 +132,36 @@ struct MainTabView: View {
 
   var enhancedIOSTabView: some View {
     ZStack(alignment: .bottom) {
-      // Tab Content Area with navigation
+      // Tab Content Area without navigation stacks
       TabView(selection: $selectedTab) {
         ForEach(availableTabs, id: \.id) { tab in
-          NavigationStack {
-            destinationView(for: tab)
-              .toolbar {
-                ToolbarItem(placement: .principal) {
-                  Text(tabLabel(for: tab))
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+          destinationView(for: tab)
+            .navigationTitle(tabLabel(for: tab))
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+              ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                  Button {
+                    showingUserProfile = true
+                  } label: {
+                    Label("Profile", systemImage: "person.crop.circle")
+                  }
+                  
+                  Divider()
+                  
+                  Button(role: .destructive) {
+                    showingSignOutConfirmation = true
+                  } label: {
+                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                  }
+                } label: {
+                  Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 22))
                     .foregroundColor(.white)
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                  Menu {
-                    Button {
-                      showingUserProfile = true
-                    } label: {
-                      Label("Profile", systemImage: "person.crop.circle")
-                    }
-                    
-                    Divider()
-                    
-                    Button(role: .destructive) {
-                      showingSignOutConfirmation = true
-                    } label: {
-                      Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-                    }
-                  } label: {
-                    Image(systemName: "person.crop.circle.fill")
-                      .font(.system(size: 22))
-                      .foregroundColor(.white)
-                  }
-                }
               }
-          }
-          .tag(tab)
+            }
+            .tag(tab)
         }
       }
       .safeAreaInset(edge: .bottom) {
@@ -268,16 +262,9 @@ struct MainTabView: View {
         }
       }
     } detail: {
-      NavigationStack {
-        destinationView(for: selectedTab)
-          .toolbar {
-            ToolbarItem(placement: .principal) {
-              Text(tabLabel(for: selectedTab))
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-            }
-          }
-      }
+      destinationView(for: selectedTab)
+        .navigationTitle(tabLabel(for: selectedTab))
+        .navigationBarTitleDisplayMode(.large)
     }
     .navigationSplitViewStyle(.balanced)
   }

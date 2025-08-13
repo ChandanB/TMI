@@ -583,10 +583,9 @@ final class AuthStateModel: BaseStateModel<EnhancedAuthenticationState, Identifi
 
     @MainActor
     private func loadUserProfile(for userID: String) async {
+        // Load user profile from Firestore
+        let userDoc: DocumentSnapshot
         do {
-            // Load user profile from Firestore
-            let userDoc: DocumentSnapshot
-            do {
                 userDoc = try await firebaseManager.firestore
                     .collection("users")
                     .document(userID)
@@ -686,18 +685,7 @@ final class AuthStateModel: BaseStateModel<EnhancedAuthenticationState, Identifi
             print("[AuthStateModel] Successfully loaded user profile for userID=\(userID). Role: \(user.role)")
             updateState(.loaded(.authenticated(user)))
             
-            await logAuditEvent(.login, result: .success)
-            
-        } catch {
-            print("[AuthStateModel] Unexpected error in loadUserProfile(for:) for userID=\(userID):", error, String(describing: type(of: error)))
-            updateState(
-                .loaded(
-                    .error(
-                        AuthenticationError(
-                            type: .serverError,
-                            message: "Failed to load user profile: \(error.localizedDescription)"
-                        ))))
-        }
+        await logAuditEvent(.login, result: .success)
     }
 
   // MARK: - Form Field Methods

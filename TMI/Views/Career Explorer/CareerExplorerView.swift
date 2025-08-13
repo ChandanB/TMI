@@ -166,8 +166,7 @@ struct CareerExplorerView: View {
   }
 
   var body: some View {
-    NavigationStack {
-      ZStack {
+    ZStack {
         // Animated background - using unified TMIBackgroundView
         TMIBackgroundView(variant: .career)
           .ignoresSafeArea()
@@ -184,7 +183,7 @@ struct CareerExplorerView: View {
               // TODO: Implement student picker
             }
             
-            if let student = selectedStudent {
+            if selectedStudent != nil {
               Button("View Career Insights") {
                 // TODO: Show insights sheet
               }
@@ -306,7 +305,6 @@ struct CareerExplorerView: View {
       .refreshable {
         await loadCareerData(forceRefresh: true)
       }
-    }
   }
 
   // MARK: - Data Loading

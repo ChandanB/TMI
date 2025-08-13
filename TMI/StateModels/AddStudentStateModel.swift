@@ -7,7 +7,6 @@
 
 import SwiftUI
 import Observation
-import SwiftUI
 
 @Observable
 final class AddStudentStateModel {
@@ -29,6 +28,10 @@ final class AddStudentStateModel {
     var showingInterestPicker = false
     var showingHobbyPicker = false
     
+    // Edit state
+    private var student: Student?
+    var isEditing: Bool { student != nil }
+    
     // Validation state
     var nameError: String?
     var gradeError: String?
@@ -37,9 +40,20 @@ final class AddStudentStateModel {
     // Dependencies
     private let studentService: StudentService
     
-    init(studentService: StudentService = StudentService(), currentSchool: String? = nil) {
+    init(student: Student? = nil, studentService: StudentService = StudentService(), currentSchool: String? = nil) {
+        self.student = student
         self.studentService = studentService
-        if let currentSchool = currentSchool { self.school = currentSchool }
+        if let student = student {
+            self.name = student.name
+            self.grade = student.grade
+            self.studentID = student.studentID ?? ""
+            self.school = student.school
+            self.dateOfBirth = student.dateOfBirth
+            self.interests = student.interests
+            self.hobbies = student.hobbies
+        } else if let currentSchool = currentSchool {
+            self.school = currentSchool
+        }
     }
     
     // MARK: - Validation
@@ -80,7 +94,8 @@ final class AddStudentStateModel {
         isLoading = true
         errorMessage = nil
         
-        let student = Student(
+        var studentToSave = Student(
+            id: student?.id,
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             grade: grade.trimmingCharacters(in: .whitespacesAndNewlines),
             school: school.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -91,7 +106,12 @@ final class AddStudentStateModel {
         )
         
         do {
-            let savedStudent = try await studentService.addStudent(student)
+            let savedStudent: Student
+            if isEditing {
+                savedStudent = try await studentService.updateStudent(studentToSave)
+            } else {
+                savedStudent = try await studentService.addStudent(studentToSave)
+            }
             isLoading = false
             return savedStudent
         } catch {

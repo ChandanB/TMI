@@ -1,97 +1,26 @@
-// StudentDetailView.swift
+//
+//  StudentDetailView.swift
+//  TMI
+//
+//  Created by Chandan Brown on 8/12/25.
+//
 
 import SwiftUI
 
-struct LegacyStudentDetailView: View {
-    let student: Student
-    
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                if let avatarImage = studentAvatar {
-                    avatarImage
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 150, height: 150)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.tmiPrimary, lineWidth: 4))
-                        .shadow(radius: 5)
-                } else {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 150, height: 150)
-                        .foregroundColor(.gray)
-                        .overlay(Circle().stroke(Color.tmiPrimary, lineWidth: 4))
-                        .shadow(radius: 5)
-                }
-                
-                Text(student.name)
-                    .font(.largeTitle)
-                    .bold()
-                
-                Text("Grade: \(student.grade)")
-                    .font(.title2)
-                
-                Text("Date of Birth: \(formattedDate)")
-                    .font(.title3)
-                
-                Divider()
-                
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Interests:")
-                        .font(.headline)
-                    if student.interests.isEmpty {
-                        Text("No interests available.")
-                            .foregroundColor(.secondary)
-                    } else {
-                        ForEach(student.interests, id: \.id) { interest in
-                            Text("• \(interest.name)")
-                                .foregroundColor(.primary)
-                        }
-                    }
-                    
-                    Text("Hobbies:")
-                        .font(.headline)
-                        .padding(.top)
-                    if student.hobbies.isEmpty {
-                        Text("No hobbies available.")
-                            .foregroundColor(.secondary)
-                    } else {
-                        ForEach(student.hobbies, id: \.id) { hobby in
-                            Text("• \(hobby.name)")
-                                .foregroundColor(.primary)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                
-                Spacer()
-            }
-            .padding()
-        }
-        .navigationTitle("Student Details")
-    }
-    
-    private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: student.dateOfBirth)
-    }
-    
-    private var studentAvatar: Image? {
-        // Implement avatar image retrieval logic here.
-        return nil
-    }
-}
-
 // Modern StudentDetailView using TMI design system
 struct StudentDetailView: View {
-    var student: Student
+    @State var student: Student
     @Environment(\.dismiss) private var dismiss
+    @State private var stateModel: StudentDetailStateModel
     @State private var tabSelection = 0
     @State private var showingNewPlanSheet = false
+    @State private var showingDeleteConfirmation = false
+    @State private var showingEditStudentSheet = false
+
+    init(student: Student) {
+        _student = State(initialValue: student)
+        _stateModel = State(initialValue: StudentDetailStateModel(student: student))
+    }
 
     var body: some View {
         NavigationStack {
@@ -123,10 +52,10 @@ struct StudentDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button("Edit Student") { }
-                        Button("Add TMI Plan") { }
+                        Button("Edit Student") { showingEditStudentSheet = true }
+                        Button("Add TMI Plan") { showingNewPlanSheet = true }
                         Divider()
-                        Button("Delete Student", role: .destructive) { }
+                        Button("Delete Student", role: .destructive) { showingDeleteConfirmation = true }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                             .font(.system(size: 20))
@@ -135,9 +64,44 @@ struct StudentDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingNewPlanSheet) {
+            CreateTMIPlanView(student: student)
+        }
+        .sheet(isPresented: $showingEditStudentSheet) {
+            AddStudentView(onStudentAdded: {
+                Task {
+                    if let updatedStudent = try? await StudentService().getStudent(by: student.id ?? "") {
+                        self.student = updatedStudent
+                    }
+                }
+            })
+        }
+        .alert("Delete Student?", isPresented: $showingDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    await deleteStudent()
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to delete this student? This action cannot be undone.")
+        }
         .preferredColorScheme(.dark)
+        .task {
+            await stateModel.fetchTMIPlans()
+        }
     }
     
+    private func deleteStudent() async {
+        do {
+            try await StudentService().deleteStudent(student)
+            dismiss()
+        } catch {
+            // Handle error
+            print("Error deleting student: \(error)")
+        }
+    }
+
     private var profileHeader: some View {
         VStack(spacing: 16) {
             ZStack {
@@ -162,7 +126,7 @@ struct StudentDetailView: View {
                 Text(student.name)
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(.white)
-                Text("Grade \(student.grade) • ID: \(student.studentID)")
+                Text("Grade \(student.grade) • ID: \(student.studentID ?? "N/A")")
                     .font(.system(size: 16))
                     .foregroundColor(.white.opacity(0.7))
             }
@@ -177,8 +141,9 @@ struct StudentDetailView: View {
                     .frame(width: 1, height: 30)
                 statView(
                     title: "TMI Plan",
-                    value: student.tmiPlans?.isEmpty == false ? "Active" : "None",
-                    color: student.tmiPlans?.isEmpty == false ? .green : .orange)
+                    value: stateModel.tmiPlans.isEmpty ? "None" : "Active",
+                    color: stateModel.tmiPlans.isEmpty ? .orange : .green
+                )
                 Rectangle()
                     .fill(Color.white.opacity(0.2))
                     .frame(width: 1, height: 30)
@@ -217,8 +182,24 @@ struct StudentDetailView: View {
     private var tabContent: some View {
         switch tabSelection {
         case 0:
-            // TMI Plans
-            if student.tmiPlans?.isEmpty ?? true {
+            tmiPlansTab
+        case 1:
+            interestsTab
+        case 2:
+            surveysTab
+        default:
+            Text("Invalid tab")
+                .foregroundColor(.white)
+        }
+    }
+
+    @ViewBuilder
+    private var tmiPlansTab: some View {
+        switch stateModel.state {
+        case .loading:
+            ProgressView()
+        case .loaded:
+            if stateModel.tmiPlans.isEmpty {
                 emptyStateView(
                     icon: "doc.text.fill",
                     title: "No TMI Plans",
@@ -227,65 +208,71 @@ struct StudentDetailView: View {
                     action: { showingNewPlanSheet = true }
                 )
             } else {
-                Text("TMI Plans content")
-                    .foregroundColor(.white)
-            }
-
-        case 1:
-            // Interests & Hobbies
-            if student.interests.isEmpty && student.hobbies.isEmpty {
-                emptyStateView(
-                    icon: "heart.fill",
-                    title: "No Interests Recorded",
-                    message: "Record the student's interests and hobbies to improve TMI alignment",
-                    buttonTitle: "Add Interests",
-                    action: { }
-                )
-            } else {
-                StudentInterestsAndHobbiesView(student: student)
-            }
-
-        case 2:
-            // Survey Results / Form Submissions
-            NavigationLink(destination: FormSubmissionsView(studentId: student.id ?? "")) {
-                HStack {
-                    Image(systemName: "list.clipboard.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.tmiSecondary)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Form Submissions")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white)
-                        
-                        Text("View all survey responses and form data")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(0.7))
+                VStack(spacing: 16) {
+                    ForEach(stateModel.tmiPlans) { plan in
+                        TMIPlanCard(plan: plan)
                     }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.5))
                 }
-                .padding(20)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.05))
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(.ultraThinMaterial)
-                                .opacity(0.3)
-                        )
-                )
             }
-            .buttonStyle(PlainButtonStyle())
-
-        default:
-            Text("Invalid tab")
-                .foregroundColor(.white)
+        case .error(let error):
+            Text("Error: \(error.localizedDescription)")
+                .foregroundColor(.red)
+        case .idle:
+            EmptyView()
         }
+    }
+
+    @ViewBuilder
+    private var interestsTab: some View {
+        if student.interests.isEmpty && student.hobbies.isEmpty {
+            emptyStateView(
+                icon: "heart.fill",
+                title: "No Interests Recorded",
+                message: "Record the student's interests and hobbies to improve TMI alignment",
+                buttonTitle: "Add Interests",
+                action: { showingEditStudentSheet = true }
+            )
+        } else {
+            StudentInterestsAndHobbiesView(student: student)
+        }
+    }
+
+    @ViewBuilder
+    private var surveysTab: some View {
+        NavigationLink(destination: FormSubmissionsView(studentId: student.id ?? "")) {
+            HStack {
+                Image(systemName: "list.clipboard.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(.tmiSecondary)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Form Submissions")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white)
+                    
+                    Text("View all survey responses and form data")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.05))
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(.ultraThinMaterial)
+                            .opacity(0.3)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
     
     private func emptyStateView(
@@ -640,3 +627,4 @@ struct EditStudentInterestsView: View {
 #Preview {
     StudentDetailView(student: Student.sampleStudent)
 }
+

@@ -16,7 +16,7 @@ class FormDetailEditorViewModel {
     func saveChanges() {
         Task {
             guard let templateID = template.id else { return }
-            let updatedData: [String: Any] = [
+            let _: [String: Any] = [
                 "id": templateID,
                 "name": template.name,
                 "description": template.templateDescription,

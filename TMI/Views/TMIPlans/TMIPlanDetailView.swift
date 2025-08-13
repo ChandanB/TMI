@@ -757,7 +757,7 @@ struct TMIPlanDetailView: View {
     
     for week in 1...maxWeeks {
       let weekDate = Calendar.current.date(byAdding: .weekOfYear, value: week - 1, to: startDate) ?? startDate
-      let isCurrentWeek = week == weeksElapsed + 1
+      let _ = week == weeksElapsed + 1
       let isFuture = week > weeksElapsed + 1
       
       let progress = calculateProgressForPeriod(

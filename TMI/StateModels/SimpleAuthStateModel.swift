@@ -88,7 +88,7 @@ final class SimpleAuthStateModel: BaseStateModel<TMIAuthState, IdentifiableError
         updateState(.loading)
         
         do {
-            let user = try await authService.signIn(withEmail: email, password: password)
+            let _ = try await authService.signIn(withEmail: email, password: password)
             
             // Wait for auth state to be updated by the service
             try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
@@ -169,7 +169,7 @@ final class SimpleAuthStateModel: BaseStateModel<TMIAuthState, IdentifiableError
         let userData: [String: Any] = [
             "id": user.id,
             "email": user.email,
-            "displayName": user.displayName,
+            "displayName": user.displayName ?? "",
             "role": user.role.rawValue,
             "profileCreatedDate": user.profileCreatedDate,
             "lastLoginDate": user.lastLoginDate as Any

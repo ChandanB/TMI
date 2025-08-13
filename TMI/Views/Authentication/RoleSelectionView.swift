@@ -470,7 +470,7 @@ struct AgeVerificationView: View {
               )
               .datePickerStyle(.wheel)
               .colorScheme(.dark)
-              .onChange(of: dateOfBirth) { newValue in
+              .onChange(of: dateOfBirth) { _, newValue in
                 validateAge(newValue)
               }
               .onAppear {

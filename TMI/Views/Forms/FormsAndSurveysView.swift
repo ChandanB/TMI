@@ -5,9 +5,7 @@ import SwiftUI
 
 struct FormsAndSurveysView: View {
   @State private var viewModel = FormStoreViewModel()
-  @State private var showingAddForm = false
   @State private var selectedFilter: FormFilter = .all
-  @State private var showingFormBuilder = false
   @State private var searchText = ""
 
   // Animation states
@@ -25,88 +23,77 @@ struct FormsAndSurveysView: View {
       // Unified Background
       TMIBackgroundView(variant: .default)
 
-      NavigationStack {
-        ZStack {
-          // Main content
-          VStack(spacing: 0) {
-            // Search and Filter - Using unified TMITextField
-            searchAndFilterBar
-              .padding(.top, 10)
-              .padding(.horizontal)
-              .opacity(isLoaded ? 1 : 0)
-              .offset(y: isLoaded ? 0 : -20)
-              .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1), value: isLoaded)
+      VStack(spacing: 0) {
+        // Search and Filter - Using unified TMITextField
+        searchAndFilterBar
+          .padding(.top, 10)
+          .padding(.horizontal)
+          .opacity(isLoaded ? 1 : 0)
+          .offset(y: isLoaded ? 0 : -20)
+          .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1), value: isLoaded)
 
-            // Categories
-            categoryView
-              .padding(.top, 15)
-              .padding(.horizontal)
-              .opacity(isLoaded ? 1 : 0)
-              .offset(y: isLoaded ? 0 : 20)
-              .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: isLoaded)
+        // Categories
+        categoryView
+          .padding(.top, 15)
+          .padding(.horizontal)
+          .opacity(isLoaded ? 1 : 0)
+          .offset(y: isLoaded ? 0 : 20)
+          .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: isLoaded)
 
-            // Content
-            if viewModel.isLoading {
-              loadingView
-            } else if filteredForms.isEmpty {
-              emptyStateView
-            } else {
-              formsList
+        // Content
+        if viewModel.isLoading {
+          loadingView
+        } else if filteredForms.isEmpty {
+          emptyStateView
+        } else {
+          formsList
+        }
+      }
+
+      // Unified Floating Action Button
+      VStack {
+        Spacer()
+
+        HStack {
+          Spacer()
+
+          TMIButton(
+            text: "Create",
+            icon: "plus",
+            style: .floating,
+            action: {
+              NavigationCoordinator.shared.navigate(to: .formBuilder)
             }
+          )
+          .offset(y: isLoaded ? 0 : 100)
+          .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5), value: isLoaded)
+          .padding(.trailing, 20)
+          .padding(.bottom, 20)
+        }
+      }
+    }
+    .navigationTitle("Forms & Surveys")
+    .foregroundColor(.white)
+    .navigationBarTitleDisplayMode(.large)
+    .toolbarBackground(.hidden, for: .navigationBar)
+    .toolbar {
+      ToolbarItem(placement: .navigationBarTrailing) {
+        Menu {
+          Button {
+            NavigationCoordinator.shared.navigate(to: .formBuilder)
+          } label: {
+            Label("Create New Form", systemImage: "square.and.pencil")
           }
 
-          // Unified Floating Action Button
-          VStack {
-            Spacer()
-
-            HStack {
-              Spacer()
-
-              TMIButton(
-                text: "Create",
-                icon: "plus",
-                style: .floating,
-                action: {
-                  showingFormBuilder = true
-                }
-              )
-              .offset(y: isLoaded ? 0 : 100)
-              .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5), value: isLoaded)
-              .padding(.trailing, 20)
-              .padding(.bottom, 20)
-            }
+          Button {
+            NavigationCoordinator.shared.navigate(to: .formCreation)
+          } label: {
+            Label("Import Form", systemImage: "square.and.arrow.down")
           }
-        }
-        .navigationTitle("Forms & Surveys")
-        .foregroundColor(.white)
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar {
-          ToolbarItem(placement: .navigationBarTrailing) {
-            Menu {
-              Button {
-                showingFormBuilder = true
-              } label: {
-                Label("Create New Form", systemImage: "square.and.pencil")
-              }
-
-              Button {
-                showingAddForm = true
-              } label: {
-                Label("Import Form", systemImage: "square.and.arrow.down")
-              }
-            } label: {
-              Image(systemName: "ellipsis.circle")
-                .font(.system(size: 20))
-                .foregroundColor(.white)
-            }
-          }
-        }
-        .sheet(isPresented: $showingAddForm) {
-          FormCreationView()
-        }
-        .sheet(isPresented: $showingFormBuilder) {
-          FormTemplateBuilderView()
+        } label: {
+          Image(systemName: "ellipsis.circle")
+            .font(.system(size: 20))
+            .foregroundColor(.white)
         }
       }
     }
@@ -159,7 +146,9 @@ struct FormsAndSurveysView: View {
     ScrollView {
       LazyVStack(spacing: 20) {
         ForEach(filteredForms) { template in
-          NavigationLink(destination: FormTemplateDetailView(template: template)) {
+          Button {
+            NavigationCoordinator.shared.navigate(to: .formDetail(template))
+          } label: {
             FormStoreCardView(template: template)
               .opacity(isLoaded ? 1 : 0)
               .offset(y: isLoaded ? 0 : 50)
@@ -230,7 +219,7 @@ struct FormsAndSurveysView: View {
         icon: "square.and.pencil",
         style: .primary,
         action: {
-          showingFormBuilder = true
+          NavigationCoordinator.shared.navigate(to: .formBuilder)
         }
       )
       .padding(.top, 10)
@@ -371,7 +360,6 @@ struct FormTemplateDetailView: View {
   var template: FormTemplate
 
   @State private var isAddingTemplate = false
-  @State private var showingDynamicForm = false
   @State private var animateContent = false
 
   var body: some View {
@@ -412,7 +400,9 @@ struct FormTemplateDetailView: View {
             icon: "eye.fill",
             style: .primary,
             action: {
-              showingDynamicForm = true
+              if let templateID = template.id {
+                NavigationCoordinator.shared.navigate(to: .dynamicForm(templateID))
+              }
             }
           )
           .padding(.horizontal, 20)
@@ -474,11 +464,6 @@ struct FormTemplateDetailView: View {
             .foregroundColor(.white)
             .frame(width: 40, height: 40)
         }
-      }
-    }
-    .sheet(isPresented: $showingDynamicForm) {
-      if let templateID = template.id {
-        DynamicFormView(templateId: templateID)
       }
     }
     .onAppear {
@@ -726,7 +711,7 @@ struct DynamicFieldView: View {
         placeholder: field.placeholder ?? "Enter text",
         text: $textValue
       )
-      .onChange(of: textValue) { oldValue, newValue in
+      .onChange(of: textValue) { newValue in
         onValueChange(newValue)
       }
 
@@ -740,7 +725,7 @@ struct DynamicFieldView: View {
         )
         .foregroundColor(.white)
         .frame(height: 120)
-        .onChange(of: textValue) { oldValue, newValue in
+        .onChange(of: textValue) { newValue in
           onValueChange(newValue)
         }
 
@@ -751,7 +736,7 @@ struct DynamicFieldView: View {
         text: $numberValue,
         keyboardType: .numberPad
       )
-      .onChange(of: numberValue) { oldValue, newValue in
+      .onChange(of: numberValue) { newValue in
         onValueChange(newValue)
       }
 
@@ -760,7 +745,7 @@ struct DynamicFieldView: View {
         .datePickerStyle(.compact)
         .labelsHidden()
         .tint(Color.tmiSecondary)
-        .onChange(of: dateValue) { oldValue, newValue in
+        .onChange(of: dateValue) { newValue in
           onValueChange(newValue)
         }
 
@@ -769,7 +754,7 @@ struct DynamicFieldView: View {
         .datePickerStyle(.compact)
         .labelsHidden()
         .tint(Color.tmiSecondary)
-        .onChange(of: dateValue) { oldValue, newValue in
+        .onChange(of: dateValue) { newValue in
           onValueChange(newValue)
         }
 
@@ -904,7 +889,7 @@ struct DynamicFieldView: View {
         .datePickerStyle(.compact)
         .labelsHidden()
         .tint(Color.tmiSecondary)
-        .onChange(of: dateValue) { oldValue, newValue in
+        .onChange(of: dateValue) { newValue in
           onValueChange(newValue)
         }
     case .email:
@@ -914,7 +899,7 @@ struct DynamicFieldView: View {
         text: $textValue,
         keyboardType: .emailAddress
       )
-      .onChange(of: textValue) { oldValue, newValue in
+      .onChange(of: textValue) { newValue in
         onValueChange(newValue)
       }
     case .phoneNumber:
@@ -924,7 +909,7 @@ struct DynamicFieldView: View {
         text: $textValue,
         keyboardType: .phonePad
       )
-      .onChange(of: textValue) { oldValue, newValue in
+      .onChange(of: textValue) { newValue in
         onValueChange(newValue)
       }
     case .url:
@@ -934,7 +919,7 @@ struct DynamicFieldView: View {
         text: $textValue,
         keyboardType: .URL
       )
-      .onChange(of: textValue) { oldValue, newValue in
+      .onChange(of: textValue) { newValue in
         onValueChange(newValue)
       }
     case .allCases:
@@ -981,29 +966,26 @@ struct FormCreationView: View {
   @Environment(\.dismiss) private var dismiss
 
   var body: some View {
-    NavigationStack {
-      ZStack {
-        // Unified Background
-        TMIBackgroundView(variant: .default)
+    ZStack {
+      // Unified Background
+      TMIBackgroundView(variant: .default)
 
-        VStack {
-          Text("Form Creation view placeholder")
-            .foregroundColor(.white)
-        }
-      }
-      .navigationTitle("Create Form")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .navigationBarLeading) {
-          Button("Cancel") {
-            dismiss()
-          }
+      VStack {
+        Text("Form Creation view placeholder")
           .foregroundColor(.white)
+      }
+    }
+    .navigationTitle("Create Form")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .navigationBarLeading) {
+        Button("Cancel") {
+          NavigationCoordinator.shared.pop()
         }
+        .foregroundColor(.white)
       }
     }
     .preferredColorScheme(.dark)
-    .presentationSizing(.page)
   }
 }
 

@@ -37,12 +37,11 @@ class TMIPlanService {
             print("[TMIPlanService] Found \(querySnapshot.documents.count) documents in collection")
             
             let plans = querySnapshot.documents.compactMap { document -> TMIPlan? in
-                do {
-                    print("[TMIPlanService] Processing document: \(document.documentID)")
-                    let data = document.data()
-                    
-                    // Manual reconstruction of TMIPlan from Firestore data
-                    guard let modelRaw = data["model"] as? String,
+                print("[TMIPlanService] Processing document: \(document.documentID)")
+                let data = document.data()
+                
+                // Manual reconstruction of TMIPlan from Firestore data
+                guard let modelRaw = data["model"] as? String,
                           let model = TMIPlanModel(rawValue: modelRaw),
                           let progress = data["progress"] as? Double,
                           let notes = data["notes"] as? String,
@@ -156,10 +155,6 @@ class TMIPlanService {
                     
                     print("[TMIPlanService] Successfully reconstructed plan: \(plan.model.rawValue)")
                     return plan
-                } catch {
-                    print("[TMIPlanService] Failed to decode TMI plan document \(document.documentID): \(error)")
-                    return nil
-                }
             }
             
             print("[TMIPlanService] Successfully fetched \(plans.count) TMI plans")
@@ -381,12 +376,11 @@ class TMIPlanService {
                 .getDocuments()
             
             let plans = querySnapshot.documents.compactMap { document -> TMIPlan? in
-                do {
-                    print("[TMIPlanService] Processing document: \(document.documentID)")
-                    let data = document.data()
-                    
-                    // Manual reconstruction of TMIPlan from Firestore data
-                    guard let modelRaw = data["model"] as? String,
+                print("[TMIPlanService] Processing document: \(document.documentID)")
+                let data = document.data()
+                
+                // Manual reconstruction of TMIPlan from Firestore data
+                guard let modelRaw = data["model"] as? String,
                           let model = TMIPlanModel(rawValue: modelRaw),
                           let progress = data["progress"] as? Double,
                           let notes = data["notes"] as? String,
@@ -500,10 +494,6 @@ class TMIPlanService {
                     
                     print("[TMIPlanService] Successfully reconstructed plan: \(plan.model.rawValue)")
                     return plan
-                } catch {
-                    print("[TMIPlanService] Failed to decode TMI plan document \(document.documentID): \(error)")
-                    return nil
-                }
             }
             
             print("[TMIPlanService] Successfully fetched \(plans.count) TMI plans for student")

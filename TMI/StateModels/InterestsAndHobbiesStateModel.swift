@@ -144,7 +144,7 @@ class InterestsAndHobbiesStateModel {
         
         return querySnapshot.documents.compactMap { document -> Interest? in
             do {
-                var interest = try document.data(as: Interest.self)
+                let interest = try document.data(as: Interest.self)
                 interest.id = document.documentID
                 return interest
             } catch {
@@ -164,7 +164,7 @@ class InterestsAndHobbiesStateModel {
         
         return querySnapshot.documents.compactMap { document -> Hobby? in
             do {
-                var hobby = try document.data(as: Hobby.self)
+                let hobby = try document.data(as: Hobby.self)
                 hobby.id = UUID(uuidString: document.documentID) ?? UUID()
                 return hobby
             } catch {
@@ -181,7 +181,7 @@ class InterestsAndHobbiesStateModel {
         
         let collection = db.collection("users").document(uid).collection("interests")
         
-        var interestToSave = interest
+        let interestToSave = interest
         // Set creation timestamp (handled in toFirestoreData())
         
         let docRef = try await collection.addDocument(data: interestToSave.toFirestoreData())
@@ -197,7 +197,7 @@ class InterestsAndHobbiesStateModel {
         
         let collection = db.collection("users").document(uid).collection("hobbies")
         
-        var hobbyToSave = hobby
+        let hobbyToSave = hobby
         // Set creation timestamp (handled in toFirestoreData())
         
         let docRef = try await collection.addDocument(data: hobbyToSave.toFirestoreData())
