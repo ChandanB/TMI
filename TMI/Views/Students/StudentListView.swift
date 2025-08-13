@@ -27,24 +27,22 @@ struct StudentListView: View {
             TMIBackgroundView(variant: .default)
                 .ignoresSafeArea()
             
-            NavigationStack {
-                VStack(spacing: 0) {
-                    // Search and filter bar
-                    searchAndFilterBar
-                        .padding(.top, 10)
-                        .padding(.horizontal)
-                        .opacity(searchBarAppeared ? 1 : 0)
-                        .offset(y: searchBarAppeared ? 0 : -20)
-                    
-                    // Main content
-                    mainContent
-                        .opacity(gridAppeared ? 1 : 0)
-                    
-                    // Quick action bar
-                    quickActionBar
-                        .opacity(actionBarAppeared ? 1 : 0)
-                        .offset(y: actionBarAppeared ? 0 : 100)
-                }
+            VStack(spacing: 0) {
+                // Search and filter bar
+                searchAndFilterBar
+                    .padding(.top, 10)
+                    .padding(.horizontal)
+                    .opacity(searchBarAppeared ? 1 : 0)
+                    .offset(y: searchBarAppeared ? 0 : -20)
+
+                // Main content
+                mainContent
+                    .opacity(gridAppeared ? 1 : 0)
+
+                // Quick action bar
+                quickActionBar
+                    .opacity(actionBarAppeared ? 1 : 0)
+                    .offset(y: actionBarAppeared ? 0 : 100)
             }
             .navigationTitle("Students")
             .foregroundColor(.white)
@@ -67,12 +65,6 @@ struct StudentListView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(30)
-        }
-        .sheet(item: $stateModel.selectedStudent) { student in
-            StudentDetailView(student: student)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(30)
         }
         .alert("Bulk Actions", isPresented: $showingBulkActionsAlert) {
             Button("OK") { }
@@ -280,7 +272,7 @@ struct StudentListView: View {
                     ForEach(stateModel.filteredStudents) { student in
                         StudentCard(student: student)
                             .onTapGesture {
-                                stateModel.selectStudent(student)
+                                NavigationCoordinator.shared.navigate(to: .studentDetail(student))
                             }
                     }
                 }
