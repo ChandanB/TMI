@@ -125,6 +125,8 @@ struct ResourcesView: View {
   @State private var selectedStudent: Student?
   @State private var studentRecommendations: [Resource] = []
   @State private var showStudentRecommendations = false
+  @State private var showingStudentPicker = false
+  @State private var showingAllRecommendations = false
   
   // Animation states
   @State private var isLoaded = false
@@ -221,6 +223,44 @@ struct ResourcesView: View {
       }
     }
   }
+  
+  private var studentPickerButton: some View {
+    Menu {
+      Button("Select Student for Recommendations") {
+        showingStudentPicker = true
+      }
+      
+      if selectedStudent != nil {
+        Button("View All Recommendations") {
+          showingAllRecommendations = true
+        }
+      }
+    } label: {
+      HStack(spacing: 6) {
+        Image(systemName: "person.circle")
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundColor(.white)
+        if selectedStudent != nil {
+          Text((selectedStudent?.name.components(separatedBy: " ").first) ?? "Student")
+            .font(.system(size: 12))
+            .foregroundColor(.white)
+        }
+      }
+      .frame(height: 36)
+      .padding(.horizontal, 12)
+      .background(
+        RoundedRectangle(cornerRadius: 18)
+          .fill(selectedStudent != nil ? Color.tmiSecondary.opacity(0.3) : Color.white.opacity(0.1))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 18)
+          .stroke(
+            selectedStudent != nil ? Color.tmiSecondary.opacity(0.5) : Color.white.opacity(0.2),
+            lineWidth: 1
+          )
+      )
+    }
+  }
 
   var body: some View {
     ZStack {
@@ -241,46 +281,7 @@ struct ResourcesView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
           ToolbarItem(placement: .navigationBarLeading) {
-            Menu {
-              Button("Select Student for Recommendations") {
-                // TODO: Implement student picker
-              }
-              
-              if selectedStudent != nil {
-                Button("View All Recommendations") {
-                  // TODO: Show all student recommendations
-                }
-              }
-            } label: {
-              HStack(spacing: 6) {
-                Image(systemName: "person.circle")
-                  .font(.system(size: 16, weight: .semibold))
-                  .foregroundColor(.white)
-                if selectedStudent != nil {
-                  Text((selectedStudent?.name.components(separatedBy: " ").first) ?? "Student")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white)
-                }
-              }
-              .frame(height: 36)
-              .padding(.horizontal, 12)
-              .background(
-                RoundedRectangle(cornerRadius: 18)
-                  .fill(selectedStudent != nil ? Color.tmiSecondary.opacity(0.3) : Color.white.opacity(0.1))
-                  .background(
-                    RoundedRectangle(cornerRadius: 18)
-                      .fill(.ultraThinMaterial)
-                      .opacity(0.3)
-                  )
-              )
-              .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                  .stroke(
-                    selectedStudent != nil ? Color.tmiSecondary.opacity(0.5) : Color.white.opacity(0.2),
-                    lineWidth: 1
-                  )
-              )
-            }
+            studentPickerButton
           }
           
           ToolbarItem(placement: .navigationBarTrailing) {
@@ -327,6 +328,32 @@ struct ResourcesView: View {
         withAnimation {
           isLoaded = true
         }
+      }
+    }
+    .sheet(isPresented: $showingStudentPicker) {
+      StudentPickerSheet(
+        selectedStudent: $selectedStudent,
+        onStudentSelected: { student in
+          selectedStudent = student
+          showStudentRecommendations = true
+          showingStudentPicker = false
+          // Load personalized resource recommendations
+          Task {
+            await loadPersonalizedRecommendations(for: student)
+          }
+        }
+      )
+      .presentationDetents([.medium, .large])
+      .presentationDragIndicator(.visible)
+    }
+    .sheet(isPresented: $showingAllRecommendations) {
+      if let student = selectedStudent {
+        AllStudentResourcesSheet(
+          student: student,
+          recommendations: studentRecommendations
+        )
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
       }
     }
     .preferredColorScheme(.dark)
@@ -545,7 +572,7 @@ struct ResourcesView: View {
         Spacer()
 
         Button("View All") {
-          // TODO: Show all student recommendations
+          showingAllRecommendations = true
         }
         .font(.caption)
         .foregroundColor(.tmiSecondary)
@@ -1370,6 +1397,86 @@ struct PersonalizedResourceCard: View {
     .onHover { hovering in
       isHovered = hovering
     }
+  }
+}
+
+// MARK: - Helper Extensions
+
+extension ResourcesView {
+  private func loadPersonalizedRecommendations(for student: Student) async {
+    // In a real implementation, this would fetch personalized recommendations
+    // For now, we'll create sample recommendations based on student interests
+    await MainActor.run {
+      // Create sample resource recommendations
+      self.studentRecommendations = [
+        Resource(
+          title: "Understanding Student Interests",
+          description: "A guide for educators on identifying and nurturing student interests",
+          category: .article,
+          url: "https://example.com/interests",
+          createdAt: Date(),
+          updatedAt: Date(),
+          tags: ["interests", "student-engagement"],
+          recommendedFor: [student.grade]
+        )
+      ]
+    }
+  }
+}
+
+// MARK: - All Student Resources Sheet
+
+struct AllStudentResourcesSheet: View {
+  let student: Student
+  let recommendations: [Resource]
+  @Environment(\.dismiss) private var dismiss
+  
+  var body: some View {
+    NavigationView {
+      ZStack {
+        TMIBackgroundView(variant: .default)
+        
+        if recommendations.isEmpty {
+          VStack(spacing: 20) {
+            Image(systemName: "books.vertical")
+              .font(.system(size: 50))
+              .foregroundColor(.white.opacity(0.3))
+            
+            Text("No Recommendations")
+              .font(.title2)
+              .foregroundColor(.white)
+            
+            Text("We haven't found specific resource recommendations for \(student.name) yet. Check back after adding more student interests and assessment data.")
+              .font(.body)
+              .foregroundColor(.white.opacity(0.7))
+              .multilineTextAlignment(.center)
+              .padding(.horizontal)
+          }
+        } else {
+          ScrollView {
+            LazyVStack(spacing: 16) {
+              ForEach(recommendations) { resource in
+                ResourceCard(resource: resource)
+                  .padding(.horizontal)
+              }
+            }
+            .padding(.top, 20)
+            .padding(.bottom, 40)
+          }
+        }
+      }
+      .navigationTitle("Resources for \(student.name)")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button("Done") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+      }
+    }
+    .preferredColorScheme(.dark)
   }
 }
 

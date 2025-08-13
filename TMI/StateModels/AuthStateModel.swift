@@ -1000,7 +1000,7 @@ final class AuthStateModel: BaseStateModel<EnhancedAuthenticationState, Identifi
   // MARK: - Consent Methods
 
   func grantConsent(_ consentType: ConsentType, digitalSignature: String? = nil) async {
-    guard let userID = currentUser?.id else { return }
+    guard currentUser?.id != nil else { return }
 
     let consentRecord = ConsentRecord(
       consentType: consentType,

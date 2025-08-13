@@ -756,7 +756,7 @@ struct TMIPlanDetailView: View {
     let maxWeeks = max(8, weeksElapsed + 1)
     
     for week in 1...maxWeeks {
-      let weekDate = Calendar.current.date(byAdding: .weekOfYear, value: week - 1, to: startDate) ?? startDate
+      let _ = Calendar.current.date(byAdding: .weekOfYear, value: week - 1, to: startDate) ?? startDate
       let _ = week == weeksElapsed + 1
       let isFuture = week > weeksElapsed + 1
       

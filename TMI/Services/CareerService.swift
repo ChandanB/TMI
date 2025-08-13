@@ -64,7 +64,7 @@ class CareerService {
     let topInterestCategory = interestCategories.max { $0.value.count < $1.value.count }?.key.rawValue ?? "General"
     
     // Find career fields with highest representation
-    let careerFields = Dictionary(grouping: allCareers) { $0.field }
+    let _ = Dictionary(grouping: allCareers) { $0.field }
     let recommendedFields = Dictionary(grouping: recommendations) { $0.field }
     
     return CareerDiscoveryInsights(

@@ -94,7 +94,7 @@ final class AddStudentStateModel {
         isLoading = true
         errorMessage = nil
         
-        var studentToSave = Student(
+        let studentToSave = Student(
             id: student?.id,
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             grade: grade.trimmingCharacters(in: .whitespacesAndNewlines),

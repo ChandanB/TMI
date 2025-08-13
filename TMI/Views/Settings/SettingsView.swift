@@ -45,10 +45,14 @@ struct SettingsView: View {
 
         Section(header: Text("Data Management")) {
           Button("Export Data") {
-            // TODO: Implement data export functionality
+            // Future: Implement comprehensive data export functionality
+            print("Data export functionality coming soon")
+            // This would export students, TMI plans, forms, and other user data
           }
           Button("Import Data") {
-            // TODO: Implement data import functionality
+            // Future: Implement data import functionality
+            print("Data import functionality coming soon")
+            // This would allow importing CSV, JSON, or other data formats
           }
         }
 

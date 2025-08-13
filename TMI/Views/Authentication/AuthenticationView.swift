@@ -234,7 +234,9 @@ struct AuthenticationView: View {
 
         Button("Cancel", role: .cancel) {}
         Button("Reset") {
-          // TODO: Implement password reset in SimpleAuthStateModel
+          Task {
+            await stateModel.handlePasswordReset()
+          }
         }
       } message: {
         Text("Enter your email address and we'll send you a link to reset your password.")

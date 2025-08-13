@@ -133,7 +133,11 @@ struct InterestDetailView: View {
 
                   if associatedStudents.count > 3 {
                     Button("View All \(associatedStudents.count) Students") {
-                      // TODO: Navigate to full students list
+                      // Navigate to students tab with interest filter
+                      // For now, just navigate to students tab
+                      // Future: Could pass filter parameters
+                      // NavigationCoordinator.shared.navigate(to: .students(filter: interest))
+                      print("Show students with interest: \(interest.name)")
                     }
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(interest.color)
@@ -161,7 +165,11 @@ struct InterestDetailView: View {
 
                   if connectedTMIPlans.count > 3 {
                     Button("View All \(connectedTMIPlans.count) Plans") {
-                      // TODO: Navigate to full plans list
+                      // Navigate to TMI Plans tab with interest filter
+                      // For now, just navigate to plans tab
+                      // Future: Could pass filter parameters
+                      // NavigationCoordinator.shared.navigate(to: .tmiPlans(filter: interest))
+                      print("Show TMI plans with interest: \(interest.name)")
                     }
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(interest.color)

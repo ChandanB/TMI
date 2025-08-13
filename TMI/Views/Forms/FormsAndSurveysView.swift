@@ -711,7 +711,7 @@ struct DynamicFieldView: View {
         placeholder: field.placeholder ?? "Enter text",
         text: $textValue
       )
-      .onChange(of: textValue) { newValue in
+      .onChange(of: textValue) { _, newValue in
         onValueChange(newValue)
       }
 
@@ -725,7 +725,7 @@ struct DynamicFieldView: View {
         )
         .foregroundColor(.white)
         .frame(height: 120)
-        .onChange(of: textValue) { newValue in
+        .onChange(of: textValue) { _, newValue in
           onValueChange(newValue)
         }
 
@@ -736,7 +736,7 @@ struct DynamicFieldView: View {
         text: $numberValue,
         keyboardType: .numberPad
       )
-      .onChange(of: numberValue) { newValue in
+      .onChange(of: numberValue) { _, newValue in
         onValueChange(newValue)
       }
 
@@ -745,7 +745,7 @@ struct DynamicFieldView: View {
         .datePickerStyle(.compact)
         .labelsHidden()
         .tint(Color.tmiSecondary)
-        .onChange(of: dateValue) { newValue in
+        .onChange(of: dateValue) { _, newValue in
           onValueChange(newValue)
         }
 
@@ -754,7 +754,7 @@ struct DynamicFieldView: View {
         .datePickerStyle(.compact)
         .labelsHidden()
         .tint(Color.tmiSecondary)
-        .onChange(of: dateValue) { newValue in
+        .onChange(of: dateValue) { _, newValue in
           onValueChange(newValue)
         }
 
@@ -889,7 +889,7 @@ struct DynamicFieldView: View {
         .datePickerStyle(.compact)
         .labelsHidden()
         .tint(Color.tmiSecondary)
-        .onChange(of: dateValue) { newValue in
+        .onChange(of: dateValue) { _, newValue in
           onValueChange(newValue)
         }
     case .email:
@@ -899,7 +899,7 @@ struct DynamicFieldView: View {
         text: $textValue,
         keyboardType: .emailAddress
       )
-      .onChange(of: textValue) { newValue in
+      .onChange(of: textValue) { _, newValue in
         onValueChange(newValue)
       }
     case .phoneNumber:
@@ -909,7 +909,7 @@ struct DynamicFieldView: View {
         text: $textValue,
         keyboardType: .phonePad
       )
-      .onChange(of: textValue) { newValue in
+      .onChange(of: textValue) { _, newValue in
         onValueChange(newValue)
       }
     case .url:
@@ -919,7 +919,7 @@ struct DynamicFieldView: View {
         text: $textValue,
         keyboardType: .URL
       )
-      .onChange(of: textValue) { newValue in
+      .onChange(of: textValue) { _, newValue in
         onValueChange(newValue)
       }
     case .allCases:

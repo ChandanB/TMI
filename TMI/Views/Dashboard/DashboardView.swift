@@ -434,7 +434,7 @@ struct DashboardView: View {
     .toolbar {
       ToolbarItem(placement: .navigationBarTrailing) {
         Button {
-          // Profile menu action
+          NavigationCoordinator.shared.navigate(to: .userProfile)
         } label: {
           HStack(spacing: 8) {
             Text("Educator")

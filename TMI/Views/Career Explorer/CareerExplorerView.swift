@@ -25,6 +25,8 @@ struct CareerExplorerView: View {
   @State private var personalizedRecommendations: [Career] = []
   @State private var careerInsights: CareerDiscoveryInsights? = nil
   @State private var showPersonalizedSection = false
+  @State private var showingStudentPicker = false
+  @State private var showingInsightsSheet = false
 
   private let careerService = CareerService.shared
 
@@ -180,12 +182,12 @@ struct CareerExplorerView: View {
         ToolbarItem(placement: .navigationBarLeading) {
           Menu {
             Button("Select Student for Recommendations") {
-              // TODO: Implement student picker
+              showingStudentPicker = true
             }
             
             if selectedStudent != nil {
               Button("View Career Insights") {
-                // TODO: Show insights sheet
+                showingInsightsSheet = true
               }
             }
           } label: {
@@ -276,6 +278,34 @@ struct CareerExplorerView: View {
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(30)
       }
+      .sheet(isPresented: $showingStudentPicker) {
+        StudentPickerSheet(
+          selectedStudent: $selectedStudent,
+          onStudentSelected: { student in
+            selectedStudent = student
+            showPersonalizedSection = true
+            showingStudentPicker = false
+            // Load personalized recommendations
+            Task {
+              personalizedRecommendations = await careerService.getPersonalizedRecommendations(for: student)
+              careerInsights = await careerService.generateInsights(
+                for: student,
+                allCareers: careers,
+                recommendations: personalizedRecommendations
+              )
+            }
+          }
+        )
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+      }
+      .sheet(isPresented: $showingInsightsSheet) {
+        if let insights = careerInsights {
+          CareerInsightsSheet(insights: insights, student: selectedStudent)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+      }
       .preferredColorScheme(.dark)
       .task {
         await loadCareerData()
@@ -363,7 +393,7 @@ struct CareerExplorerView: View {
         Spacer()
 
         Button("View Insights") {
-          // TODO: Show insights sheet
+          showingInsightsSheet = true
         }
         .font(.caption)
         .foregroundColor(.tmiSecondary)
@@ -1834,6 +1864,224 @@ struct PersonalizedCareerCard: View {
     case "Science": return "atom"
     default: return "star"
     }
+  }
+}
+
+// MARK: - Student Picker Sheet
+
+struct StudentPickerSheet: View {
+  @Binding var selectedStudent: Student?
+  let onStudentSelected: (Student) -> Void
+  @Environment(\.dismiss) private var dismiss
+  @State private var studentService = StudentService()
+  @State private var students: [Student] = []
+  @State private var isLoading = false
+  
+  var body: some View {
+    NavigationView {
+      ZStack {
+        TMIBackgroundView(variant: .default)
+        
+        if isLoading {
+          VStack {
+            ProgressView()
+              .scaleEffect(1.5)
+              .foregroundColor(.white)
+            Text("Loading Students...")
+              .foregroundColor(.white.opacity(0.7))
+              .padding(.top)
+          }
+        } else if students.isEmpty {
+          VStack(spacing: 20) {
+            Image(systemName: "person.3")
+              .font(.system(size: 50))
+              .foregroundColor(.white.opacity(0.3))
+            
+            Text("No Students Available")
+              .font(.title2)
+              .foregroundColor(.white)
+            
+            Text("Add students first to get personalized career recommendations")
+              .font(.body)
+              .foregroundColor(.white.opacity(0.7))
+              .multilineTextAlignment(.center)
+              .padding(.horizontal)
+          }
+        } else {
+          ScrollView {
+            LazyVStack(spacing: 12) {
+              ForEach(students) { student in
+                Button {
+                  onStudentSelected(student)
+                } label: {
+                  HStack {
+                    VStack(alignment: .leading) {
+                      Text(student.name)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                      Text(student.grade)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.right.circle")
+                      .foregroundColor(.tmiSecondary)
+                  }
+                  .padding()
+                  .background(
+                    RoundedRectangle(cornerRadius: 12)
+                      .fill(Color.white.opacity(0.1))
+                  )
+                }
+                .buttonStyle(ScaleButtonStyle())
+              }
+            }
+            .padding()
+          }
+        }
+      }
+      .navigationTitle("Select Student")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button("Cancel") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+      }
+    }
+    .preferredColorScheme(.dark)
+    .task {
+      isLoading = true
+      do {
+        students = try await studentService.fetchStudents()
+      } catch {
+        print("Failed to load students: \(error)")
+      }
+      isLoading = false
+    }
+  }
+}
+
+// MARK: - Career Insights Sheet
+
+struct CareerInsightsSheet: View {
+  let insights: CareerDiscoveryInsights
+  let student: Student?
+  @Environment(\.dismiss) private var dismiss
+  
+  var body: some View {
+    NavigationView {
+      ZStack {
+        TMIBackgroundView(variant: .career)
+        
+        ScrollView {
+          VStack(alignment: .leading, spacing: 24) {
+            // Header
+            if let student = student {
+              VStack(alignment: .leading, spacing: 8) {
+                Text("Career Insights for \(student.name)")
+                  .font(.title2.bold())
+                  .foregroundColor(.white)
+                
+                Text("Based on interests and personality assessment")
+                  .font(.caption)
+                  .foregroundColor(.white.opacity(0.7))
+              }
+              .padding(.horizontal)
+            }
+            
+            // Stats
+            VStack(spacing: 16) {
+              HStack {
+                InsightCard(
+                  title: "Careers Explored",
+                  value: "\(insights.totalCareersExplored)",
+                  icon: "briefcase"
+                )
+                
+                InsightCard(
+                  title: "Recommendations",
+                  value: "\(insights.personalizedRecommendations)",
+                  icon: "star.circle"
+                )
+              }
+              
+              if !insights.strongestCareerFields.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                  Text("Top Career Fields")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                  
+                  LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                  ], spacing: 8) {
+                    ForEach(insights.strongestCareerFields, id: \.self) { field in
+                      Text(field)
+                        .font(.caption.bold())
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                          Capsule()
+                            .fill(Color.tmiSecondary.opacity(0.2))
+                        )
+                        .foregroundColor(.tmiSecondary)
+                    }
+                  }
+                }
+                .padding(.horizontal)
+              }
+            }
+            .padding(.horizontal)
+          }
+          .padding(.bottom, 40)
+        }
+      }
+      .navigationTitle("Career Insights")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button("Done") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+      }
+    }
+    .preferredColorScheme(.dark)
+  }
+}
+
+// MARK: - Insight Card
+
+struct InsightCard: View {
+  let title: String
+  let value: String
+  let icon: String
+  
+  var body: some View {
+    VStack(spacing: 8) {
+      Image(systemName: icon)
+        .font(.system(size: 24))
+        .foregroundColor(.tmiSecondary)
+      
+      Text(value)
+        .font(.title.bold())
+        .foregroundColor(.white)
+      
+      Text(title)
+        .font(.caption)
+        .foregroundColor(.white.opacity(0.7))
+        .multilineTextAlignment(.center)
+    }
+    .frame(maxWidth: .infinity)
+    .padding()
+    .background(
+      RoundedRectangle(cornerRadius: 12)
+        .fill(Color.white.opacity(0.1))
+    )
   }
 }
 

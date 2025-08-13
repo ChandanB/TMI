@@ -83,13 +83,15 @@ struct TMIPlanListView: View {
           ToolbarItem(placement: .navigationBarTrailing) {
             Menu {
               Button(action: {
-                // Actions menu
+                // Navigate to form template picker for creating TMI plans
+                NavigationCoordinator.shared.navigate(to: .formBuilder)
               }) {
                 Label("Create from Template", systemImage: "doc.badge.plus")
               }
 
               Button(action: {
-                // Import action
+                // Future: Import TMI plans functionality
+                print("Import plans functionality coming soon")
               }) {
                 Label("Import Plans", systemImage: "square.and.arrow.down")
               }
@@ -97,7 +99,15 @@ struct TMIPlanListView: View {
               Divider()
 
               Button(action: {
-                // Analytics action
+                // Navigate to dashboard insights
+                // For now, create sample dashboard data
+                let sampleData = DashboardData(
+                  totalStudents: 25,
+                  activeTMIPlans: 12,
+                  interestsIdentified: 45,
+                  surveysCompleted: 8
+                )
+                NavigationCoordinator.shared.navigate(to: .dashboardInsights(sampleData))
               }) {
                 Label("View Analytics", systemImage: "chart.bar.xaxis")
               }

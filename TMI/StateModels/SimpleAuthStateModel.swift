@@ -163,13 +163,30 @@ final class SimpleAuthStateModel: BaseStateModel<TMIAuthState, IdentifiableError
         }
     }
     
+    @MainActor
+    func handlePasswordReset() async {
+        guard !email.isEmpty else {
+            updateState(.error(IdentifiableError(message: "Please enter your email address")))
+            return
+        }
+        
+        do {
+            try await authService.sendPasswordReset(email: email)
+            updateState(.loaded(.needsAuthentication))
+            // Clear the email field after successful reset request
+            email = ""
+        } catch {
+            updateState(.error(ErrorHandlingHelper.handleAuthError(error)))
+        }
+    }
+    
     // MARK: - Helper Methods
     
     private func saveUserProfile(_ user: TMIUser) async throws {
         let userData: [String: Any] = [
-            "id": user.id,
+            "id": user.id as Any,
             "email": user.email,
-            "displayName": user.displayName ?? "",
+            "displayName": user.displayName,
             "role": user.role.rawValue,
             "profileCreatedDate": user.profileCreatedDate,
             "lastLoginDate": user.lastLoginDate as Any
