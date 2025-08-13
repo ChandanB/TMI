@@ -14,9 +14,12 @@ struct CareerDetailView: View {
   @State private var animateContent = false
   @State private var showSchoolFinder = false
   @State private var relatedCareers: [Career] = []
+  @State private var careerResources: [Resource] = []
   @State private var isBookmarked = false
   @State private var isLoading = false
   @State private var error: Error?
+  @State private var showResourcesSheet = false
+  @State private var alignmentScore: Double = 0.0
   @Environment(\.presentationMode) var presentationMode
 
   private let careerService = CareerService.shared
@@ -31,17 +34,9 @@ struct CareerDetailView: View {
 
   var body: some View {
     ZStack {
-      // Background gradient
-      LinearGradient(
-        gradient: Gradient(colors: [
-          Color.tmiBackground,
-          Color.tmiPrimary.opacity(0.1),
-          Color.tmiBackground,
-        ]),
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-      )
-      .ignoresSafeArea()
+      // Use unified TMI background
+      TMIBackgroundView(variant: .career)
+        .ignoresSafeArea()
 
       ScrollView {
         VStack(spacing: 0) {
@@ -51,11 +46,27 @@ struct CareerDetailView: View {
           // Tab selection
           tabSelector
 
-          // Main content container with glass morphism effect
+          // Main content container with TMI glass morphism effect
           ZStack {
             RoundedRectangle(cornerRadius: 30)
-              .fill(Color.white.opacity(0.85))
-              .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: -5)
+              .fill(Color.white.opacity(0.05))
+              .background(
+                RoundedRectangle(cornerRadius: 30)
+                  .fill(.ultraThinMaterial)
+                  .opacity(0.3)
+              )
+              .overlay(
+                RoundedRectangle(cornerRadius: 30)
+                  .stroke(
+                    LinearGradient(
+                      colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                      startPoint: .topLeading,
+                      endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                  )
+              )
+              .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: -5)
 
             // Content based on selected tab
             VStack {
@@ -67,6 +78,15 @@ struct CareerDetailView: View {
               }
               .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
 
+              // Related resources section
+              if !careerResources.isEmpty {
+                relatedResourcesSection
+                  .opacity(animateContent ? 1 : 0)
+                  .offset(y: animateContent ? 0 : 20)
+                  .animation(
+                    .spring(response: 0.5, dampingFraction: 0.8).delay(0.25), value: animateContent)
+              }
+              
               // Related careers section
               if !relatedCareers.isEmpty {
                 relatedCareersSection
@@ -86,7 +106,7 @@ struct CareerDetailView: View {
         ToolbarItem(placement: .principal) {
           Text(career.title)
             .font(.headline)
-            .foregroundColor(.tmiPrimary)
+            .foregroundColor(.white)
         }
 
         ToolbarItem(placement: .navigationBarTrailing) {
@@ -96,7 +116,7 @@ struct CareerDetailView: View {
             }
           }) {
             Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-              .foregroundColor(.tmiPrimary)
+              .foregroundColor(.white)
           }
         }
       }
@@ -116,6 +136,9 @@ struct CareerDetailView: View {
     }
     .sheet(isPresented: $showSchoolFinder) {
       SchoolFinderView(careerField: career.field)
+    }
+    .sheet(isPresented: $showResourcesSheet) {
+      CareerResourcesView(career: career, resources: careerResources)
     }
   }
 
@@ -245,14 +268,24 @@ struct CareerDetailView: View {
     }
     .frame(height: 240)
     .background(
-      LinearGradient(
-        gradient: Gradient(colors: [
-          Color.tmiPrimary.opacity(0.8),
-          Color.tmiPrimary,
-        ]),
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-      )
+      // Use glass morphism effect consistent with TMI design
+      RoundedRectangle(cornerRadius: 0)
+        .fill(Color.white.opacity(0.05))
+        .background(
+          RoundedRectangle(cornerRadius: 0)
+            .fill(.ultraThinMaterial)
+            .opacity(0.3)
+        )
+        .overlay(
+          LinearGradient(
+            gradient: Gradient(colors: [
+              Color.tmiPrimary.opacity(0.4),
+              Color.tmiSecondary.opacity(0.3),
+            ]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          )
+        )
     )
   }
 
@@ -271,11 +304,11 @@ struct CareerDetailView: View {
             Text(tab)
               .font(.subheadline)
               .fontWeight(selectedTab == index ? .semibold : .regular)
-              .foregroundColor(selectedTab == index ? .tmiPrimary : .gray)
+              .foregroundColor(selectedTab == index ? .white : .white.opacity(0.7))
 
             // Indicator for the selected tab
             Rectangle()
-              .fill(selectedTab == index ? Color.tmiPrimary : Color.clear)
+              .fill(selectedTab == index ? Color.white : Color.clear)
               .frame(height: 3)
               .cornerRadius(2)
           }
@@ -284,8 +317,26 @@ struct CareerDetailView: View {
       }
     }
     .padding(.vertical, 8)
-    .background(Color.white)
-    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+    .background(
+      RoundedRectangle(cornerRadius: 0)
+        .fill(Color.white.opacity(0.05))
+        .background(
+          RoundedRectangle(cornerRadius: 0)
+            .fill(.ultraThinMaterial)
+            .opacity(0.3)
+        )
+    )
+    .overlay(
+      Rectangle()
+        .stroke(
+          LinearGradient(
+            colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          ),
+          lineWidth: 1
+        )
+    )
   }
 
   // MARK: - Overview Tab
@@ -297,7 +348,7 @@ struct CareerDetailView: View {
 
         Text(career.description)
           .font(.body)
-          .foregroundColor(.tmiText)
+          .foregroundColor(.white)
           .fixedSize(horizontal: false, vertical: true)
           .lineSpacing(4)
           .padding(.bottom, 4)
@@ -305,8 +356,24 @@ struct CareerDetailView: View {
       .padding(20)
       .background(
         RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white)
-          .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+          .fill(Color.white.opacity(0.05))
+          .background(
+            RoundedRectangle(cornerRadius: 16)
+              .fill(.ultraThinMaterial)
+              .opacity(0.3)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 16)
+              .stroke(
+                LinearGradient(
+                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+              )
+          )
+          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
       )
 
       // Job outlook section
@@ -315,7 +382,7 @@ struct CareerDetailView: View {
 
         Text(career.jobOutlook)
           .font(.body)
-          .foregroundColor(.tmiText)
+          .foregroundColor(.white)
           .fixedSize(horizontal: false, vertical: true)
           .lineSpacing(4)
 
@@ -336,8 +403,24 @@ struct CareerDetailView: View {
       .padding(20)
       .background(
         RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white)
-          .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+          .fill(Color.white.opacity(0.05))
+          .background(
+            RoundedRectangle(cornerRadius: 16)
+              .fill(.ultraThinMaterial)
+              .opacity(0.3)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 16)
+              .stroke(
+                LinearGradient(
+                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+              )
+          )
+          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
       )
 
       // Your progress section
@@ -349,7 +432,7 @@ struct CareerDetailView: View {
             HStack {
               Text(item.0)
                 .font(.subheadline)
-                .foregroundColor(.tmiText)
+                .foregroundColor(.white)
 
               Spacer()
 
@@ -391,8 +474,24 @@ struct CareerDetailView: View {
       .padding(20)
       .background(
         RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white)
-          .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+          .fill(Color.white.opacity(0.05))
+          .background(
+            RoundedRectangle(cornerRadius: 16)
+              .fill(.ultraThinMaterial)
+              .opacity(0.3)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 16)
+              .stroke(
+                LinearGradient(
+                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+              )
+          )
+          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
       )
     }
     .padding(.horizontal, 20)
@@ -414,7 +513,7 @@ struct CareerDetailView: View {
 
               Text(skill)
                 .font(.subheadline)
-                .foregroundColor(.tmiText)
+                .foregroundColor(.white)
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
@@ -447,7 +546,7 @@ struct CareerDetailView: View {
               Text(resource.name)
                 .font(.subheadline)
                 .fontWeight(.medium)
-                .foregroundColor(.tmiText)
+                .foregroundColor(.white)
 
               Text(resource.description)
                 .font(.caption)
@@ -472,8 +571,24 @@ struct CareerDetailView: View {
       .padding(20)
       .background(
         RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white)
-          .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+          .fill(Color.white.opacity(0.05))
+          .background(
+            RoundedRectangle(cornerRadius: 16)
+              .fill(.ultraThinMaterial)
+              .opacity(0.3)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 16)
+              .stroke(
+                LinearGradient(
+                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+              )
+          )
+          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
       )
 
       // Personality fit section
@@ -491,7 +606,7 @@ struct CareerDetailView: View {
                 VStack(spacing: 2) {
                   Text(trait.score)
                     .font(.headline)
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(.white)
 
                   Text(trait.label)
                     .font(.caption2)
@@ -501,7 +616,7 @@ struct CareerDetailView: View {
 
               Text(trait.trait)
                 .font(.caption)
-                .foregroundColor(.tmiText)
+                .foregroundColor(.white)
                 .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
@@ -520,7 +635,7 @@ struct CareerDetailView: View {
             Text("Take Full Assessment")
           }
           .font(.subheadline)
-          .foregroundColor(.tmiPrimary)
+          .foregroundColor(.white)
           .padding(.vertical, 12)
           .padding(.horizontal, 16)
           .background(
@@ -534,8 +649,24 @@ struct CareerDetailView: View {
       .padding(20)
       .background(
         RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white)
-          .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+          .fill(Color.white.opacity(0.05))
+          .background(
+            RoundedRectangle(cornerRadius: 16)
+              .fill(.ultraThinMaterial)
+              .opacity(0.3)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 16)
+              .stroke(
+                LinearGradient(
+                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+              )
+          )
+          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
       )
     }
     .padding(.horizontal, 20)
@@ -550,7 +681,7 @@ struct CareerDetailView: View {
 
         Text(career.education)
           .font(.body)
-          .foregroundColor(.tmiText)
+          .foregroundColor(.white)
           .fixedSize(horizontal: false, vertical: true)
           .lineSpacing(4)
 
@@ -598,8 +729,24 @@ struct CareerDetailView: View {
       .padding(20)
       .background(
         RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white)
-          .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+          .fill(Color.white.opacity(0.05))
+          .background(
+            RoundedRectangle(cornerRadius: 16)
+              .fill(.ultraThinMaterial)
+              .opacity(0.3)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 16)
+              .stroke(
+                LinearGradient(
+                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+              )
+          )
+          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
       )
 
       // Recommended programs
@@ -617,13 +764,13 @@ struct CareerDetailView: View {
 
                 Text(program.initials)
                   .font(.system(size: 20, weight: .bold))
-                  .foregroundColor(.tmiPrimary)
+                  .foregroundColor(.white)
               }
 
               VStack(alignment: .leading, spacing: 4) {
                 Text(program.name)
                   .font(.headline)
-                  .foregroundColor(.tmiText)
+                  .foregroundColor(.white)
 
                 Text(program.institution)
                   .font(.subheadline)
@@ -672,8 +819,24 @@ struct CareerDetailView: View {
       .padding(20)
       .background(
         RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white)
-          .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+          .fill(Color.white.opacity(0.05))
+          .background(
+            RoundedRectangle(cornerRadius: 16)
+              .fill(.ultraThinMaterial)
+              .opacity(0.3)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 16)
+              .stroke(
+                LinearGradient(
+                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+              )
+          )
+          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
       )
     }
     .padding(.horizontal, 20)
@@ -756,8 +919,24 @@ struct CareerDetailView: View {
       .padding(20)
       .background(
         RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white)
-          .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+          .fill(Color.white.opacity(0.05))
+          .background(
+            RoundedRectangle(cornerRadius: 16)
+              .fill(.ultraThinMaterial)
+              .opacity(0.3)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 16)
+              .stroke(
+                LinearGradient(
+                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+              )
+          )
+          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
       )
 
       // Milestones and achievements
@@ -779,7 +958,7 @@ struct CareerDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
               Text(milestone.title)
                 .font(.headline)
-                .foregroundColor(.tmiText)
+                .foregroundColor(.white)
 
               Text(milestone.description)
                 .font(.subheadline)
@@ -814,8 +993,24 @@ struct CareerDetailView: View {
       .padding(20)
       .background(
         RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white)
-          .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+          .fill(Color.white.opacity(0.05))
+          .background(
+            RoundedRectangle(cornerRadius: 16)
+              .fill(.ultraThinMaterial)
+              .opacity(0.3)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 16)
+              .stroke(
+                LinearGradient(
+                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+              )
+          )
+          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
       )
     }
     .padding(.horizontal, 20)
@@ -827,7 +1022,7 @@ struct CareerDetailView: View {
       HStack {
         Text("Related Careers")
           .font(.headline)
-          .foregroundColor(.tmiPrimary)
+          .foregroundColor(.white)
 
         Spacer()
 
@@ -865,18 +1060,51 @@ struct CareerDetailView: View {
     }
     .padding(.top, 24)
   }
+  
+  // MARK: - Related Resources Section
+  private var relatedResourcesSection: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack {
+        Text("Helpful Resources")
+          .font(.headline)
+          .foregroundColor(.white)
+
+        Spacer()
+
+        Button(action: {
+          showResourcesSheet = true
+        }) {
+          Text("View All")
+            .font(.subheadline)
+            .foregroundColor(.tmiSecondary)
+        }
+      }
+      .padding(.horizontal, 20)
+
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 16) {
+          ForEach(careerResources.prefix(3), id: \.id) { resource in
+            CareerResourceCard(resource: resource)
+          }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+      }
+    }
+    .padding(.top, 24)
+  }
 
   // MARK: - Helper Components
   private func sectionHeader(title: String, icon: String) -> some View {
     HStack(spacing: 8) {
       Image(systemName: icon)
-        .foregroundColor(.tmiPrimary)
+        .foregroundColor(.white)
         .font(.headline)
 
       Text(title)
         .font(.title3)
         .fontWeight(.bold)
-        .foregroundColor(.tmiPrimary)
+        .foregroundColor(.white)
     }
   }
 
@@ -1126,6 +1354,9 @@ struct CareerDetailView: View {
       // Load related careers
       relatedCareers = try await careerService.getRelatedCareers(to: career, limit: 3)
       
+      // Load career-specific resources
+      careerResources = await careerService.getCareerResources(for: career)
+      
       // Check if career is bookmarked
       let bookmarks = try await careerService.fetchCareerBookmarks()
       isBookmarked = bookmarks.contains { $0.careerTitle == career.title }
@@ -1188,7 +1419,7 @@ struct RelatedCareerCard: View {
       Text(career.title)
         .font(.headline)
         .fontWeight(.semibold)
-        .foregroundColor(.tmiText)
+        .foregroundColor(.white)
 
       Divider()
 
@@ -1206,7 +1437,7 @@ struct RelatedCareerCard: View {
         Spacer()
 
         Image(systemName: "arrow.right")
-          .foregroundColor(.tmiPrimary)
+          .foregroundColor(.white)
           .padding(8)
           .background(
             Circle()
@@ -1255,32 +1486,31 @@ struct SchoolFinderView: View {
   var body: some View {
     NavigationView {
       ZStack {
-        // Background with gradient
-        LinearGradient(
-          gradient: Gradient(colors: [
-            Color.tmiBackground,
-            Color.tmiPrimary.opacity(0.1),
-            Color.tmiBackground,
-          ]),
-          startPoint: .topLeading,
-          endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
+        // Use unified TMI background
+        TMIBackgroundView(variant: .career)
+          .ignoresSafeArea()
 
         ScrollView {
           VStack(alignment: .leading, spacing: 24) {
             // Hero section
             ZStack(alignment: .bottomLeading) {
-              Rectangle()
-                .fill(
-                  LinearGradient(
-                    gradient: Gradient(colors: [
-                      Color.tmiPrimary,
-                      Color.tmiPrimary.opacity(0.8),
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                  )
+              RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+                .background(
+                  RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.3)
+                )
+                .overlay(
+                  RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                      LinearGradient(
+                        colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                      ),
+                      lineWidth: 1
+                    )
                 )
                 .frame(height: 160)
 
@@ -1318,7 +1548,7 @@ struct SchoolFinderView: View {
             VStack(alignment: .leading, spacing: 16) {
               Text("Search Programs")
                 .font(.headline)
-                .foregroundColor(.tmiPrimary)
+                .foregroundColor(.white)
 
               HStack {
                 Image(systemName: "magnifyingglass")
@@ -1337,69 +1567,33 @@ struct SchoolFinderView: View {
               VStack(alignment: .leading, spacing: 16) {
                 Text("Filter Options")
                   .font(.headline)
-                  .foregroundColor(.tmiPrimary)
+                  .foregroundColor(.white)
 
                 // Program type filter
                 VStack(alignment: .leading, spacing: 8) {
                   Text("Program Type")
                     .font(.subheadline)
-                    .foregroundColor(.tmiText)
+                    .foregroundColor(.white)
 
-                  ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                      ForEach(programs, id: \.self) { program in
-                        CareerDetailFilterButton(
-                          title: program,
-                          isSelected: selectedProgram == program,
-                          action: {
-                            selectedProgram = selectedProgram == program ? nil : program
-                          }
-                        )
-                      }
-                    }
-                  }
+                  programTypeFilterList
                 }
 
                 // Location filter
                 VStack(alignment: .leading, spacing: 8) {
                   Text("Location")
                     .font(.subheadline)
-                    .foregroundColor(.tmiText)
+                    .foregroundColor(.white)
 
-                  ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                      ForEach(locations, id: \.self) { location in
-                        CareerDetailFilterButton(
-                          title: location,
-                          isSelected: selectedLocation == location,
-                          action: {
-                            selectedLocation = selectedLocation == location ? nil : location
-                          }
-                        )
-                      }
-                    }
-                  }
+                  locationFilterList
                 }
 
                 // Format filter
                 VStack(alignment: .leading, spacing: 8) {
                   Text("Format")
                     .font(.subheadline)
-                    .foregroundColor(.tmiText)
+                    .foregroundColor(.white)
 
-                  ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                      ForEach(formats, id: \.self) { format in
-                        CareerDetailFilterButton(
-                          title: format,
-                          isSelected: selectedFormat == format,
-                          action: {
-                            selectedFormat = selectedFormat == format ? nil : format
-                          }
-                        )
-                      }
-                    }
-                  }
+                  formatFilterList
                 }
               }
 
@@ -1422,8 +1616,24 @@ struct SchoolFinderView: View {
             .padding(20)
             .background(
               RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+                .fill(Color.white.opacity(0.05))
+                .background(
+                  RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.3)
+                )
+                .overlay(
+                  RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                      LinearGradient(
+                        colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                      ),
+                      lineWidth: 1
+                    )
+                )
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
             )
             .padding(.horizontal, 20)
             .offset(y: animateContent ? 0 : 30)
@@ -1442,13 +1652,61 @@ struct SchoolFinderView: View {
             presentationMode.wrappedValue.dismiss()
           }) {
             Image(systemName: "xmark")
-              .foregroundColor(.tmiPrimary)
+              .foregroundColor(.white)
           }
         }
       }
       .onAppear {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
           animateContent = true
+        }
+      }
+    }
+  }
+  
+  private var programTypeFilterList: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 10) {
+        ForEach(programs, id: \.self) { program in
+          CareerDetailFilterButton(
+            title: program,
+            isSelected: selectedProgram == program,
+            action: {
+              selectedProgram = selectedProgram == program ? nil : program
+            }
+          )
+        }
+      }
+    }
+  }
+  
+  private var locationFilterList: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 10) {
+        ForEach(locations, id: \.self) { location in
+          CareerDetailFilterButton(
+            title: location,
+            isSelected: selectedLocation == location,
+            action: {
+              selectedLocation = selectedLocation == location ? nil : location
+            }
+          )
+        }
+      }
+    }
+  }
+  
+  private var formatFilterList: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 10) {
+        ForEach(formats, id: \.self) { format in
+          CareerDetailFilterButton(
+            title: format,
+            isSelected: selectedFormat == format,
+            action: {
+              selectedFormat = selectedFormat == format ? nil : format
+            }
+          )
         }
       }
     }
@@ -1473,6 +1731,134 @@ struct CareerDetailFilterButton: View {
         )
         .foregroundColor(isSelected ? .white : .tmiText)
     }
+  }
+}
+
+// MARK: - Career Resource Card
+
+struct CareerResourceCard: View {
+  let resource: Resource
+  @State private var isHovered = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack {
+        ZStack {
+          Circle()
+            .fill(resource.category.color.opacity(0.2))
+            .frame(width: 40, height: 40)
+
+          Image(systemName: resource.category.icon)
+            .font(.system(size: 20))
+            .foregroundColor(resource.category.color)
+        }
+
+        Spacer()
+
+        Text(resource.category.rawValue.capitalized)
+          .font(.system(size: 10, weight: .medium))
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .background(
+            Capsule()
+              .fill(resource.category.color.opacity(0.1))
+          )
+          .foregroundColor(resource.category.color)
+      }
+
+      Text(resource.title)
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundColor(.white)
+        .lineLimit(2)
+        .multilineTextAlignment(.leading)
+
+      Text(resource.description)
+        .font(.system(size: 12))
+        .foregroundColor(.white.opacity(0.7))
+        .lineLimit(2)
+
+      HStack {
+        ForEach(resource.tags.prefix(2), id: \.self) { tag in
+          Text(tag)
+            .font(.system(size: 9))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+              Capsule()
+                .fill(Color.white.opacity(0.1))
+            )
+            .foregroundColor(.white.opacity(0.8))
+        }
+        Spacer()
+      }
+    }
+    .padding(12)
+    .frame(width: 180, height: 140)
+    .background(
+      RoundedRectangle(cornerRadius: 12)
+        .fill(Color.white.opacity(0.05))
+        .background(
+          RoundedRectangle(cornerRadius: 12)
+            .fill(.ultraThinMaterial)
+            .opacity(0.8)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 12)
+            .stroke(
+              LinearGradient(
+                colors: [resource.category.color.opacity(0.3), Color.clear, resource.category.color.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              ),
+              lineWidth: 1
+            )
+        )
+    )
+    .scaleEffect(isHovered ? 1.02 : 1.0)
+    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+    .onHover { hovering in
+      isHovered = hovering
+    }
+  }
+}
+
+// MARK: - Career Resources Sheet View
+
+struct CareerResourcesView: View {
+  let career: Career
+  let resources: [Resource]
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    NavigationStack {
+      ZStack {
+        TMIBackgroundView(variant: .default)
+          .ignoresSafeArea()
+
+        ScrollView {
+          LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
+            ForEach(resources, id: \.id) { resource in
+              NavigationLink(destination: ResourceDetailView(resource: resource)) {
+                ResourceCard(resource: resource)
+              }
+              .buttonStyle(.plain)
+            }
+          }
+          .padding(20)
+        }
+      }
+      .navigationTitle("\(career.title) Resources")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button("Done") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+      }
+    }
+    .preferredColorScheme(.dark)
   }
 }
 

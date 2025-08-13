@@ -27,20 +27,134 @@ class TMIPlanService {
     /// Fetch all TMI plans for the current user
     func fetchPlans() async throws -> [TMIPlan] {
         guard let collection = userPlansCollection else {
+            print("[TMIPlanService] Error: No user logged in, cannot fetch plans")
             throw TMIPlanServiceError.userNotAuthenticated
         }
         
         do {
-            print("[TMIPlanService] Fetching TMI plans...")
+            print("[TMIPlanService] Fetching TMI plans for user: \(Auth.auth().currentUser?.uid ?? "unknown")")
             let querySnapshot = try await collection.getDocuments()
+            print("[TMIPlanService] Found \(querySnapshot.documents.count) documents in collection")
             
             let plans = querySnapshot.documents.compactMap { document -> TMIPlan? in
                 do {
-                    var plan = try document.data(as: TMIPlan.self)
-                    // Ensure the plan has the document ID set
-                    if plan.id == nil {
-                        plan.id = document.documentID
+                    print("[TMIPlanService] Processing document: \(document.documentID)")
+                    let data = document.data()
+                    
+                    // Manual reconstruction of TMIPlan from Firestore data
+                    guard let modelRaw = data["model"] as? String,
+                          let model = TMIPlanModel(rawValue: modelRaw),
+                          let progress = data["progress"] as? Double,
+                          let notes = data["notes"] as? String,
+                          let creationTimestamp = data["creationDate"] as? Double,
+                          let lastUpdatedTimestamp = data["lastUpdated"] as? Double else {
+                        print("[TMIPlanService] Missing required fields in document \(document.documentID)")
+                        return nil
                     }
+                    
+                    let creationDate = Date(timeIntervalSince1970: creationTimestamp)
+                    let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
+                    
+                    // Reconstruct student from simplified data
+                    let student: Student
+                    if let studentData = data["student"] as? [String: Any] {
+                        student = Student(
+                            id: studentData["id"] as? String,
+                            name: studentData["name"] as? String ?? "Unknown",
+                            grade: studentData["grade"] as? String ?? "",
+                            school: "",
+                            dateOfBirth: Date()
+                        )
+                    } else {
+                        print("[TMIPlanService] Missing student data in document \(document.documentID)")
+                        return nil
+                    }
+                    
+                    // Reconstruct students array from simplified data
+                    let students: [Student]
+                    if let studentsData = data["students"] as? [[String: Any]] {
+                        students = studentsData.map { studentInfo in
+                            Student(
+                                id: studentInfo["id"] as? String,
+                                name: studentInfo["name"] as? String ?? "Unknown",
+                                grade: studentInfo["grade"] as? String ?? "",
+                                school: "",
+                                dateOfBirth: Date()
+                            )
+                        }
+                    } else {
+                        students = [student] // Fallback to main student
+                    }
+                    
+                    // Reconstruct interests from full objects
+                    let interests: [Interest]
+                    if let interestsData = data["interests"] as? [[String: Any]] {
+                        interests = interestsData.compactMap { interestData in
+                            Interest.fromFirestore(id: interestData["id"] as? String ?? "", data: interestData)
+                        }
+                    } else {
+                        interests = []
+                    }
+                    
+                    // Reconstruct hobbies from full objects
+                    let hobbies: [Hobby]
+                    if let hobbiesData = data["hobbies"] as? [[String: Any]] {
+                        hobbies = hobbiesData.compactMap { hobbyData in
+                            guard let idString = hobbyData["id"] as? String else { return nil }
+                            return Hobby.fromFirestore(id: idString, data: hobbyData)
+                        }
+                    } else {
+                        hobbies = []
+                    }
+                    
+                    // Reconstruct goals from array data
+                    let goals: [Goal]
+                    if let goalsData = data["goals"] as? [[String: Any]] {
+                        goals = goalsData.compactMap { goalData in
+                            guard let idString = goalData["id"] as? String,
+                                  let id = UUID(uuidString: idString),
+                                  let description = goalData["description"] as? String,
+                                  let statusString = goalData["status"] as? String,
+                                  let status = GoalStatus(rawValue: statusString),
+                                  let progress = goalData["progress"] as? Double else {
+                                return nil
+                            }
+                            
+                            let notes = goalData["notes"] as? String
+                            let dueDate: Date?
+                            if let dueDateTimestamp = goalData["dueDate"] as? Double {
+                                dueDate = Date(timeIntervalSince1970: dueDateTimestamp)
+                            } else {
+                                dueDate = nil
+                            }
+                            
+                            return Goal(
+                                id: id,
+                                description: description,
+                                dueDate: dueDate, status: status,
+                                progress: progress,
+                                notes: notes
+                            )
+                        }
+                    } else {
+                        goals = []
+                    }
+                    
+                    let plan = TMIPlan(
+                        id: document.documentID,
+                        student: student,
+                        students: students,
+                        model: model,
+                        interests: interests,
+                        hobbies: hobbies,
+                        creationDate: creationDate,
+                        lastUpdated: lastUpdated,
+                        goals: goals,
+                        progress: progress,
+                        notes: notes
+                    )
+                    
+                    print("[TMIPlanService] Successfully reconstructed plan: \(plan.model.rawValue)")
                     return plan
                 } catch {
                     print("[TMIPlanService] Failed to decode TMI plan document \(document.documentID): \(error)")
@@ -142,9 +256,109 @@ class TMIPlanService {
             let document = try await collection.document(id).getDocument()
             
             if document.exists {
-                var plan = try document.data(as: TMIPlan.self)
-                plan.id = document.documentID
-                return plan
+                // Use the same manual reconstruction logic
+                let data = document.data()!
+                
+                guard let modelRaw = data["model"] as? String,
+                      let model = TMIPlanModel(rawValue: modelRaw),
+                      let progress = data["progress"] as? Double,
+                      let notes = data["notes"] as? String,
+                      let creationTimestamp = data["creationDate"] as? Double,
+                      let lastUpdatedTimestamp = data["lastUpdated"] as? Double,
+                      let studentData = data["student"] as? [String: Any] else {
+                    return nil
+                }
+                
+                let creationDate = Date(timeIntervalSince1970: creationTimestamp)
+                let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
+                
+                let student = Student(
+                    id: studentData["id"] as? String,
+                    name: studentData["name"] as? String ?? "Unknown",
+                    grade: studentData["grade"] as? String ?? "",
+                    school: "",
+                    dateOfBirth: Date()
+                )
+                
+                let students: [Student]
+                if let studentsData = data["students"] as? [[String: Any]] {
+                    students = studentsData.map { studentInfo in
+                        Student(
+                            id: studentInfo["id"] as? String,
+                            name: studentInfo["name"] as? String ?? "Unknown",
+                            grade: studentInfo["grade"] as? String ?? "",
+                            school: "",
+                            dateOfBirth: Date()
+                        )
+                    }
+                } else {
+                    students = [student]
+                }
+                
+                let interests: [Interest]
+                if let interestsData = data["interests"] as? [[String: Any]] {
+                    interests = interestsData.compactMap { interestData in
+                        Interest.fromFirestore(id: interestData["id"] as? String ?? "", data: interestData)
+                    }
+                } else {
+                    interests = []
+                }
+                
+                let hobbies: [Hobby]
+                if let hobbiesData = data["hobbies"] as? [[String: Any]] {
+                    hobbies = hobbiesData.compactMap { hobbyData in
+                        guard let idString = hobbyData["id"] as? String else { return nil }
+                        return Hobby.fromFirestore(id: idString, data: hobbyData)
+                    }
+                } else {
+                    hobbies = []
+                }
+                
+                let goals: [Goal]
+                if let goalsData = data["goals"] as? [[String: Any]] {
+                    goals = goalsData.compactMap { goalData in
+                        guard let idString = goalData["id"] as? String,
+                              let id = UUID(uuidString: idString),
+                              let description = goalData["description"] as? String,
+                              let statusString = goalData["status"] as? String,
+                              let status = GoalStatus(rawValue: statusString),
+                              let progress = goalData["progress"] as? Double else {
+                            return nil
+                        }
+                        
+                        let notes = goalData["notes"] as? String
+                        let dueDate: Date?
+                        if let dueDateTimestamp = goalData["dueDate"] as? Double {
+                            dueDate = Date(timeIntervalSince1970: dueDateTimestamp)
+                        } else {
+                            dueDate = nil
+                        }
+                        
+                        return Goal(
+                            id: id,
+                            description: description,
+                            dueDate: dueDate, status: status,
+                            progress: progress,
+                            notes: notes
+                        )
+                    }
+                } else {
+                    goals = []
+                }
+                
+                return TMIPlan(
+                    id: document.documentID,
+                    student: student,
+                    students: students,
+                    model: model,
+                    interests: interests,
+                    hobbies: hobbies,
+                    creationDate: creationDate,
+                    lastUpdated: lastUpdated,
+                    goals: goals,
+                    progress: progress,
+                    notes: notes
+                )
             } else {
                 return nil
             }
@@ -168,8 +382,123 @@ class TMIPlanService {
             
             let plans = querySnapshot.documents.compactMap { document -> TMIPlan? in
                 do {
-                    var plan = try document.data(as: TMIPlan.self)
-                    plan.id = document.documentID
+                    print("[TMIPlanService] Processing document: \(document.documentID)")
+                    let data = document.data()
+                    
+                    // Manual reconstruction of TMIPlan from Firestore data
+                    guard let modelRaw = data["model"] as? String,
+                          let model = TMIPlanModel(rawValue: modelRaw),
+                          let progress = data["progress"] as? Double,
+                          let notes = data["notes"] as? String,
+                          let creationTimestamp = data["creationDate"] as? Double,
+                          let lastUpdatedTimestamp = data["lastUpdated"] as? Double else {
+                        print("[TMIPlanService] Missing required fields in document \(document.documentID)")
+                        return nil
+                    }
+                    
+                    let creationDate = Date(timeIntervalSince1970: creationTimestamp)
+                    let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
+                    
+                    // Reconstruct student from simplified data
+                    let student: Student
+                    if let studentData = data["student"] as? [String: Any] {
+                        student = Student(
+                            id: studentData["id"] as? String,
+                            name: studentData["name"] as? String ?? "Unknown",
+                            grade: studentData["grade"] as? String ?? "",
+                            school: "",
+                            dateOfBirth: Date()
+                        )
+                    } else {
+                        print("[TMIPlanService] Missing student data in document \(document.documentID)")
+                        return nil
+                    }
+                    
+                    // Reconstruct students array from simplified data
+                    let students: [Student]
+                    if let studentsData = data["students"] as? [[String: Any]] {
+                        students = studentsData.map { studentInfo in
+                            Student(
+                                id: studentInfo["id"] as? String,
+                                name: studentInfo["name"] as? String ?? "Unknown",
+                                grade: studentInfo["grade"] as? String ?? "",
+                                school: "",
+                                dateOfBirth: Date()
+                            )
+                        }
+                    } else {
+                        students = [student] // Fallback to main student
+                    }
+                    
+                    // Reconstruct interests from full objects
+                    let interests: [Interest]
+                    if let interestsData = data["interests"] as? [[String: Any]] {
+                        interests = interestsData.compactMap { interestData in
+                            Interest.fromFirestore(id: interestData["id"] as? String ?? "", data: interestData)
+                        }
+                    } else {
+                        interests = []
+                    }
+                    
+                    // Reconstruct hobbies from full objects
+                    let hobbies: [Hobby]
+                    if let hobbiesData = data["hobbies"] as? [[String: Any]] {
+                        hobbies = hobbiesData.compactMap { hobbyData in
+                            guard let idString = hobbyData["id"] as? String else { return nil }
+                            return Hobby.fromFirestore(id: idString, data: hobbyData)
+                        }
+                    } else {
+                        hobbies = []
+                    }
+                    
+                    // Reconstruct goals from array data
+                    let goals: [Goal]
+                    if let goalsData = data["goals"] as? [[String: Any]] {
+                        goals = goalsData.compactMap { goalData in
+                            guard let idString = goalData["id"] as? String,
+                                  let id = UUID(uuidString: idString),
+                                  let description = goalData["description"] as? String,
+                                  let statusString = goalData["status"] as? String,
+                                  let status = GoalStatus(rawValue: statusString),
+                                  let progress = goalData["progress"] as? Double else {
+                                return nil
+                            }
+                            
+                            let notes = goalData["notes"] as? String
+                            let dueDate: Date?
+                            if let dueDateTimestamp = goalData["dueDate"] as? Double {
+                                dueDate = Date(timeIntervalSince1970: dueDateTimestamp)
+                            } else {
+                                dueDate = nil
+                            }
+                            
+                            return Goal(
+                                id: id,
+                                description: description,
+                                dueDate: dueDate, status: status,
+                                progress: progress,
+                                notes: notes
+                            )
+                        }
+                    } else {
+                        goals = []
+                    }
+                    
+                    let plan = TMIPlan(
+                        id: document.documentID,
+                        student: student,
+                        students: students,
+                        model: model,
+                        interests: interests,
+                        hobbies: hobbies,
+                        creationDate: creationDate,
+                        lastUpdated: lastUpdated,
+                        goals: goals,
+                        progress: progress,
+                        notes: notes
+                    )
+                    
+                    print("[TMIPlanService] Successfully reconstructed plan: \(plan.model.rawValue)")
                     return plan
                 } catch {
                     print("[TMIPlanService] Failed to decode TMI plan document \(document.documentID): \(error)")

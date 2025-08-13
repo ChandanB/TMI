@@ -105,6 +105,15 @@ final class TMIPlanListStateModel: BaseStateModel<[TMIPlan], IdentifiableError> 
     }
     
     @MainActor
+    func addExistingPlan(_ plan: TMIPlan) {
+        // Add a plan that's already saved to Firebase to the current state
+        if case .loaded(var plans) = state {
+            plans.append(plan)
+            updateState(.loaded(plans))
+        }
+    }
+    
+    @MainActor
     func updatePlan(_ plan: TMIPlan) async -> Bool {
         do {
             let updatedPlan = try await planService.updatePlan(plan)

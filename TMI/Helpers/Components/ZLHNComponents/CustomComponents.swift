@@ -52,16 +52,6 @@ struct BottomSheet<SheetContent: View>: ViewModifier {
   }
 }
 
-struct VisualEffectBlur: UIViewRepresentable {
-  var blurStyle: UIBlurEffect.Style
-
-  func makeUIView(context: Context) -> UIVisualEffectView {
-    return UIVisualEffectView(effect: UIBlurEffect(style: blurStyle))
-  }
-
-  func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
-}
-
 // Helper view modifier to create the coordinated overlay
 struct CoordinatedOverlay<OverlayView: View>: ViewModifier {
   var overlayView: OverlayView
@@ -113,22 +103,6 @@ struct CustomFontModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content.font(Font.custom(fontName, size: size))
-  }
-}
-
-// MARK: - ImageColors
-struct ImageColors {
-  var background: Color
-  var primary: Color
-  var secondary: Color
-  var detail: Color
-}
-
-// MARK: - ColorExtractionService
-class ColorExtractionService {
-  func extractColors(from image: UIImage) async -> ImageColors? {
-    // Actual color extraction logic
-    return nil
   }
 }
 

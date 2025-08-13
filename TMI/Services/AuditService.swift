@@ -9,6 +9,109 @@ import FirebaseFirestore
 import Foundation
 import Observation
 
+// MARK: - TEMPORARY TYPE STUBS FOR AUDIT & COMPLIANCE MODELS
+// These are minimal definitions to unblock compilation. Please refine and move to dedicated files.
+
+enum RiskLevel: String, Codable {
+    case low, medium, high, critical
+}
+
+enum AuditResult: String, Codable {
+    case success, failure
+}
+
+struct DeviceInfo: Codable {
+    let deviceType: DeviceType
+    let operatingSystem: String
+    let osVersion: String
+    let appVersion: String
+    let deviceModel: String
+    let deviceID: String
+    let timezone: String
+    let locale: String
+    // Add more fields as needed
+}
+
+enum DeviceType: String, Codable {
+    case iPhone, iPad, Mac, unknown
+}
+
+struct AuditEvent: Codable {
+    var id: String = UUID().uuidString
+    var eventID: String = UUID().uuidString
+    var timestamp: Date = Date()
+    var userID: String
+    var userRole: UserRole
+    var action: AuditAction
+    var resourceType: String
+    var resourceID: String?
+    var dataClassification: DataClassification
+    var ipAddress: String?
+    var deviceInfo: DeviceInfo?
+    var sessionID: String?
+    var consentVersion: String?
+    var additionalMetadata: [String: String]?
+    var result: AuditResult
+    var riskLevel: RiskLevel
+}
+
+enum AuditAction: String, Codable {
+    case login, logout, loginFailed, consentGranted, consentRevoked
+    // Add more actions as appropriate
+    var displayName: String {
+        switch self {
+        case .login: return "Login"
+        case .logout: return "Logout"
+        case .loginFailed: return "Login Failed"
+        case .consentGranted: return "Consent Granted"
+        case .consentRevoked: return "Consent Revoked"
+        }
+    }
+    var defaultRiskLevel: RiskLevel {
+        switch self {
+        case .loginFailed: return .high
+        case .logout: return .low
+        default: return .medium
+        }
+    }
+}
+
+enum ComplianceReportType: String, Codable {
+    case coppa, ferpa, general
+}
+
+struct ComplianceReport: Codable {
+    var reportType: ComplianceReportType
+    var generatedBy: String
+    var timeRange: DateInterval
+    var summary: AuditSummary
+    var dataRetentionCompliance: DataRetentionCompliance
+    var consentCompliance: ConsentCompliance
+}
+
+struct AuditSummary: Codable {
+    var totalEvents: Int
+    var timeRange: DateInterval
+}
+
+struct DataRetentionCompliance: Codable {
+    var compliantRecords: Int
+    var violatingRecords: Int
+    var expiringSoon: Int
+    var totalRecords: Int
+}
+
+struct ConsentCompliance: Codable {
+    var usersWithValidConsent: Int
+    var usersWithExpiredConsent: Int
+    var usersWithMissingConsent: Int
+    var minorsWithParentalConsent: Int
+    var minorsWithoutParentalConsent: Int
+    var totalUsers: Int
+}
+
+// End of temporary stubs.
+
 // MARK: - Audit Service
 
 @Observable

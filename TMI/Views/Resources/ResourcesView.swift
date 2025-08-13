@@ -121,10 +121,106 @@ struct ResourcesView: View {
   // State Model
   @State private var stateModel = ResourcesStateModel()
   
+  // Student integration
+  @State private var selectedStudent: Student?
+  @State private var studentRecommendations: [Resource] = []
+  @State private var showStudentRecommendations = false
+  
   // Animation states
   @State private var isLoaded = false
 
   private var showSearchBar: Bool { true }
+
+  // Break up the complex body to fix compiler timeout
+  private var mainContent: some View {
+    VStack(spacing: 0) {
+      // Search bar - appears when scrolled
+      if showSearchBar {
+        searchBarView
+          .transition(.move(edge: .top).combined(with: .opacity))
+      }
+
+      // Scrollable content
+      scrollableContent
+    }
+  }
+  
+  private var scrollableContent: some View {
+    ScrollView {
+      VStack(spacing: 24) {
+        // Student recommendations section
+        if showStudentRecommendations && selectedStudent != nil {
+          studentRecommendationsSection
+            .opacity(isLoaded ? 1 : 0)
+            .offset(y: isLoaded ? 0 : 20)
+            .animation(
+              .spring(response: 0.5, dampingFraction: 0.7).delay(0.05), value: isLoaded)
+        }
+        
+        // Featured resources section
+        if hasFeaturedResources {
+          featuredResourcesSection
+            .opacity(isLoaded ? 1 : 0)
+            .offset(y: isLoaded ? 0 : 20)
+            .animation(
+              .spring(response: 0.5, dampingFraction: 0.7).delay(0.1), value: isLoaded)
+        }
+
+        // Category filter
+        categoryPickerView
+          .padding(.horizontal, 20)
+          .opacity(isLoaded ? 1 : 0)
+          .offset(y: isLoaded ? 0 : 20)
+          .animation(
+            .spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: isLoaded)
+
+        // Resources grid
+        resourcesContentView
+      }
+      .padding(.top, 20)
+    }
+    .coordinateSpace(name: "scroll")
+    .safeAreaInset(
+      edge: .top,
+      content: {
+        searchBarView
+          .opacity(showSearchBar ? 0 : 1)
+      })
+  }
+  
+  private var resourcesContentView: some View {
+    Group {
+      if filteredResources.isEmpty {
+        emptyStateView
+          .opacity(isLoaded ? 1 : 0)
+          .offset(y: isLoaded ? 0 : 30)
+          .animation(
+            .spring(response: 0.5, dampingFraction: 0.7).delay(0.3), value: isLoaded)
+      } else {
+        resourcesGridView
+      }
+    }
+  }
+  
+  private var floatingAddButton: some View {
+    VStack {
+      Spacer()
+
+      HStack {
+        Spacer()
+
+        TMIButton(
+          text: "plus",
+          style: .floating,
+          action: { stateModel.showingAddResource = true }
+        )
+        .padding(24)
+        .opacity(isLoaded ? 1 : 0)
+        .offset(y: isLoaded ? 0 : 100)
+        .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5), value: isLoaded)
+      }
+    }
+  }
 
   var body: some View {
     ZStack {
@@ -134,79 +230,59 @@ struct ResourcesView: View {
       NavigationStack {
         ZStack {
           // Main content
-          VStack(spacing: 0) {
-            // Search bar - appears when scrolled
-            if showSearchBar {
-              searchBarView
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
-
-            // Scrollable content
-            ScrollView {
-              VStack(spacing: 24) {
-                // Featured resources section
-                if hasFeaturedResources {
-                  featuredResourcesSection
-                    .opacity(isLoaded ? 1 : 0)
-                    .offset(y: isLoaded ? 0 : 20)
-                    .animation(
-                      .spring(response: 0.5, dampingFraction: 0.7).delay(0.1), value: isLoaded)
-                }
-
-                // Category filter
-                categoryPickerView
-                  .padding(.horizontal, 20)
-                  .opacity(isLoaded ? 1 : 0)
-                  .offset(y: isLoaded ? 0 : 20)
-                  .animation(
-                    .spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: isLoaded)
-
-                // Resources grid
-                if filteredResources.isEmpty {
-                  emptyStateView
-                    .opacity(isLoaded ? 1 : 0)
-                    .offset(y: isLoaded ? 0 : 30)
-                    .animation(
-                      .spring(response: 0.5, dampingFraction: 0.7).delay(0.3), value: isLoaded)
-                } else {
-                  resourcesGridView
-                }
-              }
-              .padding(.top, 20)
-            }
-            .coordinateSpace(name: "scroll")
-            .safeAreaInset(
-              edge: .top,
-              content: {
-                searchBarView
-                  .opacity(showSearchBar ? 0 : 1)
-              })
-          }
+          mainContent
 
           // Floating Add Button
-          VStack {
-            Spacer()
-
-            HStack {
-              Spacer()
-
-              TMIButton(
-                text: "plus",
-                style: .floating,
-                action: { stateModel.showingAddResource = true }
-              )
-              .padding(24)
-              .opacity(isLoaded ? 1 : 0)
-              .offset(y: isLoaded ? 0 : 100)
-              .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5), value: isLoaded)
-            }
-          }
+          floatingAddButton
         }
         .navigationTitle("Resource Library")
         .foregroundColor(.white)
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
+          ToolbarItem(placement: .navigationBarLeading) {
+            Menu {
+              Button("Select Student for Recommendations") {
+                // TODO: Implement student picker
+              }
+              
+              if selectedStudent != nil {
+                Button("View All Recommendations") {
+                  // TODO: Show all student recommendations
+                }
+              }
+            } label: {
+              HStack(spacing: 6) {
+                Image(systemName: "person.circle")
+                  .font(.system(size: 16, weight: .semibold))
+                  .foregroundColor(.white)
+                if selectedStudent != nil {
+                  Text((selectedStudent?.name.components(separatedBy: " ").first) ?? "Student")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white)
+                }
+              }
+              .frame(height: 36)
+              .padding(.horizontal, 12)
+              .background(
+                RoundedRectangle(cornerRadius: 18)
+                  .fill(selectedStudent != nil ? Color.tmiSecondary.opacity(0.3) : Color.white.opacity(0.1))
+                  .background(
+                    RoundedRectangle(cornerRadius: 18)
+                      .fill(.ultraThinMaterial)
+                      .opacity(0.3)
+                  )
+              )
+              .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                  .stroke(
+                    selectedStudent != nil ? Color.tmiSecondary.opacity(0.5) : Color.white.opacity(0.2),
+                    lineWidth: 1
+                  )
+              )
+            }
+          }
+          
           ToolbarItem(placement: .navigationBarTrailing) {
             Menu {
               Button(action: {
@@ -245,6 +321,7 @@ struct ResourcesView: View {
     .onAppear {
       Task {
         await stateModel.fetch()
+        await loadStudentRecommendations()
       }
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
         withAnimation {
@@ -451,6 +528,53 @@ struct ResourcesView: View {
     }
     .padding(.vertical, 40)
     .padding(.horizontal, 20)
+  }
+
+  // MARK: - Student Recommendations Section
+
+  private var studentRecommendationsSection: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack {
+        Image(systemName: "star.fill")
+          .foregroundColor(.yellow)
+
+        Text("For \((selectedStudent?.name.components(separatedBy: " ").first) ?? "You")")
+          .font(.system(size: 18, weight: .semibold))
+          .foregroundColor(.white)
+
+        Spacer()
+
+        Button("View All") {
+          // TODO: Show all student recommendations
+        }
+        .font(.caption)
+        .foregroundColor(.tmiSecondary)
+      }
+      .padding(.horizontal, 20)
+
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 16) {
+          ForEach(studentRecommendations.prefix(5), id: \.id) { resource in
+            NavigationLink(destination: EnhancedResourceDetailView(resource: resource)) {
+              PersonalizedResourceCard(resource: resource)
+                .frame(width: 280, height: 160)
+            }
+            .buttonStyle(ScaleButtonStyle())
+          }
+        }
+        .padding(.horizontal, 20)
+      }
+    }
+  }
+
+  // MARK: - Data Loading
+  
+  private func loadStudentRecommendations() async {
+    guard let student = selectedStudent else { return }
+    
+    let careerService = CareerService.shared
+    studentRecommendations = await careerService.getRecommendedResources(for: student)
+    showStudentRecommendations = !studentRecommendations.isEmpty
   }
 
   // MARK: - Filtered Resources
@@ -1090,68 +1214,6 @@ struct LongResourceFormField: View {
   }
 }
 
-// MARK: - Flow Layout
-
-struct ResourcesFlowLayout: Layout {
-  var spacing: CGFloat = 8
-
-  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-    let width = proposal.width ?? .infinity
-
-    return layout(width: width, subviews: subviews)
-  }
-
-  func placeSubviews(
-    in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
-  ) {
-    let width = proposal.width ?? bounds.width
-
-    var origin = bounds.origin
-    var maxHeight: CGFloat = 0
-
-    for subview in subviews {
-      let size = subview.sizeThatFits(.unspecified)
-
-      if origin.x + size.width > width {
-        // Move to next row
-        origin.x = bounds.origin.x
-        origin.y += maxHeight + spacing
-        maxHeight = 0
-      }
-
-      subview.place(at: origin, proposal: ProposedViewSize(size))
-
-      maxHeight = max(maxHeight, size.height)
-      origin.x += size.width + spacing
-    }
-  }
-
-  private func layout(width: CGFloat, subviews: Subviews) -> CGSize {
-    var origin = CGPoint.zero
-    var maxHeight: CGFloat = 0
-    var totalHeight: CGFloat = 0
-
-    for subview in subviews {
-      let size = subview.sizeThatFits(.unspecified)
-
-      if origin.x + size.width > width {
-        // Move to next row
-        origin.x = 0
-        origin.y += maxHeight + spacing
-        totalHeight += maxHeight + spacing
-        maxHeight = 0
-      }
-
-      maxHeight = max(maxHeight, size.height)
-      origin.x += size.width + spacing
-    }
-
-    totalHeight += maxHeight
-
-    return CGSize(width: width, height: totalHeight)
-  }
-}
-
 // MARK: - Helper Views
 
 // MARK: - Extensions
@@ -1170,6 +1232,146 @@ extension View {
 }
 
 // MARK: - Preview
+
+// MARK: - Personalized Resource Card
+
+struct PersonalizedResourceCard: View {
+  let resource: Resource
+  @State private var isHovered = false
+
+  var body: some View {
+    ZStack(alignment: .bottomLeading) {
+      // Background with enhanced gradient overlay
+      RoundedRectangle(cornerRadius: 16)
+        .fill(
+          LinearGradient(
+            gradient: Gradient(stops: [
+              .init(color: resource.category.color.opacity(0.6), location: 0),
+              .init(color: Color.black.opacity(0.8), location: 1),
+            ]),
+            startPoint: .top,
+            endPoint: .bottom
+          )
+        )
+
+      // Personalization indicator (top right)
+      VStack {
+        HStack {
+          Spacer()
+          
+          HStack(spacing: 4) {
+            Image(systemName: "star.fill")
+              .font(.system(size: 10, weight: .bold))
+              .foregroundColor(.yellow)
+
+            Text("Recommended")
+              .font(.system(size: 10, weight: .semibold))
+              .foregroundColor(.yellow)
+          }
+          .padding(.horizontal, 8)
+          .padding(.vertical, 4)
+          .background(
+            Capsule()
+              .fill(Color.yellow.opacity(0.2))
+          )
+        }
+        .padding(.top, 12)
+        .padding(.trailing, 12)
+        
+        Spacer()
+      }
+
+      // Category icon (watermarked)
+      Image(systemName: resource.category.icon)
+        .font(.system(size: 60))
+        .foregroundColor(.white.opacity(0.1))
+        .offset(x: -15, y: -15)
+        .rotationEffect(.degrees(-10))
+
+      // Content
+      VStack(alignment: .leading, spacing: 8) {
+        // Category pill
+        Text(resource.category.rawValue.capitalized)
+          .font(.system(size: 11, weight: .semibold))
+          .padding(.horizontal, 10)
+          .padding(.vertical, 4)
+          .background(
+            Capsule()
+              .fill(resource.category.color.opacity(0.3))
+          )
+          .foregroundColor(resource.category.color)
+
+        // Title
+        Text(resource.title)
+          .font(.system(size: 16, weight: .bold))
+          .foregroundColor(.white)
+          .lineLimit(2)
+
+        // Description
+        Text(resource.description)
+          .font(.system(size: 13))
+          .foregroundColor(.white.opacity(0.8))
+          .lineLimit(2)
+
+        // Tags (top 2)
+        HStack(spacing: 6) {
+          ForEach(resource.tags.prefix(2), id: \.self) { tag in
+            Text(tag)
+              .font(.system(size: 10))
+              .padding(.horizontal, 6)
+              .padding(.vertical, 2)
+              .background(
+                RoundedRectangle(cornerRadius: 4)
+                  .fill(Color.white.opacity(0.15))
+              )
+              .foregroundColor(.white.opacity(0.9))
+          }
+
+          if resource.tags.count > 2 {
+            Text("+\(resource.tags.count - 2)")
+              .font(.system(size: 10))
+              .padding(.horizontal, 6)
+              .padding(.vertical, 2)
+              .background(
+                RoundedRectangle(cornerRadius: 4)
+                  .fill(Color.white.opacity(0.15))
+              )
+              .foregroundColor(.white.opacity(0.9))
+          }
+        }
+      }
+      .padding(16)
+    }
+    .background(
+      RoundedRectangle(cornerRadius: 16)
+        .fill(Color.white.opacity(0.02))
+        .background(
+          RoundedRectangle(cornerRadius: 16)
+            .fill(.ultraThinMaterial)
+            .opacity(0.3)
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: 8)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 16)
+        .stroke(
+          LinearGradient(
+            colors: [
+              Color.yellow.opacity(0.4), .clear, resource.category.color.opacity(0.3),
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          ),
+          lineWidth: 1
+        )
+    )
+    .scaleEffect(isHovered ? 1.02 : 1.0)
+    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+    .onHover { hovering in
+      isHovered = hovering
+    }
+  }
+}
 
 #Preview {
   ResourcesView()

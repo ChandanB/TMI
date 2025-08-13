@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Observation
+import SwiftUI
 
 @Observable
 final class AddStudentStateModel {
@@ -15,6 +16,7 @@ final class AddStudentStateModel {
     var name = ""
     var grade = ""
     var studentID = ""
+    var school = ""
     var dateOfBirth = Date()
     var interests: [Interest] = []
     var hobbies: [Hobby] = []
@@ -30,12 +32,14 @@ final class AddStudentStateModel {
     // Validation state
     var nameError: String?
     var gradeError: String?
+    var schoolError: String?
     
     // Dependencies
     private let studentService: StudentService
     
-    init(studentService: StudentService = StudentService()) {
+    init(studentService: StudentService = StudentService(), currentSchool: String? = nil) {
         self.studentService = studentService
+        if let currentSchool = currentSchool { self.school = currentSchool }
     }
     
     // MARK: - Validation
@@ -46,6 +50,7 @@ final class AddStudentStateModel {
         // Reset errors
         nameError = nil
         gradeError = nil
+       
         
         // Validate name
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -78,6 +83,7 @@ final class AddStudentStateModel {
         let student = Student(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             grade: grade.trimmingCharacters(in: .whitespacesAndNewlines),
+            school: school.trimmingCharacters(in: .whitespacesAndNewlines),
             dateOfBirth: dateOfBirth,
             studentID: studentID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : studentID.trimmingCharacters(in: .whitespacesAndNewlines),
             interests: interests,
@@ -93,13 +99,6 @@ final class AddStudentStateModel {
             errorMessage = "Failed to save student: \(error.localizedDescription)"
             showingAlert = true
             return nil
-        }
-    }
-    
-    @MainActor
-    func addStudent(onSuccess: @escaping (Student) -> Void) async {
-        if let savedStudent = await saveStudent() {
-            onSuccess(savedStudent)
         }
     }
     

@@ -109,13 +109,10 @@ struct TMIPlanListView: View {
           }
         }
         .sheet(isPresented: $stateModel.showingNewPlan) {
-          NewTMIPlanView { newPlan in
-            Task {
-              let success = await stateModel.addPlan(newPlan)
-              if success {
-                stateModel.hideNewPlan()
-              }
-            }
+          NewTMIPlanView { savedPlan in
+            // Plan is already saved in NewTMIPlanView, just update the state
+            stateModel.addExistingPlan(savedPlan)
+            stateModel.hideNewPlan()
           }
           .presentationDetents([.large])
           .presentationDragIndicator(.visible)
@@ -127,7 +124,13 @@ struct TMIPlanListView: View {
     .onAppear {
       animateViews()
       Task {
-        await stateModel.fetch()
+        // Fetch data if not already loaded or if it's been a while
+        if case .idle = stateModel.state {
+          await stateModel.fetch()
+        } else if case .loaded = stateModel.state {
+          // Refresh to ensure we have the latest data
+          await stateModel.fetch()
+        }
       }
     }
     // The alert now uses a Binding to stateModel.hasError and calls clearError()

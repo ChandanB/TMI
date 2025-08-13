@@ -10,241 +10,275 @@ import Observation
 
 struct AddStudentView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var stateModel = AddStudentStateModel()
+    @Environment(\.simpleAuthStateModel) private var authStateModel
+    @State private var stateModel: AddStudentStateModel?
     
-    let onStudentAdded: (Student) -> Void
+    let onStudentAdded: () -> Void
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Background
-                TMIBackgroundView(variant: .default)
-                    .ignoresSafeArea()
-                
-                // Content
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        VStack(spacing: 8) {
-                            Image(systemName: "person.badge.plus")
-                                .font(.system(size: 50))
-                                .foregroundColor(.tmiSecondary)
-                                .padding(.top, 20)
-                            
-                            Text("Add New Student")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.white)
-                            
-                            Text("Enter the student's basic information")
-                                .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.7))
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding(.bottom, 10)
+        Group {
+            if let stateModel = stateModel {
+                NavigationStack {
+                    ZStack {
+                        // Background
+                        TMIBackgroundView(variant: .default)
+                            .ignoresSafeArea()
                         
-                        // Form
-                        TMIGlassCard(style: .default) {
-                            VStack(spacing: 20) {
-                                // Name field
-                                TMITextField(
-                                    icon: "person.fill",
-                                    placeholder: "Student Name",
-                                    text: $stateModel.name
-                                )
-                                
-                                // Grade field
-                                TMITextField(
-                                    icon: "number.square",
-                                    placeholder: "Grade Level",
-                                    text: $stateModel.grade
-                                )
-                                
-                                // Student ID field
-                                TMITextField(
-                                    icon: "barcode",
-                                    placeholder: "Student ID (optional)",
-                                    text: $stateModel.studentID
-                                )
-                                
-                                // Date of Birth
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Label("Date of Birth", systemImage: "calendar")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.9))
+                        // Content
+                        ScrollView {
+                            VStack(spacing: 24) {
+                                // Header
+                                VStack(spacing: 8) {
+                                    Image(systemName: "person.badge.plus")
+                                        .font(.system(size: 50))
+                                        .foregroundColor(.tmiSecondary)
+                                        .padding(.top, 20)
                                     
-                                    DatePicker(
-                                        "Date of Birth",
-                                        selection: $stateModel.dateOfBirth,
-                                        in: Calendar.current.date(byAdding: .year, value: -25, to: Date())!...Calendar.current.date(byAdding: .year, value: -3, to: Date())!,
-                                        displayedComponents: .date
-                                    )
-                                    .datePickerStyle(.compact)
-                                    .accentColor(.tmiSecondary)
-                                    .labelsHidden()
-                                }
-                                .padding(.vertical, 8)
-                                
-                                // Interests Section
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Label("Interests (\(stateModel.selectedInterestCount))", systemImage: "heart")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.9))
-                                    
-                                    Button(action: {
-                                        stateModel.showInterestPicker()
-                                    }) {
-                                        HStack {
-                                            Text(stateModel.interests.isEmpty ? "Add interests" : stateModel.interests.map { $0.name }.joined(separator: ", "))
-                                                .foregroundColor(stateModel.interests.isEmpty ? .white.opacity(0.6) : .white)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                            
-                                            Image(systemName: "chevron.right")
-                                                .foregroundColor(.white.opacity(0.6))
-                                                .font(.system(size: 14))
-                                        }
-                                        .padding(16)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.white.opacity(0.05))
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .fill(.ultraThinMaterial)
-                                                        .opacity(0.3)
-                                                )
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(
-                                                    LinearGradient(
-                                                        colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                                                        startPoint: .topLeading,
-                                                        endPoint: .bottomTrailing
-                                                    ),
-                                                    lineWidth: 1
-                                                )
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                
-                                // Hobbies Section
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Label("Hobbies (\(stateModel.selectedHobbyCount))", systemImage: "gamecontroller")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.9))
-                                    
-                                    Button(action: {
-                                        stateModel.showHobbyPicker()
-                                    }) {
-                                        HStack {
-                                            Text(stateModel.hobbies.isEmpty ? "Add hobbies" : stateModel.hobbies.map { $0.name }.joined(separator: ", "))
-                                                .foregroundColor(stateModel.hobbies.isEmpty ? .white.opacity(0.6) : .white)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                            
-                                            Image(systemName: "chevron.right")
-                                                .foregroundColor(.white.opacity(0.6))
-                                                .font(.system(size: 14))
-                                        }
-                                        .padding(16)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.white.opacity(0.05))
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .fill(.ultraThinMaterial)
-                                                        .opacity(0.3)
-                                                )
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(
-                                                    LinearGradient(
-                                                        colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                                                        startPoint: .topLeading,
-                                                        endPoint: .bottomTrailing
-                                                    ),
-                                                    lineWidth: 1
-                                                )
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                        
-                        // Error message
-                        if let errorMessage = stateModel.errorMessage {
-                            TMIGlassCard(style: .error) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .foregroundColor(.orange)
-                                        .font(.system(size: 20))
-                                    
-                                    Text(errorMessage)
-                                        .font(.system(size: 14))
+                                    Text("Add New Student")
+                                        .font(.system(size: 24, weight: .bold))
                                         .foregroundColor(.white)
-                                        .multilineTextAlignment(.leading)
                                     
-                                    Spacer()
+                                    Text("Enter the student's basic information")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .multilineTextAlignment(.center)
                                 }
-                            }
-                        }
-                        
-                        // Submit button
-                        TMIButton(
-                            text: "Add Student",
-                            icon: "person.badge.plus",
-                            style: .primary,
-                            isLoading: stateModel.isLoading,
-                            action: {
-                                Task {
-                                    await stateModel.addStudent { student in
-                                        onStudentAdded(student)
-                                        dismiss()
+                                .padding(.bottom, 10)
+                                
+                                // Form
+                                TMIGlassCard(style: .default) {
+                                    VStack(spacing: 20) {
+                                        // Name field
+                                        TMITextField(
+                                            icon: "person.fill",
+                                            placeholder: "Student Name",
+                                            text: Binding(
+                                                get: { stateModel.name },
+                                                set: { stateModel.name = $0 }
+                                            )
+                                        )
+                                        
+                                        // Grade field
+                                        TMITextField(
+                                            icon: "number.square",
+                                            placeholder: "Grade Level",
+                                            text: Binding(
+                                                get: { stateModel.grade },
+                                                set: { stateModel.grade = $0 }
+                                            )
+                                        )
+                                        
+                                        // Student ID field
+                                        TMITextField(
+                                            icon: "barcode",
+                                            placeholder: "Student ID (optional)",
+                                            text: Binding(
+                                                get: { stateModel.studentID },
+                                                set: { stateModel.studentID = $0 }
+                                            )
+                                        )
+                                        
+                                        // Date of Birth
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Label("Date of Birth", systemImage: "calendar")
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundColor(.white.opacity(0.9))
+                                            
+                                            DatePicker(
+                                                "Date of Birth",
+                                                selection: Binding(
+                                                    get: { stateModel.dateOfBirth },
+                                                    set: { stateModel.dateOfBirth = $0 }
+                                                ),
+                                                in: Calendar.current.date(byAdding: .year, value: -25, to: Date())!...Calendar.current.date(byAdding: .year, value: -3, to: Date())!,
+                                                displayedComponents: .date
+                                            )
+                                            .datePickerStyle(.compact)
+                                            .accentColor(.tmiSecondary)
+                                            .labelsHidden()
+                                        }
+                                        .padding(.vertical, 8)
+                                        
+                                        // Interests Section
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Label("Interests (\(stateModel.selectedInterestCount))", systemImage: "heart")
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundColor(.white.opacity(0.9))
+                                            
+                                            Button(action: {
+                                                stateModel.showInterestPicker()
+                                            }) {
+                                                HStack {
+                                                    Text(stateModel.interests.isEmpty ? "Add interests" : stateModel.interests.map { $0.name }.joined(separator: ", "))
+                                                        .foregroundColor(stateModel.interests.isEmpty ? .white.opacity(0.6) : .white)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                                    
+                                                    Image(systemName: "chevron.right")
+                                                        .foregroundColor(.white.opacity(0.6))
+                                                        .font(.system(size: 14))
+                                                }
+                                                .padding(16)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .fill(Color.white.opacity(0.05))
+                                                        .background(
+                                                            RoundedRectangle(cornerRadius: 12)
+                                                                .fill(.ultraThinMaterial)
+                                                                .opacity(0.3)
+                                                        )
+                                                )
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .stroke(
+                                                            LinearGradient(
+                                                                colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                                                                startPoint: .topLeading,
+                                                                endPoint: .bottomTrailing
+                                                            ),
+                                                            lineWidth: 1
+                                                        )
+                                                )
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                        
+                                        // Hobbies Section
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Label("Hobbies (\(stateModel.selectedHobbyCount))", systemImage: "gamecontroller")
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundColor(.white.opacity(0.9))
+                                            
+                                            Button(action: {
+                                                stateModel.showHobbyPicker()
+                                            }) {
+                                                HStack {
+                                                    Text(stateModel.hobbies.isEmpty ? "Add hobbies" : stateModel.hobbies.map { $0.name }.joined(separator: ", "))
+                                                        .foregroundColor(stateModel.hobbies.isEmpty ? .white.opacity(0.6) : .white)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                                    
+                                                    Image(systemName: "chevron.right")
+                                                        .foregroundColor(.white.opacity(0.6))
+                                                        .font(.system(size: 14))
+                                                }
+                                                .padding(16)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .fill(Color.white.opacity(0.05))
+                                                        .background(
+                                                            RoundedRectangle(cornerRadius: 12)
+                                                                .fill(.ultraThinMaterial)
+                                                                .opacity(0.3)
+                                                        )
+                                                )
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .stroke(
+                                                            LinearGradient(
+                                                                colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                                                                startPoint: .topLeading,
+                                                                endPoint: .bottomTrailing
+                                                            ),
+                                                            lineWidth: 1
+                                                        )
+                                                )
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
                                     }
                                 }
+                                
+                                // Error message
+                                if let errorMessage = stateModel.errorMessage {
+                                    TMIGlassCard(style: .error) {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: "exclamationmark.triangle")
+                                                .foregroundColor(.orange)
+                                                .font(.system(size: 20))
+                                            
+                                            Text(errorMessage)
+                                                .font(.system(size: 14))
+                                                .foregroundColor(.white)
+                                                .multilineTextAlignment(.leading)
+                                            
+                                            Spacer()
+                                        }
+                                    }
+                                }
+                                
+                                // Submit button
+                                TMIButton(
+                                    text: "Add Student",
+                                    icon: "person.badge.plus",
+                                    style: .primary,
+                                    isLoading: stateModel.isLoading,
+                                    action: {
+                                        Task {
+                                            if await stateModel.saveStudent() != nil {
+                                                onStudentAdded()
+                                                dismiss()
+                                            }
+                                        }
+                                    }
+                                )
+                                .disabled(stateModel.isLoading || !stateModel.isFormValid)
+                                .opacity(stateModel.isFormValid ? 1.0 : 0.7)
+                                .animation(.easeInOut(duration: 0.2), value: stateModel.isFormValid)
+                                
+                                Spacer(minLength: 50)
                             }
-                        )
-                        .disabled(stateModel.isLoading || !stateModel.isFormValid)
-                        .opacity(stateModel.isFormValid ? 1.0 : 0.7)
-                        .animation(.easeInOut(duration: 0.2), value: stateModel.isFormValid)
-                        
-                        Spacer(minLength: 50)
+                            .padding(.horizontal, 24)
+                        }
                     }
-                    .padding(.horizontal, 24)
-                }
-            }
-            .navigationTitle("Add Student")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+                    .navigationTitle("Add Student")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Cancel") {
+                                dismiss()
+                            }
+                            .foregroundColor(.white)
+                        }
                     }
-                    .foregroundColor(.white)
                 }
+                .preferredColorScheme(.dark)
+                .sheet(isPresented: Binding(
+                    get: { stateModel.showingInterestPicker },
+                    set: { stateModel.showingInterestPicker = $0 }
+                )) {
+                    InterestSelectionView(
+                        selectedInterests: Binding(
+                            get: { stateModel.interests },
+                            set: { stateModel.interests = $0 }
+                        ),
+                        onDismiss: {
+                            stateModel.hideInterestPicker()
+                        }
+                    )
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                }
+                .sheet(isPresented: Binding(
+                    get: { stateModel.showingHobbyPicker },
+                    set: { stateModel.showingHobbyPicker = $0 }
+                )) {
+                    HobbySelectionView(
+                        selectedHobbies: Binding(
+                            get: { stateModel.hobbies },
+                            set: { stateModel.hobbies = $0 }
+                        ),
+                        onDismiss: {
+                            stateModel.hideHobbyPicker()
+                        }
+                    )
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                }
+            } else {
+                ProgressView()
+                    .onAppear {
+                        stateModel = AddStudentStateModel(currentSchool: authStateModel.currentUser?.institutionID ?? "")
+                    }
             }
-        }
-        .preferredColorScheme(.dark)
-        .sheet(isPresented: $stateModel.showingInterestPicker) {
-            InterestSelectionView(
-                selectedInterests: $stateModel.interests,
-                onDismiss: {
-                    stateModel.hideInterestPicker()
-                }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $stateModel.showingHobbyPicker) {
-            HobbySelectionView(
-                selectedHobbies: $stateModel.hobbies,
-                onDismiss: {
-                    stateModel.hideHobbyPicker()
-                }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
         }
     }
 }
@@ -423,4 +457,3 @@ struct HobbyPickerCard: View {
         .buttonStyle(.plain)
     }
 }
-

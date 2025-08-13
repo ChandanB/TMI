@@ -5,17 +5,7 @@
 //  Created by Chandan Brown on 9/14/24.
 //
 
-import SwiftData
 import SwiftUI
-
-@Model
-final class Item {
-    var timestamp: Date
-    
-    init(timestamp: Date) {
-        self.timestamp = timestamp
-    }
-}
 
 struct SearchBarTextFieldStyle: ViewModifier {
     @Binding var isEditing: Bool
@@ -42,44 +32,6 @@ struct SearchBarTextFieldStyle: ViewModifier {
                     }
                 }
             )
-    }
-}
-
-struct ZLHNSearchableDropdown<Item: Identifiable & Codable & CustomStringConvertible>: View where Item: Equatable {
-    @Binding var searchText: String
-    var placeholder: String = "Search"
-    var onCommit: (() -> Void)?
-    var onCancel: (() -> Void)?
-    var items: [Item]? = nil
-    var selectedItem: Binding<Item?>?
-    
-    @State private var isEditing = false
-    @State private var showCancelButton = false
-    
-    var body: some View {
-        VStack {
-            CustomSearchBar(searchText: $searchText, onCommit: onCommit, onCancel: onCancel, placeholder: placeholder, isEditing: $isEditing, showCancelButton: $showCancelButton)
-            
-            if let items = items, isEditing, let selectedItem = selectedItem {
-                DropdownListView(items: items, query: searchText, selectedItem: selectedItem)
-            }
-        }
-    }
-}
-
-struct ZLHNSearchBar: View {
-    @Binding var searchText: String
-    var placeholder: String = "Search"
-    var onCommit: (() -> Void)?
-    var onCancel: (() -> Void)?
-    
-    @State private var isEditing = false
-    @State private var showCancelButton = false
-    
-    var body: some View {
-        VStack {
-            CustomSearchBar(searchText: $searchText, onCommit: onCommit, onCancel: onCancel, placeholder: placeholder, isEditing: $isEditing, showCancelButton: $showCancelButton)
-        }
     }
 }
 

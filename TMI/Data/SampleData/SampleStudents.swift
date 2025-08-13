@@ -14,6 +14,7 @@ extension Student {
             Student(
                 name: "Alex Chen",
                 grade: "10",
+                school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -15, to: Date()) ?? Date(),
                 studentID: "ST-001",
                 interests: [
@@ -75,6 +76,7 @@ extension Student {
             Student(
                 name: "Maria Rodriguez",
                 grade: "11",
+                school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -16, to: Date()) ?? Date(),
                 studentID: "ST-002",
                 interests: [
@@ -138,6 +140,7 @@ extension Student {
             Student(
                 name: "Jordan Williams",
                 grade: "12",
+                school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -17, to: Date()) ?? Date(),
                 studentID: "ST-003",
                 interests: [
@@ -201,6 +204,7 @@ extension Student {
             Student(
                 name: "Taylor Johnson",
                 grade: "9",
+                school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -14, to: Date()) ?? Date(),
                 studentID: "ST-004",
                 interests: [
@@ -265,6 +269,7 @@ extension Student {
             Student(
                 name: "Aisha Patel",
                 grade: "11",
+                school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -16, to: Date()) ?? Date(),
                 studentID: "ST-005",
                 interests: [
@@ -328,6 +333,7 @@ extension Student {
             Student(
                 name: "Sam Peterson",
                 grade: "10",
+                school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -15, to: Date()) ?? Date(),
                 studentID: "ST-006",
                 interests: [
@@ -391,6 +397,7 @@ extension Student {
             Student(
                 name: "Marcus Thompson",
                 grade: "12",
+                school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -17, to: Date()) ?? Date(),
                 studentID: "ST-007",
                 interests: [
@@ -454,6 +461,7 @@ extension Student {
             Student(
                 name: "Devon Smith",
                 grade: "11",
+                school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -16, to: Date()) ?? Date(),
                 studentID: "ST-008",
                 interests: [

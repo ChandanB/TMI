@@ -24,9 +24,9 @@ class CareerService {
     careerCache = Career.sampleCareers
   }
   
-  // MARK: - Career Data Management
+  // MARK: - Enhanced Career Data Management
   
-  /// Fetch all available careers
+  /// Fetch all available careers with enhanced caching and analytics
   func fetchAllCareers(forceRefresh: Bool = false) async throws -> [Career] {
     // Check cache first
     if !forceRefresh, let lastUpdate = lastCacheUpdate,
@@ -51,6 +51,31 @@ class CareerService {
     careerCache = Career.sampleCareers
     lastCacheUpdate = Date()
     return careerCache
+  }
+  
+  /// Get personalized career discovery insights
+  func getCareerDiscoveryInsights(for student: Student) async throws -> CareerDiscoveryInsights {
+    let allCareers = try await fetchAllCareers()
+    let recommendations = try await getCareerRecommendations(for: student)
+    
+    // Analyze student's interest patterns
+    let allCategories = student.interests.flatMap { $0.category }
+    let interestCategories = Dictionary(grouping: allCategories) { $0 }
+    let topInterestCategory = interestCategories.max { $0.value.count < $1.value.count }?.key.rawValue ?? "General"
+    
+    // Find career fields with highest representation
+    let careerFields = Dictionary(grouping: allCareers) { $0.field }
+    let recommendedFields = Dictionary(grouping: recommendations) { $0.field }
+    
+    return CareerDiscoveryInsights(
+      totalCareersExplored: allCareers.count,
+      personalizedRecommendations: recommendations.count,
+      topInterestCategory: topInterestCategory,
+      strongestCareerFields: Array(recommendedFields.keys.prefix(3)),
+      emergingOpportunities: getEmergingCareers(from: recommendations),
+      skillGaps: identifySkillGaps(student: student, targetCareers: recommendations),
+      nextSteps: generateNextSteps(for: student, basedOn: recommendations)
+    )
   }
   
   /// Fetch careers by field/category
@@ -95,7 +120,7 @@ class CareerService {
     return Array(allCareers.sorted { $0.growthRate > $1.growthRate }.prefix(5))
   }
   
-  /// Get career recommendations based on student interests
+  /// Get comprehensive career recommendations based on student interests, performance, and engagement
   func getCareerRecommendations(for student: Student) async throws -> [Career] {
     let allCareers = try await fetchAllCareers()
     var scoredCareers: [(career: Career, score: Double)] = []
@@ -103,30 +128,63 @@ class CareerService {
     for career in allCareers {
       var score = 0.0
       
-      // Score based on interests
+      // Enhanced interest-based scoring with weighted categories
       for interest in student.interests {
-        if career.field.lowercased().contains(interest.name.lowercased()) ||
-           career.title.lowercased().contains(interest.name.lowercased()) ||
-           career.description.lowercased().contains(interest.name.lowercased()) {
-          score += Double(interest.popularityScore ?? 1) * 0.3
+        let interestWeight = Double(interest.popularityScore ?? 1)
+        let categoryWeight = getInterestCategoryWeight(interest.category.first?.rawValue ?? "")
+        
+        if career.field.lowercased().contains(interest.name.lowercased()) {
+          score += interestWeight * 0.4 * categoryWeight // Direct field match gets highest weight
+        } else if career.title.lowercased().contains(interest.name.lowercased()) {
+          score += interestWeight * 0.3 * categoryWeight
+        } else if career.description.lowercased().contains(interest.name.lowercased()) {
+          score += interestWeight * 0.2 * categoryWeight
+        }
+        
+        // Check if interest aligns with career skills
+        for skill in career.skills {
+          if skill.lowercased().contains(interest.name.lowercased()) {
+            score += interestWeight * 0.25 * categoryWeight
+          }
         }
       }
       
-      // Score based on hobbies
+      // Enhanced hobby-based scoring with skill alignment
       for hobby in student.hobbies {
-        if career.skills.contains(where: { skill in
-          skill.lowercased().contains(hobby.name.lowercased())
-        }) || career.description.lowercased().contains(hobby.name.lowercased()) {
-          score += Double(hobby.popularityScore ?? 1) * 0.2
+        let hobbyWeight = Double(hobby.popularityScore ?? 1)
+        
+        for skill in career.skills {
+          if skill.lowercased().contains(hobby.name.lowercased()) {
+            score += hobbyWeight * 0.3 // Direct skill match
+          }
+        }
+        
+        if career.description.lowercased().contains(hobby.name.lowercased()) {
+          score += hobbyWeight * 0.15
         }
       }
       
-      // Score based on academic performance (if available)
+      // Enhanced academic performance scoring with subject alignment
       if let academicPerformance = student.academicPerformance {
-        if let gpa = academicPerformance.gpa, gpa >= 3.5 && career.education.contains("Master's") {
-          score += 0.2
-        } else if let gpa = academicPerformance.gpa, gpa >= 3.0 && career.education.contains("Bachelor's") {
-          score += 0.15
+        if let gpa = academicPerformance.gpa {
+          // Education level alignment
+          if gpa >= 3.5 && career.education.contains("Master's") {
+            score += 0.25
+          } else if gpa >= 3.5 && career.education.contains("PhD") {
+            score += 0.3
+          } else if gpa >= 3.0 && career.education.contains("Bachelor's") {
+            score += 0.2
+          } else if gpa >= 2.5 && (career.education.contains("Associate") || career.education.contains("Certificate")) {
+            score += 0.15
+          }
+        }
+        
+        // Subject-specific performance alignment
+        for subjectPerformance in academicPerformance.subjects {
+          if career.skills.contains(where: { $0.lowercased().contains(subjectPerformance.name.lowercased()) }) {
+            let gradeValue = convertGradeToNumeric(subjectPerformance.grade)
+            score += gradeValue * 0.1
+          }
         }
       }
       
@@ -298,7 +356,7 @@ class CareerService {
     return Array(Set(allCareers.flatMap { $0.skills })).sorted()
   }
   
-  /// Get career field icon
+  /// Get career field icon with extended coverage
   func getFieldIcon(for field: String) -> String {
     switch field.lowercased() {
     case "technology": return "desktopcomputer"
@@ -308,7 +366,120 @@ class CareerService {
     case "engineering": return "gearshape.2"
     case "arts": return "paintpalette"
     case "science": return "atom"
+    case "finance": return "dollarsign.circle"
+    case "law": return "scale.3d"
+    case "public service": return "building.columns"
+    case "media": return "tv"
+    case "sports": return "figure.run"
+    case "culinary": return "fork.knife"
     default: return "star"
+    }
+  }
+  
+  // MARK: - Enhanced Helper Methods
+  
+  private func getInterestCategoryWeight(_ category: String) -> Double {
+    switch category.lowercased() {
+    case "academic", "stem": return 1.2
+    case "creative", "arts": return 1.1
+    case "social", "leadership": return 1.0
+    case "physical", "sports": return 0.9
+    default: return 1.0
+    }
+  }
+  
+  private func convertGradeToNumeric(_ grade: String) -> Double {
+    switch grade.uppercased() {
+    case "A+", "A": return 4.0
+    case "A-": return 3.7
+    case "B+": return 3.3
+    case "B": return 3.0
+    case "B-": return 2.7
+    case "C+": return 2.3
+    case "C": return 2.0
+    case "C-": return 1.7
+    case "D": return 1.0
+    default: return 0.0
+    }
+  }
+  
+  private func getEmergingCareers(from careers: [Career]) -> [Career] {
+    return careers.filter { $0.growthRate > 0.15 }.prefix(3).map { $0 }
+  }
+  
+  private func identifySkillGaps(student: Student, targetCareers: [Career]) -> [String] {
+    let studentSkills = Set(student.interests.map { $0.name } + student.hobbies.map { $0.name })
+    let requiredSkills = Set(targetCareers.flatMap { $0.skills })
+    return Array(requiredSkills.subtracting(studentSkills)).prefix(5).map { $0 }
+  }
+  
+  private func generateNextSteps(for student: Student, basedOn careers: [Career]) -> [String] {
+    var steps: [String] = []
+    
+    if careers.isEmpty {
+      steps.append("Complete a comprehensive interest assessment")
+      steps.append("Explore different career fields through job shadowing")
+    } else {
+      steps.append("Research the top 3 recommended career paths in detail")
+      steps.append("Connect with professionals in \(careers.first?.field ?? "your field of interest")")
+      steps.append("Consider relevant coursework or certifications")
+    }
+    
+    return steps
+  }
+  
+  // MARK: - Resource Integration
+  
+  /// Get career-specific resources from ResourceService
+  func getCareerResources(for career: Career) async -> [Resource] {
+    let resourceService = ResourceService.shared
+    
+    do {
+      // Get all resources
+      let allResources = try await resourceService.fetchAllResources()
+      
+      // Filter resources relevant to this career
+      return allResources.filter { resource in
+        // Check if resource tags match career field or skills
+        let careerKeywords = [career.field.lowercased(), career.title.lowercased()] + 
+                           career.skills.map { $0.lowercased() }
+        
+        return resource.tags.contains { tag in
+          careerKeywords.contains { $0.contains(tag.lowercased()) }
+        } || resource.title.lowercased().contains(career.field.lowercased())
+      }.prefix(5).map { $0 }
+    } catch {
+      print("Failed to fetch career resources: \(error)")
+      return []
+    }
+  }
+  
+  /// Get recommended resources for a student based on their career interests
+  func getRecommendedResources(for student: Student) async -> [Resource] {
+    let resourceService = ResourceService.shared
+    
+    do {
+      let allResources = try await resourceService.fetchAllResources()
+      let careerRecommendations = try await getCareerRecommendations(for: student)
+      
+      // Get resources that match student's recommended career fields
+      let relevantFields = Set(careerRecommendations.map { $0.field.lowercased() })
+      let studentInterests = Set(student.interests.map { $0.name.lowercased() })
+      
+      return allResources.filter { resource in
+        // Check if resource is relevant to recommended career fields
+        let resourceKeywords = resource.tags.map { $0.lowercased() } + 
+                              [resource.title.lowercased()]
+        
+        return relevantFields.contains { field in
+          resourceKeywords.contains { $0.contains(field) }
+        } || studentInterests.contains { interest in
+          resourceKeywords.contains { $0.contains(interest) }
+        }
+      }.prefix(8).map { $0 }
+    } catch {
+      print("Failed to fetch recommended resources: \(error)")
+      return []
     }
   }
 }
@@ -322,6 +493,28 @@ struct CareerStatistics: Codable {
   let averageSalary: Double
   let highGrowthCareers: Int
   let fieldDistribution: [String: Int]
+}
+
+struct CareerDiscoveryInsights {
+  let totalCareersExplored: Int
+  let personalizedRecommendations: Int
+  let topInterestCategory: String
+  let strongestCareerFields: [String]
+  let emergingOpportunities: [Career]
+  let skillGaps: [String]
+  let nextSteps: [String]
+  let generatedAt: Date
+  
+  init(totalCareersExplored: Int, personalizedRecommendations: Int, topInterestCategory: String, strongestCareerFields: [String], emergingOpportunities: [Career], skillGaps: [String], nextSteps: [String]) {
+    self.totalCareersExplored = totalCareersExplored
+    self.personalizedRecommendations = personalizedRecommendations
+    self.topInterestCategory = topInterestCategory
+    self.strongestCareerFields = strongestCareerFields
+    self.emergingOpportunities = emergingOpportunities
+    self.skillGaps = skillGaps
+    self.nextSteps = nextSteps
+    self.generatedAt = Date()
+  }
 }
 
 struct CareerBookmark: Codable, Identifiable {

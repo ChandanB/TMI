@@ -14,6 +14,8 @@ struct ResourceDetailView: View {
     @State private var isBookmarked = false
     @State private var isLoading = false
     @State private var relatedResources: [Resource] = []
+    @State private var showWebView = false
+    @State private var showBookmarkConfirmation = false
     @Environment(\.presentationMode) var presentationMode
     
     private let resourceService = ResourceService.shared
@@ -92,6 +94,14 @@ struct ResourceDetailView: View {
         }
         .task {
             await loadResourceData()
+        }
+        .sheet(isPresented: $showWebView) {
+            SafariWebView(url: URL(string: resource.url) ?? URL(string: "https://example.com")!)
+        }
+        .alert("Resource Bookmarked", isPresented: $showBookmarkConfirmation) {
+            Button("OK") { }
+        } message: {
+            Text("\(resource.title) has been added to your bookmarks.")
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.6)) {

@@ -536,36 +536,6 @@ struct InsightsButtonView: View {
   }
 }
 
-// MARK: - Glowing Progress View Style
-
-struct GlowingProgressViewStyle: ProgressViewStyle {
-  var color: Color
-
-  func makeBody(configuration: Configuration) -> some View {
-    GeometryReader { geometry in
-      ZStack(alignment: .leading) {
-        RoundedRectangle(cornerRadius: 10)
-          .fill(Color.white.opacity(0.1))
-          .frame(width: geometry.size.width, height: 4)
-
-        RoundedRectangle(cornerRadius: 10)
-          .fill(
-            LinearGradient(
-              colors: [color, color.opacity(0.8)],
-              startPoint: .leading,
-              endPoint: .trailing
-            )
-          )
-          .frame(
-            width: geometry.size.width * CGFloat(configuration.fractionCompleted ?? 0), height: 4
-          )
-          .shadow(color: color.opacity(0.5), radius: 4, x: 0, y: 0)
-      }
-    }
-    .frame(height: 4)
-  }
-}
-
 // MARK: -  Alignment Chart
 
 struct DashboardAlignmentChartView: View {

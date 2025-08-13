@@ -184,6 +184,47 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     await fetch()
   }
 
+  @MainActor
+  func fetchDataForTimeFrame(_ timeFrame: TimeFrame) async {
+    // Don't update selectedTimeFrame here to avoid infinite loop
+    // The UI binding will handle the selectedTimeFrame state
+    
+    // Instead of refetching all data, just regenerate the dashboard data 
+    // with the new timeframe applied to existing data
+    guard case .loaded(let currentData) = state else {
+      // If no data is loaded yet, fetch it
+      await fetch()
+      return
+    }
+    
+    // Regenerate data with new timeframe filter
+    let filteredData = filterDataForTimeFrame(currentData, timeFrame: timeFrame)
+    updateState(.loaded(filteredData))
+  }
+  
+  private func filterDataForTimeFrame(_ data: DashboardData, timeFrame: TimeFrame) -> DashboardData {
+    // Use TimeFrame's built-in date calculation methods
+    let startDate = timeFrame.startDate()
+    let endDate = timeFrame.endDate()
+    
+    // Filter recent activities based on timeframe
+    let filteredActivities = data.recentActivities.filter { activity in
+      activity.date >= startDate && activity.date <= endDate
+    }
+    
+    // Return filtered data with the same core stats but filtered activities
+    // Note: Core stats (totalStudents, etc.) remain the same as they represent overall counts
+    return DashboardData(
+      engagementData: data.engagementData, // Keep engagement data as is for now
+      totalStudents: data.totalStudents,
+      activeTMIPlans: data.activeTMIPlans,
+      interestsIdentified: data.interestsIdentified,
+      surveysCompleted: data.surveysCompleted,
+      plansAligned: data.plansAligned,
+      recentActivities: filteredActivities
+    )
+  }
+
   // MARK: - UI State Accessors
 
   var selectedTimeFrame: TimeFrame {
@@ -199,6 +240,11 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   var showingInsightsSheet: Bool {
     get { return ui.get("showingInsightsSheet") ?? false }
     set { ui.set("showingInsightsSheet", value: newValue) }
+  }
+
+  var showingAllActivities: Bool {
+    get { return ui.get("showingAllActivities") ?? false }
+    set { ui.set("showingAllActivities", value: newValue) }
   }
 
   // MARK: - Helper Methods
@@ -435,7 +481,16 @@ struct DashboardView: View {
           .presentationSizing(.page)
       }
     }
+    .sheet(isPresented: binding(stateModel, \.showingAllActivities)) {
+      if case .loaded(let dashboardData) = stateModel.state {
+        AllActivitiesView(activities: dashboardData.recentActivities)
+          .presentationDetents([.medium, .large])
+          .presentationDragIndicator(.visible)
+      }
+    }
     .task {
+      // Initialize the local selectedTimeFrame with the stateModel's value
+      selectedTimeFrame = stateModel.selectedTimeFrame
       await stateModel.fetch()
     }
     .refreshable {
@@ -448,8 +503,9 @@ struct DashboardView: View {
 
   private var loadingView: some View {
     VStack(spacing: 24) {
-      LottieLoadingView()
-        .frame(width: 100, height: 100)
+      ProgressView()
+        .scaleEffect(1.5)
+        .tint(.white)
 
       Text("Loading your dashboard")
         .font(.headline)
@@ -520,7 +576,7 @@ struct DashboardView: View {
           )
 
         // Time frame selector
-        TimeFrameSelector(selection: binding(stateModel, \.selectedTimeFrame))
+        TimeFrameSelector(selection: $selectedTimeFrame)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.top, 8)
           .opacity(headerAnimation ? 1 : 0)
@@ -528,6 +584,11 @@ struct DashboardView: View {
             .spring(response: 0.6, dampingFraction: 0.7).delay(0.2),
             value: headerAnimation
           )
+          .onChange(of: selectedTimeFrame) { _, newTimeFrame in
+            Task {
+              await stateModel.fetchDataForTimeFrame(newTimeFrame)
+            }
+          }
 
         // Dashboard cards
         if sizeClass == .regular {
@@ -567,7 +628,7 @@ struct DashboardView: View {
 
         // Insights button
         InsightsButtonView {
-          stateModel.showingInsightsSheet = true
+          showingInsightsSheet = true
         }
         .opacity(buttonAnimation ? 1 : 0)
         .offset(y: buttonAnimation ? 0 : 20)
@@ -671,7 +732,8 @@ struct DashboardView: View {
           Spacer()
 
           Button {
-            // View all activities
+            // Show all activities sheet
+            stateModel.showingAllActivities = true
           } label: {
             HStack(spacing: 4) {
               Text("View All")
@@ -726,4 +788,62 @@ struct DashboardView: View {
 #Preview {
   DashboardView()
     .preferredColorScheme(.dark)
+}
+
+// MARK: - All Activities View
+
+struct AllActivitiesView: View {
+  let activities: [RecentActivity]
+  @Environment(\.dismiss) private var dismiss
+  
+  var body: some View {
+    NavigationStack {
+      ZStack {
+        TMIBackgroundView(variant: .dashboard)
+          .ignoresSafeArea()
+        
+        ScrollView {
+          LazyVStack(spacing: 16) {
+            ForEach(activities) { activity in
+              DashboardActivityRow(activity: activity)
+                .padding(.horizontal, 20)
+            }
+            
+            if activities.isEmpty {
+              VStack(spacing: 16) {
+                Image(systemName: "tray.fill")
+                  .font(.system(size: 50))
+                  .foregroundColor(.white.opacity(0.3))
+                
+                Text("No Recent Activities")
+                  .font(.title2.bold())
+                  .foregroundColor(.white)
+                
+                Text("Activities will appear here as you and your students interact with the TMI system.")
+                  .font(.body)
+                  .foregroundColor(.white.opacity(0.7))
+                  .multilineTextAlignment(.center)
+                  .padding(.horizontal, 40)
+              }
+              .frame(maxWidth: .infinity)
+              .padding(.top, 100)
+            }
+          }
+          .padding(.top, 20)
+          .padding(.bottom, 40)
+        }
+      }
+      .navigationTitle("All Activities")
+      .navigationBarTitleDisplayMode(.large)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button("Done") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+      }
+    }
+    .preferredColorScheme(.dark)
+  }
 }

@@ -34,124 +34,23 @@ class StudentService {
             print("[StudentService] Fetching students...")
             let querySnapshot = try await collection.getDocuments()
             
-            let students = querySnapshot.documents.compactMap { document -> Student? in
-                let data = document.data()
-                print("[StudentService] Document \(document.documentID) data: \(data)")
-                
-                // Extract required fields
-                guard let name = data["name"] as? String,
-                      let grade = data["grade"] as? String,
-                      let dateOfBirthTimestamp = data["dateOfBirth"] as? Double else {
-                    print("[StudentService] Missing required fields in document \(document.documentID)")
-                    return nil
+            let students: [Student] = try querySnapshot.documents.compactMap { document in
+                do {
+                    // Using a helper function to decode the document
+                    return try parseStudent(from: document)
+                } catch {
+                    // If parsing fails for one document, we throw the specific error
+                    throw StudentServiceError.dataParsingFailed(documentID: document.documentID, underlyingError: error)
                 }
-                
-                let dateOfBirth = Date(timeIntervalSince1970: dateOfBirthTimestamp)
-                
-                // Extract optional fields
-                let studentID = data["studentID"] as? String
-                let photoURL = (data["photoURL"] as? String).flatMap { URL(string: $0) }
-                let lastInteractionDate = (data["lastInteractionDate"] as? Double).map { Date(timeIntervalSince1970: $0) }
-                
-                // Parse interests
-                let interests = (data["interests"] as? [[String: Any]] ?? []).compactMap { interestData -> Interest? in
-                    guard let name = interestData["name"] as? String else { return nil }
-                    let id = interestData["id"] as? String
-                    return Interest(id: id, name: name, category: [])
-                }
-                
-                // Parse hobbies
-                let hobbies = (data["hobbies"] as? [[String: Any]] ?? []).compactMap { hobbyData -> Hobby? in
-                    guard let name = hobbyData["name"] as? String else { return nil }
-                    return Hobby(name: name, category: [])
-                }
-                
-                // Parse survey results
-                let surveyResults = (data["surveyResults"] as? [[String: Any]])?.compactMap { surveyData -> SurveyResult? in
-                    guard let id = surveyData["id"] as? String,
-                          let surveyName = surveyData["surveyName"] as? String,
-                          let dateTimestamp = surveyData["date"] as? Double,
-                          let isComplete = surveyData["isComplete"] as? Bool else { return nil }
-                    
-                    let date = Date(timeIntervalSince1970: dateTimestamp)
-                    let responses = (surveyData["responses"] as? [[String: Any]] ?? []).compactMap { responseData -> SurveyResult.SurveyResponse? in
-                        guard let questionID = responseData["questionID"] as? String,
-                              let question = responseData["question"] as? String,
-                              let answer = responseData["answer"] as? String else { return nil }
-                        return SurveyResult.SurveyResponse(questionID: questionID, question: question, answer: answer)
-                    }
-                    
-                    return SurveyResult(id: id, surveyName: surveyName, date: date, isComplete: isComplete, responses: responses)
-                }
-                
-                // Parse academic performance
-                let academicPerformance: AcademicPerformance? = {
-                    guard let perfData = data["academicPerformance"] as? [String: Any] else { return nil }
-                    
-                    let gpa = perfData["gpa"] as? Double
-                    let subjects = (perfData["subjects"] as? [[String: Any]] ?? []).compactMap { subjectData -> SubjectPerformance? in
-                        guard let name = subjectData["name"] as? String,
-                              let grade = subjectData["grade"] as? String,
-                              let score = subjectData["score"] as? Double,
-                              let interestAlignment = subjectData["interestAlignment"] as? Double else { return nil }
-                        return SubjectPerformance(name: name, grade: grade, score: score, interestAlignment: interestAlignment)
-                    }
-                    let strengths = perfData["strengths"] as? [String] ?? []
-                    let areasForImprovement = perfData["areasForImprovement"] as? [String] ?? []
-                    
-                    return AcademicPerformance(gpa: gpa, subjects: subjects, strengths: strengths, areasForImprovement: areasForImprovement)
-                }()
-                
-                // Parse engagement history
-                let engagementHistory = (data["engagementHistory"] as? [[String: Any]])?.compactMap { engagementData -> EngagementRecord? in
-                    guard let dateTimestamp = engagementData["date"] as? Double,
-                          let score = engagementData["score"] as? Double,
-                          let sourceRaw = engagementData["source"] as? String,
-                          let source = EngagementRecord.EngagementSource(rawValue: sourceRaw) else { return nil }
-                    
-                    let date = Date(timeIntervalSince1970: dateTimestamp)
-                    let notes = engagementData["notes"] as? String
-                    
-                    return EngagementRecord(date: date, score: score, source: source, notes: notes)
-                }
-                
-                // Parse notes
-                let notes = (data["notes"] as? [[String: Any]])?.compactMap { noteData -> StudentNote? in
-                    guard let idString = noteData["id"] as? String,
-                          let id = UUID(uuidString: idString),
-                          let dateTimestamp = noteData["date"] as? Double,
-                          let author = noteData["author"] as? String,
-                          let content = noteData["content"] as? String,
-                          let categoryRaw = noteData["category"] as? String,
-                          let category = StudentNote.NoteCategory(rawValue: categoryRaw) else { return nil }
-                    
-                    let date = Date(timeIntervalSince1970: dateTimestamp)
-                    return StudentNote(id: id, date: date, author: author, content: content, category: category)
-                }
-                
-                // Create student with all parsed data
-                var student = Student(
-                    id: document.documentID,
-                    name: name,
-                    grade: grade,
-                    dateOfBirth: dateOfBirth,
-                    studentID: studentID,
-                    interests: interests,
-                    hobbies: hobbies,
-                    photoURL: photoURL,
-                    surveyResults: surveyResults,
-                    academicPerformance: academicPerformance,
-                    engagementHistory: engagementHistory,
-                    notes: notes,
-                    lastInteractionDate: lastInteractionDate
-                )
-                
-                return student
             }
             
             print("[StudentService] Successfully fetched \(students.count) students")
             return students
+        } catch let error as StudentServiceError {
+            // Re-throw our custom error
+            throw error
         } catch {
+            // Catch any other errors (e.g., network issues)
             print("[StudentService] Error fetching students: \(error)")
             throw StudentServiceError.fetchFailed(error.localizedDescription)
         }
@@ -239,54 +138,248 @@ class StudentService {
             print("[StudentService] Fetching student with ID: \(id)")
             let document = try await collection.document(id).getDocument()
             
-            if document.exists {
-                guard let data = document.data() else { return nil }
-                
-                // Use same parsing logic as fetchStudents
-                guard let name = data["name"] as? String,
-                      let grade = data["grade"] as? String,
-                      let dateOfBirthTimestamp = data["dateOfBirth"] as? Double else {
-                    print("[StudentService] Missing required fields in document \(document.documentID)")
-                    return nil
-                }
-                
-                let dateOfBirth = Date(timeIntervalSince1970: dateOfBirthTimestamp)
-                let studentID = data["studentID"] as? String
-                let photoURL = (data["photoURL"] as? String).flatMap { URL(string: $0) }
-                let lastInteractionDate = (data["lastInteractionDate"] as? Double).map { Date(timeIntervalSince1970: $0) }
-                
-                // Parse interests, hobbies, and other complex data using same logic as fetchStudents
-                let interests = (data["interests"] as? [[String: Any]] ?? []).compactMap { interestData -> Interest? in
-                    guard let name = interestData["name"] as? String else { return nil }
-                    let id = interestData["id"] as? String
-                    return Interest(id: id, name: name, category: [])
-                }
-                
-                let hobbies = (data["hobbies"] as? [[String: Any]] ?? []).compactMap { hobbyData -> Hobby? in
-                    guard let name = hobbyData["name"] as? String else { return nil }
-                    return Hobby(name: name, category: [])
-                }
-                
-                let student = Student(
-                    id: document.documentID,
-                    name: name,
-                    grade: grade,
-                    dateOfBirth: dateOfBirth,
-                    studentID: studentID,
-                    interests: interests,
-                    hobbies: hobbies,
-                    photoURL: photoURL,
-                    lastInteractionDate: lastInteractionDate
-                )
-                
-                return student
-            } else {
+            guard document.exists else {
                 return nil
             }
+            
+            return try parseStudent(from: document)
+            
+        } catch let error as StudentServiceError {
+            throw error
         } catch {
             print("[StudentService] Error fetching student: \(error)")
             throw StudentServiceError.fetchFailed(error.localizedDescription)
         }
+    }
+    
+    // MARK: - Private Parsing Helper
+    
+    private func parseStudent(from document: QueryDocumentSnapshot) throws -> Student {
+        let data = document.data()
+        print("[StudentService] Parsing document \(document.documentID)...")
+        
+        // Extract required fields
+        guard let name = data["name"] as? String,
+              let grade = data["grade"] as? String,
+              let dateOfBirthTimestamp = data["dateOfBirth"] as? Double else {
+            // Using a specific error for missing fields
+            throw NSError(domain: "StudentService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Missing required fields"])
+        }
+        
+        let dateOfBirth = Date(timeIntervalSince1970: dateOfBirthTimestamp)
+        
+        // Extract optional fields
+        let studentID = data["studentID"] as? String
+        let photoURL = (data["photoURL"] as? String).flatMap { URL(string: $0) }
+        let lastInteractionDate = (data["lastInteractionDate"] as? Double).map { Date(timeIntervalSince1970: $0) }
+        
+        // Parse interests
+        let interests = (data["interests"] as? [[String: Any]] ?? []).compactMap { interestData -> Interest? in
+            guard let name = interestData["name"] as? String else { return nil }
+            let id = interestData["id"] as? String
+            return Interest(id: id, name: name, category: [])
+        }
+        
+        // Parse hobbies
+        let hobbies = (data["hobbies"] as? [[String: Any]] ?? []).compactMap { hobbyData -> Hobby? in
+            guard let name = hobbyData["name"] as? String else { return nil }
+            return Hobby(name: name, category: [])
+        }
+        
+        // Parse survey results
+        let surveyResults = (data["surveyResults"] as? [[String: Any]])?.compactMap { surveyData -> SurveyResult? in
+            guard let id = surveyData["id"] as? String,
+                  let surveyName = surveyData["surveyName"] as? String,
+                  let dateTimestamp = surveyData["date"] as? Double,
+                  let isComplete = surveyData["isComplete"] as? Bool else { return nil }
+            
+            let date = Date(timeIntervalSince1970: dateTimestamp)
+            let responses = (surveyData["responses"] as? [[String: Any]] ?? []).compactMap { responseData -> SurveyResult.SurveyResponse? in
+                guard let questionID = responseData["questionID"] as? String,
+                      let question = responseData["question"] as? String,
+                      let answer = responseData["answer"] as? String else { return nil }
+                return SurveyResult.SurveyResponse(questionID: questionID, question: question, answer: answer)
+            }
+            
+            return SurveyResult(id: id, surveyName: surveyName, date: date, isComplete: isComplete, responses: responses)
+        }
+        
+        // Parse academic performance
+        let academicPerformance: AcademicPerformance? = {
+            guard let perfData = data["academicPerformance"] as? [String: Any] else { return nil }
+            
+            let gpa = perfData["gpa"] as? Double
+            let subjects = (perfData["subjects"] as? [[String: Any]] ?? []).compactMap { subjectData -> SubjectPerformance? in
+                guard let name = subjectData["name"] as? String,
+                      let grade = subjectData["grade"] as? String,
+                      let score = subjectData["score"] as? Double,
+                      let interestAlignment = subjectData["interestAlignment"] as? Double else { return nil }
+                return SubjectPerformance(name: name, grade: grade, score: score, interestAlignment: interestAlignment)
+            }
+            let strengths = perfData["strengths"] as? [String] ?? []
+            let areasForImprovement = perfData["areasForImprovement"] as? [String] ?? []
+            
+            return AcademicPerformance(gpa: gpa, subjects: subjects, strengths: strengths, areasForImprovement: areasForImprovement)
+        }()
+        
+        // Parse engagement history
+        let engagementHistory = (data["engagementHistory"] as? [[String: Any]])?.compactMap { engagementData -> EngagementRecord? in
+            guard let dateTimestamp = engagementData["date"] as? Double,
+                  let score = engagementData["score"] as? Double,
+                  let sourceRaw = engagementData["source"] as? String,
+                  let source = EngagementRecord.EngagementSource(rawValue: sourceRaw) else { return nil }
+            
+            let date = Date(timeIntervalSince1970: dateTimestamp)
+            let notes = engagementData["notes"] as? String
+            
+            return EngagementRecord(date: date, score: score, source: source, notes: notes)
+        }
+        
+        // Parse notes
+        let notes = (data["notes"] as? [[String: Any]])?.compactMap { noteData -> StudentNote? in
+            guard let idString = noteData["id"] as? String,
+                  let id = UUID(uuidString: idString),
+                  let dateTimestamp = noteData["date"] as? Double,
+                  let author = noteData["author"] as? String,
+                  let content = noteData["content"] as? String,
+                  let categoryRaw = noteData["category"] as? String,
+                  let category = StudentNote.NoteCategory(rawValue: categoryRaw) else { return nil }
+            
+            let date = Date(timeIntervalSince1970: dateTimestamp)
+            return StudentNote(id: id, date: date, author: author, content: content, category: category)
+        }
+        
+        // Create student with all parsed data with school: ""
+        return Student(
+            id: document.documentID,
+            name: name,
+            grade: grade,
+            school: "",
+            dateOfBirth: dateOfBirth,
+            studentID: studentID,
+            interests: interests,
+            hobbies: hobbies,
+            photoURL: photoURL,
+            surveyResults: surveyResults,
+            academicPerformance: academicPerformance,
+            engagementHistory: engagementHistory,
+            notes: notes,
+            lastInteractionDate: lastInteractionDate
+        )
+    }
+    
+    private func parseStudent(from document: DocumentSnapshot) throws -> Student {
+        let data = document.data() ?? [:]
+        print("[StudentService] Parsing document \(document.documentID)...")
+        
+        // Extract required fields
+        guard let name = data["name"] as? String,
+              let grade = data["grade"] as? String,
+              let dateOfBirthTimestamp = data["dateOfBirth"] as? Double else {
+            // Using a specific error for missing fields
+            throw NSError(domain: "StudentService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Missing required fields"])
+        }
+        
+        let dateOfBirth = Date(timeIntervalSince1970: dateOfBirthTimestamp)
+        
+        // Extract optional fields
+        let studentID = data["studentID"] as? String
+        let photoURL = (data["photoURL"] as? String).flatMap { URL(string: $0) }
+        let lastInteractionDate = (data["lastInteractionDate"] as? Double).map { Date(timeIntervalSince1970: $0) }
+        
+        // Parse interests
+        let interests = (data["interests"] as? [[String: Any]] ?? []).compactMap { interestData -> Interest? in
+            guard let name = interestData["name"] as? String else { return nil }
+            let id = interestData["id"] as? String
+            return Interest(id: id, name: name, category: [])
+        }
+        
+        // Parse hobbies
+        let hobbies = (data["hobbies"] as? [[String: Any]] ?? []).compactMap { hobbyData -> Hobby? in
+            guard let name = hobbyData["name"] as? String else { return nil }
+            return Hobby(name: name, category: [])
+        }
+        
+        // Parse survey results
+        let surveyResults = (data["surveyResults"] as? [[String: Any]])?.compactMap { surveyData -> SurveyResult? in
+            guard let id = surveyData["id"] as? String,
+                  let surveyName = surveyData["surveyName"] as? String,
+                  let dateTimestamp = surveyData["date"] as? Double,
+                  let isComplete = surveyData["isComplete"] as? Bool else { return nil }
+            
+            let date = Date(timeIntervalSince1970: dateTimestamp)
+            let responses = (surveyData["responses"] as? [[String: Any]] ?? []).compactMap { responseData -> SurveyResult.SurveyResponse? in
+                guard let questionID = responseData["questionID"] as? String,
+                      let question = responseData["question"] as? String,
+                      let answer = responseData["answer"] as? String else { return nil }
+                return SurveyResult.SurveyResponse(questionID: questionID, question: question, answer: answer)
+            }
+            
+            return SurveyResult(id: id, surveyName: surveyName, date: date, isComplete: isComplete, responses: responses)
+        }
+        
+        // Parse academic performance
+        let academicPerformance: AcademicPerformance? = {
+            guard let perfData = data["academicPerformance"] as? [String: Any] else { return nil }
+            
+            let gpa = perfData["gpa"] as? Double
+            let subjects = (perfData["subjects"] as? [[String: Any]] ?? []).compactMap { subjectData -> SubjectPerformance? in
+                guard let name = subjectData["name"] as? String,
+                      let grade = subjectData["grade"] as? String,
+                      let score = subjectData["score"] as? Double,
+                      let interestAlignment = subjectData["interestAlignment"] as? Double else { return nil }
+                return SubjectPerformance(name: name, grade: grade, score: score, interestAlignment: interestAlignment)
+            }
+            let strengths = perfData["strengths"] as? [String] ?? []
+            let areasForImprovement = perfData["areasForImprovement"] as? [String] ?? []
+            
+            return AcademicPerformance(gpa: gpa, subjects: subjects, strengths: strengths, areasForImprovement: areasForImprovement)
+        }()
+        
+        // Parse engagement history
+        let engagementHistory = (data["engagementHistory"] as? [[String: Any]])?.compactMap { engagementData -> EngagementRecord? in
+            guard let dateTimestamp = engagementData["date"] as? Double,
+                  let score = engagementData["score"] as? Double,
+                  let sourceRaw = engagementData["source"] as? String,
+                  let source = EngagementRecord.EngagementSource(rawValue: sourceRaw) else { return nil }
+            
+            let date = Date(timeIntervalSince1970: dateTimestamp)
+            let notes = engagementData["notes"] as? String
+            
+            return EngagementRecord(date: date, score: score, source: source, notes: notes)
+        }
+        
+        // Parse notes
+        let notes = (data["notes"] as? [[String: Any]])?.compactMap { noteData -> StudentNote? in
+            guard let idString = noteData["id"] as? String,
+                  let id = UUID(uuidString: idString),
+                  let dateTimestamp = noteData["date"] as? Double,
+                  let author = noteData["author"] as? String,
+                  let content = noteData["content"] as? String,
+                  let categoryRaw = noteData["category"] as? String,
+                  let category = StudentNote.NoteCategory(rawValue: categoryRaw) else { return nil }
+            
+            let date = Date(timeIntervalSince1970: dateTimestamp)
+            return StudentNote(id: id, date: date, author: author, content: content, category: category)
+        }
+        
+        // Create student with all parsed data with school: ""
+        return Student(
+            id: document.documentID,
+            name: name,
+            grade: grade,
+            school: "",
+            dateOfBirth: dateOfBirth,
+            studentID: studentID,
+            interests: interests,
+            hobbies: hobbies,
+            photoURL: photoURL,
+            surveyResults: surveyResults,
+            academicPerformance: academicPerformance,
+            engagementHistory: engagementHistory,
+            notes: notes,
+            lastInteractionDate: lastInteractionDate
+        )
     }
 }
 
@@ -299,6 +392,7 @@ enum StudentServiceError: Error, LocalizedError {
     case saveFailed(String)
     case updateFailed(String)
     case deleteFailed(String)
+    case dataParsingFailed(documentID: String, underlyingError: Error)
     
     var errorDescription: String? {
         switch self {
@@ -314,6 +408,96 @@ enum StudentServiceError: Error, LocalizedError {
             return "Failed to update student: \(message)"
         case .deleteFailed(let message):
             return "Failed to delete student: \(message)"
+        case .dataParsingFailed(let documentID, let underlyingError):
+            return "Failed to parse data for document \(documentID): \(underlyingError.localizedDescription)"
         }
     }
 }
+
+// MARK: - Mock Service for Previews
+
+class MockStudentService: StudentService {
+    private var mockStudents: [Student] = Student.sampleStudents.map {
+        // Adjust sampleStudents to have school: "" by creating new struct
+        Student(
+            id: $0.id,
+            name: $0.name,
+            grade: $0.grade,
+            school: "",
+            dateOfBirth: $0.dateOfBirth,
+            studentID: $0.studentID,
+            interests: $0.interests,
+            hobbies: $0.hobbies,
+            photoURL: $0.photoURL,
+            surveyResults: $0.surveyResults,
+            academicPerformance: $0.academicPerformance,
+            engagementHistory: $0.engagementHistory,
+            notes: $0.notes,
+            lastInteractionDate: $0.lastInteractionDate
+        )
+    }
+    
+    override func fetchStudents() async throws -> [Student] {
+        print("[MockStudentService] Fetching mock students...")
+        try await Task.sleep(nanoseconds: 1_000_000_000) // Simulate network delay
+        return mockStudents
+    }
+    
+    override func addStudent(_ student: Student) async throws -> Student {
+        print("[MockStudentService] Adding mock student: \(student.name)")
+        let newStudent = Student(
+            id: UUID().uuidString,
+            name: student.name,
+            grade: student.grade,
+            school: "",
+            dateOfBirth: student.dateOfBirth,
+            studentID: student.studentID,
+            interests: student.interests,
+            hobbies: student.hobbies,
+            photoURL: student.photoURL,
+            surveyResults: student.surveyResults,
+            academicPerformance: student.academicPerformance,
+            engagementHistory: student.engagementHistory,
+            notes: student.notes,
+            lastInteractionDate: student.lastInteractionDate
+        )
+        mockStudents.append(newStudent)
+        return newStudent
+    }
+    
+    override func updateStudent(_ student: Student) async throws -> Student {
+        print("[MockStudentService] Updating mock student: \(student.name)")
+        if let index = mockStudents.firstIndex(where: { $0.id == student.id }) {
+            let updatedStudent = Student(
+                id: student.id,
+                name: student.name,
+                grade: student.grade,
+                school: "",
+                dateOfBirth: student.dateOfBirth,
+                studentID: student.studentID,
+                interests: student.interests,
+                hobbies: student.hobbies,
+                photoURL: student.photoURL,
+                surveyResults: student.surveyResults,
+                academicPerformance: student.academicPerformance,
+                engagementHistory: student.engagementHistory,
+                notes: student.notes,
+                lastInteractionDate: student.lastInteractionDate
+            )
+            mockStudents[index] = updatedStudent
+            return updatedStudent
+        }
+        return student
+    }
+    
+    override func deleteStudent(_ student: Student) async throws {
+        print("[MockStudentService] Deleting mock student: \(student.name)")
+        mockStudents.removeAll { $0.id == student.id }
+    }
+    
+    override func getStudent(by id: String) async throws -> Student? {
+        print("[MockStudentService] Getting mock student by ID: \(id)")
+        return mockStudents.first { $0.id == id }
+    }
+}
+

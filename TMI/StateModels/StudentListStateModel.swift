@@ -44,18 +44,13 @@ final class StudentListStateModel: BaseStateModel<[Student], IdentifiableError> 
     @MainActor
     func addStudent(_ student: Student) async -> Bool {
         do {
-            let savedStudent = try await studentService.addStudent(student)
-            
-            // Update the current state to include the new student
-            if case .loaded(var students) = state {
-                students.append(savedStudent)
-                updateState(.loaded(students))
-            }
-            
+            _ = try await studentService.addStudent(student)
+            // Always refresh the list after adding a student to avoid duplicates
+            await fetch()
             return true
         } catch {
             let identifiableError = ErrorHandlingHelper.handleRepositoryError(
-                error, 
+                error,
                 userFriendlyMessage: "Failed to add student"
             )
             updateState(.error(identifiableError))

@@ -13,6 +13,7 @@ struct Student: Codable, Identifiable, Hashable {
     // MARK: - Core Properties
     let name: String
     let grade: String
+    let school: String
     let dateOfBirth: Date
     let studentID: String?
     var photoURL: URL?
@@ -89,8 +90,8 @@ struct Student: Codable, Identifiable, Hashable {
             return sum / Double(recentEngagements.count)
         }
         
-        // Fallback to random for demo/placeholder
-        return Double.random(in: 0...1)
+        // Fallback to neutral value for new students
+        return 0.5
     }
     
     // Engagement trend - whether engagement is improving, declining, or stable
@@ -129,6 +130,7 @@ struct Student: Codable, Identifiable, Hashable {
     init(id: String? = nil,
          name: String,
          grade: String,
+         school: String,
          dateOfBirth: Date,
          tmiPlans: [TMIPlan]? = nil,
          studentID: String? = nil,
@@ -144,6 +146,7 @@ struct Student: Codable, Identifiable, Hashable {
         self.id = id
         self.name = name
         self.grade = grade
+        self.school = school
         self.dateOfBirth = dateOfBirth
         self.tmiPlans = tmiPlans
         self.studentID = studentID
@@ -173,6 +176,7 @@ struct Student: Codable, Identifiable, Hashable {
         var data: [String: Any] = [
             "name": name,
             "grade": grade,
+            "school": school,
             "dateOfBirth": dateOfBirth.timeIntervalSince1970
         ]
         
@@ -406,6 +410,7 @@ extension Student {
         return Student(
             name: "John Doe",
             grade: "10",
+            school: "Sample High School",
             dateOfBirth: Date(),
             interests: [],
             hobbies: [],
@@ -422,3 +427,4 @@ extension Student {
         return comprehensiveSampleStudents
     }
 }
+

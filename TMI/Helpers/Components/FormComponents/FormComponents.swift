@@ -7,23 +7,6 @@
 
 import SwiftUI
 
-struct CustomForm<Content: View>: View {
-    let content: Content
-    
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-    
-    var body: some View {
-        VStack {
-            content
-        }
-        .padding(36)
-        .background(Color(.systemGroupedBackground))
-        .cornerRadius(10)
-    }
-}
-
 struct MultipleChoiceField: View {
     var label: String
     @Binding var selectedOptions: [String]
@@ -163,64 +146,6 @@ struct DatePickerView: View {
     }
 }
 
-struct FileUploadButton: View {
-    @Binding var fileURL: String
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: "paperclip")
-                Text(fileURL.isEmpty ? "Upload File" : fileURL)
-            }
-        }
-        .buttonStyle(PlainButtonStyle())
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(Color.gray.opacity(0.2))
-        .cornerRadius(10)
-    }
-}
-
-struct LabelTextField: View {
-    let label: String
-    @Binding var text: String
-    
-    var body: some View {
-        VStack(alignment: .leading) {
-            Text(label)
-                .font(.headline)
-            TextField("", text: $text)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-        }
-    }
-}
-
-struct RequiredToggle: View {
-    @Binding var isRequired: Bool
-    
-    var body: some View {
-        Toggle(isOn: $isRequired) {
-            Text("Is This Field Required?")
-        }
-        .toggleStyle(SwitchToggleStyle(tint: .blue))
-    }
-}
-
-struct OptionItem: Identifiable, Hashable {
-    let id: UUID = UUID()
-    var value: String
-}
-
-struct OptionItemView: View {
-    @Binding var option: OptionItem
-    
-    var body: some View {
-        TextField("Option", text: $option.value)
-            .textFieldStyle(RoundedBorderTextFieldStyle())
-    }
-}
-
 struct OptionsEditor: View {
     @Binding var options: [String]
     @Bindable var viewModel: FormTemplateBuilderViewModel
@@ -260,6 +185,3 @@ struct OptionsEditor: View {
         viewModel.removeOptionFromField(inSection: sectionIndex, fieldIndex: fieldIndex, optionIndex: options.count - 1)
     }
 }
-
-
-

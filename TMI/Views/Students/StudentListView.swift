@@ -17,6 +17,10 @@ struct StudentListView: View {
     @State private var gridAppeared = false
     @State private var actionBarAppeared = false
     
+    // Alert states
+    @State private var showingBulkActionsAlert = false
+    @State private var showingExportAlert = false
+    
     var body: some View {
         ZStack {
             // Background
@@ -54,10 +58,10 @@ struct StudentListView: View {
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $stateModel.showingAddStudent) {
-            AddStudentView { student in
+            AddStudentView {
                 // Handle student added
                 Task {
-                    await stateModel.addStudent(student)
+                    await stateModel.fetch()
                 }
             }
             .presentationDetents([.large])
@@ -69,6 +73,16 @@ struct StudentListView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(30)
+        }
+        .alert("Bulk Actions", isPresented: $showingBulkActionsAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Bulk actions will be available in a future update.")
+        }
+        .alert("Export Students", isPresented: $showingExportAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Export functionality will be available in a future update.")
         }
         .task {
             await stateModel.fetch()
@@ -86,11 +100,6 @@ struct StudentListView: View {
             }
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.4)) {
                 actionBarAppeared = true
-            }
-            
-            // Refresh data when view appears (e.g., returning from another tab)
-            Task {
-                await stateModel.fetch()
             }
         }
     }
@@ -340,7 +349,7 @@ struct StudentListView: View {
                     icon: "person.crop.rectangle.stack.fill",
                     title: "Bulk Actions",
                     action: {
-                        // Implement bulk actions
+                        showingBulkActionsAlert = true
                     }
                 )
                 
@@ -349,7 +358,7 @@ struct StudentListView: View {
                     icon: "square.and.arrow.up",
                     title: "Export",
                     action: {
-                        // Implement export
+                        showingExportAlert = true
                     }
                 )
             }

@@ -24,10 +24,6 @@ extension FirebaseManager {
         try await user.delete()
     }
     
-    func getCurrentUser() -> User? {
-        return Auth.auth().currentUser
-    }
-    
     func verifyEmail() async throws {
         guard let user = Auth.auth().currentUser else {
             throw NSError(domain: "AuthenticationError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No user is currently signed in."])
@@ -57,4 +53,3 @@ extension FirebaseManager {
         try await user.reauthenticate(with: credential)
     }
 }
-

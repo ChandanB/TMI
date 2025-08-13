@@ -16,23 +16,6 @@ extension FirebaseManager {
         return try await fetchDocuments(inCollection: .formTemplates)
     }
     
-    /// Fetches user's form templates
-    func fetchUserFormTemplates(userId: String) async throws -> [FormTemplate] {
-        let user: TMIUser = try await fetchDocument(inCollection: .users, withId: userId)
-        let templateIds = user.formTemplates
-        
-        var templates: [FormTemplate] = []
-        for templateId in templateIds {
-            do {
-                let template: FormTemplate = try await fetchDocument(inCollection: .formTemplates, withId: templateId)
-                templates.append(template)
-            } catch {
-                print("Failed to fetch template \(templateId): \(error)")
-            }
-        }
-        return templates
-    }
-    
     /// Creates a new form template
     func createFormTemplate(_ template: FormTemplate) async throws -> FormTemplate {
         try await createDocument(inCollection: .formTemplates, document: template)
@@ -90,16 +73,6 @@ extension FirebaseManager {
         try await updateDocument(inCollection: .formTemplates, document: updatedTemplate)
     }
     
-    /// Fetches form submissions for a specific form
-    func fetchFormSubmissions(formId: String) async throws -> [FormSubmission] {
-        let query = FirestoreCollection.formSubmissions.reference()
-            .whereField("formId", isEqualTo: formId)
-            .order(by: "submissionDate", descending: true)
-        
-        let snapshot = try await query.getDocuments()
-        return snapshot.documents.compactMap { try? $0.data(as: FormSubmission.self) }
-    }
-    
     /// Fetches form submissions by a specific user
     func fetchUserFormSubmissions(userId: String) async throws -> [FormSubmission] {
         let query = FirestoreCollection.formSubmissions.reference()
@@ -118,28 +91,6 @@ extension FirebaseManager {
         
         let snapshot = try await query.getDocuments()
         return snapshot.documents.compactMap { try? $0.data(as: FormSubmission.self) }
-    }
-    
-    // MARK: - Form Template Collection Management
-    
-    /// Adds a form template to user's collection
-    func addFormTemplateToUserCollection(formTemplateId: String, userId: String) async throws {
-        let user: TMIUser = try await fetchDocument(inCollection: .users, withId: userId)
-        var updatedUser = user
-        
-        if !updatedUser.formTemplates.contains(formTemplateId) {
-            updatedUser.formTemplates.append(formTemplateId)
-            try await updateDocument(inCollection: .users, document: updatedUser)
-        }
-    }
-    
-    /// Removes a form template from user's collection
-    func removeFormTemplateFromUserCollection(formTemplateId: String, userId: String) async throws {
-        let user: TMIUser = try await fetchDocument(inCollection: .users, withId: userId)
-        var updatedUser = user
-        
-        updatedUser.formTemplates.removeAll { $0 == formTemplateId }
-        try await updateDocument(inCollection: .users, document: updatedUser)
     }
     
     // MARK: - Validation Helper

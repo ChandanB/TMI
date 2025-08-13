@@ -122,27 +122,6 @@ final class DynamicFormStateModel: BaseStateModel<FormTemplate, IdentifiableErro
   }
 }
 
-
-struct DynamicFormSectionView: View {
-  let section: FormSection
-  @Environment(\.dynamicFormStateModel) private var stateModel
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text(section.title)
-        .font(.title2.bold())
-
-      ForEach(section.fields) { field in
-        DynamicFormFieldView(field: field)
-          .environment(\.dynamicFormStateModel, stateModel)
-      }
-
-      Divider().padding(.vertical)
-    }
-  }
-}
-
-
 struct DynamicFormFieldView: View {
   let field: FormField
   @Environment(\.dynamicFormStateModel) private var stateModel
@@ -419,8 +398,8 @@ struct DynamicFormView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.tmiSecondary)
-                    )
-                    .foregroundColor(.white)
+                        )
+                        .foregroundColor(.white)
                 }
             } else {
                 Button {
@@ -635,4 +614,3 @@ struct ProgressIndicator: View {
         }
     }
 }
-

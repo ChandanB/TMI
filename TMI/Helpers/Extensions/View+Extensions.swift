@@ -7,28 +7,6 @@
 
 import SwiftUI
 
-struct BlurView: UIViewRepresentable {
-    var style: UIBlurEffect.Style
-
-    func makeUIView(context: Context) -> UIVisualEffectView {
-        let view = UIVisualEffectView(effect: UIBlurEffect(style: style))
-        return view
-    }
-
-    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
-}
-
-struct QuickActionButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding()
-            .background(Color.tmiPrimary)
-            .foregroundColor(.white)
-            .cornerRadius(10)
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
-    }
-}
-
 struct RoundedCorner: Shape {
     var radius: CGFloat = .infinity
     var corners: UIRectCorner = .allCorners
@@ -56,12 +34,6 @@ extension View {
             }
             self
         }
-    }
-    
-    func imageModifier() -> some View {
-        self
-            .foregroundColor(.blue)
-            .frame(width: 24, height: 24)
     }
     
     func customFont(name: String, size: CGFloat) -> some View {
@@ -98,14 +70,6 @@ extension UIApplication {
     }
 }
 
-extension String {
-    func widthOfString(usingFont font: UIFont) -> CGFloat {
-        let fontAttributes = [NSAttributedString.Key.font: font]
-        let size = self.size(withAttributes: fontAttributes)
-        return size.width
-    }
-}
-
 extension View {
     /// Creates a binding for any property on an object
     /// - Parameters:
@@ -117,29 +81,5 @@ extension View {
             get: { object[keyPath: keyPath] },
             set: { object[keyPath: keyPath] = $0 }
         )
-    }
-    
-    /// Creates a binding for an optional Identifiable item (useful for .sheet(item:) modifiers)
-    /// - Parameters:
-    ///   - object: Observable object
-    ///   - keyPath: Path to the optional Identifiable property
-    /// - Returns: A binding to the optional Identifiable property
-    func itemBinding<Object, Item: Identifiable>(_ object: Object, _ keyPath: ReferenceWritableKeyPath<Object, Item?>) -> Binding<Item?> {
-        Binding(
-            get: { object[keyPath: keyPath] },
-            set: { object[keyPath: keyPath] = $0 }
-        )
-    }
-    
-    /// Creates a computed binding from getter and setter functions
-    /// - Parameters:
-    ///   - get: Function to get the value
-    ///   - set: Function to set the value
-    /// - Returns: A binding using the provided getter and setter
-    func computedBinding<T>(
-        get: @escaping () -> T,
-        set: @escaping (T) -> Void
-    ) -> Binding<T> {
-        Binding(get: get, set: set)
     }
 }

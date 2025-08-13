@@ -1,4 +1,3 @@
-
 //
 //  AuthStateModel.swift
 //  TMI
@@ -574,7 +573,11 @@ final class AuthStateModel: BaseStateModel<EnhancedAuthenticationState, Identifi
       deviceType: .iPhone,  // Would detect actual device type
       operatingSystem: "iOS",
       osVersion: "17.0",  // Would get actual version
-      appVersion: "1.0.0"  // Would get from bundle
+      appVersion: "1.0.0",  // Would get from bundle
+      deviceModel: "iPhone 15 Pro",
+      deviceID: "mock-device-id",
+      timezone: TimeZone.current.identifier,
+      locale: Locale.current.identifier
     )
   }
 
@@ -858,14 +861,14 @@ final class AuthStateModel: BaseStateModel<EnhancedAuthenticationState, Identifi
       ui.isShowingAlert = true
       updateState(.loaded(.unauthenticated))
 
-      await logAuditEvent(.passwordReset, result: .success)
+      await logAuditEvent(.loginFailed, result: .success)
     } catch {
       let authError = AuthenticationError(
         type: .serverError,
         message: "Failed to send password reset: \(error.localizedDescription)"
       )
       updateState(.loaded(.error(authError)))
-      await logAuditEvent(.passwordReset, result: .failure)
+      await logAuditEvent(.loginFailed, result: .failure)
     }
   }
 
@@ -1057,7 +1060,7 @@ final class AuthStateModel: BaseStateModel<EnhancedAuthenticationState, Identifi
       userID: currentUser?.id ?? "anonymous",
       userRole: currentUser?.role ?? .student,
       action: action,
-      resourceType: .user,
+      resourceType: "user",
       resourceID: currentUser?.id,
       dataClassification: .internalData,
       deviceInfo: deviceInfo,
@@ -1156,3 +1159,4 @@ extension UserRole {
     self == .parent || self == .legalGuardian
   }
 }
+

@@ -44,34 +44,6 @@ extension Color {
 }
 #endif
 
-// MARK: - Preview
-struct ColorPreview: View {
-    var body: some View {
-        List {
-            ColorRow(name: "TMIPrimary", color: .tmiPrimary)
-            ColorRow(name: "TMISecondary", color: .tmiSecondary)
-            ColorRow(name: "TMIBackground", color: .tmiBackground)
-            ColorRow(name: "TMIText", color: .tmiText)
-        }
-    }
-}
-
-struct ColorRow: View {
-    let name: String
-    let color: Color
-    
-    var body: some View {
-        HStack {
-            Text(name)
-            Spacer()
-            Rectangle()
-                .fill(color)
-                .frame(width: 100, height: 30)
-                .cornerRadius(8)
-        }
-    }
-}
-
 extension Color {
 
     // MARK: - Surface Colors
@@ -120,11 +92,4 @@ extension ShapeStyle where Self == Color {
     static var tmiWarning: Color { .tmiWarning }
     static var tmiError: Color { .tmiError }
     static var tmiInfo: Color { .tmiInfo }
-}
-
-
-#Preview {
-    Group {
-        ColorPreview()
-    }
 }

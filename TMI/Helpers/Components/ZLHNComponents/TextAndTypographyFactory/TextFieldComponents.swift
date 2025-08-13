@@ -48,38 +48,6 @@ struct ZLHNTextField: View {
   }
 }
 
-struct ZLHNCurrencyTextField: View {
-  var label: String?
-  var placeholder: String
-  @Binding var text: String
-  var keyboardType: UIKeyboardType = .decimalPad
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      if let label = label {
-        Text(label)
-          .headline()
-          .foregroundColor(.primary)
-      }
-
-      HStack {
-        Text("$")
-          .foregroundColor(.secondary)
-          .padding(.leading, 12)
-
-        TextField(placeholder, text: $text)
-          .keyboardType(keyboardType)
-          .padding(.leading, -8)
-      }
-      .overlay(
-        RoundedRectangle(cornerRadius: 5)
-          .stroke(Color.gray, lineWidth: 1)
-      )
-    }
-    .padding(.horizontal)
-  }
-}
-
 struct ZLHNMultilineTextField: View {
   var placeholder: String
   @Binding var text: String
@@ -175,59 +143,5 @@ struct ZLHNAnimatedSecureField: View {
 
   private func validatePassword() {
     isValid = text.count >= 8
-  }
-}
-
-struct ZLHNPasswordConfirmationField: View {
-  @Binding var password: String
-  @Binding var confirmPassword: String
-  @State private var showPasswordMismatchError = false
-
-  var body: some View {
-    VStack {
-      ZLHNAnimatedSecureField(label: "Password", text: $password)
-      ZLHNAnimatedSecureField(label: "Confirm Password", text: $confirmPassword)
-        .padding(.top, 6)
-
-      if showPasswordMismatchError {
-        Text("Passwords do not match")
-          .foregroundColor(.red)
-          .padding(.top, 2)
-      }
-    }
-    .onAppear {
-      validatePasswords()
-    }
-    .onChange(of: password) { _, _ in validatePasswords() }
-    .onChange(of: confirmPassword) { _, _ in validatePasswords() }
-  }
-
-  private func validatePasswords() {
-    showPasswordMismatchError =
-      !password.isEmpty && !confirmPassword.isEmpty && password != confirmPassword
-  }
-}
-
-struct ZLHNPhoneNumberTextField: View {
-  @Binding var phoneNumber: String
-  var regionCode: String = Locale.current.region?.identifier ?? "US"
-
-  var body: some View {
-    HStack {
-      Image(systemName: "flag.fill")  // Placeholder for country flag
-        .imageModifier()  // Custom view modifier for styling
-      TextField("Enter phone number", text: $phoneNumber)
-        .keyboardType(.phonePad)
-        .onChange(of: phoneNumber) { oldValue, newValue in
-          formatPhoneNumber(newValue)
-        }
-    }
-  }
-
-  private func formatPhoneNumber(_ number: String) {
-    //        let formatter = NBAsYouTypeFormatter(regionCode: regionCode)
-    //        if let formattedNumber = formatter?.inputString(number) {
-    //            phoneNumber = formattedNumber
-    //        }
   }
 }

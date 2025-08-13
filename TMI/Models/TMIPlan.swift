@@ -65,6 +65,7 @@ struct TMIPlan: Codable, Identifiable, Hashable {
         hasher.combine(id)
     }
     
+    
     // MARK: - Firestore Conversion
     
     func toFirestoreData() -> [String: Any] {
@@ -92,9 +93,16 @@ struct TMIPlan: Codable, Identifiable, Hashable {
             ]
         }
         
-        // Convert interests and hobbies to IDs
-        data["interests"] = interests.map { $0.id ?? "" }
-        data["hobbies"] = hobbies.map { $0.id.uuidString }
+        // Convert interests and hobbies to full objects for proper reconstruction
+        data["interests"] = interests.map { $0.toFirestoreData() }
+        data["hobbies"] = hobbies.map { hobby in
+            return [
+                "id": hobby.id.uuidString,
+                "name": hobby.name,
+                "category": hobby.category,
+                "popularityScore": hobby.popularityScore as Any
+            ]
+        }
         
         // Convert goals
         data["goals"] = goals.map { goal in

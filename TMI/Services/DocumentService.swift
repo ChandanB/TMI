@@ -47,22 +47,6 @@ extension FirebaseManager {
     }
   }
 
-  // MARK: Fetch All Documents In Collection
-  func fetchEveryDocument<T: Codable & Identifiable>(inCollection collection: FirestoreCollection)
-    async throws -> [T]
-  {
-    do {
-      let snapshot = try await collection.reference().getDocuments()
-      let documents = snapshot.documents.compactMap { document -> T? in
-        try? document.data(as: T.self)
-      }
-      return documents
-    } catch {
-      print("ERROR: \(error). Failed to fetch documents in collection \(collection)")
-      throw error
-    }
-  }
-
   func fetchDocuments<T: Codable & Identifiable>(
     inCollection collection: FirestoreCollection, withIDs ids: [String]? = nil,
     fieldName: String? = nil, fieldValue: Any? = nil, includeCurrentDocument: Bool = true,
@@ -77,10 +61,6 @@ extension FirebaseManager {
 
     if let currentDocumentId = FirestoreConstants.currentUser?.uid, !includeCurrentDocument {
       query = query.whereField("uid", isNotEqualTo: currentDocumentId)
-    }
-
-    if let excludeDocumentIds = excludeDocumentIds, !excludeDocumentIds.isEmpty {
-      query = query.whereField("uid", notIn: excludeDocumentIds)
     }
 
     if let ids = ids, !ids.isEmpty {
@@ -100,41 +80,6 @@ extension FirebaseManager {
     } catch {
       print("Failed to fetch \(collection) documents: \(error)")
       throw error
-    }
-  }
-
-  // MARK: Increment Field For Document In Collection
-  func incrementField(
-    forDocumentId documentId: String, inCollection collection: FirestoreCollection, field: String,
-    incrementValue: Int = 1, completion: @escaping (Result<Void, Error>) -> Void
-  ) {
-    let documentRef = collection.reference().document(documentId)
-
-    firestore.runTransaction({ (transaction, errorPointer) -> Any? in
-      let documentSnapshot: DocumentSnapshot
-      do {
-        documentSnapshot = try transaction.getDocument(documentRef)
-      } catch let fetchError as NSError {
-        errorPointer?.pointee = fetchError
-        return nil
-      }
-
-      guard let currentValue = documentSnapshot.data()?[field] as? Int else {
-        let error = NSError(
-          domain: "App", code: 0,
-          userInfo: [NSLocalizedDescriptionKey: "Unable to retrieve \(field) from Firestore"])
-        errorPointer?.pointee = error
-        return nil
-      }
-
-      transaction.updateData([field: currentValue + incrementValue], forDocument: documentRef)
-      return nil
-    }) { _, error in
-      if let error = error {
-        completion(.failure(error))
-      } else {
-        completion(.success(()))
-      }
     }
   }
 }

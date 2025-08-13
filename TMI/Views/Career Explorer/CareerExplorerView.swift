@@ -19,12 +19,150 @@ struct CareerExplorerView: View {
   @State private var filtersAppeared = false
   @State private var searchAppeared = false
   @State private var statsAppeared = false
+  
+  // Student selection and personalization
+  @State private var selectedStudent: Student? = nil
+  @State private var personalizedRecommendations: [Career] = []
+  @State private var careerInsights: CareerDiscoveryInsights? = nil
+  @State private var showPersonalizedSection = false
 
   private let careerService = CareerService.shared
 
   // Get all unique skills across careers
   private var allSkills: [String] {
     Array(Set(careers.flatMap { $0.skills })).sorted()
+  }
+  
+  // Break up the complex body expression to fix compiler timeout
+  private var mainContent: some View {
+    VStack(spacing: 0) {
+      // Search bar with enhanced design
+      enhancedSearchBar
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 16)
+        .opacity(searchAppeared ? 1 : 0)
+        .offset(y: searchAppeared ? 0 : -20)
+        .animation(
+          .spring(response: 0.6, dampingFraction: 0.7).delay(0.2),
+          value: searchAppeared)
+
+      // Enhanced career field picker
+      enhancedCareerFieldPicker
+        .padding(.bottom, 16)
+        .opacity(filtersAppeared ? 1 : 0)
+        .offset(y: filtersAppeared ? 0 : -15)
+        .animation(
+          .spring(response: 0.6, dampingFraction: 0.7).delay(0.3),
+          value: filtersAppeared)
+
+      scrollableContent
+    }
+  }
+  
+  private var scrollableContent: some View {
+    ZStack {
+      // Main content with glass morphism effect
+      ScrollView {
+        VStack(alignment: .leading, spacing: 16) {
+          if isLoading {
+            // Loading state
+            loadingView
+          } else if !filteredCareers.isEmpty {
+            careerContent
+          } else {
+            // Enhanced empty state
+            enhancedEmptyStateView
+          }
+        }
+        .padding(20)
+      }
+    }
+    .background(glassMorphismBackground)
+    .cornerRadius(28, corners: [.topLeft, .topRight])
+  }
+  
+  private var careerContent: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      // Personalized recommendations section (only show if student selected)
+      if showPersonalizedSection && searchText.isEmpty
+        && selectedField == nil && selectedSkills.isEmpty
+      {
+        personalizedRecommendationsSection
+      }
+
+      // Trending careers section (only show if not filtering)
+      if showTrendingSection && searchText.isEmpty
+        && selectedField == nil && selectedSkills.isEmpty
+      {
+        trendingCareersSection
+      }
+
+      // Career statistics summary with enhanced design
+      enhancedCareerStatsSummary
+        .opacity(statsAppeared ? 1 : 0)
+        .offset(y: statsAppeared ? 0 : 15)
+        .animation(
+          .spring(response: 0.6, dampingFraction: 0.7).delay(0.4),
+          value: statsAppeared)
+
+      // Career grid with enhanced cards
+      careerGrid
+    }
+  }
+  
+  private var careerGrid: some View {
+    LazyVGrid(
+      columns: [GridItem(.adaptive(minimum: 170), spacing: 16)],
+      spacing: 20
+    ) {
+      ForEach(filteredCareers.indices, id: \.self) { index in
+        let career = filteredCareers[index]
+        NavigationLink(
+          destination: CareerDetailView(career: career)
+        ) {
+          PremiumCareerCard(career: career)
+            .scaleEffect(animateCards ? 1 : 0.9)
+            .opacity(animateCards ? 1 : 0)
+            .animation(
+              .spring(response: 0.4, dampingFraction: 0.7)
+                .delay(Double(index % 6) * 0.05 + 0.2),
+              value: animateCards
+            )
+            .onTapGesture {
+              Task {
+                try? await careerService
+                  .trackCareerExploration(
+                    career: career,
+                    action: .viewed
+                  )
+              }
+            }
+        }
+      }
+    }
+  }
+  
+  private var glassMorphismBackground: some View {
+    RoundedRectangle(cornerRadius: 28, style: .continuous)
+      .fill(Color.white.opacity(0.05))
+      .background(
+        RoundedRectangle(cornerRadius: 28, style: .continuous)
+          .fill(.ultraThinMaterial)
+          .opacity(0.9)
+      )
+      .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: 10)
+      .overlay(
+        RoundedRectangle(cornerRadius: 28, style: .continuous)
+          .stroke(
+            LinearGradient(
+              colors: [.white.opacity(0.5), .clear, .white.opacity(0.2)],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            ),
+            lineWidth: 0.5
+          )
+      )
   }
 
   var body: some View {
@@ -34,116 +172,55 @@ struct CareerExplorerView: View {
         TMIBackgroundView(variant: .career)
           .ignoresSafeArea()
 
-        VStack(spacing: 0) {
-          // Search bar with enhanced design
-          enhancedSearchBar
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
-            .opacity(searchAppeared ? 1 : 0)
-            .offset(y: searchAppeared ? 0 : -20)
-            .animation(
-              .spring(response: 0.6, dampingFraction: 0.7).delay(0.2),
-              value: searchAppeared)
-
-          // Enhanced career field picker
-          enhancedCareerFieldPicker
-            .padding(.bottom, 16)
-            .opacity(filtersAppeared ? 1 : 0)
-            .offset(y: filtersAppeared ? 0 : -15)
-            .animation(
-              .spring(response: 0.6, dampingFraction: 0.7).delay(0.3),
-              value: filtersAppeared)
-
-          ZStack {
-            // Main content with glass morphism effect
-            ScrollView {
-              VStack(alignment: .leading, spacing: 16) {
-                if isLoading {
-                  // Loading state
-                  loadingView
-                } else if !filteredCareers.isEmpty {
-                  // Trending careers section (only show if not filtering)
-                  if showTrendingSection && searchText.isEmpty
-                    && selectedField == nil && selectedSkills.isEmpty
-                  {
-                    trendingCareersSection
-                  }
-
-                  // Career statistics summary with enhanced design
-                  enhancedCareerStatsSummary
-                    .opacity(statsAppeared ? 1 : 0)
-                    .offset(y: statsAppeared ? 0 : 15)
-                    .animation(
-                      .spring(response: 0.6, dampingFraction: 0.7).delay(0.4),
-                      value: statsAppeared)
-
-                  // Career grid with enhanced cards
-                  LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 170), spacing: 16)],
-                    spacing: 20
-                  ) {
-                    ForEach(filteredCareers.indices, id: \.self) { index in
-                      let career = filteredCareers[index]
-                      NavigationLink(
-                        destination: CareerDetailView(career: career)
-                      ) {
-                        PremiumCareerCard(career: career)
-                          .scaleEffect(animateCards ? 1 : 0.9)
-                          .opacity(animateCards ? 1 : 0)
-                          .animation(
-                            .spring(response: 0.4, dampingFraction: 0.7)
-                              .delay(Double(index % 6) * 0.05 + 0.2),
-                            value: animateCards
-                          )
-                          .onTapGesture {
-                            Task {
-                              try? await careerService
-                                .trackCareerExploration(
-                                  career: career,
-                                  action: .viewed
-                                )
-                            }
-                          }
-                      }
-                    }
-                  }
-                } else {
-                  // Enhanced empty state
-                  enhancedEmptyStateView
-                }
-              }
-              .padding(20)
-            }
-          }
-          .background(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-              .fill(Color.white.opacity(0.05))
-              .background(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                  .fill(.ultraThinMaterial)
-                  .opacity(0.9)
-              )
-              .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: 10)
-          )
-          .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-              .stroke(
-                LinearGradient(
-                  colors: [.white.opacity(0.5), .clear, .white.opacity(0.2)],
-                  startPoint: .topLeading,
-                  endPoint: .bottomTrailing
-                ),
-                lineWidth: 0.5
-              )
-          )
-          .cornerRadius(28, corners: [.topLeft, .topRight])
-        }
+        mainContent
       }
       .navigationTitle("Career Explorer")
       .navigationBarTitleDisplayMode(.large)
       .foregroundColor(.white)
       .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Menu {
+            Button("Select Student for Recommendations") {
+              // TODO: Implement student picker
+            }
+            
+            if let student = selectedStudent {
+              Button("View Career Insights") {
+                // TODO: Show insights sheet
+              }
+            }
+          } label: {
+            HStack(spacing: 6) {
+              Image(systemName: "person.circle")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+              if let student = selectedStudent {
+                Text(student.name.components(separatedBy: " ").first ?? "Student")
+                  .font(.system(size: 12))
+                  .foregroundColor(.white)
+              }
+            }
+            .frame(height: 36)
+            .padding(.horizontal, 12)
+            .background(
+              RoundedRectangle(cornerRadius: 18)
+                .fill((selectedStudent != nil) ? Color.tmiSecondary.opacity(0.3) : Color.white.opacity(0.1))
+                .background(
+                  RoundedRectangle(cornerRadius: 18)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.3)
+                )
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 18)
+                .stroke(
+                  (selectedStudent != nil) ? Color.tmiSecondary.opacity(0.5) : Color.white.opacity(0.2),
+                  lineWidth: 1
+                )
+            )
+          }
+        }
+        
         ToolbarItem(placement: .navigationBarTrailing) {
           Button(action: {
             isFilterSheetPresented = true
@@ -247,17 +324,67 @@ struct CareerExplorerView: View {
       careers = try await careersLoad
       trendingCareers = try await trendingLoad
       careerStatistics = try await statisticsLoad
+      
+      // Load personalized recommendations if student is selected
+      if let student = selectedStudent {
+        personalizedRecommendations = try await careerService.getCareerRecommendations(for: student)
+        careerInsights = try await careerService.getCareerDiscoveryInsights(for: student)
+        showPersonalizedSection = !personalizedRecommendations.isEmpty
+      } else {
+        showPersonalizedSection = false
+        personalizedRecommendations = []
+        careerInsights = nil
+      }
     } catch {
       self.error = error
       // Fallback to sample data
       careers = Career.sampleCareers
       trendingCareers = Array(Career.sampleCareers.prefix(5))
+      showPersonalizedSection = false
+      personalizedRecommendations = []
+      careerInsights = nil
     }
 
     isLoading = false
   }
 
   // MARK: - UI Components
+  
+  // MARK: - Personalized Recommendations Section
+  
+  private var personalizedRecommendationsSection: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack {
+        Image(systemName: "star.fill")
+          .foregroundColor(.yellow)
+
+        Text("For \((selectedStudent?.name.components(separatedBy: " ").first) ?? "You")")
+          .font(.system(size: 18, weight: .bold))
+          .foregroundColor(.white)
+
+        Spacer()
+
+        Button("View Insights") {
+          // TODO: Show insights sheet
+        }
+        .font(.caption)
+        .foregroundColor(.tmiSecondary)
+      }
+
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 12) {
+          ForEach(personalizedRecommendations.prefix(5), id: \.id) { career in
+            NavigationLink(destination: CareerDetailView(career: career)) {
+              PersonalizedCareerCard(career: career)
+            }
+          }
+        }
+        .padding(.horizontal, 20)
+      }
+      .padding(.horizontal, -20)
+    }
+    .padding(.bottom, 8)
+  }
 
   // Loading view
   private var loadingView: some View {
@@ -1598,6 +1725,104 @@ struct TrendingCareerCard: View {
             .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
         )
     )
+  }
+
+  private func getFieldIcon(field: String) -> String {
+    switch field {
+    case "Technology": return "desktopcomputer"
+    case "Healthcare": return "heart.text.square"
+    case "Education": return "book"
+    case "Business": return "briefcase"
+    case "Engineering": return "gearshape.2"
+    case "Arts": return "paintpalette"
+    case "Science": return "atom"
+    default: return "star"
+    }
+  }
+}
+
+// MARK: - Personalized Career Card
+
+struct PersonalizedCareerCard: View {
+  let career: Career
+  @State private var isHovered = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Image(systemName: getFieldIcon(field: career.field))
+          .font(.system(size: 16))
+          .foregroundColor(.tmiSecondary)
+
+        Spacer()
+
+        // Personalization indicator
+        HStack(spacing: 4) {
+          Image(systemName: "star.fill")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(.yellow)
+
+          Text("Match")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(.yellow)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(
+          Capsule()
+            .fill(Color.yellow.opacity(0.1))
+        )
+      }
+
+      Text(career.title)
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundColor(.white)
+        .lineLimit(2)
+        .multilineTextAlignment(.leading)
+
+      Text(career.field)
+        .font(.system(size: 12))
+        .foregroundColor(.white.opacity(0.7))
+
+      HStack {
+        Text("$\(Int(career.salaryRange.lowerBound/1000))k+")
+          .font(.system(size: 12, weight: .medium))
+          .foregroundColor(.tmiSecondary)
+
+        Spacer()
+
+        Image(systemName: "arrow.right")
+          .font(.system(size: 10))
+          .foregroundColor(.white.opacity(0.5))
+      }
+    }
+    .padding(12)
+    .frame(width: 140, height: 120)
+    .background(
+      RoundedRectangle(cornerRadius: 12)
+        .fill(Color.white.opacity(0.05))
+        .background(
+          RoundedRectangle(cornerRadius: 12)
+            .fill(.ultraThinMaterial)
+            .opacity(0.8)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 12)
+            .stroke(
+              LinearGradient(
+                colors: [Color.yellow.opacity(0.3), Color.clear, Color.yellow.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              ),
+              lineWidth: 1
+            )
+        )
+    )
+    .scaleEffect(isHovered ? 1.05 : 1.0)
+    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+    .onHover { hovering in
+      isHovered = hovering
+    }
   }
 
   private func getFieldIcon(field: String) -> String {
