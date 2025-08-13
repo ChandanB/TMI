@@ -131,55 +131,50 @@ struct MainTabView: View {
   // MARK: - iOS  Tab View
 
   var enhancedIOSTabView: some View {
-    ZStack(alignment: .bottom) {
-      // Tab Content Area without navigation stacks
-      TabView(selection: $selectedTab) {
-        ForEach(availableTabs, id: \.id) { tab in
-          destinationView(for: tab)
-            .navigationTitle(tabLabel(for: tab))
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-              ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
+      ZStack(alignment: .bottom) {
+          // Tab Content Area
+          destinationView(for: selectedTab)
+              .safeAreaInset(edge: .bottom) {
+                  // Gives space for our custom tab bar
+                  Spacer().frame(height: 70)
+              }
+
+          // Custom Tab Bar
+          PremiumGlassTabBar(
+              selectedTab: $selectedTab,
+              previousTab: $previousTab,
+              availableTabs: availableTabs
+          )
+          .offset(y: tabBarVisible ? 0 : 100)
+      }
+      .navigationTitle(tabLabel(for: selectedTab))
+      .navigationBarTitleDisplayMode(.large)
+      .toolbar {
+          ToolbarItem(placement: .navigationBarTrailing) {
+              Menu {
                   Button {
-                    showingUserProfile = true
+                      showingUserProfile = true
                   } label: {
-                    Label("Profile", systemImage: "person.crop.circle")
+                      Label("Profile", systemImage: "person.crop.circle")
                   }
                   
                   Divider()
                   
                   Button(role: .destructive) {
-                    showingSignOutConfirmation = true
+                      showingSignOutConfirmation = true
                   } label: {
-                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                      Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                   }
-                } label: {
+              } label: {
                   Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundColor(.white)
-                }
+                      .font(.system(size: 22))
+                      .foregroundColor(.white)
               }
-            }
-            .tag(tab)
-        }
+          }
       }
-      .safeAreaInset(edge: .bottom) {
-        // Gives space for our custom tab bar
-        Spacer().frame(height: 70)
+      .onChange(of: selectedTab) { oldValue, newValue in
+          previousTab = oldValue
       }
-
-      // Custom Tab Bar
-      PremiumGlassTabBar(
-        selectedTab: $selectedTab,
-        previousTab: $previousTab,
-        availableTabs: availableTabs
-      )
-      .offset(y: tabBarVisible ? 0 : 100)
-    }
-    .onChange(of: selectedTab) { oldValue, newValue in
-      previousTab = oldValue
-    }
   }
 
   // MARK: - iPadOS/macOS  View
