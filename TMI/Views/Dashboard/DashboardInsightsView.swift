@@ -13,8 +13,6 @@ struct DashboardInsightsView: View {
   @Environment(\.dismiss) private var dismiss
   let dashboardData: DashboardData
   
-  @State private var aiInsights: [AIInsight] = []
-  @State private var isLoadingInsights = false
   @State private var showingLegacyInsights = false
 
   var body: some View {
@@ -89,69 +87,19 @@ struct DashboardInsightsView: View {
             }
           }
 
-          // AI Insights
-          if isLoadingInsights {
-            TMIGlassCard(style: .dashboard) {
-              VStack(spacing: 20) {
-                ProgressView()
-                  .scaleEffect(1.2)
-                  .tint(.white)
-                
-                VStack(spacing: 8) {
-                  Text("Analyzing Data with Foundation Models")
-                    .font(.title3.weight(.semibold))
-                    .foregroundColor(.white)
-                  
-                  Text("Generating AI-powered educational insights...")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
-                }
-              }
-              .frame(minHeight: 120)
-            }
-          } else if !aiInsights.isEmpty {
-            TMIGlassCard(style: .dashboard) {
-              VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                  Text("🧠 AI Insights")
-                    .font(.title3.weight(.semibold))
-                    .foregroundColor(.white)
-                  
-                  Spacer()
-                }
+          // Recommendations
+          TMIGlassCard(style: .dashboard) {
+            VStack(alignment: .leading, spacing: 16) {
+              Text("Insights & Recommendations")
+                .font(.title3.weight(.semibold))
+                .foregroundColor(.white)
 
-                ForEach(aiInsights.prefix(4)) { insight in
-                  AIInsightRow(insight: insight)
+              ForEach(recommendations) { recommendation in
+                RecommendationRow(recommendation: recommendation)
 
-                  if insight.id != aiInsights.prefix(4).last!.id {
-                    Divider()
-                      .background(Color.white.opacity(0.1))
-                  }
-                }
-                
-                if aiInsights.count > 4 {
-                  Text("+ \(aiInsights.count - 4) more insights")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
-                    .padding(.top, 8)
-                }
-              }
-            }
-          } else {
-            // Fallback to legacy recommendations
-            TMIGlassCard(style: .dashboard) {
-              VStack(alignment: .leading, spacing: 16) {
-                Text("Basic Recommendations")
-                  .font(.title3.weight(.semibold))
-                  .foregroundColor(.white)
-
-                ForEach(recommendations) { recommendation in
-                  RecommendationRow(recommendation: recommendation)
-
-                  if recommendation.id != recommendations.last!.id {
-                    Divider()
-                      .background(Color.white.opacity(0.1))
-                  }
+                if recommendation.id != recommendations.last!.id {
+                  Divider()
+                    .background(Color.white.opacity(0.1))
                 }
               }
             }
@@ -160,11 +108,23 @@ struct DashboardInsightsView: View {
           // Action buttons
           HStack(spacing: 16) {
             Button {
-              // Schedule meeting action
+              // Open calendar app for scheduling
+              if let calendarURL = URL(string: "calshow://") {
+                #if os(iOS)
+                if UIApplication.shared.canOpenURL(calendarURL) {
+                  UIApplication.shared.open(calendarURL)
+                } else {
+                  // Fallback to default calendar URL
+                  if let fallbackURL = URL(string: "calendar://") {
+                    UIApplication.shared.open(fallbackURL)
+                  }
+                }
+                #endif
+              }
             } label: {
               HStack {
                 Image(systemName: "calendar.badge.plus")
-                Text("Schedule Meeting")
+                Text("Open Calendar")
               }
               .font(.system(size: 16, weight: .semibold))
               .padding(16)
@@ -182,7 +142,22 @@ struct DashboardInsightsView: View {
             .buttonStyle(ScaleButtonStyle())
 
             Button {
-              // Export report action
+              // Export report action - share dashboard data
+              let reportText = generateDashboardReport()
+              let activityController = UIActivityViewController(
+                activityItems: [reportText],
+                applicationActivities: nil
+              )
+              
+              #if os(iOS)
+              if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                 let window = windowScene.windows.first,
+                 let rootViewController = window.rootViewController {
+                activityController.popoverPresentationController?.sourceView = window
+                activityController.popoverPresentationController?.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
+                rootViewController.present(activityController, animated: true)
+              }
+              #endif
             } label: {
               HStack {
                 Image(systemName: "square.and.arrow.up")
@@ -210,35 +185,12 @@ struct DashboardInsightsView: View {
         .padding(.bottom, 40)
       }
     }
-    .task {
-      await loadAIInsights()
-    }
     .sheet(isPresented: $showingLegacyInsights) {
       LegacyInsightsView(dashboardData: dashboardData)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
     .preferredColorScheme(.dark)
-  }
-  
-  // MARK: - AI Insights Loading
-  
-  @MainActor
-  private func loadAIInsights() async {
-    isLoadingInsights = true
-    
-    if #available(iOS 26.0, *) {
-      // Use Foundation Models for iOS 26+
-      aiInsights = await AIInsightsService.shared.generateInsights(from: dashboardData)
-    } else if #available(iOS 18.0, *) {
-      // Use enhanced rule-based insights for iOS 18-25
-      aiInsights = await AIInsightsService.shared.generateInsights(from: dashboardData)
-    } else {
-      // Fallback for older iOS versions
-      aiInsights = []
-    }
-    
-    isLoadingInsights = false
   }
   
   // MARK: - Computed Properties
@@ -318,6 +270,42 @@ struct DashboardInsightsView: View {
     
     return Array(recs.prefix(3)) // Limit to 3 recommendations
   }
+  
+  // MARK: - Helper Methods
+  
+  private func generateDashboardReport() -> String {
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateStyle = .full
+    dateFormatter.timeStyle = .none
+    
+    let report = """
+    TMI Dashboard Report
+    Generated: \(dateFormatter.string(from: Date()))
+    
+    PERFORMANCE OVERVIEW
+    • Total Students: \(dashboardData.totalStudents)
+    • Active TMI Plans: \(dashboardData.activeTMIPlans)
+    • Surveys Completed: \(dashboardData.surveysCompleted)
+    • Interests Identified: \(dashboardData.interestsIdentified)
+    • Plans Aligned: \(dashboardData.plansAligned)
+    
+    KEY METRICS
+    • Survey Completion Rate: \(Int(surveyCompletionRate * 100))%
+    • Plan Alignment Rate: \(Int(planAlignmentRate * 100))%
+    • Plan Effectiveness: \(Int(planEffectiveness * 100))%
+    
+    RECENT ACTIVITIES (\(dashboardData.recentActivities.count))
+    \(dashboardData.recentActivities.map { "• \($0.title): \($0.description)" }.joined(separator: "\n"))
+    
+    RECOMMENDATIONS
+    \(recommendations.map { "• \($0.title): \($0.description)" }.joined(separator: "\n"))
+    
+    ---
+    Report generated by TMI Education Platform
+    """
+    
+    return report
+  }
 }
 
 // MARK: - Preview
@@ -334,127 +322,6 @@ struct DashboardInsightsView: View {
   ))
 }
 
-// MARK: - AI Insight Row Component
-
-struct AIInsightRow: View {
-  let insight: AIInsight
-  @State private var isExpanded = false
-  
-  var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      // Main insight content
-      HStack(spacing: 12) {
-        // Priority/Category indicator
-        ZStack {
-          Circle()
-            .fill(insight.priority.color.opacity(0.2))
-            .frame(width: 40, height: 40)
-          
-          Image(systemName: insight.category.icon)
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundColor(insight.priority.color)
-        }
-        
-        VStack(alignment: .leading, spacing: 4) {
-          HStack {
-            Text(insight.title)
-              .font(.system(size: 16, weight: .semibold))
-              .foregroundColor(.white)
-            
-            Spacer()
-            
-            // Confidence indicator
-            HStack(spacing: 4) {
-              Image(systemName: "brain.head.profile")
-                .font(.system(size: 10))
-                .foregroundColor(.white.opacity(0.6))
-              
-              Text("\(Int(insight.confidence * 100))%")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
-            }
-          }
-          
-          Text(insight.description)
-            .font(.system(size: 14))
-            .foregroundColor(.white.opacity(0.8))
-            .lineLimit(isExpanded ? nil : 2)
-          
-          // Priority and category tags
-          HStack(spacing: 8) {
-            InsightTagView(text: insight.priority.rawValue, color: insight.priority.color)
-            InsightTagView(text: insight.category.rawValue, color: insight.category.color)
-            
-            Spacer()
-            
-            if !insight.actionItems.isEmpty {
-              Button {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                  isExpanded.toggle()
-                }
-              } label: {
-                HStack(spacing: 4) {
-                  Text(isExpanded ? "Less" : "Actions")
-                    .font(.system(size: 12, weight: .medium))
-                  
-                  Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 10))
-                }
-                .foregroundColor(.white.opacity(0.7))
-              }
-            }
-          }
-          .padding(.top, 4)
-        }
-      }
-      
-      // Expanded action items
-      if isExpanded && !insight.actionItems.isEmpty {
-        VStack(alignment: .leading, spacing: 8) {
-          Text("Recommended Actions:")
-            .font(.system(size: 13, weight: .medium))
-            .foregroundColor(.white)
-          
-          ForEach(Array(insight.actionItems.enumerated()), id: \.offset) { index, action in
-            HStack(alignment: .top, spacing: 8) {
-              Text("\(index + 1).")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
-                .frame(width: 16, alignment: .leading)
-              
-              Text(action)
-                .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.8))
-            }
-          }
-        }
-        .padding(.leading, 52)
-        .padding(.top, 8)
-        .transition(.opacity.combined(with: .move(edge: .top)))
-      }
-    }
-    .padding(.vertical, 4)
-  }
-}
-
-// MARK: - Insight Tag View Component
-
-struct InsightTagView: View {
-  let text: String
-  let color: Color
-  
-  var body: some View {
-    Text(text)
-      .font(.system(size: 10, weight: .medium))
-      .padding(.horizontal, 6)
-      .padding(.vertical, 2)
-      .background(
-        Capsule()
-          .fill(color.opacity(0.15))
-      )
-      .foregroundColor(color)
-  }
-}
 
 // MARK: - Legacy Insights View
 

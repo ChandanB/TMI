@@ -144,29 +144,41 @@ struct CareerDetailView: View {
 
   // MARK: - Hero Header
   private var heroHeader: some View {
-    ZStack(alignment: .bottom) {
-      // Background image with overlay
-      ZStack {
-        Image(systemName: getCareerIcon(field: career.field))
-          .resizable()
-          .aspectRatio(contentMode: .fit)
-          .frame(width: 120, height: 120)
-          .foregroundColor(.tmiPrimary.opacity(0.15))
-          .offset(x: 40, y: -20)
-          .rotationEffect(.degrees(15))
+    ZStack {
+      // Enhanced background with gradient and glass morphism
+      RoundedRectangle(cornerRadius: 0)
+        .fill(
+          LinearGradient(
+            gradient: Gradient(stops: [
+              .init(color: Color.tmiPrimary.opacity(0.4), location: 0.0),
+              .init(color: Color.tmiSecondary.opacity(0.3), location: 0.7),
+              .init(color: Color.clear, location: 1.0)
+            ]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          )
+        )
+        .background(
+          RoundedRectangle(cornerRadius: 0)
+            .fill(.ultraThinMaterial)
+            .opacity(0.8)
+        )
 
-        // Animated particles for visual interest
-        ForEach(0..<5) { i in
-          Circle()
-            .fill(Color.tmiSecondary.opacity(0.2))
-            .frame(width: CGFloat.random(in: 5...15))
-            .offset(
-              x: CGFloat.random(in: -80...80),
-              y: CGFloat.random(in: -40...20)
-            )
+      // Floating geometric elements for visual interest
+      GeometryReader { geometry in
+        ForEach(0..<8) { i in
+          let size = CGFloat.random(in: 8...24)
+          let xPos = CGFloat.random(in: 0...geometry.size.width)
+          let yPos = CGFloat.random(in: 0...geometry.size.height)
+          
+          RoundedRectangle(cornerRadius: size / 4)
+            .fill(Color.white.opacity(0.1))
+            .frame(width: size, height: size)
+            .position(x: xPos, y: yPos)
+            .rotationEffect(.degrees(Double.random(in: 0...360)))
             .opacity(animateContent ? 1 : 0)
             .animation(
-              Animation.easeInOut(duration: Double.random(in: 2...4))
+              Animation.easeInOut(duration: Double.random(in: 3...6))
                 .repeatForever(autoreverses: true)
                 .delay(Double.random(in: 0...2)),
               value: animateContent
@@ -174,324 +186,443 @@ struct CareerDetailView: View {
         }
       }
 
-      // Career info overlay
-      VStack(alignment: .leading, spacing: 12) {
-        HStack {
-          VStack(alignment: .leading, spacing: 4) {
-            Text(career.title)
-              .font(.title)
-              .fontWeight(.bold)
-              .foregroundColor(.white)
-              .opacity(animateContent ? 1 : 0)
-              .offset(y: animateContent ? 0 : 20)
-              .animation(.spring(response: 0.6, dampingFraction: 0.8), value: animateContent)
-
-            Text(career.field)
-              .font(.title3)
-              .foregroundColor(.white.opacity(0.8))
-              .opacity(animateContent ? 1 : 0)
-              .offset(y: animateContent ? 0 : 20)
-              .animation(
-                .spring(response: 0.6, dampingFraction: 0.8).delay(0.1), value: animateContent)
-          }
-
-          Spacer()
-
-          // Career icon
+      // Enhanced career info with modern layout
+      VStack(spacing: 20) {
+        // Header section with improved typography
+        HStack(alignment: .top, spacing: 16) {
+          // Enhanced career icon with multiple layers
           ZStack {
+            // Outer glow effect
             Circle()
-              .fill(Color.white.opacity(0.2))
-              .frame(width: 56, height: 56)
+              .fill(
+                RadialGradient(
+                  gradient: Gradient(colors: [
+                    Color.tmiSecondary.opacity(0.3),
+                    Color.clear
+                  ]),
+                  center: .center,
+                  startRadius: 30,
+                  endRadius: 50
+                )
+              )
+              .frame(width: 100, height: 100)
+            
+            // Main icon background
+            Circle()
+              .fill(
+                LinearGradient(
+                  gradient: Gradient(colors: [
+                    Color.white.opacity(0.2),
+                    Color.white.opacity(0.1)
+                  ]),
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                )
+              )
+              .frame(width: 70, height: 70)
+              .overlay(
+                Circle()
+                  .stroke(
+                    LinearGradient(
+                      gradient: Gradient(colors: [
+                        Color.white.opacity(0.3),
+                        Color.clear
+                      ]),
+                      startPoint: .topLeading,
+                      endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2
+                  )
+              )
 
             Image(systemName: getCareerIcon(field: career.field))
-              .font(.system(size: 26))
+              .font(.system(size: 32, weight: .medium))
               .foregroundColor(.white)
           }
           .opacity(animateContent ? 1 : 0)
           .scaleEffect(animateContent ? 1 : 0.6)
-          .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.2), value: animateContent)
-        }
+          .animation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.1), value: animateContent)
 
-        // Career quick stats
-        HStack(spacing: 16) {
-          VStack(alignment: .leading, spacing: 4) {
-            Text("$\(career.salaryRange.lowerBound/1000)k-$\(career.salaryRange.upperBound/1000)k")
-              .font(.headline)
+          VStack(alignment: .leading, spacing: 8) {
+            // Career title with enhanced typography
+            Text(career.title)
+              .font(.system(size: 32, weight: .bold, design: .rounded))
               .foregroundColor(.white)
+              .opacity(animateContent ? 1 : 0)
+              .offset(y: animateContent ? 0 : 30)
+              .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.2), value: animateContent)
 
-            Text("Salary Range")
-              .font(.caption)
-              .foregroundColor(.white.opacity(0.7))
-          }
-
-          Divider()
-            .frame(height: 24)
-            .background(Color.white.opacity(0.3))
-
-          VStack(alignment: .leading, spacing: 4) {
-            Text(getGrowthCategory(outlook: career.jobOutlook))
-              .font(.headline)
-              .foregroundColor(.white)
-
-            Text("Job Growth")
-              .font(.caption)
-              .foregroundColor(.white.opacity(0.7))
-          }
-
-          Divider()
-            .frame(height: 24)
-            .background(Color.white.opacity(0.3))
-
-          VStack(alignment: .leading, spacing: 4) {
-            Text(getEducationLevel(education: career.education))
-              .font(.headline)
-              .foregroundColor(.white)
-
-            Text("Education")
-              .font(.caption)
-              .foregroundColor(.white.opacity(0.7))
+            // Field badge with improved design
+            HStack(spacing: 6) {
+              Circle()
+                .fill(Color.tmiSecondary)
+                .frame(width: 8, height: 8)
+              
+              Text(career.field)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white.opacity(0.9))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+              Capsule()
+                .fill(Color.white.opacity(0.15))
+                .background(
+                  Capsule()
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.6)
+                )
+            )
+            .opacity(animateContent ? 1 : 0)
+            .offset(y: animateContent ? 0 : 30)
+            .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.3), value: animateContent)
+            
+            Spacer()
           }
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 20)
-        .background(
-          RoundedRectangle(cornerRadius: 16)
-            .fill(Color.tmiPrimary.opacity(0.8))
-            .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4)
-        )
-        .opacity(animateContent ? 1 : 0)
-        .offset(y: animateContent ? 0 : 30)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: animateContent)
+
+        // Enhanced stats cards with improved design
+        HStack(spacing: 12) {
+          // Salary Card
+          CareerStatCard(
+            icon: "dollarsign.circle.fill",
+            title: "$\(career.salaryRange.lowerBound/1000)k-$\(career.salaryRange.upperBound/1000)k",
+            subtitle: "Annual Salary",
+            color: Color.green,
+            animateContent: animateContent,
+            delay: 0.4
+          )
+          
+          // Growth Card
+          CareerStatCard(
+            icon: "chart.line.uptrend.xyaxis",
+            title: getGrowthCategory(outlook: career.jobOutlook),
+            subtitle: "Job Growth",
+            color: Color.blue,
+            animateContent: animateContent,
+            delay: 0.5
+          )
+          
+          // Education Card
+          CareerStatCard(
+            icon: "graduationcap.fill",
+            title: getEducationLevel(education: career.education),
+            subtitle: "Education",
+            color: Color.purple,
+            animateContent: animateContent,
+            delay: 0.6
+          )
+        }
       }
       .padding(.horizontal, 20)
-      .padding(.bottom, 16)
+      .padding(.bottom, 24)
     }
-    .frame(height: 240)
-    .background(
-      // Use glass morphism effect consistent with TMI design
-      RoundedRectangle(cornerRadius: 0)
-        .fill(Color.white.opacity(0.05))
-        .background(
-          RoundedRectangle(cornerRadius: 0)
-            .fill(.ultraThinMaterial)
-            .opacity(0.3)
-        )
-        .overlay(
-          LinearGradient(
-            gradient: Gradient(colors: [
-              Color.tmiPrimary.opacity(0.4),
-              Color.tmiSecondary.opacity(0.3),
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          )
-        )
-    )
+    .frame(height: 280)
   }
 
-  // MARK: - Tab Selector
+  // MARK: - Enhanced Tab Selector
   private var tabSelector: some View {
-    HStack(spacing: 0) {
-      ForEach(["Overview", "Skills", "Education", "Pathway"], id: \.self) { tab in
-        let index = ["Overview", "Skills", "Education", "Pathway"].firstIndex(of: tab) ?? 0
-
-        Button(action: {
-          withAnimation {
-            selectedTab = index
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 4) {
+        ForEach(Array(zip(["Overview", "Skills", "Education", "Pathway"], 
+                         ["info.circle", "star.fill", "graduationcap.fill", "arrow.up.right"])), 
+                id: \.0) { tab, icon in
+          let index = ["Overview", "Skills", "Education", "Pathway"].firstIndex(of: tab) ?? 0
+          
+          Button(action: {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+              selectedTab = index
+            }
+          }) {
+            HStack(spacing: 8) {
+              Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(selectedTab == index ? .white : .white.opacity(0.6))
+              
+              Text(tab)
+                .font(.system(size: 16, weight: selectedTab == index ? .semibold : .medium))
+                .foregroundColor(selectedTab == index ? .white : .white.opacity(0.7))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+              Group {
+                if selectedTab == index {
+                  RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                      LinearGradient(
+                        gradient: Gradient(colors: [
+                          Color.tmiPrimary.opacity(0.8),
+                          Color.tmiSecondary.opacity(0.6)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                      )
+                    )
+                    .overlay(
+                      RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                    )
+                } else {
+                  RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white.opacity(0.08))
+                    .overlay(
+                      RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+                }
+              }
+            )
           }
-        }) {
-          VStack(spacing: 8) {
-            Text(tab)
-              .font(.subheadline)
-              .fontWeight(selectedTab == index ? .semibold : .regular)
-              .foregroundColor(selectedTab == index ? .white : .white.opacity(0.7))
-
-            // Indicator for the selected tab
-            Rectangle()
-              .fill(selectedTab == index ? Color.white : Color.clear)
-              .frame(height: 3)
-              .cornerRadius(2)
-          }
+          .buttonStyle(.plain)
         }
-        .frame(maxWidth: .infinity)
       }
+      .padding(.horizontal, 20)
     }
-    .padding(.vertical, 8)
+    .padding(.vertical, 16)
     .background(
-      RoundedRectangle(cornerRadius: 0)
-        .fill(Color.white.opacity(0.05))
-        .background(
-          RoundedRectangle(cornerRadius: 0)
-            .fill(.ultraThinMaterial)
-            .opacity(0.3)
-        )
-    )
-    .overlay(
       Rectangle()
-        .stroke(
-          LinearGradient(
-            colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          ),
-          lineWidth: 1
-        )
+        .fill(Color.black.opacity(0.2))
+        .background(.ultraThinMaterial.opacity(0.8))
     )
   }
 
   // MARK: - Overview Tab
   private var overviewTab: some View {
     VStack(alignment: .leading, spacing: 20) {
-      // About section
-      VStack(alignment: .leading, spacing: 12) {
+      // About section with enhanced card design
+      VStack(alignment: .leading, spacing: 16) {
         sectionHeader(title: "About This Career", icon: "info.circle")
-
+        
         Text(career.description)
-          .font(.body)
+          .font(.system(size: 16, weight: .regular))
           .foregroundColor(.white)
           .fixedSize(horizontal: false, vertical: true)
-          .lineSpacing(4)
-          .padding(.bottom, 4)
+          .lineSpacing(6)
+          .opacity(animateContent ? 1 : 0)
+          .offset(y: animateContent ? 0 : 10)
+          .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1), value: animateContent)
       }
-      .padding(20)
+      .padding(24)
       .background(
-        RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white.opacity(0.05))
+        RoundedRectangle(cornerRadius: 20)
+          .fill(Color.white.opacity(0.06))
           .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
               .fill(.ultraThinMaterial)
-              .opacity(0.3)
+              .opacity(0.8)
           )
           .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
               .stroke(
                 LinearGradient(
-                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  colors: [.white.opacity(0.25), .clear, .white.opacity(0.1)],
                   startPoint: .topLeading,
                   endPoint: .bottomTrailing
                 ),
-                lineWidth: 1
+                lineWidth: 1.5
               )
           )
-          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+          .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
       )
 
-      // Job outlook section
-      VStack(alignment: .leading, spacing: 12) {
+      // Job outlook section with enhanced design
+      VStack(alignment: .leading, spacing: 16) {
         sectionHeader(title: "Job Outlook", icon: "chart.line.uptrend.xyaxis")
-
+        
         Text(career.jobOutlook)
-          .font(.body)
+          .font(.system(size: 16, weight: .regular))
           .foregroundColor(.white)
           .fixedSize(horizontal: false, vertical: true)
-          .lineSpacing(4)
-
-        // Growth indicator
-        HStack {
-          Text("Growth Potential:")
-            .font(.subheadline)
-            .foregroundColor(.gray)
-
-          ForEach(0..<5) { i in
-            Image(systemName: "star.fill")
-              .foregroundColor(
-                i < getGrowthRating(outlook: career.jobOutlook) ? .yellow : .gray.opacity(0.3))
+          .lineSpacing(6)
+          .opacity(animateContent ? 1 : 0)
+          .offset(y: animateContent ? 0 : 10)
+          .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: animateContent)
+        
+        // Enhanced growth indicator with modern design
+        HStack(spacing: 12) {
+          VStack(alignment: .leading, spacing: 4) {
+            Text("Growth Potential")
+              .font(.system(size: 14, weight: .medium))
+              .foregroundColor(.white.opacity(0.8))
+            
+            HStack(spacing: 4) {
+              ForEach(0..<5) { i in
+                Image(systemName: "star.fill")
+                  .font(.system(size: 16))
+                  .foregroundColor(
+                    i < getGrowthRating(outlook: career.jobOutlook) ? .yellow : .white.opacity(0.2)
+                  )
+                  .scaleEffect(animateContent ? 1 : 0.5)
+                  .animation(
+                    .spring(response: 0.5, dampingFraction: 0.7).delay(0.3 + Double(i) * 0.05),
+                    value: animateContent
+                  )
+              }
+            }
           }
+          
+          Spacer()
+          
+          // Growth category badge
+          Text(getGrowthCategory(outlook: career.jobOutlook))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+              Capsule()
+                .fill(
+                  LinearGradient(
+                    colors: [Color.green.opacity(0.8), Color.blue.opacity(0.6)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                  )
+                )
+            )
         }
-        .padding(.top, 8)
+        .padding(.top, 12)
       }
-      .padding(20)
+      .padding(24)
       .background(
-        RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white.opacity(0.05))
+        RoundedRectangle(cornerRadius: 20)
+          .fill(Color.white.opacity(0.06))
           .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
               .fill(.ultraThinMaterial)
-              .opacity(0.3)
+              .opacity(0.8)
           )
           .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
               .stroke(
                 LinearGradient(
-                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  colors: [.white.opacity(0.25), .clear, .white.opacity(0.1)],
                   startPoint: .topLeading,
                   endPoint: .bottomTrailing
                 ),
-                lineWidth: 1
+                lineWidth: 1.5
               )
           )
-          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+          .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
       )
 
-      // Your progress section
-      VStack(alignment: .leading, spacing: 12) {
+      // Enhanced progress section with modern design
+      VStack(alignment: .leading, spacing: 16) {
         sectionHeader(title: "Your Progress", icon: "chart.bar.fill")
-
-        ForEach(progressData, id: \.0) { item in
-          VStack(alignment: .leading, spacing: 8) {
-            HStack {
-              Text(item.0)
-                .font(.subheadline)
-                .foregroundColor(.white)
-
-              Spacer()
-
-              Text("\(Int(item.1 * 100))%")
-                .font(.caption)
-                .foregroundColor(.tmiSecondary)
+        
+        VStack(spacing: 16) {
+          ForEach(Array(progressData.enumerated()), id: \.offset) { index, item in
+            VStack(alignment: .leading, spacing: 12) {
+              HStack {
+                Text(item.0)
+                  .font(.system(size: 16, weight: .medium))
+                  .foregroundColor(.white)
+                
+                Spacer()
+                
+                Text("\(Int(item.1 * 100))%")
+                  .font(.system(size: 14, weight: .bold))
+                  .foregroundColor(getProgressColor(value: item.1))
+                  .padding(.horizontal, 8)
+                  .padding(.vertical, 4)
+                  .background(
+                    Capsule()
+                      .fill(getProgressColor(value: item.1).opacity(0.15))
+                  )
+              }
+              
+              // Enhanced progress bar with animation
+              GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                  RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.white.opacity(0.1))
+                    .frame(height: 10)
+                  
+                  RoundedRectangle(cornerRadius: 6)
+                    .fill(
+                      LinearGradient(
+                        colors: [
+                          getProgressColor(value: item.1),
+                          getProgressColor(value: item.1).opacity(0.7)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                      )
+                    )
+                    .frame(
+                      width: animateContent ? CGFloat(item.1) * geometry.size.width : 0,
+                      height: 10
+                    )
+                    .animation(
+                      .spring(response: 0.8, dampingFraction: 0.8).delay(0.4 + Double(index) * 0.1),
+                      value: animateContent
+                    )
+                }
+              }
+              .frame(height: 10)
             }
-
-            // Progress bar
-            ZStack(alignment: .leading) {
-              RoundedRectangle(cornerRadius: 4)
-                .fill(Color.gray.opacity(0.2))
-                .frame(height: 8)
-
-              RoundedRectangle(cornerRadius: 4)
-                .fill(getProgressColor(value: item.1))
-                .frame(width: CGFloat(item.1) * UIScreen.main.bounds.width * 0.8, height: 8)
-                .animation(
-                  .spring(response: 0.6, dampingFraction: 0.8).delay(0.3), value: animateContent)
-            }
+            .opacity(animateContent ? 1 : 0)
+            .offset(y: animateContent ? 0 : 20)
+            .animation(
+              .spring(response: 0.6, dampingFraction: 0.8).delay(0.3 + Double(index) * 0.1),
+              value: animateContent
+            )
           }
         }
 
+        // Enhanced action button
         Button(action: {
           // Action to create personalized plan
         }) {
-          Text("Create Personalized Plan")
-            .font(.headline)
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(
-              RoundedRectangle(cornerRadius: 12)
-                .fill(Color.tmiPrimary)
-            )
-        }
-        .padding(.top, 16)
-      }
-      .padding(20)
-      .background(
-        RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white.opacity(0.05))
+          HStack(spacing: 8) {
+            Image(systemName: "plus.circle.fill")
+              .font(.system(size: 18, weight: .semibold))
+            
+            Text("Create Personalized Plan")
+              .font(.system(size: 16, weight: .semibold))
+          }
+          .foregroundColor(.white)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 16)
           .background(
             RoundedRectangle(cornerRadius: 16)
+              .fill(
+                LinearGradient(
+                  colors: [Color.tmiPrimary, Color.tmiSecondary],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                )
+              )
+              .shadow(color: Color.tmiPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
+          )
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(animateContent ? 1 : 0.9)
+        .opacity(animateContent ? 1 : 0)
+        .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.8), value: animateContent)
+        .padding(.top, 20)
+      }
+      .padding(24)
+      .background(
+        RoundedRectangle(cornerRadius: 20)
+          .fill(Color.white.opacity(0.06))
+          .background(
+            RoundedRectangle(cornerRadius: 20)
               .fill(.ultraThinMaterial)
-              .opacity(0.3)
+              .opacity(0.8)
           )
           .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
               .stroke(
                 LinearGradient(
-                  colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                  colors: [.white.opacity(0.25), .clear, .white.opacity(0.1)],
                   startPoint: .topLeading,
                   endPoint: .bottomTrailing
                 ),
-                lineWidth: 1
+                lineWidth: 1.5
               )
           )
-          .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+          .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
       )
     }
     .padding(.horizontal, 20)
@@ -500,26 +631,56 @@ struct CareerDetailView: View {
   // MARK: - Skills Tab
   private var skillsTab: some View {
     VStack(alignment: .leading, spacing: 20) {
-      // Core skills section
-      VStack(alignment: .leading, spacing: 12) {
+      // Enhanced core skills section
+      VStack(alignment: .leading, spacing: 16) {
         sectionHeader(title: "Required Skills", icon: "star.fill")
-
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 12)], spacing: 12) {
-          ForEach(career.skills, id: \.self) { skill in
-            HStack {
-              Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
-                .font(.subheadline)
-
+        
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 16) {
+          ForEach(Array(career.skills.enumerated()), id: \.offset) { index, skill in
+            HStack(spacing: 10) {
+              ZStack {
+                Circle()
+                  .fill(Color.green.opacity(0.2))
+                  .frame(width: 24, height: 24)
+                
+                Image(systemName: "checkmark")
+                  .foregroundColor(.green)
+                  .font(.system(size: 12, weight: .bold))
+              }
+              
               Text(skill)
-                .font(.subheadline)
+                .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white)
+                .lineLimit(2)
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-              RoundedRectangle(cornerRadius: 8)
-                .fill(Color.tmiSecondary.opacity(0.1))
+              RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.06))
+                .background(
+                  RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.6)
+                )
+                .overlay(
+                  RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                      LinearGradient(
+                        colors: [.white.opacity(0.2), .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                      ),
+                      lineWidth: 1
+                    )
+                )
+            )
+            .opacity(animateContent ? 1 : 0)
+            .offset(y: animateContent ? 0 : 20)
+            .animation(
+              .spring(response: 0.6, dampingFraction: 0.8).delay(0.1 + Double(index) * 0.05),
+              value: animateContent
             )
           }
         }
@@ -1096,16 +1257,26 @@ struct CareerDetailView: View {
 
   // MARK: - Helper Components
   private func sectionHeader(title: String, icon: String) -> some View {
-    HStack(spacing: 8) {
-      Image(systemName: icon)
-        .foregroundColor(.white)
-        .font(.headline)
-
+    HStack(spacing: 12) {
+      ZStack {
+        Circle()
+          .fill(Color.tmiPrimary.opacity(0.2))
+          .frame(width: 32, height: 32)
+        
+        Image(systemName: icon)
+          .foregroundColor(.white)
+          .font(.system(size: 16, weight: .semibold))
+      }
+      
       Text(title)
-        .font(.title3)
-        .fontWeight(.bold)
+        .font(.system(size: 20, weight: .bold, design: .rounded))
         .foregroundColor(.white)
+      
+      Spacer()
     }
+    .opacity(animateContent ? 1 : 0)
+    .offset(y: animateContent ? 0 : -10)
+    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: animateContent)
   }
 
   // MARK: - Helper Functions
@@ -1389,6 +1560,89 @@ struct CareerDetailView: View {
       // Handle error silently for now
       print("Failed to toggle bookmark: \(error)")
     }
+  }
+}
+
+// MARK: - CareerStatCard Component
+
+struct CareerStatCard: View {
+  let icon: String
+  let title: String
+  let subtitle: String
+  let color: Color
+  let animateContent: Bool
+  let delay: Double
+  
+  var body: some View {
+    VStack(spacing: 8) {
+      // Icon with enhanced styling
+      ZStack {
+        Circle()
+          .fill(
+            RadialGradient(
+              gradient: Gradient(colors: [
+                color.opacity(0.2),
+                color.opacity(0.1)
+              ]),
+              center: .center,
+              startRadius: 15,
+              endRadius: 25
+            )
+          )
+          .frame(width: 44, height: 44)
+        
+        Image(systemName: icon)
+          .font(.system(size: 20, weight: .semibold))
+          .foregroundColor(color)
+      }
+      
+      // Title and subtitle with improved typography
+      VStack(spacing: 2) {
+        Text(title)
+          .font(.system(size: 16, weight: .bold))
+          .foregroundColor(.white)
+          .lineLimit(1)
+          .minimumScaleFactor(0.8)
+        
+        Text(subtitle)
+          .font(.system(size: 12, weight: .medium))
+          .foregroundColor(.white.opacity(0.7))
+          .lineLimit(1)
+      }
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 16)
+    .padding(.horizontal, 12)
+    .background(
+      RoundedRectangle(cornerRadius: 16)
+        .fill(Color.white.opacity(0.08))
+        .background(
+          RoundedRectangle(cornerRadius: 16)
+            .fill(.ultraThinMaterial)
+            .opacity(0.6)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 16)
+            .stroke(
+              LinearGradient(
+                gradient: Gradient(colors: [
+                  Color.white.opacity(0.2),
+                  Color.clear
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              ),
+              lineWidth: 1
+            )
+        )
+    )
+    .opacity(animateContent ? 1 : 0)
+    .offset(y: animateContent ? 0 : 20)
+    .scaleEffect(animateContent ? 1 : 0.9)
+    .animation(
+      .spring(response: 0.8, dampingFraction: 0.8).delay(delay),
+      value: animateContent
+    )
   }
 }
 
@@ -1861,6 +2115,7 @@ struct CareerResourcesView: View {
     .preferredColorScheme(.dark)
   }
 }
+
 
 // Preview
 #Preview {

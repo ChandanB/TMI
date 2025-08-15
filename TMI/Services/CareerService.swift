@@ -35,28 +35,50 @@ class CareerService {
       return careerCache
     }
     
-    // Try to fetch from Firebase first, fallback to sample data
-    do {
-      let careers = try await fetchCareersFromFirebase()
-      if !careers.isEmpty {
-        careerCache = careers
+    // Use AIInsightsService to generate careers
+    if #available(iOS 26.0, *) {
+        do {
+            let aiResponse = try await AIInsightsService.shared.generateCareerData(for: nil)
+            careerCache = aiResponse.careers
+            lastCacheUpdate = Date()
+            return careerCache
+        } catch {
+            print("Failed to generate careers with AI: \(error)")
+            // Fallback to sample data if AI generation fails
+            careerCache = Career.sampleCareers
+            lastCacheUpdate = Date()
+            return careerCache
+        }
+    } else {
+        // Fallback to sample data for older iOS versions
+        careerCache = Career.sampleCareers
         lastCacheUpdate = Date()
-        return careers
-      }
-    } catch {
-      print("Failed to fetch careers from Firebase: \(error)")
+        return careerCache
     }
-    
-    // Fallback to sample data
-    careerCache = Career.sampleCareers
-    lastCacheUpdate = Date()
-    return careerCache
   }
   
   /// Get personalized career discovery insights
   func getCareerDiscoveryInsights(for student: Student) async throws -> CareerDiscoveryInsights {
-    let allCareers = try await fetchAllCareers()
-    let recommendations = try await getCareerRecommendations(for: student)
+    if #available(iOS 26.0, *) {
+        do {
+            let aiResponse = try await AIInsightsService.shared.generateCareerData(for: student)
+            return aiResponse.insights
+        } catch {
+            print("Failed to generate career insights with AI: \(error)")
+            // Fallback to rule-based insights if AI fails
+            let allCareers = try await fetchAllCareers()
+            return generateRuleBasedCareerDiscoveryInsights(for: student, allCareers: allCareers)
+        }
+    } else {
+        // Fallback to rule-based insights for older iOS versions
+        let allCareers = try await fetchAllCareers()
+        return generateRuleBasedCareerDiscoveryInsights(for: student, allCareers: allCareers)
+    }
+  }
+
+  // New helper function for rule-based insights (extracted from original getCareerDiscoveryInsights)
+  private func generateRuleBasedCareerDiscoveryInsights(for student: Student, allCareers: [Career]) -> CareerDiscoveryInsights {
+    let recommendations = generateRuleBasedCareerRecommendations(for: student, allCareers: allCareers)
     
     // Analyze student's interest patterns
     let allCategories = student.interests.flatMap { $0.category }
@@ -122,7 +144,25 @@ class CareerService {
   
   /// Get comprehensive career recommendations based on student interests, performance, and engagement
   func getCareerRecommendations(for student: Student) async throws -> [Career] {
-    let allCareers = try await fetchAllCareers()
+    if #available(iOS 26.0, *) {
+        do {
+            let aiResponse = try await AIInsightsService.shared.generateCareerData(for: student)
+            return aiResponse.careers // AI generates personalized careers
+        } catch {
+            print("Failed to generate personalized careers with AI: \(error)")
+            // Fallback to rule-based recommendations if AI fails
+            let allCareers = try await fetchAllCareers()
+            return generateRuleBasedCareerRecommendations(for: student, allCareers: allCareers)
+        }
+    } else {
+        // Fallback to rule-based recommendations for older iOS versions
+        let allCareers = try await fetchAllCareers()
+        return generateRuleBasedCareerRecommendations(for: student, allCareers: allCareers)
+    }
+  }
+
+  // New helper function for rule-based recommendations (extracted from original getCareerRecommendations)
+  private func generateRuleBasedCareerRecommendations(for student: Student, allCareers: [Career]) -> [Career] {
     var scoredCareers: [(career: Career, score: Double)] = []
     
     for career in allCareers {
@@ -495,7 +535,7 @@ struct CareerStatistics: Codable {
   let fieldDistribution: [String: Int]
 }
 
-struct CareerDiscoveryInsights {
+struct CareerDiscoveryInsights: Codable {
   let totalCareersExplored: Int
   let personalizedRecommendations: Int
   let topInterestCategory: String

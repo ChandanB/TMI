@@ -17,8 +17,65 @@ class FormStoreViewModel {
 
     func loadTemplates() {
         formTemplates = [
-            DefaultFormTemplates.camperRegistrationFormTemplate,
-            DefaultFormTemplates.jobApplicationFormTemplate,
+            FormTemplate(
+                name: "Student Goal Setting Form",
+                templateDescription: "Help students establish clear academic and personal goals aligned with their interests and TMI plan objectives.",
+                sections: [
+                    FormSection(title: "Academic Goals", fields: [
+                        FormField(label: "What are your main academic goals for this semester?", type: .longText, isRequired: true),
+                        FormField(label: "Which subjects do you want to improve in?", type: .multipleChoice, isRequired: true, options: ["Math", "Science", "English", "History", "Art", "Music", "Physical Education", "Other"]),
+                        FormField(label: "How do you learn best?", type: .multipleChoice, isRequired: false, options: ["Visual aids", "Hands-on activities", "Discussion", "Reading", "Technology", "Group work", "Individual work"])
+                    ]),
+                    FormSection(title: "Personal Development", fields: [
+                        FormField(label: "What personal skills would you like to develop?", type: .multipleChoice, isRequired: true, options: ["Communication", "Leadership", "Time Management", "Problem Solving", "Creativity", "Collaboration", "Self-confidence"]),
+                        FormField(label: "Describe your ideal learning environment", type: .longText, isRequired: false)
+                    ])
+                ],
+                createdAt: Date(),
+                updatedAt: Date(),
+                isActive: true,
+                category: "Assessment"
+            ),
+            FormTemplate(
+                name: "Educational Intervention Evaluation",
+                templateDescription: "Assess the effectiveness of current educational interventions and identify areas for improvement in student support strategies.",
+                sections: [
+                    FormSection(title: "Intervention Assessment", fields: [
+                        FormField(label: "Which intervention strategies are currently being used?", type: .multipleChoice, isRequired: true, options: ["Chase Your Space", "Acknowledge Interests", "Align Your Mind", "Direct and Correct", "Bully to Boss", "Meek to Protector"]),
+                        FormField(label: "How effective has the current intervention been?", type: .rating, isRequired: true),
+                        FormField(label: "What positive changes have you observed?", type: .longText, isRequired: true)
+                    ]),
+                    FormSection(title: "Recommendations", fields: [
+                        FormField(label: "What modifications would you recommend?", type: .longText, isRequired: false),
+                        FormField(label: "Additional support needed", type: .multipleChoice, isRequired: false, options: ["More one-on-one time", "Peer support", "Family involvement", "Additional resources", "Different approach", "No changes needed"])
+                    ])
+                ],
+                createdAt: Date(),
+                updatedAt: Date(),
+                isActive: true,
+                category: "Assessment"
+            ),
+            FormTemplate(
+                name: "Parent-Teacher Communication Form",
+                templateDescription: "Facilitate effective communication between parents, teachers, and counselors regarding student progress and TMI plan implementation.",
+                sections: [
+                    FormSection(title: "Student Progress Update", fields: [
+                        FormField(label: "Student Name", type: .text, isRequired: true),
+                        FormField(label: "Current TMI Plan Focus", type: .multipleChoice, isRequired: true, options: ["Chase Your Space", "Acknowledge Interests", "Align Your Mind", "Direct and Correct", "Bully to Boss", "Meek to Protector"]),
+                        FormField(label: "Recent academic progress", type: .longText, isRequired: true),
+                        FormField(label: "Behavioral observations", type: .longText, isRequired: false)
+                    ]),
+                    FormSection(title: "Home-School Collaboration", fields: [
+                        FormField(label: "How can we better support your child at home?", type: .longText, isRequired: false),
+                        FormField(label: "Parent/Guardian concerns or questions", type: .longText, isRequired: false),
+                        FormField(label: "Preferred communication method", type: .multipleChoice, isRequired: true, options: ["Email", "Phone call", "In-person meeting", "Text message", "School portal"])
+                    ])
+                ],
+                createdAt: Date(),
+                updatedAt: Date(),
+                isActive: true,
+                category: "Feedback"
+            ),
             FormTemplate(
             name: "Student Interest Survey",
             templateDescription: "Comprehensive survey to identify student interests, hobbies, and career aspirations to help develop personalized TMI plans.",

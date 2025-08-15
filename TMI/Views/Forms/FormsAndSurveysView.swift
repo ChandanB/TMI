@@ -11,6 +11,11 @@ struct FormsAndSurveysView: View {
   // Animation states
   @State private var isLoaded = false
   @State private var hasScrolled = false
+  
+  // Sheet states
+  @State private var showingFormCreation = false
+  @State private var showingFormBuilder = false
+  @State private var showingFormImport = false
 
   enum FormFilter: String, CaseIterable {
     case all = "All"
@@ -62,7 +67,7 @@ struct FormsAndSurveysView: View {
             icon: "plus",
             style: .floating,
             action: {
-              NavigationCoordinator.shared.navigate(to: .formBuilder)
+              showingFormCreation = true
             }
           )
           .offset(y: isLoaded ? 0 : 100)
@@ -80,13 +85,13 @@ struct FormsAndSurveysView: View {
       ToolbarItem(placement: .navigationBarTrailing) {
         Menu {
           Button {
-            NavigationCoordinator.shared.navigate(to: .formBuilder)
+            showingFormBuilder = true
           } label: {
             Label("Create New Form", systemImage: "square.and.pencil")
           }
 
           Button {
-            NavigationCoordinator.shared.navigate(to: .formCreation)
+            showingFormImport = true
           } label: {
             Label("Import Form", systemImage: "square.and.arrow.down")
           }
@@ -106,6 +111,15 @@ struct FormsAndSurveysView: View {
       }
     }
     .preferredColorScheme(.dark)
+    .sheet(isPresented: $showingFormCreation) {
+      FormCreationView()
+    }
+    .sheet(isPresented: $showingFormBuilder) {
+      FormBuilderView()
+    }
+    .sheet(isPresented: $showingFormImport) {
+      FormImportView()
+    }
   }
 
   // MARK: - Search & Filter (Updated)
@@ -146,9 +160,7 @@ struct FormsAndSurveysView: View {
     ScrollView {
       LazyVStack(spacing: 20) {
         ForEach(filteredForms) { template in
-          Button {
-            NavigationCoordinator.shared.navigate(to: .formDetail(template))
-          } label: {
+          NavigationLink(destination: FormTemplateDetailView(template: template)) {
             FormStoreCardView(template: template)
               .opacity(isLoaded ? 1 : 0)
               .offset(y: isLoaded ? 0 : 50)
@@ -160,7 +172,7 @@ struct FormsAndSurveysView: View {
                 value: isLoaded
               )
           }
-          .buttonStyle(ScaleButtonStyle())
+          .buttonStyle(PlainButtonStyle())
         }
       }
       .padding(20)
@@ -219,7 +231,7 @@ struct FormsAndSurveysView: View {
         icon: "square.and.pencil",
         style: .primary,
         action: {
-          NavigationCoordinator.shared.navigate(to: .formBuilder)
+          showingFormCreation = true
         }
       )
       .padding(.top, 10)
@@ -361,6 +373,7 @@ struct FormTemplateDetailView: View {
 
   @State private var isAddingTemplate = false
   @State private var animateContent = false
+  @State private var showingPreview = false
 
   var body: some View {
     ZStack {
@@ -400,9 +413,7 @@ struct FormTemplateDetailView: View {
             icon: "eye.fill",
             style: .primary,
             action: {
-              if let templateID = template.id {
-                NavigationCoordinator.shared.navigate(to: .dynamicForm(templateID))
-              }
+              showingPreview = true
             }
           )
           .padding(.horizontal, 20)
@@ -472,6 +483,9 @@ struct FormTemplateDetailView: View {
       }
     }
     .preferredColorScheme(.dark)
+    .sheet(isPresented: $showingPreview) {
+      FormPreviewView(template: template)
+    }
   }
 
   private var formHeader: some View {
@@ -964,28 +978,471 @@ struct FormsProgressIndicator: View {
 
 struct FormCreationView: View {
   @Environment(\.dismiss) private var dismiss
+  @State private var formName = ""
+  @State private var formDescription = ""
+  @State private var selectedCategory = "Survey"
+  
+  let categories = ["Survey", "Assessment", "Feedback", "Registration", "Other"]
 
   var body: some View {
-    ZStack {
-      // Unified Background
-      TMIBackgroundView(variant: .default)
+    NavigationStack {
+      ZStack {
+        TMIBackgroundView(variant: .default)
+          .ignoresSafeArea()
 
-      VStack {
-        Text("Form Creation view placeholder")
-          .foregroundColor(.white)
-      }
-    }
-    .navigationTitle("Create Form")
-    .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-      ToolbarItem(placement: .navigationBarLeading) {
-        Button("Cancel") {
-          NavigationCoordinator.shared.pop()
+        ScrollView {
+          VStack(spacing: 24) {
+            // Header
+            TMIGlassCard(style: .default) {
+              VStack(spacing: 16) {
+                Image(systemName: "square.and.pencil")
+                  .font(.system(size: 40))
+                  .foregroundColor(.tmiSecondary)
+                
+                Text("Create New Form")
+                  .font(.title2.bold())
+                  .foregroundColor(.white)
+                
+                Text("Start building your custom form from scratch")
+                  .font(.body)
+                  .foregroundColor(.white.opacity(0.8))
+                  .multilineTextAlignment(.center)
+              }
+            }
+            .padding(.top, 20)
+            
+            // Form details
+            TMIGlassCard(style: .default) {
+              VStack(spacing: 20) {
+                TMITextField(
+                  icon: "doc.text",
+                  placeholder: "Form Name",
+                  text: $formName
+                )
+                
+                VStack(alignment: .leading, spacing: 8) {
+                  HStack {
+                    Image(systemName: "text.alignleft")
+                      .font(.system(size: 16))
+                      .foregroundColor(.tmiSecondary)
+                    Text("Description")
+                      .font(.system(size: 16, weight: .medium))
+                      .foregroundColor(.white)
+                  }
+                  
+                  TextEditor(text: $formDescription)
+                    .scrollContentBackground(.hidden)
+                    .padding(12)
+                    .background(
+                      RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.05))
+                    )
+                    .foregroundColor(.white)
+                    .frame(height: 100)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                  HStack {
+                    Image(systemName: "tag")
+                      .font(.system(size: 16))
+                      .foregroundColor(.tmiSecondary)
+                    Text("Category")
+                      .font(.system(size: 16, weight: .medium))
+                      .foregroundColor(.white)
+                  }
+                  
+                  Menu {
+                    ForEach(categories, id: \.self) { category in
+                      Button(category) {
+                        selectedCategory = category
+                      }
+                    }
+                  } label: {
+                    HStack {
+                      Text(selectedCategory)
+                        .foregroundColor(.white)
+                      Spacer()
+                      Image(systemName: "chevron.down")
+                        .foregroundColor(.white.opacity(0.7))
+                    }
+                    .padding(12)
+                    .background(
+                      RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.05))
+                    )
+                  }
+                }
+              }
+            }
+            
+            // Action buttons
+            VStack(spacing: 12) {
+              TMIButton(
+                text: "Continue to Builder",
+                icon: "arrow.right",
+                style: .primary,
+                isDisabled: formName.isEmpty,
+                action: {
+                  // Navigate to form builder with these details
+                  dismiss()
+                }
+              )
+              
+              TMIButton(
+                text: "Start from Template",
+                icon: "doc.on.doc",
+                style: .secondary,
+                action: {
+                  // Show template selection
+                  dismiss()
+                }
+              )
+            }
+            .padding(.bottom, 40)
+          }
+          .padding(.horizontal, 20)
         }
-        .foregroundColor(.white)
+      }
+      .navigationTitle("Create Form")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Button("Cancel") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+      }
+      .preferredColorScheme(.dark)
+    }
+  }
+}
+
+// MARK: - Form Builder View
+
+struct FormBuilderView: View {
+  @Environment(\.dismiss) private var dismiss
+  
+  var body: some View {
+    NavigationStack {
+      ZStack {
+        TMIBackgroundView(variant: .default)
+          .ignoresSafeArea()
+        
+        ScrollView {
+          VStack(spacing: 24) {
+            // Header
+            TMIGlassCard(style: .default) {
+              VStack(spacing: 16) {
+                Image(systemName: "hammer.fill")
+                  .font(.system(size: 40))
+                  .foregroundColor(.tmiSecondary)
+                
+                Text("Form Builder")
+                  .font(.title2.bold())
+                  .foregroundColor(.white)
+                
+                Text("Drag and drop fields to create your custom form")
+                  .font(.body)
+                  .foregroundColor(.white.opacity(0.8))
+                  .multilineTextAlignment(.center)
+              }
+            }
+            .padding(.top, 20)
+            
+            // Coming soon message
+            TMIGlassCard(style: .default) {
+              VStack(spacing: 16) {
+                Image(systemName: "wrench.and.screwdriver.fill")
+                  .font(.system(size: 60))
+                  .foregroundColor(.orange)
+                
+                Text("Coming Soon")
+                  .font(.title.bold())
+                  .foregroundColor(.white)
+                
+                Text("The drag-and-drop form builder is currently under development. For now, you can use our pre-built templates from the Forms & Surveys library.")
+                  .font(.body)
+                  .foregroundColor(.white.opacity(0.8))
+                  .multilineTextAlignment(.center)
+                  .padding(.horizontal)
+              }
+            }
+            
+            TMIButton(
+              text: "View Templates",
+              icon: "doc.on.doc.fill",
+              style: .primary,
+              action: {
+                dismiss()
+              }
+            )
+            .padding(.bottom, 40)
+          }
+          .padding(.horizontal, 20)
+        }
+      }
+      .navigationTitle("Form Builder")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Button("Cancel") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+      }
+      .preferredColorScheme(.dark)
+    }
+  }
+}
+
+// MARK: - Form Preview View
+
+struct FormPreviewView: View {
+  let template: FormTemplate
+  @Environment(\.dismiss) private var dismiss
+  @State private var currentSectionIndex = 0
+  @State private var fieldValues: [String: Any] = [:]
+  
+  var body: some View {
+    NavigationStack {
+      ZStack {
+        TMIBackgroundView(variant: .default)
+          .ignoresSafeArea()
+        
+        VStack(spacing: 0) {
+          // Progress indicator
+          if template.sections.count > 1 {
+            FormsProgressIndicator(
+              current: currentSectionIndex + 1,
+              total: template.sections.count
+            )
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+          }
+          
+          // Current section
+          ScrollView {
+            VStack(spacing: 20) {
+              if currentSectionIndex < template.sections.count {
+                let currentSection = template.sections[currentSectionIndex]
+                
+                // Section header
+                TMIGlassCard(style: .default) {
+                  VStack(spacing: 12) {
+                    Text(currentSection.title)
+                      .font(.title2.bold())
+                      .foregroundColor(.white)
+                    
+                    if let description = currentSection.description, !description.isEmpty {
+                      Text(description)
+                        .font(.body)
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                    }
+                  }
+                }
+                .padding(.top, 20)
+                
+                // Fields
+                ForEach(currentSection.fields) { field in
+                  DynamicFieldView(field: field) { value in
+                    if let fieldId = field.id {
+                      fieldValues[fieldId] = value
+                    }
+                  }
+                }
+              }
+              
+              Spacer(minLength: 100)
+            }
+            .padding(.horizontal, 20)
+          }
+          
+          // Navigation buttons
+          HStack(spacing: 16) {
+            if currentSectionIndex > 0 {
+              TMIButton(
+                text: "Previous",
+                icon: "chevron.left",
+                style: .secondary,
+                action: {
+                  withAnimation(.easeInOut(duration: 0.3)) {
+                    currentSectionIndex -= 1
+                  }
+                }
+              )
+            }
+            
+            Spacer()
+            
+            if currentSectionIndex < template.sections.count - 1 {
+              TMIButton(
+                text: "Next",
+                icon: "chevron.right",
+                style: .primary,
+                action: {
+                  withAnimation(.easeInOut(duration: 0.3)) {
+                    currentSectionIndex += 1
+                  }
+                }
+              )
+            } else {
+              TMIButton(
+                text: "Complete Preview",
+                icon: "checkmark",
+                style: .primary,
+                action: {
+                  dismiss()
+                }
+              )
+            }
+          }
+          .padding(.horizontal, 20)
+          .padding(.bottom, 20)
+        }
+      }
+      .navigationTitle("Preview: \(template.name)")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Button("Close") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+      }
+      .preferredColorScheme(.dark)
+    }
+  }
+}
+
+// MARK: - Form Import View
+
+struct FormImportView: View {
+  @Environment(\.dismiss) private var dismiss
+  @State private var selectedFile: URL?
+  @State private var showingFilePicker = false
+  
+  var body: some View {
+    NavigationStack {
+      ZStack {
+        TMIBackgroundView(variant: .default)
+          .ignoresSafeArea()
+        
+        ScrollView {
+          VStack(spacing: 24) {
+            // Header
+            TMIGlassCard(style: .default) {
+              VStack(spacing: 16) {
+                Image(systemName: "square.and.arrow.down.fill")
+                  .font(.system(size: 40))
+                  .foregroundColor(.tmiSecondary)
+                
+                Text("Import Form")
+                  .font(.title2.bold())
+                  .foregroundColor(.white)
+                
+                Text("Import existing forms from JSON files or other compatible formats")
+                  .font(.body)
+                  .foregroundColor(.white.opacity(0.8))
+                  .multilineTextAlignment(.center)
+              }
+            }
+            .padding(.top, 20)
+            
+            // File selection
+            TMIGlassCard(style: .default) {
+              VStack(spacing: 20) {
+                if let file = selectedFile {
+                  HStack(spacing: 16) {
+                    Image(systemName: "doc.text.fill")
+                      .font(.system(size: 24))
+                      .foregroundColor(.tmiSecondary)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                      Text(file.lastPathComponent)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white)
+                      
+                      Text("Ready to import")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.7))
+                    }
+                    
+                    Spacer()
+                    
+                    Button("Change") {
+                      showingFilePicker = true
+                    }
+                    .foregroundColor(.tmiSecondary)
+                  }
+                } else {
+                  VStack(spacing: 16) {
+                    Image(systemName: "doc.badge.plus")
+                      .font(.system(size: 40))
+                      .foregroundColor(.white.opacity(0.3))
+                    
+                    Text("No file selected")
+                      .font(.system(size: 18, weight: .medium))
+                      .foregroundColor(.white.opacity(0.7))
+                  }
+                }
+                
+                TMIButton(
+                  text: selectedFile == nil ? "Select File" : "Change File",
+                  icon: "folder",
+                  style: .secondary,
+                  action: {
+                    showingFilePicker = true
+                  }
+                )
+              }
+            }
+            
+            // Import button
+            TMIButton(
+              text: "Import Form",
+              icon: "square.and.arrow.down",
+              style: .primary,
+              isDisabled: selectedFile == nil,
+              action: {
+                // Import the form
+                dismiss()
+              }
+            )
+            .padding(.bottom, 40)
+          }
+          .padding(.horizontal, 20)
+        }
+      }
+      .navigationTitle("Import Form")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Button("Cancel") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+      }
+      .preferredColorScheme(.dark)
+      .fileImporter(
+        isPresented: $showingFilePicker,
+        allowedContentTypes: [.json, .data],
+        allowsMultipleSelection: false
+      ) { result in
+        switch result {
+        case .success(let files):
+          if let file = files.first {
+            selectedFile = file
+          }
+        case .failure(let error):
+          print("Error selecting file: \(error)")
+        }
       }
     }
-    .preferredColorScheme(.dark)
   }
 }
 

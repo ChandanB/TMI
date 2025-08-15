@@ -10,12 +10,18 @@ import SwiftUI
 
 struct TMIPlanListView: View {
   @State private var stateModel = TMIPlanListStateModel()
+  @Environment(\.dashboardStateModel) var dashboardStateModel
 
   // Animation states
   @State private var headerAppeared = false
   @State private var searchAppeared = false
   @State private var plansAppeared = false
   @State private var fabAppeared = false
+  
+  // Sheet states
+  @State private var showingFormBuilder = false
+  @State private var showingAnalytics = false
+  @State private var showingImportPlans = false
 
   var body: some View {
     ZStack {
@@ -83,15 +89,15 @@ struct TMIPlanListView: View {
           ToolbarItem(placement: .navigationBarTrailing) {
             Menu {
               Button(action: {
-                // Navigate to form template picker for creating TMI plans
-                NavigationCoordinator.shared.navigate(to: .formBuilder)
+                // Show form template picker for creating TMI plans
+                showingFormBuilder = true
               }) {
                 Label("Create from Template", systemImage: "doc.badge.plus")
               }
 
               Button(action: {
-                // Future: Import TMI plans functionality
-                print("Import plans functionality coming soon")
+                // Show import plans interface
+                showingImportPlans = true
               }) {
                 Label("Import Plans", systemImage: "square.and.arrow.down")
               }
@@ -99,15 +105,8 @@ struct TMIPlanListView: View {
               Divider()
 
               Button(action: {
-                // Navigate to dashboard insights
-                // For now, create sample dashboard data
-                let sampleData = DashboardData(
-                  totalStudents: 25,
-                  activeTMIPlans: 12,
-                  interestsIdentified: 45,
-                  surveysCompleted: 8
-                )
-                NavigationCoordinator.shared.navigate(to: .dashboardInsights(sampleData))
+                // Navigate to dashboard insights with real data
+                showingAnalytics = true
               }) {
                 Label("View Analytics", systemImage: "chart.bar.xaxis")
               }
@@ -142,6 +141,39 @@ struct TMIPlanListView: View {
           await stateModel.fetch()
         }
       }
+    }
+    .sheet(isPresented: $showingFormBuilder) {
+      FormTemplateBuilderView()
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+    .sheet(isPresented: $showingAnalytics) {
+      Group {
+        if case .loaded(let dashboardData) = dashboardStateModel.state {
+          DashboardInsightsView(dashboardData: dashboardData)
+        } else {
+          // Fallback while loading
+          ProgressView("Loading Analytics...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(red: 0.08, green: 0.08, blue: 0.15))
+            .task {
+              await dashboardStateModel.fetch()
+            }
+        }
+      }
+      .presentationDetents([.large])
+      .presentationDragIndicator(.visible)
+    }
+    .sheet(isPresented: $showingImportPlans) {
+      ImportPlansView { importedPlans in
+        // Handle imported plans
+        for plan in importedPlans {
+          stateModel.addExistingPlan(plan)
+        }
+        showingImportPlans = false
+      }
+      .presentationDetents([.large])
+      .presentationDragIndicator(.visible)
     }
     // The alert now uses a Binding to stateModel.hasError and calls clearError()
     .alert("Error", isPresented: Binding(
@@ -710,4 +742,226 @@ struct TMIPlanFilterOptionCard: View {
 
 #Preview {
   TMIPlanListView()
+}
+
+// MARK: - Import Plans View
+
+struct ImportPlansView: View {
+  let onImport: ([TMIPlan]) -> Void
+  @Environment(\.dismiss) private var dismiss
+  
+  @State private var selectedFileURL: URL?
+  @State private var isImporting = false
+  @State private var importError: String?
+  @State private var showingFilePicker = false
+  
+  var body: some View {
+    NavigationStack {
+      ZStack {
+        TMIBackgroundView(variant: .default)
+          .ignoresSafeArea()
+        
+        VStack(spacing: 24) {
+          // Header
+          VStack(spacing: 12) {
+            Image(systemName: "square.and.arrow.down.fill")
+              .font(.system(size: 50))
+              .foregroundColor(.tmiSecondary)
+            
+            Text("Import TMI Plans")
+              .font(.title.bold())
+              .foregroundColor(.white)
+            
+            Text("Select a JSON file containing TMI plans to import into your system.")
+              .font(.body)
+              .foregroundColor(.white.opacity(0.7))
+              .multilineTextAlignment(.center)
+              .padding(.horizontal, 20)
+          }
+          .padding(.top, 40)
+          
+          // File selection
+          TMIGlassCard(style: .default) {
+            VStack(spacing: 16) {
+              if let fileURL = selectedFileURL {
+                HStack {
+                  Image(systemName: "doc.fill")
+                    .foregroundColor(.green)
+                  
+                  VStack(alignment: .leading, spacing: 2) {
+                    Text(fileURL.lastPathComponent)
+                      .font(.headline)
+                      .foregroundColor(.white)
+                    
+                    Text("File selected")
+                      .font(.caption)
+                      .foregroundColor(.white.opacity(0.7))
+                  }
+                  
+                  Spacer()
+                  
+                  Button("Change") {
+                    showingFilePicker = true
+                  }
+                  .foregroundColor(.tmiSecondary)
+                }
+              } else {
+                VStack(spacing: 16) {
+                  Image(systemName: "doc.badge.plus")
+                    .font(.system(size: 40))
+                    .foregroundColor(.white.opacity(0.5))
+                  
+                  Text("No file selected")
+                    .font(.headline)
+                    .foregroundColor(.white.opacity(0.7))
+                }
+              }
+              
+              Button {
+                showingFilePicker = true
+              } label: {
+                Text(selectedFileURL == nil ? "Select File" : "Change File")
+                  .font(.headline)
+                  .foregroundColor(.white)
+                  .frame(maxWidth: .infinity)
+                  .padding()
+                  .background(
+                    RoundedRectangle(cornerRadius: 12)
+                      .fill(Color.tmiSecondary)
+                  )
+              }
+              .buttonStyle(.plain)
+            }
+          }
+          
+          // Error message
+          if let importError = importError {
+            TMIGlassCard(style: .default) {
+              HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                  .foregroundColor(.orange)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                  Text("Import Error")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                  
+                  Text(importError)
+                    .font(.body)
+                    .foregroundColor(.white.opacity(0.8))
+                }
+                
+                Spacer()
+              }
+            }
+          }
+          
+          Spacer()
+          
+          // Action buttons
+          HStack(spacing: 16) {
+            Button("Cancel") {
+              dismiss()
+            }
+            .font(.headline)
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(
+              RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+            )
+            
+            Button {
+              if selectedFileURL != nil {
+                Task {
+                  await performImport()
+                }
+              }
+            } label: {
+              Group {
+                if isImporting {
+                  HStack {
+                    ProgressView()
+                      .scaleEffect(0.8)
+                      .tint(.white)
+                    Text("Importing...")
+                  }
+                } else {
+                  Text("Import Plans")
+                }
+              }
+              .font(.headline)
+              .foregroundColor(.white)
+              .frame(maxWidth: .infinity)
+              .padding()
+              .background(
+                RoundedRectangle(cornerRadius: 12)
+                  .fill(selectedFileURL != nil ? Color.tmiSecondary : Color.gray)
+              )
+            }
+            .disabled(selectedFileURL == nil || isImporting)
+            .buttonStyle(.plain)
+          }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 40)
+      }
+      .navigationTitle("Import Plans")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Button("Cancel") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+      }
+    }
+    .preferredColorScheme(.dark)
+    .fileImporter(
+      isPresented: $showingFilePicker,
+      allowedContentTypes: [.json],
+      onCompletion: { result in
+        switch result {
+        case .success(let url):
+          selectedFileURL = url
+          importError = nil
+        case .failure(let error):
+          importError = error.localizedDescription
+        }
+      }
+    )
+  }
+  
+  @MainActor
+  private func performImport() async {
+    guard let fileURL = selectedFileURL else { return }
+    
+    isImporting = true
+    importError = nil
+    
+    do {
+      let data = try Data(contentsOf: fileURL)
+      let decoder = JSONDecoder()
+      decoder.dateDecodingStrategy = .iso8601
+      
+      let importedPlans = try decoder.decode([TMIPlan].self, from: data)
+      
+      // Validate imported plans
+      guard !importedPlans.isEmpty else {
+        importError = "No valid TMI plans found in the file."
+        isImporting = false
+        return
+      }
+      
+      // Success - call the completion handler
+      onImport(importedPlans)
+      
+    } catch {
+      importError = "Failed to import plans: \(error.localizedDescription)"
+    }
+    
+    isImporting = false
+  }
 }

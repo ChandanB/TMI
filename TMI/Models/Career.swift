@@ -8,8 +8,8 @@
 import FirebaseFirestore
 import SwiftUI
 
-struct Career: Identifiable {
-    let id = UUID()
+struct Career: Identifiable, Codable {
+    let id: UUID
     let title: String
     let field: String
     let description: String
@@ -18,7 +18,59 @@ struct Career: Identifiable {
     let salaryRange: ClosedRange<Double>
     let jobOutlook: String
     let growthRate: Double
-    
+
+    // Custom CodingKeys for salaryRange
+    enum CodingKeys: String, CodingKey {
+        case id, title, field, description, skills, education, jobOutlook, growthRate
+        case salaryRangeLowerBound
+        case salaryRangeUpperBound
+    }
+
+    // Custom initializer for decoding
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        field = try container.decode(String.self, forKey: .field)
+        description = try container.decode(String.self, forKey: .description)
+        skills = try container.decode([String].self, forKey: .skills)
+        education = try container.decode(String.self, forKey: .education)
+        jobOutlook = try container.decode(String.self, forKey: .jobOutlook)
+        growthRate = try container.decode(Double.self, forKey: .growthRate)
+
+        let lowerBound = try container.decode(Double.self, forKey: .salaryRangeLowerBound)
+        let upperBound = try container.decode(Double.self, forKey: .salaryRangeUpperBound)
+        salaryRange = lowerBound...upperBound
+    }
+
+    // Custom encoder for encoding
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(field, forKey: .field)
+        try container.encode(description, forKey: .description)
+        try container.encode(skills, forKey: .skills)
+        try container.encode(education, forKey: .education)
+        try container.encode(jobOutlook, forKey: .jobOutlook)
+        try container.encode(growthRate, forKey: .growthRate)
+        try container.encode(salaryRange.lowerBound, forKey: .salaryRangeLowerBound)
+        try container.encode(salaryRange.upperBound, forKey: .salaryRangeUpperBound)
+    }
+
+    // Existing initializer (must be kept for sample data and direct creation)
+    init(title: String, field: String, description: String, skills: [String], education: String, salaryRange: ClosedRange<Double>, jobOutlook: String, growthRate: Double) {
+        self.id = UUID()
+        self.title = title
+        self.field = field
+        self.description = description
+        self.skills = skills
+        self.education = education
+        self.salaryRange = salaryRange
+        self.jobOutlook = jobOutlook
+        self.growthRate = growthRate
+    }
+
     // Sample careers for preview
     static var sampleCareers: [Career] = [
         Career(

@@ -22,68 +22,74 @@ struct PerformanceInsightView: View {
             Divider()
                 .padding(.vertical, 4)
             
-            Chart {
-                ForEach(Array(performanceData.enumerated()), id: \.element.id) { index, dataPoint in
-                    BarMark(
-                        x: .value("Subject", dataPoint.subject),
-                        y: .value("Score", animateChart ? dataPoint.score : 0)
+            Chart(performanceData) { dataPoint in
+                BarMark(
+                    x: .value("Academic Subject", dataPoint.subject),
+                    y: .value("Performance Score", animateChart ? dataPoint.score : 0)
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [
+                            colorFor(subject: dataPoint.subject),
+                            colorFor(subject: dataPoint.subject).opacity(0.8)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [
-                                Color.tmiPrimary,
-                                colorFor(subject: dataPoint.subject)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .cornerRadius(6)
-                    .annotation(position: .top) {
-                        if animateChart {
-                            Text("\(Int(dataPoint.score))")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(colorFor(subject: dataPoint.subject))
-                                .transition(.opacity.animation(.easeIn.delay(Double(index) * 0.1)))
-                        }
-                    }
-                }
+                )
+                .cornerRadius(8)
+                .opacity(animateChart ? 1.0 : 0.0)
                 
-                RuleMark(y: .value("Average", 80))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
-                    .foregroundStyle(.gray.opacity(0.5))
-                    .annotation(position: .leading) {
-                        Text("Avg")
-                            .font(.caption2.weight(.bold))
+                // Reference line for average
+                RuleMark(y: .value("Class Average", 80))
+                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [4, 4]))
+                    .foregroundStyle(.primary.opacity(0.6))
+                    .annotation(position: .topLeading, alignment: .leading) {
+                        Text("Class Avg (80%)")
+                            .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(.ultraThinMaterial)
+                            )
                     }
             }
             .chartYScale(domain: 0...100)
             .chartXAxis {
-                AxisMarks(values: .automatic) { value in
+                AxisMarks(preset: .aligned, values: .automatic) { value in
                     AxisValueLabel {
                         if let subject = value.as(String.self) {
                             Text(subject)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                         }
                     }
-                    AxisGridLine()
+                    AxisGridLine(centered: true)
+                        .foregroundStyle(.quaternary)
                 }
             }
             .chartYAxis {
-                AxisMarks(position: .leading, values: .automatic) { value in
-                    AxisGridLine()
-                    AxisTick()
+                AxisMarks(preset: .aligned, position: .leading, values: .automatic(desiredCount: 6)) { value in
+                    AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(.quaternary)
+                    AxisTick(centered: true, length: 4)
+                        .foregroundStyle(.tertiary)
                     AxisValueLabel {
                         if let score = value.as(Double.self) {
-                            Text("\(Int(score))")
+                            Text("\(Int(score))%")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
             }
+            .accessibilityLabel("Academic Performance Chart")
+            .accessibilityValue("Bar chart showing performance scores by subject")
+            .accessibilityHint("Each bar represents performance in a different academic subject")
             .frame(height: 300)
             .onAppear {
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.3)) {

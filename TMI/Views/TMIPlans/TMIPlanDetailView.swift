@@ -5,6 +5,7 @@ import SwiftUI
 
 struct TMIPlanDetailView: View {
   let plan: TMIPlan
+  @Environment(\.dismiss) private var dismiss
 
   // Animation states
   @State private var headerAppeared = false
@@ -106,14 +107,18 @@ struct TMIPlanDetailView: View {
       }
     }
     .sheet(isPresented: $showingEditSheet) {
-      Text("Edit Plan View")
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+      EditTMIPlanView(plan: plan) { updatedPlan in
+        // Handle the updated plan
+        // In a real implementation, you would update the plan data
+        // For now, we'll just dismiss
+      }
+      .presentationDetents([.large])
+      .presentationDragIndicator(.visible)
     }
     .alert("Delete TMI Plan", isPresented: $showingDeleteAlert) {
       Button("Cancel", role: .cancel) {}
       Button("Delete", role: .destructive) {
-        // Delete action
+        deletePlan()
       }
     } message: {
       Text("Are you sure you want to delete this TMI plan? This action cannot be undone.")
@@ -135,6 +140,19 @@ struct TMIPlanDetailView: View {
 
     withAnimation(.easeOut(duration: 0.5).delay(0.5)) {
       contentAppeared = true
+    }
+  }
+  
+  private func deletePlan() {
+    Task {
+      do {
+        try await TMIPlanService().deletePlan(plan)
+        await MainActor.run {
+          dismiss()
+        }
+      } catch {
+        print("Error deleting TMI plan: \(error)")
+      }
     }
   }
 
@@ -351,87 +369,92 @@ struct TMIPlanDetailView: View {
   }
 
   private var enhancedProgressChart: some View {
-    Chart {
-      // Ideal progress line
-      ForEach(progressData) { dataPoint in
-        LineMark(
-          x: .value("Date", dataPoint.date),
-          y: .value("Target", dataPoint.target)
-        )
-        .foregroundStyle(Color.gray.opacity(0.5))
-        .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
-        .symbol {
-          Circle()
-            .fill(Color.gray.opacity(0.5))
-            .frame(width: 6, height: 6)
-        }
-      }
-
-      // Actual progress line
-      ForEach(progressData) { dataPoint in
-        LineMark(
-          x: .value("Date", dataPoint.date),
-          y: .value("Progress", dataPoint.progress)
-        )
-        .foregroundStyle(
-          LinearGradient(
-            colors: [modelColor, modelColor.opacity(0.7)],
-            startPoint: .leading,
-            endPoint: .trailing
-          )
-        )
-        .lineStyle(StrokeStyle(lineWidth: 3))
-        .symbol {
-          Circle()
-            .fill(modelColor)
-            .frame(width: 8, height: 8)
-        }
-      }
-
-      // Progress area fill
-      ForEach(progressData) { dataPoint in
-        AreaMark(
-          x: .value("Date", dataPoint.date),
-          y: .value("Progress", dataPoint.progress)
-        )
-        .foregroundStyle(
-          LinearGradient(
-            colors: [modelColor.opacity(0.3), modelColor.opacity(0.0)],
-            startPoint: .top,
-            endPoint: .bottom
-          )
-        )
-      }
+    Chart(progressData) { dataPoint in
+      // Area fill
+      AreaMark(
+        x: .value("Period", dataPoint.date),
+        y: .value("Progress", dataPoint.progress)
+      )
+      .foregroundStyle(areaGradient)
+      .interpolationMethod(.catmullRom)
+      
+      // Target line
+      LineMark(
+        x: .value("Period", dataPoint.date),
+        y: .value("Target", dataPoint.target)
+      )
+      .foregroundStyle(targetLineStyle)
+      .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
+      
+      // Progress line
+      LineMark(
+        x: .value("Period", dataPoint.date),
+        y: .value("Progress", dataPoint.progress)
+      )
+      .foregroundStyle(progressLineGradient)
+      .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+      .interpolationMethod(.catmullRom)
+      
+      // Progress points
+      PointMark(
+        x: .value("Period", dataPoint.date),
+        y: .value("Progress", dataPoint.progress)
+      )
+      .foregroundStyle(modelColor)
+      .symbolSize(64)
     }
     .chartYScale(domain: 0...1)
     .chartYAxis {
-      AxisMarks(position: .leading) { value in
-        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [5, 5]))
+      AxisMarks(position: .leading, values: .stride(by: 0.25)) { value in
+        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 4]))
           .foregroundStyle(Color.white.opacity(0.2))
-
-        if let doubleValue = value.as(Double.self) {
-          AxisValueLabel {
+        
+        AxisValueLabel {
+          if let doubleValue = value.as(Double.self) {
             Text("\(Int(doubleValue * 100))%")
-              .font(.system(size: 10))
-              .foregroundColor(.white.opacity(0.6))
+              .font(.caption2)
+              .foregroundColor(.white.opacity(0.7))
           }
         }
       }
     }
     .chartXAxis {
-      AxisMarks { value in
-        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [5, 5]))
+      AxisMarks(values: .automatic(desiredCount: 6)) { value in
+        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 4]))
           .foregroundStyle(Color.white.opacity(0.1))
-
+        
         AxisValueLabel {
           if let stringValue = value.as(String.self) {
             Text(stringValue)
-              .font(.system(size: 10))
-              .foregroundColor(.white.opacity(0.6))
+              .font(.caption2)
+              .foregroundColor(.white.opacity(0.7))
+              .lineLimit(1)
           }
         }
       }
     }
+    .accessibilityLabel("TMI Plan Progress Chart")
+    .accessibilityValue("Shows progress over time compared to target")
+  }
+  
+  private var areaGradient: LinearGradient {
+    LinearGradient(
+      colors: [modelColor.opacity(0.3), modelColor.opacity(0.05)],
+      startPoint: .top,
+      endPoint: .bottom
+    )
+  }
+  
+  private var progressLineGradient: LinearGradient {
+    LinearGradient(
+      colors: [modelColor, modelColor.opacity(0.8)],
+      startPoint: .leading,
+      endPoint: .trailing
+    )
+  }
+  
+  private var targetLineStyle: Color {
+    Color.gray.opacity(0.6)
   }
 
   private func legendItem(color: Color, label: String) -> some View {
@@ -1331,3 +1354,278 @@ struct TMIGoal: Identifiable {
 #Preview {
   TMIPlanDetailView(plan: TMIPlan.samplePlan)
 }
+
+// MARK: - Edit TMI Plan View
+
+struct EditTMIPlanView: View {
+  let plan: TMIPlan
+  let onPlanUpdated: (TMIPlan) -> Void
+  @Environment(\.dismiss) private var dismiss
+  
+  @State private var notes: String
+  @State private var selectedInterests: [Interest]
+  @State private var selectedHobbies: [Hobby]
+  @State private var isUpdating = false
+  
+  init(plan: TMIPlan, onPlanUpdated: @escaping (TMIPlan) -> Void) {
+    self.plan = plan
+    self.onPlanUpdated = onPlanUpdated
+    _notes = State(initialValue: plan.notes)
+    _selectedInterests = State(initialValue: plan.interests)
+    _selectedHobbies = State(initialValue: plan.hobbies)
+  }
+  
+  var body: some View {
+    NavigationStack {
+      ZStack {
+        TMIBackgroundView(variant: .default)
+          .ignoresSafeArea()
+        
+        ScrollView {
+          VStack(spacing: 24) {
+            // Header
+            VStack(spacing: 8) {
+              Image(systemName: "pencil.circle.fill")
+                .font(.system(size: 50))
+                .foregroundColor(.tmiSecondary)
+              
+              Text("Edit TMI Plan")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(.white)
+              
+              Text("Update the plan details")
+                .font(.system(size: 16))
+                .foregroundColor(.white.opacity(0.7))
+            }
+            .padding(.top, 20)
+            
+            // Plan Info (Read-only)
+            TMIGlassCard(style: .default) {
+              VStack(alignment: .leading, spacing: 16) {
+                Text("Plan Information")
+                  .font(.title3.weight(.semibold))
+                  .foregroundColor(.white)
+                
+                VStack(alignment: .leading, spacing: 12) {
+                  HStack {
+                    Text("Model:")
+                      .foregroundColor(.white.opacity(0.7))
+                    Text(plan.model.rawValue)
+                      .foregroundColor(.white)
+                      .fontWeight(.medium)
+                  }
+                  
+                  HStack {
+                    Text("Student:")
+                      .foregroundColor(.white.opacity(0.7))
+                    Text(plan.student.name)
+                      .foregroundColor(.white)
+                      .fontWeight(.medium)
+                  }
+                  
+                  HStack {
+                    Text("Progress:")
+                      .foregroundColor(.white.opacity(0.7))
+                    Text("\(Int(plan.progress * 100))%")
+                      .foregroundColor(.tmiSecondary)
+                      .fontWeight(.medium)
+                  }
+                }
+              }
+            }
+            
+            // Notes Section
+            TMIGlassCard(style: .default) {
+              VStack(alignment: .leading, spacing: 16) {
+                Text("Notes")
+                  .font(.title3.weight(.semibold))
+                  .foregroundColor(.white)
+                
+                TextEditor(text: $notes)
+                  .frame(minHeight: 100)
+                  .scrollContentBackground(.hidden)
+                  .background(Color.clear)
+                  .foregroundColor(.white)
+                  .font(.system(size: 16))
+              }
+            }
+            
+            // Interests Section
+            TMIGlassCard(style: .default) {
+              VStack(alignment: .leading, spacing: 16) {
+                Text("Associated Interests")
+                  .font(.title3.weight(.semibold))
+                  .foregroundColor(.white)
+                
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 12) {
+                  ForEach(Interest.sampleInterests) { interest in
+                    InterestToggleCard(
+                      interest: interest,
+                      isSelected: selectedInterests.contains(interest),
+                      onToggle: { toggleInterest(interest) }
+                    )
+                  }
+                }
+              }
+            }
+            
+            // Hobbies Section
+            TMIGlassCard(style: .default) {
+              VStack(alignment: .leading, spacing: 16) {
+                Text("Associated Hobbies")
+                  .font(.title3.weight(.semibold))
+                  .foregroundColor(.white)
+                
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 12) {
+                  ForEach(Hobby.sampleHobbies) { hobby in
+                    HobbyToggleCard(
+                      hobby: hobby,
+                      isSelected: selectedHobbies.contains(hobby),
+                      onToggle: { toggleHobby(hobby) }
+                    )
+                  }
+                }
+              }
+            }
+          }
+          .padding(20)
+        }
+      }
+      .navigationTitle("Edit Plan")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Button("Cancel") {
+            dismiss()
+          }
+          .foregroundColor(.white)
+        }
+        
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button("Save") {
+            updatePlan()
+          }
+          .foregroundColor(.tmiSecondary)
+          .disabled(isUpdating)
+        }
+      }
+    }
+    .preferredColorScheme(.dark)
+  }
+  
+  private func toggleInterest(_ interest: Interest) {
+    if selectedInterests.contains(interest) {
+      selectedInterests.removeAll { $0.id == interest.id }
+    } else {
+      selectedInterests.append(interest)
+    }
+  }
+  
+  private func toggleHobby(_ hobby: Hobby) {
+    if selectedHobbies.contains(hobby) {
+      selectedHobbies.removeAll { $0.id == hobby.id }
+    } else {
+      selectedHobbies.append(hobby)
+    }
+  }
+  
+  private func updatePlan() {
+    isUpdating = true
+    
+    Task {
+      do {
+        var updatedPlan = plan
+        updatedPlan.notes = notes
+        updatedPlan.interests = selectedInterests
+        updatedPlan.hobbies = selectedHobbies
+        updatedPlan.lastUpdated = Date()
+        
+        try await TMIPlanService().updatePlan(updatedPlan)
+        
+        await MainActor.run {
+          onPlanUpdated(updatedPlan)
+          dismiss()
+        }
+      } catch {
+        print("Error updating TMI plan: \(error)")
+      }
+      
+      await MainActor.run {
+        isUpdating = false
+      }
+    }
+  }
+}
+
+// MARK: - Supporting Views for Edit
+
+struct InterestToggleCard: View {
+  let interest: Interest
+  let isSelected: Bool
+  let onToggle: () -> Void
+  
+  var body: some View {
+    Button(action: onToggle) {
+      HStack(spacing: 8) {
+        Image(systemName: interest.iconName)
+          .font(.system(size: 14))
+          .foregroundColor(interest.color)
+        
+        Text(interest.name)
+          .font(.system(size: 13, weight: .medium))
+          .foregroundColor(.white)
+          .lineLimit(1)
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .background(
+        RoundedRectangle(cornerRadius: 8)
+          .fill(isSelected ? interest.color.opacity(0.2) : Color.white.opacity(0.05))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 8)
+          .stroke(
+            isSelected ? interest.color.opacity(0.5) : Color.white.opacity(0.2),
+            lineWidth: 1
+          )
+      )
+    }
+    .buttonStyle(.plain)
+  }
+}
+
+struct HobbyToggleCard: View {
+  let hobby: Hobby
+  let isSelected: Bool
+  let onToggle: () -> Void
+  
+  var body: some View {
+    Button(action: onToggle) {
+      HStack(spacing: 8) {
+        Image(systemName: hobby.iconName)
+          .font(.system(size: 14))
+          .foregroundColor(hobby.color)
+        
+        Text(hobby.name)
+          .font(.system(size: 13, weight: .medium))
+          .foregroundColor(.white)
+          .lineLimit(1)
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .background(
+        RoundedRectangle(cornerRadius: 8)
+          .fill(isSelected ? hobby.color.opacity(0.2) : Color.white.opacity(0.05))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 8)
+          .stroke(
+            isSelected ? hobby.color.opacity(0.5) : Color.white.opacity(0.2),
+            lineWidth: 1
+          )
+      )
+    }
+    .buttonStyle(.plain)
+  }
+}
+

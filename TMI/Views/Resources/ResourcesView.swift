@@ -44,73 +44,210 @@ struct Resource: Identifiable, Codable {
 
   static var sampleResources: [Resource] {
     [
+      // Featured Resources
       Resource(
         title: "Understanding Student Engagement",
-        description:
-          "A comprehensive guide to measuring and improving student engagement in educational settings.",
+        description: "A comprehensive guide to measuring and improving student engagement in educational settings.",
         category: .article,
-        url: "https://example.com/article1",
+        url: "https://www.edutopia.org/article/understanding-student-engagement",
         createdAt: Date().addingTimeInterval(-86400 * 7),
         updatedAt: Date().addingTimeInterval(-86400 * 7),
-        tags: ["engagement", "research", "metrics"],
-        recommendedFor: ["Teachers", "Counselors"],
+        tags: ["engagement", "research", "metrics", "classroom-management"],
+        recommendedFor: ["Teachers", "Counselors", "Administrators"],
         isFeatured: true
-      ),
-      Resource(
-        title: "Aligning Interests with Academic Performance",
-        description:
-          "Video series exploring how student interests can be leveraged to improve academic outcomes.",
-        category: .video,
-        url: "https://example.com/video1",
-        createdAt: Date().addingTimeInterval(-86400 * 14),
-        updatedAt: Date().addingTimeInterval(-86400 * 14),
-        tags: ["interests", "academic performance", "motivation"],
-        recommendedFor: ["All Educators"]
       ),
       Resource(
         title: "TMI Implementation Course",
-        description:
-          "Step-by-step course on implementing Tangible Modification Intervention in your school or district.",
+        description: "Step-by-step course on implementing Tangible Modification Intervention in your school or district.",
         category: .course,
-        url: "https://example.com/course1",
+        url: "https://www.coursera.org/learn/trauma-informed-education",
         createdAt: Date().addingTimeInterval(-86400 * 30),
         updatedAt: Date().addingTimeInterval(-86400 * 30),
-        tags: ["implementation", "training", "certification"],
-        recommendedFor: ["Administrators", "Program Coordinators"],
+        tags: ["implementation", "training", "certification", "trauma-informed"],
+        recommendedFor: ["Administrators", "Program Coordinators", "Counselors"],
         isFeatured: true
       ),
       Resource(
-        title: "Interest-Based Learning: A Practical Guide",
-        description:
-          "Book on developing curriculum and learning activities based on student interests.",
-        category: .book,
-        url: "https://example.com/book1",
-        createdAt: Date().addingTimeInterval(-86400 * 60),
-        updatedAt: Date().addingTimeInterval(-86400 * 60),
-        tags: ["curriculum", "interest-based learning"],
-        recommendedFor: ["Curriculum Developers", "Teachers"]
+        title: "Student Interest Assessment Toolkit",
+        description: "Comprehensive toolkit with validated instruments for assessing student interests across age groups.",
+        category: .tool,
+        url: "https://www.assessmenttools.edu/interest-inventory",
+        createdAt: Date().addingTimeInterval(-86400 * 15),
+        updatedAt: Date().addingTimeInterval(-86400 * 15),
+        tags: ["assessment", "interests", "toolkit", "validated-instruments"],
+        recommendedFor: ["Counselors", "Teachers", "Researchers"],
+        isFeatured: true
+      ),
+
+      // Video Resources
+      Resource(
+        title: "Aligning Interests with Academic Performance",
+        description: "Video series exploring how student interests can be leveraged to improve academic outcomes.",
+        category: .video,
+        url: "https://www.youtube.com/watch?v=example1",
+        createdAt: Date().addingTimeInterval(-86400 * 14),
+        updatedAt: Date().addingTimeInterval(-86400 * 14),
+        tags: ["interests", "academic performance", "motivation", "research-based"],
+        recommendedFor: ["All Educators", "Parents"]
       ),
       Resource(
+        title: "Trauma-Informed Teaching Strategies",
+        description: "Professional development video series on implementing trauma-informed practices in the classroom.",
+        category: .video,
+        url: "https://www.youtube.com/watch?v=example2",
+        createdAt: Date().addingTimeInterval(-86400 * 21),
+        updatedAt: Date().addingTimeInterval(-86400 * 21),
+        tags: ["trauma-informed", "teaching-strategies", "professional-development"],
+        recommendedFor: ["Teachers", "Counselors", "Social Workers"]
+      ),
+      Resource(
+        title: "Building Student Voice and Choice",
+        description: "Webinar recording on empowering students through interest-based learning opportunities.",
+        category: .video,
+        url: "https://www.youtube.com/watch?v=example3",
+        createdAt: Date().addingTimeInterval(-86400 * 35),
+        updatedAt: Date().addingTimeInterval(-86400 * 35),
+        tags: ["student-voice", "choice", "empowerment", "engagement"],
+        recommendedFor: ["Teachers", "Administrators"]
+      ),
+
+      // Book Resources
+      Resource(
+        title: "Interest-Based Learning: A Practical Guide",
+        description: "Book on developing curriculum and learning activities based on student interests.",
+        category: .book,
+        url: "https://www.amazon.com/interest-based-learning-guide",
+        createdAt: Date().addingTimeInterval(-86400 * 60),
+        updatedAt: Date().addingTimeInterval(-86400 * 60),
+        tags: ["curriculum", "interest-based learning", "pedagogy"],
+        recommendedFor: ["Curriculum Developers", "Teachers", "Instructional Designers"]
+      ),
+      Resource(
+        title: "The Trauma-Informed School: A Step-by-Step Implementation Guide",
+        description: "Comprehensive guide for transforming schools into trauma-informed environments.",
+        category: .book,
+        url: "https://www.amazon.com/trauma-informed-school-guide",
+        createdAt: Date().addingTimeInterval(-86400 * 45),
+        updatedAt: Date().addingTimeInterval(-86400 * 45),
+        tags: ["trauma-informed", "school-transformation", "implementation"],
+        recommendedFor: ["Administrators", "Counselors", "Social Workers"]
+      ),
+      Resource(
+        title: "Culturally Responsive Teaching and the Brain",
+        description: "Research-based strategies for engaging diverse learners through culturally responsive practices.",
+        category: .book,
+        url: "https://www.amazon.com/culturally-responsive-teaching-brain",
+        createdAt: Date().addingTimeInterval(-86400 * 75),
+        updatedAt: Date().addingTimeInterval(-86400 * 75),
+        tags: ["culturally-responsive", "diversity", "neuroscience", "engagement"],
+        recommendedFor: ["Teachers", "Administrators", "Curriculum Developers"]
+      ),
+
+      // Tools and Interactive Content
+      Resource(
         title: "Interest Survey Builder",
-        description: "Interactive tool for creating customized student interest surveys.",
+        description: "Interactive tool for creating customized student interest surveys with analytics dashboard.",
         category: .tool,
-        url: "https://example.com/tool1",
+        url: "https://www.surveytools.edu/interest-builder",
         createdAt: Date().addingTimeInterval(-86400 * 90),
         updatedAt: Date().addingTimeInterval(-86400 * 90),
-        tags: ["surveys", "assessment", "tools"],
-        recommendedFor: ["All Educators"]
+        tags: ["surveys", "assessment", "tools", "analytics"],
+        recommendedFor: ["All Educators", "Researchers"]
+      ),
+      Resource(
+        title: "Digital Portfolio Platform",
+        description: "Web-based platform for students to showcase their interests and learning journey.",
+        category: .tool,
+        url: "https://www.portfolioplatform.edu",
+        createdAt: Date().addingTimeInterval(-86400 * 55),
+        updatedAt: Date().addingTimeInterval(-86400 * 55),
+        tags: ["portfolios", "student-showcase", "digital-tools"],
+        recommendedFor: ["Teachers", "Students", "Parents"]
       ),
       Resource(
         title: "Student Interest Exploration Game",
-        description:
-          "Interactive game designed to help students explore and articulate their interests and passions.",
+        description: "Interactive game designed to help students explore and articulate their interests and passions.",
         category: .interactiveContent,
-        url: "https://example.com/interactive1",
+        url: "https://www.interestexplorer.games",
         createdAt: Date().addingTimeInterval(-86400 * 120),
         updatedAt: Date().addingTimeInterval(-86400 * 120),
-        tags: ["games", "student self-discovery"],
-        recommendedFor: ["Students", "Counselors"]
+        tags: ["games", "student self-discovery", "engagement"],
+        recommendedFor: ["Students", "Counselors", "Teachers"]
       ),
+      Resource(
+        title: "Virtual Career Exploration Lab",
+        description: "Immersive virtual reality experience connecting student interests to career pathways.",
+        category: .interactiveContent,
+        url: "https://www.careerlab.vr",
+        createdAt: Date().addingTimeInterval(-86400 * 40),
+        updatedAt: Date().addingTimeInterval(-86400 * 40),
+        tags: ["career-exploration", "virtual-reality", "pathways"],
+        recommendedFor: ["Counselors", "Students", "Career Coordinators"]
+      ),
+
+      // Articles and Research
+      Resource(
+        title: "The Science of Student Motivation",
+        description: "Research synthesis on intrinsic motivation and its relationship to academic achievement.",
+        category: .article,
+        url: "https://www.edresearch.org/student-motivation-science",
+        createdAt: Date().addingTimeInterval(-86400 * 25),
+        updatedAt: Date().addingTimeInterval(-86400 * 25),
+        tags: ["motivation", "research", "achievement", "intrinsic-motivation"],
+        recommendedFor: ["Researchers", "Teachers", "Administrators"]
+      ),
+      Resource(
+        title: "Implementing Social-Emotional Learning",
+        description: "Evidence-based strategies for integrating SEL into academic instruction.",
+        category: .article,
+        url: "https://www.sel-research.org/implementation-guide",
+        createdAt: Date().addingTimeInterval(-86400 * 18),
+        updatedAt: Date().addingTimeInterval(-86400 * 18),
+        tags: ["social-emotional-learning", "SEL", "integration", "evidence-based"],
+        recommendedFor: ["Teachers", "Counselors", "Administrators"]
+      ),
+      Resource(
+        title: "Measuring Student Engagement: Best Practices",
+        description: "Comprehensive guide to assessment tools and methodologies for measuring student engagement.",
+        category: .article,
+        url: "https://www.engagementresearch.org/measurement-guide",
+        createdAt: Date().addingTimeInterval(-86400 * 32),
+        updatedAt: Date().addingTimeInterval(-86400 * 32),
+        tags: ["engagement", "measurement", "assessment", "best-practices"],
+        recommendedFor: ["Researchers", "Administrators", "Teachers"]
+      ),
+
+      // Course Resources
+      Resource(
+        title: "Foundations of Trauma-Informed Education",
+        description: "Online course covering the neuroscience of trauma and its impact on learning.",
+        category: .course,
+        url: "https://www.traumaeducation.org/foundations-course",
+        createdAt: Date().addingTimeInterval(-86400 * 65),
+        updatedAt: Date().addingTimeInterval(-86400 * 65),
+        tags: ["trauma-informed", "neuroscience", "foundations", "professional-development"],
+        recommendedFor: ["All Educators", "Mental Health Professionals"]
+      ),
+      Resource(
+        title: "Data-Driven Decision Making in Education",
+        description: "Professional development course on using student data to inform instructional practices.",
+        category: .course,
+        url: "https://www.datadecisions.edu/course",
+        createdAt: Date().addingTimeInterval(-86400 * 50),
+        updatedAt: Date().addingTimeInterval(-86400 * 50),
+        tags: ["data-driven", "decision-making", "analytics", "instruction"],
+        recommendedFor: ["Teachers", "Administrators", "Data Analysts"]
+      ),
+      Resource(
+        title: "Culturally Responsive Pedagogy Certification",
+        description: "Certification program in culturally responsive teaching methods and strategies.",
+        category: .course,
+        url: "https://www.culturalresponse.edu/certification",
+        createdAt: Date().addingTimeInterval(-86400 * 85),
+        updatedAt: Date().addingTimeInterval(-86400 * 85),
+        tags: ["culturally-responsive", "certification", "pedagogy", "diversity"],
+        recommendedFor: ["Teachers", "Instructional Coaches", "Administrators"]
+      )
     ]
   }
 }

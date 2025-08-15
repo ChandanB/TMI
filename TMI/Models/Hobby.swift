@@ -311,90 +311,449 @@ enum HobbyCategory: String, CaseIterable, Identifiable, Codable {
 extension Hobby {
     static var sampleHobbies: [Hobby] {
         return [
+            // Sports & Physical Activities
             Hobby(
                 name: "Basketball",
                 category: [.sports],
-                description: "Playing basketball regularly",
+                description: "Playing basketball regularly at recreational and competitive levels",
                 academicRelevance: [.physicalEducation, .mathematics],
                 popularityScore: 85,
                 isFeatured: true,
-                academicBenefits: "Improves coordination and understanding of statistics",
-                skillsDeveloped: [.teamwork, .leadership, .resilience],
+                academicBenefits: "Improves coordination, understanding of statistics, and spatial reasoning",
+                skillsDeveloped: [.teamwork, .leadership, .resilience, .timeManagement],
                 educationalActivities: [
-                    "Track personal statistics",
-                    "Learn about basketball history",
-                    "Study game strategies"
+                    "Track personal and team statistics",
+                    "Learn about basketball history and legends",
+                    "Study game strategies and play analysis",
+                    "Analyze shooting percentages and improve accuracy"
                 ]
             ),
+            
             Hobby(
-                name: "Reading Fiction",
-                category: [.reading],
-                description: "Reading fiction novels and short stories",
-                academicRelevance: [.english],
-                popularityScore: 70,
-                academicBenefits: "Enhances vocabulary and comprehension skills",
-                skillsDeveloped: [.creativity, .emotionalIntelligence],
+                name: "Soccer",
+                category: [.sports],
+                description: "Playing and following soccer/football locally and internationally",
+                academicRelevance: [.physicalEducation, .mathematics, .socialStudies],
+                popularityScore: 88,
+                academicBenefits: "Develops strategic thinking, global awareness, and physical coordination",
+                skillsDeveloped: [.teamwork, .resilience, .adaptability, .leadership],
                 educationalActivities: [
-                    "Join a book club",
-                    "Write book reviews",
-                    "Create character analyses"
+                    "Study World Cup history and international teams",
+                    "Analyze team formations and tactics",
+                    "Learn about soccer cultures around the world",
+                    "Track fitness and performance improvements"
                 ]
             ),
+            
             Hobby(
-                name: "Guitar Playing",
-                category: [.music],
-                description: "Learning and playing guitar",
-                academicRelevance: [.music, .mathematics],
-                popularityScore: 75,
-                academicBenefits: "Develops pattern recognition and rhythm skills",
-                skillsDeveloped: [.creativity, .timeManagement, .resilience],
+                name: "Running & Track",
+                category: [.sports, .outdoors],
+                description: "Distance running, sprinting, and track field events",
+                academicRelevance: [.physicalEducation, .science, .mathematics],
+                popularityScore: 74,
+                academicBenefits: "Teaches goal-setting, data tracking, and understanding of human physiology",
+                skillsDeveloped: [.resilience, .timeManagement, .problemSolving],
                 educationalActivities: [
-                    "Learn music theory",
-                    "Practice daily scales",
-                    "Perform for friends and family"
+                    "Track running times and analyze improvements",
+                    "Study exercise physiology and nutrition",
+                    "Set and achieve personal running goals",
+                    "Learn about famous marathons and athletes"
                 ]
             ),
+            
             Hobby(
-                name: "Video Gaming",
-                category: [.gaming, .technology],
-                description: "Playing video games across different platforms",
-                academicRelevance: [.computerScience, .english],
-                popularityScore: 90,
-                academicBenefits: "Improves problem-solving and strategic thinking",
-                skillsDeveloped: [.problemSolving, .criticalThinking, .adaptability],
+                name: "Swimming",
+                category: [.sports],
+                description: "Swimming for fitness, competition, and recreation",
+                academicRelevance: [.physicalEducation, .science],
+                popularityScore: 71,
+                academicBenefits: "Develops understanding of physics principles and body mechanics",
+                skillsDeveloped: [.resilience, .timeManagement, .problemSolving],
                 educationalActivities: [
-                    "Analyze game narratives",
-                    "Learn about game development",
-                    "Create game mods or levels"
+                    "Study different swimming strokes and techniques",
+                    "Learn about water safety and lifesaving",
+                    "Track swim times and distances",
+                    "Understand the physics of buoyancy and drag"
                 ]
             ),
+            
+            // Creative Arts & Crafts
             Hobby(
-                name: "Cooking",
-                category: [.cooking],
-                description: "Preparing and experimenting with different recipes",
-                academicRelevance: [.science, .mathematics],
-                popularityScore: 65,
-                isFeatured: true,
-                academicBenefits: "Teaches chemistry concepts and measurement skills",
-                skillsDeveloped: [.creativity, .problemSolving, .timeManagement],
+                name: "Drawing & Sketching",
+                category: [.arts, .creative],
+                description: "Creating drawings, sketches, and artistic illustrations",
+                academicRelevance: [.art, .science],
+                popularityScore: 76,
+                academicBenefits: "Develops observation skills, spatial reasoning, and artistic techniques",
+                skillsDeveloped: [.creativity, .criticalThinking, .timeManagement],
                 educationalActivities: [
-                    "Study food chemistry",
-                    "Create a recipe book",
-                    "Learn about cultural cuisines"
+                    "Study different drawing techniques and styles",
+                    "Create scientific illustrations and diagrams",
+                    "Practice perspective and proportion",
+                    "Sketch from life and nature observations"
                 ]
             ),
+            
             Hobby(
                 name: "Photography",
                 category: [.arts, .creative, .technology],
-                description: "Taking and editing photographs",
-                academicRelevance: [.art, .science],
-                popularityScore: 72,
-                academicBenefits: "Teaches principles of light, composition, and digital editing",
-                skillsDeveloped: [.creativity, .criticalThinking],
+                description: "Taking and editing photographs of various subjects",
+                academicRelevance: [.art, .science, .computerScience],
+                popularityScore: 78,
+                isFeatured: true,
+                academicBenefits: "Teaches principles of light, composition, digital editing, and visual storytelling",
+                skillsDeveloped: [.creativity, .criticalThinking, .adaptability],
                 educationalActivities: [
-                    "Study composition techniques",
-                    "Learn photo editing software",
-                    "Create themed photo collections"
+                    "Study composition techniques and rule of thirds",
+                    "Learn photo editing software like Photoshop",
+                    "Create themed photo collections and portfolios",
+                    "Understand camera settings and light physics"
+                ]
+            ),
+            
+            Hobby(
+                name: "Painting & Watercolors",
+                category: [.arts, .creative],
+                description: "Creating paintings using various mediums and techniques",
+                academicRelevance: [.art, .science],
+                popularityScore: 67,
+                academicBenefits: "Develops color theory, composition skills, and artistic expression",
+                skillsDeveloped: [.creativity, .timeManagement, .resilience],
+                educationalActivities: [
+                    "Study famous artists and painting styles",
+                    "Learn color theory and mixing techniques",
+                    "Paint landscapes and nature studies",
+                    "Experiment with different painting mediums"
+                ]
+            ),
+            
+            Hobby(
+                name: "Jewelry Making",
+                category: [.arts, .creative],
+                description: "Designing and creating jewelry and accessories",
+                academicRelevance: [.art, .mathematics],
+                popularityScore: 63,
+                academicBenefits: "Develops fine motor skills, design principles, and geometric understanding",
+                skillsDeveloped: [.creativity, .timeManagement, .problemSolving],
+                educationalActivities: [
+                    "Learn about different metals and gemstones",
+                    "Study jewelry design principles",
+                    "Practice wire wrapping and beading techniques",
+                    "Create custom pieces for special occasions"
+                ]
+            ),
+            
+            // Music & Performance
+            Hobby(
+                name: "Guitar Playing",
+                category: [.music],
+                description: "Learning and playing acoustic or electric guitar",
+                academicRelevance: [.music, .mathematics],
+                popularityScore: 75,
+                academicBenefits: "Develops pattern recognition, rhythm skills, and musical theory understanding",
+                skillsDeveloped: [.creativity, .timeManagement, .resilience, .emotionalIntelligence],
+                educationalActivities: [
+                    "Learn music theory and chord progressions",
+                    "Practice daily scales and finger exercises",
+                    "Perform for friends, family, and school events",
+                    "Study different musical genres and guitar styles"
+                ]
+            ),
+            
+            Hobby(
+                name: "Piano & Keyboard",
+                category: [.music],
+                description: "Playing piano and electronic keyboards",
+                academicRelevance: [.music, .mathematics],
+                popularityScore: 73,
+                academicBenefits: "Enhances mathematical thinking, coordination, and musical comprehension",
+                skillsDeveloped: [.creativity, .timeManagement, .resilience],
+                educationalActivities: [
+                    "Learn classical and contemporary pieces",
+                    "Study music composition and arrangement",
+                    "Practice scales and musical exercises",
+                    "Perform in recitals and school concerts"
+                ]
+            ),
+            
+            Hobby(
+                name: "Singing & Vocals",
+                category: [.music],
+                description: "Developing vocal skills and performing songs",
+                academicRelevance: [.music, .english],
+                popularityScore: 69,
+                academicBenefits: "Improves breath control, language skills, and musical expression",
+                skillsDeveloped: [.creativity, .communication, .emotionalIntelligence],
+                educationalActivities: [
+                    "Practice vocal warm-ups and breathing exercises",
+                    "Learn songs from different cultures and eras",
+                    "Perform in school choirs or talent shows",
+                    "Study vocal techniques and music interpretation"
+                ]
+            ),
+            
+            // Reading & Literature
+            Hobby(
+                name: "Reading Fiction",
+                category: [.reading],
+                description: "Reading novels, short stories, and fictional works",
+                academicRelevance: [.english, .history],
+                popularityScore: 70,
+                academicBenefits: "Enhances vocabulary, comprehension skills, and cultural understanding",
+                skillsDeveloped: [.creativity, .emotionalIntelligence, .criticalThinking],
+                educationalActivities: [
+                    "Join or start a book club with peers",
+                    "Write book reviews and character analyses",
+                    "Explore different genres and time periods",
+                    "Connect literature to historical and social contexts"
+                ]
+            ),
+            
+            Hobby(
+                name: "Comic Books & Graphic Novels",
+                category: [.reading, .arts],
+                description: "Reading and collecting comics and graphic literature",
+                academicRelevance: [.english, .art],
+                popularityScore: 77,
+                academicBenefits: "Develops visual literacy, storytelling appreciation, and artistic awareness",
+                skillsDeveloped: [.creativity, .criticalThinking, .emotionalIntelligence],
+                educationalActivities: [
+                    "Analyze storytelling techniques in comics",
+                    "Study the history of comic book art",
+                    "Create original comic strips or stories",
+                    "Explore comics from different cultures"
+                ]
+            ),
+            
+            Hobby(
+                name: "Poetry & Creative Writing",
+                category: [.reading, .creative],
+                description: "Writing and reading poetry and creative literature",
+                academicRelevance: [.english],
+                popularityScore: 64,
+                academicBenefits: "Develops language skills, self-expression, and literary appreciation",
+                skillsDeveloped: [.creativity, .communication, .emotionalIntelligence],
+                educationalActivities: [
+                    "Write personal poems and short stories",
+                    "Study different poetry forms and styles",
+                    "Participate in poetry slams or writing contests",
+                    "Keep a creative writing journal"
+                ]
+            ),
+            
+            // Gaming & Technology
+            Hobby(
+                name: "Video Gaming",
+                category: [.gaming, .technology],
+                description: "Playing video games across different platforms and genres",
+                academicRelevance: [.computerScience, .english, .mathematics],
+                popularityScore: 90,
+                isFeatured: true,
+                academicBenefits: "Improves problem-solving, strategic thinking, and digital literacy",
+                skillsDeveloped: [.problemSolving, .criticalThinking, .adaptability, .teamwork],
+                educationalActivities: [
+                    "Analyze game narratives and character development",
+                    "Learn about game development and programming",
+                    "Create game mods or custom levels",
+                    "Study the history and evolution of video games"
+                ]
+            ),
+            
+            Hobby(
+                name: "Board Games & Strategy Games",
+                category: [.gaming, .social],
+                description: "Playing board games, card games, and strategy games",
+                academicRelevance: [.mathematics, .socialStudies],
+                popularityScore: 72,
+                academicBenefits: "Develops strategic thinking, probability understanding, and social skills",
+                skillsDeveloped: [.problemSolving, .criticalThinking, .teamwork],
+                educationalActivities: [
+                    "Learn classic strategy games like chess",
+                    "Organize game nights with friends and family",
+                    "Study game theory and probability",
+                    "Create original games and rule sets"
+                ]
+            ),
+            
+            Hobby(
+                name: "Building Models & Miniatures",
+                category: [.technology, .creative],
+                description: "Building and painting model aircraft, cars, and miniatures",
+                academicRelevance: [.art, .science, .mathematics],
+                popularityScore: 58,
+                academicBenefits: "Develops attention to detail, spatial reasoning, and historical knowledge",
+                skillsDeveloped: [.creativity, .timeManagement, .resilience],
+                educationalActivities: [
+                    "Research historical accuracy for models",
+                    "Learn about scale and proportion",
+                    "Practice fine motor skills and painting techniques",
+                    "Study engineering and design principles"
+                ]
+            ),
+            
+            // Cooking & Food
+            Hobby(
+                name: "Cooking & Baking",
+                category: [.cooking],
+                description: "Preparing meals, baking desserts, and experimenting with recipes",
+                academicRelevance: [.science, .mathematics],
+                popularityScore: 68,
+                isFeatured: true,
+                academicBenefits: "Teaches chemistry concepts, measurement skills, and cultural awareness",
+                skillsDeveloped: [.creativity, .problemSolving, .timeManagement, .adaptability],
+                educationalActivities: [
+                    "Study food chemistry and cooking science",
+                    "Create and modify recipes",
+                    "Learn about cultural cuisines and traditions",
+                    "Practice nutrition and healthy cooking"
+                ]
+            ),
+            
+            Hobby(
+                name: "Gardening & Growing Food",
+                category: [.outdoors, .learning],
+                description: "Growing vegetables, herbs, and flowers",
+                academicRelevance: [.science, .mathematics],
+                popularityScore: 61,
+                academicBenefits: "Teaches biology, ecology, and sustainable living practices",
+                skillsDeveloped: [.problemSolving, .timeManagement, .resilience],
+                educationalActivities: [
+                    "Study plant biology and growth cycles",
+                    "Track growth data and weather patterns",
+                    "Learn about sustainable farming practices",
+                    "Create a school or community garden project"
+                ]
+            ),
+            
+            // Outdoor Activities
+            Hobby(
+                name: "Hiking & Nature Walking",
+                category: [.outdoors],
+                description: "Exploring nature trails, parks, and outdoor environments",
+                academicRelevance: [.science, .physicalEducation],
+                popularityScore: 66,
+                academicBenefits: "Develops environmental awareness, physical fitness, and observation skills",
+                skillsDeveloped: [.resilience, .adaptability, .problemSolving],
+                educationalActivities: [
+                    "Study local flora and fauna",
+                    "Learn navigation and map reading skills",
+                    "Track hiking distances and elevation gains",
+                    "Participate in environmental conservation efforts"
+                ]
+            ),
+            
+            Hobby(
+                name: "Camping & Outdoor Skills",
+                category: [.outdoors],
+                description: "Camping, survival skills, and outdoor adventures",
+                academicRelevance: [.science, .physicalEducation],
+                popularityScore: 62,
+                academicBenefits: "Teaches practical life skills, environmental science, and self-reliance",
+                skillsDeveloped: [.problemSolving, .resilience, .adaptability, .leadership],
+                educationalActivities: [
+                    "Learn wilderness survival techniques",
+                    "Study weather patterns and outdoor safety",
+                    "Practice camp cooking and fire safety",
+                    "Participate in scouting or outdoor programs"
+                ]
+            ),
+            
+            // Collecting & Organization
+            Hobby(
+                name: "Coin Collecting",
+                category: [.collecting, .learning],
+                description: "Collecting and studying coins from different countries and eras",
+                academicRelevance: [.history, .socialStudies, .mathematics],
+                popularityScore: 54,
+                academicBenefits: "Develops historical knowledge, research skills, and attention to detail",
+                skillsDeveloped: [.criticalThinking, .timeManagement, .problemSolving],
+                educationalActivities: [
+                    "Research the history behind different coins",
+                    "Learn about world currencies and economies",
+                    "Study metallurgy and coin production",
+                    "Organize and catalog collections systematically"
+                ]
+            ),
+            
+            Hobby(
+                name: "Trading Cards & Collectibles",
+                category: [.collecting, .social],
+                description: "Collecting and trading sports cards, Pokemon, or other collectibles",
+                academicRelevance: [.mathematics, .socialStudies],
+                popularityScore: 75,
+                academicBenefits: "Develops mathematical thinking, research skills, and market awareness",
+                skillsDeveloped: [.problemSolving, .communication, .criticalThinking],
+                educationalActivities: [
+                    "Study statistics and player performance data",
+                    "Learn about market values and economics",
+                    "Practice negotiation and trading skills",
+                    "Research card history and production methods"
+                ]
+            ),
+            
+            // Social & Learning Activities
+            Hobby(
+                name: "Volunteering & Community Service",
+                category: [.social, .learning],
+                description: "Helping in the community through various volunteer activities",
+                academicRelevance: [.socialStudies, .english],
+                popularityScore: 65,
+                academicBenefits: "Develops civic responsibility, communication skills, and social awareness",
+                skillsDeveloped: [.leadership, .communication, .emotionalIntelligence, .teamwork],
+                educationalActivities: [
+                    "Participate in local charity events",
+                    "Help at community food banks or shelters",
+                    "Tutor younger students in academic subjects",
+                    "Organize fundraising events for causes"
+                ]
+            ),
+            
+            Hobby(
+                name: "Learning Languages",
+                category: [.learning, .social],
+                description: "Learning foreign languages and exploring different cultures",
+                academicRelevance: [.foreignLanguage, .socialStudies],
+                popularityScore: 59,
+                academicBenefits: "Enhances cognitive flexibility, cultural awareness, and communication skills",
+                skillsDeveloped: [.communication, .adaptability, .emotionalIntelligence],
+                educationalActivities: [
+                    "Practice with native speakers online or locally",
+                    "Watch foreign films with subtitles",
+                    "Study cultural traditions and celebrations",
+                    "Use language learning apps and games"
+                ]
+            ),
+            
+            // Technology & Making
+            Hobby(
+                name: "3D Printing & Design",
+                category: [.technology, .creative],
+                description: "Designing and printing 3D objects and prototypes",
+                academicRelevance: [.computerScience, .art, .mathematics],
+                popularityScore: 67,
+                academicBenefits: "Combines technology skills with design thinking and spatial reasoning",
+                skillsDeveloped: [.creativity, .problemSolving, .criticalThinking, .adaptability],
+                educationalActivities: [
+                    "Learn 3D modeling software like Tinkercad",
+                    "Design solutions to everyday problems",
+                    "Study engineering and product design",
+                    "Create artistic sculptures and functional objects"
+                ]
+            ),
+            
+            Hobby(
+                name: "Electronics & Circuits",
+                category: [.technology, .learning],
+                description: "Building electronic circuits and learning about electronics",
+                academicRelevance: [.science, .mathematics, .computerScience],
+                popularityScore: 56,
+                academicBenefits: "Develops understanding of physics, engineering, and logical thinking",
+                skillsDeveloped: [.problemSolving, .criticalThinking, .adaptability],
+                educationalActivities: [
+                    "Build simple circuits with LEDs and resistors",
+                    "Learn about electricity and magnetism",
+                    "Create electronic projects and inventions",
+                    "Study how electronic devices work"
                 ]
             )
         ]

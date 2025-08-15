@@ -149,6 +149,7 @@ enum FoundationModelType: String, CaseIterable {
     case educationalAnalysis = "educational-analysis-v1"
     case studentEngagement = "student-engagement-v1"
     case interventionPlanning = "intervention-planning-v1"
+    case careerExploration = "career-exploration-v1"
     
     var systemPrompt: String {
         switch self {
@@ -174,6 +175,18 @@ enum FoundationModelType: String, CaseIterable {
             return """
             You are an intervention planning expert focused on TMI strategies.
             Analyze student data to recommend optimal intervention approaches, timing, and resource allocation.
+            """
+        case .careerExploration:
+            return """
+            You are an expert career counselor and educational guide. Your role is to generate comprehensive career profiles and personalized recommendations based on user interests, skills, and academic data.
+            
+            Focus on:
+            - Providing detailed career descriptions, required skills, education paths, salary ranges, and job outlooks.
+            - Identifying emerging career opportunities.
+            - Suggesting skill development paths and next steps for career exploration.
+            - Tailoring recommendations to individual student profiles.
+            
+            Output should be structured as a JSON object containing an array of career profiles and a career discovery insights summary.
             """
         }
     }
@@ -245,6 +258,153 @@ class AIInsightsService {
     
     // MARK: - Main Insights Generation
     
+    // Define a new struct to hold the AI-generated career data and insights
+    struct AICareerResponse: Codable {
+        let careers: [Career]
+        let insights: CareerDiscoveryInsights
+    }
+
+    @available(iOS 26.0, *)
+    @MainActor
+    func generateCareerData(for student: Student?) async throws -> AICareerResponse {
+        guard await isAppleIntelligenceAvailable() else {
+            print("[AIInsightsService] Apple Intelligence not available for career data, falling back to sample data.")
+            return generateSampleAICareerResponse(for: student)
+        }
+
+        let previousType = modelConfiguration.modelType
+        configureFoundationModel(type: .careerExploration)
+
+        do {
+            let model = try await loadFoundationModel()
+            let prompt = generateCareerPrompt(for: student)
+            
+            var response: Any // Declare response here
+            
+            #if canImport(AppleIntelligence)
+            guard let foundationModel = model as? AppleIntelligence.FoundationModels.Model else {
+                throw AIInsightsError.modelLoadingFailed("Failed to cast Foundation Model to expected type.")
+            }
+            response = try await foundationModel.generateResponse(for: prompt)
+            #else
+            // Fallback for when AppleIntelligence is not available
+            throw AIInsightsError.foundationModelsUnavailable
+            #endif
+            let aiResponse = try parseAICareerResponse(response)
+            
+            // Restore previous configuration
+            modelConfiguration = FoundationModelConfiguration(modelType: previousType)
+            return aiResponse
+        } catch {
+            print("[AIInsightsService] AI career data generation failed: \(error), falling back to sample data.")
+            // Restore previous configuration
+            modelConfiguration = FoundationModelConfiguration(modelType: previousType)
+            return generateSampleAICareerResponse(for: student)
+        }
+    }
+
+    private func generateCareerPrompt(for student: Student?) -> String {
+        var prompt = """
+        Generate a JSON object containing an array of diverse career profiles and a career discovery insights summary.
+        
+        **CAREER PROFILE STRUCTURE:**
+        Each career profile in the 'careers' array should have the following keys:
+        - \"id\": String (UUID)
+        - \"title\": String (e.g., \"Software Engineer\")
+        - \"field\": String (e.g., \"Technology\", \"Healthcare\", \"Business\")
+        - \"description\": String (detailed overview)
+        - \"skills\": [String] (key skills required)
+        - \"education\": String (typical education path)
+        - \"salaryRange\": {\"lowerBound\": Double, \"upperBound\": Double} (annual salary range in USD)
+        - \"jobOutlook\": String (e.g., \"Rapid growth\", \"Stable\", \"Declining\")
+        - \"growthRate\": Double (e.g., 0.22 for 22% growth)
+
+        **CAREER DISCOVERY INSIGHTS STRUCTURE:**
+        The 'insights' object should have the following keys:
+        - \"totalCareersExplored\": Int
+        - \"personalizedRecommendations\": Int
+        - \"topInterestCategory\": String
+        - \"strongestCareerFields\": [String]
+        - \"emergingOpportunities\": [Career] (array of Career objects)
+        - \"skillGaps\": [String]
+        - \"nextSteps\": [String]
+        - \"generatedAt\": Double (Unix timestamp)
+
+        **INSTRUCTIONS:**
+        - Generate 10-15 diverse career profiles.
+        - Ensure 'salaryRange' values are realistic.
+        - 'growthRate' should be a decimal (e.g., 0.15 for 15%).
+        - For 'insights', populate based on the generated careers and any provided student data.
+        - 'emergingOpportunities' should be a subset of the generated careers with high growth potential.
+        - 'skillGaps' and 'nextSteps' should be relevant to the generated careers and student profile.
+        """
+
+        if let student = student {
+            prompt += """
+            
+            **STUDENT PROFILE FOR PERSONALIZATION:**
+            - Name: \(student.name)
+            - Grade: \(student.grade)
+            - Interests: \(student.interests.map { $0.name }.joined(separator: ", "))
+            - Hobbies: \(student.hobbies.map { $0.name }.joined(separator: ", "))
+            - Academic Performance (GPA): \(student.academicPerformance?.gpa ?? 0.0)
+            - Academic Subjects: \(student.academicPerformance?.subjects.map { "\($0.name) (\($0.grade))" }.joined(separator: ", ") ?? "N/A")
+            
+            **PERSONALIZATION FOCUS:**
+            - Prioritize careers that align with the student's interests, hobbies, and academic strengths.
+            - Identify specific skill gaps for this student based on recommended careers.
+            - Suggest actionable next steps tailored to this student's profile.
+            """
+        }
+        
+        prompt += "\n\nGenerate the JSON response now:"
+        return prompt
+    }
+
+    @available(iOS 26.0, *)
+    private func parseAICareerResponse(_ response: Any) throws -> AICareerResponse {
+        #if canImport(AppleIntelligence)
+        guard let modelResponse = response as? AppleIntelligence.ModelResponse else {
+            throw AIInsightsError.responseParsingFailed("Invalid response type")
+        }
+        
+        guard let responseText = modelResponse.text else {
+            throw AIInsightsError.responseParsingFailed("No text in response")
+        }
+        
+        guard let jsonData = responseText.data(using: .utf8) else {
+            throw AIInsightsError.responseParsingFailed("Could not convert response to data")
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970 // For generatedAt in insights
+        
+        do {
+            let aiResponse = try decoder.decode(AICareerResponse.self, from: jsonData)
+            return aiResponse
+        } catch {
+            print("JSON Decoding Error: \(error)")
+            throw AIInsightsError.responseParsingFailed("JSON parsing failed: \(error.localizedDescription)")
+        }
+        #else
+        throw AIInsightsError.foundationModelsUnavailable
+        #endif
+    }
+
+    private func generateSampleAICareerResponse(for student: Student?) -> AICareerResponse {
+        let sampleCareers = Career.sampleCareers
+        let sampleInsights = CareerDiscoveryInsights(
+            totalCareersExplored: sampleCareers.count,
+            personalizedRecommendations: student != nil ? 5 : 0, // Placeholder
+            topInterestCategory: student?.interests.first?.category.first?.rawValue ?? "General",
+            strongestCareerFields: Array(Set(sampleCareers.map { $0.field }).prefix(3)),
+            emergingOpportunities: sampleCareers.filter { $0.growthRate > 0.15 }.prefix(3).map { $0 },
+            skillGaps: student != nil ? ["Data Analysis", "Cloud Computing"] : [], // Placeholder
+            nextSteps: student != nil ? ["Explore online courses in recommended fields", "Attend career fairs"] : [] // Placeholder
+        )
+        return AICareerResponse(careers: sampleCareers, insights: sampleInsights)
+    }
+
     @MainActor
     func generateInsights(from dashboardData: DashboardData) async -> [AIInsight] {
         // Check if Apple Intelligence is available
@@ -303,11 +463,19 @@ class AIInsightsService {
             // Load the Foundation Model
             let model = try await loadFoundationModel()
             
+            #if canImport(AppleIntelligence)
+            guard let foundationModel = model as? AppleIntelligence.FoundationModels.Model else {
+                throw AIInsightsError.modelLoadingFailed("Failed to cast Foundation Model to expected type.")
+            }
             // Generate comprehensive analysis prompt
             let prompt = generateAnalysisPrompt(from: dataContext)
             
             // Generate insights using Foundation Models
-            let response = try await model.generateResponse(for: prompt)
+            let response = try await foundationModel.generateResponse(for: prompt)
+            #else
+            // Fallback for when AppleIntelligence is not available
+            throw AIInsightsError.foundationModelsUnavailable
+            #endif
             
             // Parse the AI response into structured insights
             let insights = try parseFoundationModelResponse(response)

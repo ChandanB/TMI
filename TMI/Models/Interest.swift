@@ -485,111 +485,358 @@ enum InterestCategory: String, CaseIterable, Identifiable, Codable, Comparable, 
 extension Interest {
     static var sampleInterests: [Interest] {
         [
+            // STEM & Technology Interests
             Interest(
                 name: "Robotics",
                 category: [.technology, .science],
-                description: "Building and programming robots",
+                description: "Building and programming robots for competitions and practical applications",
                 academicRelevance: [.computerScience, .mathematics, .science],
                 interventionModels: [.chaseYourSpace, .alignYourMind],
                 popularityScore: 85,
                 isFeatured: true,
-                academicBenefits: "Improves logical thinking and applied science skills",
+                academicBenefits: "Improves logical thinking, applied science skills, and engineering concepts",
                 careerPathways: [.stem, .technology],
                 educationalActivities: [
                     "Build a simple robot using a kit",
                     "Program basic robot movements",
-                    "Participate in a robotics challenge"
+                    "Participate in FIRST Robotics competitions",
+                    "Design solutions for real-world problems"
                 ],
-                behavioralBenefits: "Encourages focus, patience, and attention to detail",
-                skillsDeveloped: [.problemSolving, .criticalThinking, .teamwork]
+                behavioralBenefits: "Encourages focus, patience, attention to detail, and collaborative problem-solving",
+                skillsDeveloped: [.problemSolving, .criticalThinking, .teamwork, .timeManagement]
             ),
             
+            Interest(
+                name: "Programming & Coding",
+                category: [.technology],
+                description: "Learning programming languages and software development",
+                academicRelevance: [.computerScience, .mathematics],
+                interventionModels: [.chaseYourSpace, .alignYourMind],
+                popularityScore: 88,
+                isFeatured: true,
+                academicBenefits: "Strengthens logical thinking, mathematical reasoning, and problem-solving skills",
+                careerPathways: [.technology, .stem],
+                educationalActivities: [
+                    "Create simple games or mobile apps",
+                    "Solve coding challenges on platforms like HackerRank",
+                    "Build a personal website or portfolio",
+                    "Participate in coding competitions"
+                ],
+                behavioralBenefits: "Develops persistence, analytical thinking, and systematic approach to challenges",
+                skillsDeveloped: [.problemSolving, .criticalThinking, .adaptability, .timeManagement]
+            ),
+            
+            Interest(
+                name: "Data Science & Analytics",
+                category: [.technology, .science],
+                description: "Analyzing data to find patterns and make predictions",
+                academicRelevance: [.mathematics, .computerScience, .science],
+                interventionModels: [.chaseYourSpace, .alignYourMind],
+                popularityScore: 79,
+                academicBenefits: "Develops statistical thinking, research skills, and data interpretation",
+                careerPathways: [.stem, .technology, .business],
+                educationalActivities: [
+                    "Analyze school survey data",
+                    "Create data visualizations",
+                    "Study sports or social media statistics",
+                    "Build simple prediction models"
+                ],
+                behavioralBenefits: "Encourages evidence-based thinking and systematic analysis",
+                skillsDeveloped: [.criticalThinking, .problemSolving, .communication]
+            ),
+            
+            // Arts & Creative Interests
             Interest(
                 name: "Creative Writing",
                 category: [.literature, .arts],
-                description: "Writing stories, poems, and essays",
+                description: "Writing stories, poems, scripts, and other creative works",
                 academicRelevance: [.english],
                 interventionModels: [.acknowledgeInterests, .fromMeek2Promising],
                 popularityScore: 72,
-                academicBenefits: "Enhances vocabulary, grammar, and self-expression",
+                academicBenefits: "Enhances vocabulary, grammar, self-expression, and critical thinking",
+                careerPathways: [.creativeArts, .education],
                 educationalActivities: [
-                    "Start a personal journal",
+                    "Start a personal journal or blog",
                     "Create short stories based on daily experiences",
-                    "Participate in writing contests"
+                    "Participate in writing contests and workshops",
+                    "Write for the school newspaper or magazine"
                 ],
-                behavioralBenefits: "Provides healthy emotional outlet and self-reflection",
-                skillsDeveloped: [.creativity, .communication, .emotionalIntelligence]
+                behavioralBenefits: "Provides healthy emotional outlet, self-reflection, and confidence building",
+                skillsDeveloped: [.creativity, .communication, .emotionalIntelligence, .criticalThinking]
             ),
             
+            Interest(
+                name: "Digital Art & Design",
+                category: [.arts, .technology],
+                description: "Creating digital artwork, graphics, and visual designs",
+                academicRelevance: [.art, .computerScience],
+                interventionModels: [.acknowledgeInterests, .chaseYourSpace],
+                popularityScore: 81,
+                academicBenefits: "Combines artistic creativity with technological skills",
+                careerPathways: [.creativeArts, .technology],
+                educationalActivities: [
+                    "Design posters for school events",
+                    "Create digital portfolios",
+                    "Learn graphic design software",
+                    "Design logos for clubs or organizations"
+                ],
+                behavioralBenefits: "Builds confidence through creative expression and skill mastery",
+                skillsDeveloped: [.creativity, .criticalThinking, .adaptability]
+            ),
+            
+            Interest(
+                name: "Theater & Drama",
+                category: [.arts, .entertainment],
+                description: "Acting, directing, and theater production",
+                academicRelevance: [.english, .art, .music, .history],
+                interventionModels: [.fromMeek2Promising, .fromBully2Boss, .acknowledgeInterests],
+                popularityScore: 68,
+                isFeatured: true,
+                academicBenefits: "Enhances literary analysis, historical context understanding, and public speaking",
+                careerPathways: [.creativeArts, .education],
+                educationalActivities: [
+                    "Perform in class plays and school productions",
+                    "Analyze character motivations in literature",
+                    "Write and direct original scripts",
+                    "Study theater history and techniques"
+                ],
+                behavioralBenefits: "Builds confidence, empathy, public speaking skills, and emotional intelligence",
+                skillsDeveloped: [.communication, .teamwork, .creativity, .emotionalIntelligence, .leadership]
+            ),
+            
+            // Sports & Physical Activities
             Interest(
                 name: "Basketball",
                 category: [.sports],
-                description: "Playing and following basketball",
+                description: "Playing and analyzing basketball at competitive and recreational levels",
                 academicRelevance: [.physicalEducation, .mathematics],
                 interventionModels: [.directAndCorrect, .fromBully2Boss],
                 popularityScore: 90,
-                academicBenefits: "Teaches statistics, geometry, and physics concepts",
+                academicBenefits: "Teaches statistics, geometry, physics concepts, and data analysis",
                 educationalActivities: [
                     "Track and analyze game statistics",
                     "Study the physics of shooting techniques",
-                    "Create team strategies"
+                    "Create team strategies and playbooks",
+                    "Research basketball history and culture"
                 ],
-                behavioralBenefits: "Builds teamwork, discipline, and positive competitive spirit",
-                skillsDeveloped: [.teamwork, .leadership, .resilience]
+                behavioralBenefits: "Builds teamwork, discipline, positive competitive spirit, and resilience",
+                skillsDeveloped: [.teamwork, .leadership, .resilience, .timeManagement]
             ),
             
             Interest(
-                name: "Environmental Science",
+                name: "Soccer & Football",
+                category: [.sports],
+                description: "Playing and studying soccer/football tactics and culture",
+                academicRelevance: [.physicalEducation, .mathematics, .socialStudies],
+                interventionModels: [.directAndCorrect, .fromBully2Boss],
+                popularityScore: 87,
+                academicBenefits: "Develops spatial reasoning, strategic thinking, and cultural awareness",
+                educationalActivities: [
+                    "Analyze team formations and strategies",
+                    "Study World Cup history and cultural impact",
+                    "Track fitness and performance metrics",
+                    "Learn about international soccer cultures"
+                ],
+                behavioralBenefits: "Promotes teamwork, cultural understanding, and physical fitness",
+                skillsDeveloped: [.teamwork, .leadership, .resilience, .adaptability]
+            ),
+            
+            // Science & Environmental Interests
+            Interest(
+                name: "Environmental Science & Conservation",
                 category: [.science, .outdoors, .socialCauses],
-                description: "Studying and protecting natural environments",
-                academicRelevance: [.science, .socialStudies],
+                description: "Studying and protecting natural environments and ecosystems",
+                academicRelevance: [.science, .socialStudies, .mathematics],
                 interventionModels: [.chaseYourSpace, .acknowledgeInterests],
                 popularityScore: 75,
                 isFeatured: true,
-                academicBenefits: "Connects biology, chemistry, and social responsibility",
+                academicBenefits: "Connects biology, chemistry, earth science, and social responsibility",
                 careerPathways: [.stem, .publicService],
                 educationalActivities: [
-                    "Conduct water quality testing",
-                    "Start a school recycling program",
-                    "Research local environmental issues"
+                    "Conduct water quality testing projects",
+                    "Start a school recycling or sustainability program",
+                    "Research local environmental issues",
+                    "Participate in community conservation efforts"
                 ],
-                behavioralBenefits: "Develops community awareness and responsible citizenship",
-                skillsDeveloped: [.criticalThinking, .problemSolving, .leadership]
+                behavioralBenefits: "Develops community awareness, responsible citizenship, and long-term thinking",
+                skillsDeveloped: [.criticalThinking, .problemSolving, .leadership, .communication]
             ),
             
             Interest(
-                name: "Drama Club",
-                category: [.arts, .entertainment],
-                description: "Acting and theater production",
-                academicRelevance: [.english, .art, .music],
-                interventionModels: [.fromMeek2Promising, .fromBully2Boss],
-                popularityScore: 68,
-                academicBenefits: "Enhances literary analysis and historical context understanding",
-                educationalActivities: [
-                    "Perform in class plays",
-                    "Analyze character motivations in literature",
-                    "Write original scripts"
-                ],
-                behavioralBenefits: "Builds confidence, empathy, and public speaking skills",
-                skillsDeveloped: [.communication, .teamwork, .creativity, .emotionalIntelligence]
-            ),
-            
-            Interest(
-                name: "Coding",
-                category: [.technology],
-                description: "Learning programming languages",
-                academicRelevance: [.computerScience, .mathematics],
+                name: "Astronomy & Space Science",
+                category: [.science, .technology],
+                description: "Studying space, planets, stars, and the universe",
+                academicRelevance: [.science, .mathematics, .computerScience],
                 interventionModels: [.chaseYourSpace, .alignYourMind],
-                popularityScore: 82,
-                academicBenefits: "Strengthens logical thinking and problem-solving skills",
-                careerPathways: [.technology, .stem],
+                popularityScore: 73,
+                academicBenefits: "Integrates physics, mathematics, and cutting-edge technology",
+                careerPathways: [.stem, .technology],
                 educationalActivities: [
-                    "Create simple games or apps",
-                    "Solve coding challenges",
-                    "Build a personal website"
+                    "Observe and track celestial objects",
+                    "Build model rockets or telescopes",
+                    "Study space missions and astronaut training",
+                    "Participate in astronomy clubs or star parties"
                 ],
-                behavioralBenefits: "Develops persistence and analytical thinking",
-                skillsDeveloped: [.problemSolving, .criticalThinking, .adaptability]
+                behavioralBenefits: "Encourages curiosity, wonder, and systematic observation skills",
+                skillsDeveloped: [.criticalThinking, .problemSolving, .adaptability]
+            ),
+            
+            // Music & Performance
+            Interest(
+                name: "Music Performance & Composition",
+                category: [.music, .arts],
+                description: "Playing instruments, singing, and creating original music",
+                academicRelevance: [.music, .mathematics],
+                interventionModels: [.acknowledgeInterests, .fromMeek2Promising],
+                popularityScore: 77,
+                academicBenefits: "Develops mathematical patterns, rhythm, and auditory processing skills",
+                careerPathways: [.creativeArts, .education],
+                educationalActivities: [
+                    "Learn music theory and composition",
+                    "Perform in school concerts and recitals",
+                    "Create original songs or compositions",
+                    "Study different musical cultures and genres"
+                ],
+                behavioralBenefits: "Builds confidence, emotional expression, and performance skills",
+                skillsDeveloped: [.creativity, .timeManagement, .resilience, .emotionalIntelligence]
+            ),
+            
+            // Leadership & Social Causes
+            Interest(
+                name: "Student Government & Leadership",
+                category: [.leadership, .socialCauses],
+                description: "Leading student organizations and representing peer interests",
+                academicRelevance: [.socialStudies, .english],
+                interventionModels: [.fromBully2Boss, .chaseYourSpace],
+                popularityScore: 69,
+                academicBenefits: "Develops civics knowledge, public speaking, and democratic processes",
+                careerPathways: [.publicService, .business],
+                educationalActivities: [
+                    "Run for student council or class office",
+                    "Organize school events and initiatives",
+                    "Lead community service projects",
+                    "Advocate for student rights and interests"
+                ],
+                behavioralBenefits: "Builds leadership skills, empathy, and social responsibility",
+                skillsDeveloped: [.leadership, .communication, .problemSolving, .teamwork]
+            ),
+            
+            Interest(
+                name: "Debate & Public Speaking",
+                category: [.academics, .leadership],
+                description: "Participating in debates, speech competitions, and forensics",
+                academicRelevance: [.english, .socialStudies, .history],
+                interventionModels: [.fromMeek2Promising, .alignYourMind],
+                popularityScore: 66,
+                academicBenefits: "Enhances research skills, critical thinking, and argumentation",
+                careerPathways: [.business, .publicService, .education],
+                educationalActivities: [
+                    "Participate in debate tournaments",
+                    "Research current events and policy issues",
+                    "Practice impromptu speaking",
+                    "Analyze rhetorical techniques in speeches"
+                ],
+                behavioralBenefits: "Builds confidence, critical thinking, and persuasive communication",
+                skillsDeveloped: [.communication, .criticalThinking, .resilience, .adaptability]
+            ),
+            
+            // Health & Wellness
+            Interest(
+                name: "Health & Fitness Science",
+                category: [.wellness, .science],
+                description: "Understanding human health, nutrition, and physical fitness",
+                academicRelevance: [.science, .physicalEducation, .mathematics],
+                interventionModels: [.chaseYourSpace, .directAndCorrect],
+                popularityScore: 71,
+                academicBenefits: "Connects biology, chemistry, and data analysis to personal health",
+                careerPathways: [.healthcare, .stem],
+                educationalActivities: [
+                    "Track fitness goals and analyze progress data",
+                    "Study nutrition and its effects on performance",
+                    "Research exercise physiology",
+                    "Design workout programs for different goals"
+                ],
+                behavioralBenefits: "Promotes self-care, goal-setting, and healthy lifestyle choices",
+                skillsDeveloped: [.problemSolving, .timeManagement, .resilience]
+            ),
+            
+            // Reading & Literature
+            Interest(
+                name: "Literature & Book Clubs",
+                category: [.literature, .academics],
+                description: "Reading, analyzing, and discussing various forms of literature",
+                academicRelevance: [.english, .history, .socialStudies],
+                interventionModels: [.acknowledgeInterests, .alignYourMind],
+                popularityScore: 70,
+                academicBenefits: "Enhances vocabulary, comprehension, cultural awareness, and analytical skills",
+                educationalActivities: [
+                    "Join or start a book club",
+                    "Write book reviews and literary analyses",
+                    "Explore different genres and time periods",
+                    "Connect literature to historical contexts"
+                ],
+                behavioralBenefits: "Develops empathy, critical thinking, and cultural understanding",
+                skillsDeveloped: [.criticalThinking, .communication, .emotionalIntelligence]
+            ),
+            
+            // Business & Entrepreneurship
+            Interest(
+                name: "Entrepreneurship & Business",
+                category: [.academics, .leadership],
+                description: "Starting businesses, understanding economics, and developing entrepreneurial skills",
+                academicRelevance: [.mathematics, .socialStudies, .english],
+                interventionModels: [.chaseYourSpace, .fromBully2Boss],
+                popularityScore: 74,
+                academicBenefits: "Integrates math, economics, communication, and strategic thinking",
+                careerPathways: [.business, .technology],
+                educationalActivities: [
+                    "Start a small business or online store",
+                    "Participate in business plan competitions",
+                    "Study successful entrepreneurs and companies",
+                    "Learn about financial literacy and investing"
+                ],
+                behavioralBenefits: "Develops initiative, risk assessment, and goal-oriented thinking",
+                skillsDeveloped: [.leadership, .problemSolving, .communication, .adaptability]
+            ),
+            
+            // Language & Culture
+            Interest(
+                name: "Foreign Languages & Cultures",
+                category: [.academics, .socialCauses],
+                description: "Learning languages and exploring different cultures worldwide",
+                academicRelevance: [.foreignLanguage, .socialStudies, .history],
+                interventionModels: [.acknowledgeInterests, .alignYourMind],
+                popularityScore: 68,
+                academicBenefits: "Enhances cognitive flexibility, cultural awareness, and communication skills",
+                careerPathways: [.education, .publicService, .business],
+                educationalActivities: [
+                    "Practice conversation with native speakers",
+                    "Explore cultural traditions and celebrations",
+                    "Watch foreign films with subtitles",
+                    "Participate in cultural exchange programs"
+                ],
+                behavioralBenefits: "Builds cultural empathy, global awareness, and cognitive flexibility",
+                skillsDeveloped: [.communication, .adaptability, .emotionalIntelligence]
+            ),
+            
+            // Making & Building
+            Interest(
+                name: "Engineering & Maker Projects",
+                category: [.crafts, .technology, .science],
+                description: "Building, designing, and creating physical objects and solutions",
+                academicRelevance: [.science, .mathematics, .art],
+                interventionModels: [.chaseYourSpace, .alignYourMind],
+                popularityScore: 76,
+                academicBenefits: "Applies physics, engineering principles, and creative problem-solving",
+                careerPathways: [.stem, .trades],
+                educationalActivities: [
+                    "Build bridges, towers, or mechanical devices",
+                    "Design solutions to everyday problems",
+                    "Participate in engineering challenges",
+                    "Learn about different engineering disciplines"
+                ],
+                behavioralBenefits: "Encourages persistence, creativity, and hands-on learning",
+                skillsDeveloped: [.problemSolving, .creativity, .criticalThinking, .teamwork]
             )
         ]
     }

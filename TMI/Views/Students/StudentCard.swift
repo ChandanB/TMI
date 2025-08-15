@@ -19,11 +19,21 @@ struct StudentCard: View {
             .shadow(radius: 3)
         } else {
           Text(student.initials)
-            .font(.system(size: 40))
+            .font(.system(size: 32, weight: .bold))
             .foregroundColor(.white)
             .frame(width: 80, height: 80)
-            .background(Color.tmiPrimary)
+            .background(
+              LinearGradient(
+                colors: [Color.tmiSecondary, Color.tmiSecondary.opacity(0.8)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              )
+            )
             .clipShape(Circle())
+            .overlay(
+              Circle()
+                .stroke(Color.white.opacity(0.2), lineWidth: 2)
+            )
         }
 
         // Student Name

@@ -65,16 +65,25 @@ struct StudentDetailView: View {
             }
         }
         .sheet(isPresented: $showingNewPlanSheet) {
-            CreateTMIPlanView(student: student)
+            NewTMIPlanView(preselectedStudent: student) { newPlan in
+                // Refresh the TMI plans after creation
+                Task {
+                    await stateModel.fetchTMIPlans()
+                }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingEditStudentSheet) {
-            AddStudentView(onStudentAdded: {
+            AddStudentView(student: student, onStudentAdded: {
                 Task {
                     if let updatedStudent = try? await StudentService().getStudent(by: student.id ?? "") {
                         self.student = updatedStudent
                     }
                 }
             })
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .alert("Delete Student?", isPresented: $showingDeleteConfirmation) {
             Button("Delete", role: .destructive) {

@@ -17,9 +17,9 @@ struct StudentListView: View {
     @State private var gridAppeared = false
     @State private var actionBarAppeared = false
     
-    // Alert states
-    @State private var showingBulkActionsAlert = false
-    @State private var showingExportAlert = false
+    // Alert and sheet states
+    @State private var showingBulkActionsSheet = false
+    @State private var showingExportSheet = false
     
     var body: some View {
         ZStack {
@@ -66,15 +66,23 @@ struct StudentListView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(30)
         }
-        .alert("Bulk Actions", isPresented: $showingBulkActionsAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Bulk actions will be available in a future update.")
+        .sheet(isPresented: $showingBulkActionsSheet) {
+            BulkActionsView(students: stateModel.filteredStudents) { action in
+                // Handle bulk action completion
+                Task {
+                    await stateModel.fetch() // Refresh data
+                }
+                showingBulkActionsSheet = false
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
-        .alert("Export Students", isPresented: $showingExportAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Export functionality will be available in a future update.")
+        .sheet(isPresented: $showingExportSheet) {
+            ExportStudentsView(students: stateModel.filteredStudents) {
+                showingExportSheet = false
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
         .task {
             await stateModel.fetch()
@@ -270,10 +278,10 @@ struct StudentListView: View {
                     spacing: 20
                 ) {
                     ForEach(stateModel.filteredStudents) { student in
-                        StudentCard(student: student)
-                            .onTapGesture {
-                                NavigationCoordinator.shared.navigate(to: .studentDetail(student))
-                            }
+                        NavigationLink(destination: StudentDetailView(student: student)) {
+                            StudentCard(student: student)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -341,7 +349,7 @@ struct StudentListView: View {
                     icon: "person.crop.rectangle.stack.fill",
                     title: "Bulk Actions",
                     action: {
-                        showingBulkActionsAlert = true
+                        showingBulkActionsSheet = true
                     }
                 )
                 
@@ -350,7 +358,7 @@ struct StudentListView: View {
                     icon: "square.and.arrow.up",
                     title: "Export",
                     action: {
-                        showingExportAlert = true
+                        showingExportSheet = true
                     }
                 )
             }
@@ -387,4 +395,527 @@ struct StudentListView: View {
 
 #Preview {
     StudentListView()
+}
+
+// MARK: - Bulk Actions View
+
+struct BulkActionsView: View {
+    let students: [Student]
+    let onComplete: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var selectedStudents: Set<String> = []
+    @State private var isPerformingAction = false
+    @State private var actionCompleted = false
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                TMIBackgroundView(variant: .default)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 12) {
+                        Image(systemName: "person.crop.rectangle.stack.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.tmiSecondary)
+                        
+                        Text("Bulk Actions")
+                            .font(.title.bold())
+                            .foregroundColor(.white)
+                        
+                        Text("Select students and choose an action to apply to all selected students.")
+                            .font(.body)
+                            .foregroundColor(.white.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                    }
+                    
+                    // Student selection
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Text("Select Students")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                
+                                Spacer()
+                                
+                                Button(selectedStudents.count == students.count ? "Deselect All" : "Select All") {
+                                    if selectedStudents.count == students.count {
+                                        selectedStudents.removeAll()
+                                    } else {
+                                        selectedStudents = Set(students.compactMap { $0.id })
+                                    }
+                                }
+                                .foregroundColor(.tmiSecondary)
+                            }
+                            
+                            Divider()
+                                .background(Color.white.opacity(0.1))
+                            
+                            ScrollView {
+                                LazyVStack(spacing: 8) {
+                                    ForEach(students) { student in
+                                        HStack {
+                                            Button {
+                                                if let studentId = student.id {
+                                                    if selectedStudents.contains(studentId) {
+                                                        selectedStudents.remove(studentId)
+                                                    } else {
+                                                        selectedStudents.insert(studentId)
+                                                    }
+                                                }
+                                            } label: {
+                                                HStack {
+                                                    Image(systemName: selectedStudents.contains(student.id ?? "") ? "checkmark.circle.fill" : "circle")
+                                                        .foregroundColor(selectedStudents.contains(student.id ?? "") ? .tmiSecondary : .white.opacity(0.5))
+                                                    
+                                                    Text(student.name)
+                                                        .foregroundColor(.white)
+                                                    
+                                                    Spacer()
+                                                }
+                                                .contentShape(Rectangle())
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                        .padding(.vertical, 4)
+                                    }
+                                }
+                            }
+                            .frame(maxHeight: 200)
+                        }
+                    }
+                    
+                    // Available actions
+                    if !selectedStudents.isEmpty {
+                        TMIGlassCard(style: .default) {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Available Actions")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                
+                                VStack(spacing: 12) {
+                                    BulkActionButton(
+                                        icon: "bell.fill",
+                                        title: "Send Reminder",
+                                        description: "Coming soon - Survey completion reminders",
+                                        color: .orange.opacity(0.6),
+                                        isPerforming: false,
+                                        action: {
+                                            // Disabled - feature not yet implemented
+                                        }
+                                    )
+                                    
+                                    BulkActionButton(
+                                        icon: "doc.fill.badge.plus",
+                                        title: "Create TMI Plans",
+                                        description: "Coming soon - Bulk TMI plan generation",
+                                        color: .blue.opacity(0.6),
+                                        isPerforming: false,
+                                        action: {
+                                            // Disabled - feature not yet implemented
+                                        }
+                                    )
+                                    
+                                    BulkActionButton(
+                                        icon: "star.fill",
+                                        title: "Update Engagement",
+                                        description: "Coming soon - Bulk engagement updates",
+                                        color: .green.opacity(0.6),
+                                        isPerforming: false,
+                                        action: {
+                                            // Disabled - feature not yet implemented
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
+            }
+            .navigationTitle("Bulk Actions")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+    
+    @MainActor
+    private func performBulkAction(_ action: String) async {
+        // Actions are currently disabled - no implementation
+        onComplete(action)
+    }
+}
+
+// MARK: - Bulk Action Button
+
+struct BulkActionButton: View {
+    let icon: String
+    let title: String
+    let description: String
+    let color: Color
+    let isPerforming: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(color)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(.white.opacity(description.contains("Coming soon") ? 0.5 : 1.0))
+                    
+                    Text(description)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                
+                Spacer()
+                
+                if isPerforming {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .tint(.white)
+                } else if description.contains("Coming soon") {
+                    Image(systemName: "clock")
+                        .foregroundColor(.white.opacity(0.3))
+                } else {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(description.contains("Coming soon") ? 0.02 : 0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(color.opacity(0.3), lineWidth: 1)
+                    )
+            )
+        }
+        .disabled(isPerforming || description.contains("Coming soon"))
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Export Students View
+
+struct ExportStudentsView: View {
+    let students: [Student]
+    let onComplete: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var selectedFormat: ExportFormat = .csv
+    @State private var includePrivateData = false
+    @State private var isExporting = false
+    
+    enum ExportFormat: String, CaseIterable {
+        case csv = "CSV"
+        case json = "JSON"
+        case pdf = "PDF Report"
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                TMIBackgroundView(variant: .default)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 12) {
+                        Image(systemName: "square.and.arrow.up.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.tmiSecondary)
+                        
+                        Text("Export Students")
+                            .font(.title.bold())
+                            .foregroundColor(.white)
+                        
+                        Text("Generate and share student data in your preferred format.")
+                            .font(.body)
+                            .foregroundColor(.white.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                    }
+                    
+                    // Export options
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Export Format")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            VStack(spacing: 8) {
+                                ForEach(ExportFormat.allCases, id: \.self) { format in
+                                    Button {
+                                        selectedFormat = format
+                                    } label: {
+                                        HStack {
+                                            Image(systemName: selectedFormat == format ? "largecircle.fill.circle" : "circle")
+                                                .foregroundColor(selectedFormat == format ? .tmiSecondary : .white.opacity(0.5))
+                                            
+                                            Text(format.rawValue)
+                                                .foregroundColor(.white)
+                                            
+                                            Spacer()
+                                        }
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Privacy options
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Privacy Settings")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            Toggle(isOn: $includePrivateData) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Include Private Data")
+                                        .foregroundColor(.white)
+                                    
+                                    Text("Include sensitive information like Student ID and date of birth")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                            }
+                            .tint(.tmiSecondary)
+                        }
+                    }
+                    
+                    // Export summary
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Export Summary")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            HStack {
+                                Text("Students:")
+                                Spacer()
+                                Text("\(students.count)")
+                            }
+                            .foregroundColor(.white)
+                            
+                            HStack {
+                                Text("Format:")
+                                Spacer()
+                                Text(selectedFormat.rawValue)
+                            }
+                            .foregroundColor(.white)
+                            
+                            HStack {
+                                Text("Privacy Level:")
+                                Spacer()
+                                Text(includePrivateData ? "Full Data" : "Public Data Only")
+                            }
+                            .foregroundColor(.white)
+                            
+                            HStack {
+                                Text("Output:")
+                                Spacer()
+                                Text("Text data via Share Sheet")
+                            }
+                            .foregroundColor(.white.opacity(0.7))
+                            .font(.caption)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Export button
+                    Button {
+                        Task {
+                            await performExport()
+                        }
+                    } label: {
+                        Group {
+                            if isExporting {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                        .tint(.white)
+                                    Text("Exporting...")
+                                }
+                            } else {
+                                HStack {
+                                    Image(systemName: "square.and.arrow.up")
+                                    Text("Generate & Share Data")
+                                }
+                            }
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.tmiSecondary)
+                        )
+                    }
+                    .disabled(isExporting)
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
+            }
+            .navigationTitle("Export")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+    
+    @MainActor
+    private func performExport() async {
+        isExporting = true
+        
+        // Generate export data
+        let exportData = generateExportData()
+        
+        // Share the data
+        let activityController = UIActivityViewController(
+            activityItems: [exportData],
+            applicationActivities: nil
+        )
+        
+        #if os(iOS)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootViewController = window.rootViewController {
+            activityController.popoverPresentationController?.sourceView = window
+            activityController.popoverPresentationController?.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
+            rootViewController.present(activityController, animated: true)
+        }
+        #endif
+        
+        isExporting = false
+        onComplete()
+    }
+    
+    private func generateExportData() -> String {
+        switch selectedFormat {
+        case .csv:
+            return generateCSV()
+        case .json:
+            return generateJSON()
+        case .pdf:
+            return generatePDFReport()
+        }
+    }
+    
+    private func generateCSV() -> String {
+        var csv = "Name,Grade,School,Age,Engagement Score,Interests Count,TMI Plans Count"
+        if includePrivateData {
+            csv += ",Student ID,Date of Birth"
+        }
+        csv += "\n"
+        
+        for student in students {
+            let interests = student.interests.count
+            let plans = student.tmiPlans?.count ?? 0
+            
+            var row = "\(student.name),\(student.grade),\(student.school),\(student.age),\(student.engagementScore),\(interests),\(plans)"
+            if includePrivateData {
+                row += ",\(student.studentID ?? ""),\(student.formattedDateOfBirth)"
+            }
+            csv += row + "\n"
+        }
+        
+        return csv
+    }
+    
+    private func generateJSON() -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        encoder.dateEncodingStrategy = .iso8601
+        
+        do {
+            let data = try encoder.encode(students)
+            return String(data: data, encoding: .utf8) ?? "Failed to encode data"
+        } catch {
+            return "Failed to encode data: \(error.localizedDescription)"
+        }
+    }
+    
+    private func generatePDFReport() -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .long
+        
+        var report = """
+        TMI Students Report
+        Generated: \(dateFormatter.string(from: Date()))
+        Total Students: \(students.count)
+        
+        STUDENT SUMMARY
+        """
+        
+        for (index, student) in students.enumerated() {
+            report += """
+            
+            \(index + 1). \(student.name)
+               Grade: \(student.grade)
+               School: \(student.school)
+               Age: \(student.age) years
+               Engagement Score: \(Int(student.engagementScore * 100))%
+               Interests: \(student.interests.count)
+               TMI Plans: \(student.tmiPlans?.count ?? 0)
+            """
+            
+            if includePrivateData {
+                report += """
+                   Student ID: \(student.studentID ?? "Not provided")
+                   Date of Birth: \(student.formattedDateOfBirth)
+                """
+            }
+        }
+        
+        report += """
+        
+        
+        ---
+        Report generated by TMI Education Platform
+        """
+        
+        return report
+    }
 }

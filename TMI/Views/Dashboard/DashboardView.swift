@@ -399,10 +399,15 @@ struct DashboardView: View {
 
   @State private var selectedTimeFrame: TimeFrame = .week
   @State private var showingInsightsSheet = false
+  @State private var showingUserProfile = false
   @State private var headerAnimation = false
   @State private var cardsAnimation = false
   @State private var chartAnimation = false
   @State private var buttonAnimation = false
+  
+  // AI Insights state
+  @State private var aiInsights: [AIInsight] = []
+  @State private var isLoadingInsights = false
 
   var body: some View {
     ZStack {
@@ -426,15 +431,10 @@ struct DashboardView: View {
     .foregroundColor(.white)
     .foregroundStyle(.white)
     .navigationBarTitleDisplayMode(.large)
-    .sheet(isPresented: binding(stateModel, \.showingInsightsSheet)) {
-      if case .loaded(let dashboardData) = stateModel.state {
-        DashboardInsightsView(dashboardData: dashboardData)
-      }
-    }
     .toolbar {
       ToolbarItem(placement: .navigationBarTrailing) {
         Button {
-          NavigationCoordinator.shared.navigate(to: .userProfile)
+          showingUserProfile = true
         } label: {
           HStack(spacing: 8) {
             Text("Educator")
@@ -473,25 +473,27 @@ struct DashboardView: View {
         .buttonStyle(ScaleButtonStyle())
       }
     }
-    .sheet(isPresented: $showingInsightsSheet) {
-      if case .loaded(let dashboardData) = stateModel.state {
-        DashboardInsightsView(dashboardData: dashboardData)
-          .presentationDetents([.medium, .large])
-          .presentationDragIndicator(.visible)
-          .presentationSizing(.page)
-      }
-    }
     .sheet(isPresented: binding(stateModel, \.showingAllActivities)) {
       if case .loaded(let dashboardData) = stateModel.state {
         AllActivitiesView(activities: dashboardData.recentActivities)
-          .presentationDetents([.medium, .large])
+          .presentationDetents([PresentationDetent.medium, PresentationDetent.large])
           .presentationDragIndicator(.visible)
       }
+    }
+    .sheet(isPresented: $showingUserProfile) {
+      UserProfileView()
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
     }
     .task {
       // Initialize the local selectedTimeFrame with the stateModel's value
       selectedTimeFrame = stateModel.selectedTimeFrame
       await stateModel.fetch()
+      
+      // Load AI insights after dashboard data is available
+      if case .loaded(let dashboardData) = stateModel.state {
+        await loadAIInsights(for: dashboardData)
+      }
     }
     .refreshable {
       await stateModel.refresh()
@@ -626,16 +628,32 @@ struct DashboardView: View {
             value: chartAnimation
           )
 
-        // Insights button
-        InsightsButtonView {
-          showingInsightsSheet = true
-        }
-        .opacity(buttonAnimation ? 1 : 0)
-        .offset(y: buttonAnimation ? 0 : 20)
-        .animation(
-          .spring(response: 0.6, dampingFraction: 0.7).delay(0.5),
-          value: buttonAnimation
-        )
+        // Performance Overview (from insights)
+        performanceOverviewView(data)
+          .opacity(buttonAnimation ? 1 : 0)
+          .offset(y: buttonAnimation ? 0 : 20)
+          .animation(
+            .spring(response: 0.6, dampingFraction: 0.7).delay(0.5),
+            value: buttonAnimation
+          )
+
+        // Insights & Recommendations (embedded)
+        insightsAndRecommendationsView(data)
+          .opacity(buttonAnimation ? 1 : 0)
+          .offset(y: buttonAnimation ? 0 : 20)
+          .animation(
+            .spring(response: 0.6, dampingFraction: 0.7).delay(0.6),
+            value: buttonAnimation
+          )
+
+        // Action buttons (from insights)
+        dashboardActionButtons(data)
+          .opacity(buttonAnimation ? 1 : 0)
+          .offset(y: buttonAnimation ? 0 : 20)
+          .animation(
+            .spring(response: 0.6, dampingFraction: 0.7).delay(0.7),
+            value: buttonAnimation
+          )
       }
       .padding(.horizontal, 20)
       .padding(.bottom, 40)
@@ -776,6 +794,498 @@ struct DashboardView: View {
       }
     }
   }
+
+  // MARK: - Integrated Insights Views
+
+  private func performanceOverviewView(_ data: DashboardData) -> some View {
+    TMIGlassCard(style: .dashboard) {
+      VStack(alignment: .leading, spacing: 20) {
+        Text("Performance Overview")
+          .font(.title3.weight(.semibold))
+          .foregroundColor(.white)
+
+        HStack(spacing: 16) {
+          StatCircle(
+            value: "\(Int(surveyCompletionRate(data) * 100))%",
+            title: "Survey\nCompletion",
+            color: .green,
+            icon: "chart.bar.fill"
+          )
+
+          StatCircle(
+            value: "\(Int(planAlignmentRate(data) * 100))%", 
+            title: "Plan\nAlignment",
+            color: Color.tmiSecondary,
+            icon: "person.fill.checkmark"
+          )
+
+          StatCircle(
+            value: "\(Int(planEffectiveness(data) * 100))%",
+            title: "Plan\nEffectiveness", 
+            color: .orange,
+            icon: "star.fill"
+          )
+        }
+        .padding(.vertical, 10)
+      }
+    }
+  }
+
+  private func insightsAndRecommendationsView(_ data: DashboardData) -> some View {
+    Group {
+      // AI-Powered Insights & Recommendations
+      if #available(iOS 18.0, *) {
+        TMIGlassCard(style: .dashboard) {
+          VStack(alignment: .leading, spacing: 16) {
+            HStack {
+              VStack(alignment: .leading, spacing: 4) {
+                Text("AI Insights & Recommendations")
+                  .font(.title3.weight(.semibold))
+                  .foregroundColor(.white)
+                
+                Text("Generated by advanced analytics")
+                  .font(.subheadline)
+                  .foregroundColor(.white.opacity(0.7))
+              }
+              
+              Spacer()
+              
+              if isLoadingInsights {
+                ProgressView()
+                  .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                  .scaleEffect(0.8)
+              }
+            }
+            
+            Divider()
+              .background(Color.white.opacity(0.2))
+            
+            if aiInsights.isEmpty && !isLoadingInsights {
+              VStack(spacing: 12) {
+                Image(systemName: "brain.head.profile")
+                  .font(.system(size: 24))
+                  .foregroundColor(.white.opacity(0.6))
+                
+                Text("Generating AI insights...")
+                  .font(.subheadline)
+                  .foregroundColor(.white.opacity(0.7))
+                
+                Text("Analysis will appear as data becomes available")
+                  .font(.caption)
+                  .foregroundColor(.white.opacity(0.5))
+              }
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 20)
+            } else {
+              ForEach(aiInsights.prefix(3)) { insight in
+                AIInsightRow(insight: insight)
+                
+                if insight.id != aiInsights.prefix(3).last!.id {
+                  Divider()
+                    .background(Color.white.opacity(0.1))
+                }
+              }
+            }
+          }
+        }
+      } else {
+        // Fallback for iOS < 18.0
+        TMIGlassCard(style: .dashboard) {
+          VStack(alignment: .leading, spacing: 16) {
+            HStack {
+              VStack(alignment: .leading, spacing: 4) {
+                Text("Insights & Recommendations")
+                  .font(.title3.weight(.semibold))
+                  .foregroundColor(.white)
+                
+                Text("Based on current data patterns")
+                  .font(.subheadline)
+                  .foregroundColor(.white.opacity(0.7))
+              }
+              
+              Spacer()
+            }
+            
+            Divider()
+              .background(Color.white.opacity(0.2))
+            
+            ForEach(recommendations(data).prefix(3)) { recommendation in
+              BasicRecommendationRow(recommendation: recommendation)
+              
+              if recommendation.id != recommendations(data).prefix(3).last!.id {
+                Divider()
+                  .background(Color.white.opacity(0.1))
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private func dashboardActionButtons(_ data: DashboardData) -> some View {
+    HStack(spacing: 16) {
+      Button {
+        // Open calendar app for scheduling
+        if let calendarURL = URL(string: "calshow://") {
+          #if os(iOS)
+          if UIApplication.shared.canOpenURL(calendarURL) {
+            UIApplication.shared.open(calendarURL)
+          } else {
+            // Fallback to default calendar URL
+            if let fallbackURL = URL(string: "calendar://") {
+              UIApplication.shared.open(fallbackURL)
+            }
+          }
+          #endif
+        }
+      } label: {
+        HStack {
+          Image(systemName: "calendar.badge.plus")
+          Text("Open Calendar")
+        }
+        .font(.system(size: 16, weight: .semibold))
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(
+          RoundedRectangle(cornerRadius: 12)
+            .fill(Color.white.opacity(0.05))
+            .overlay(
+              RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+            )
+        )
+        .foregroundColor(.white)
+      }
+      .buttonStyle(ScaleButtonStyle())
+
+      Button {
+        // Export report action - share dashboard data
+        let reportText = generateDashboardReport(data)
+        let activityController = UIActivityViewController(
+          activityItems: [reportText],
+          applicationActivities: nil
+        )
+        
+        #if os(iOS)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootViewController = window.rootViewController {
+          activityController.popoverPresentationController?.sourceView = window
+          activityController.popoverPresentationController?.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
+          rootViewController.present(activityController, animated: true)
+        }
+        #endif
+      } label: {
+        HStack {
+          Image(systemName: "square.and.arrow.up")
+          Text("Export Report")
+        }
+        .font(.system(size: 16, weight: .semibold))
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(
+          RoundedRectangle(cornerRadius: 12)
+            .fill(
+              LinearGradient(
+                colors: [Color.tmiSecondary, Color.tmiSecondary.opacity(0.8)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              )
+            )
+        )
+        .foregroundColor(.white)
+      }
+      .buttonStyle(ScaleButtonStyle())
+    }
+  }
+
+  // MARK: - Insights Helper Methods
+
+  private func surveyCompletionRate(_ data: DashboardData) -> Double {
+    guard data.totalStudents > 0 else { return 0.0 }
+    return Double(data.surveysCompleted) / Double(data.totalStudents)
+  }
+
+  private func planAlignmentRate(_ data: DashboardData) -> Double {
+    guard data.totalStudents > 0 else { return 0.0 }
+    return Double(data.plansAligned) / Double(data.totalStudents)
+  }
+
+  private func planEffectiveness(_ data: DashboardData) -> Double {
+    // Calculate plan effectiveness based on plans vs students ratio and activity
+    let planRatio = data.totalStudents > 0 ? 
+      Double(data.activeTMIPlans) / Double(data.totalStudents) : 0.0
+    let activityBonus = data.recentActivities.count > 0 ? 0.15 : 0.0
+    return min(1.0, planRatio * 0.8 + activityBonus)
+  }
+
+  // MARK: - AI Insights Integration
+  
+  @MainActor
+  private func loadAIInsights(for data: DashboardData) async {
+    guard !isLoadingInsights else { return }
+    
+    isLoadingInsights = true
+    
+    if #available(iOS 18.0, *) {
+      let insights = await AIInsightsService.shared.generateInsights(from: data)
+      aiInsights = insights
+      print("[DashboardView] Loaded \(insights.count) AI insights")
+    }
+    
+    isLoadingInsights = false
+  }
+  
+  private func recommendations(_ data: DashboardData) -> [InsightRecommendation] {
+    // Use AI-generated insights if available, fall back to rule-based
+    if #available(iOS 18.0, *), !aiInsights.isEmpty {
+      return convertAIInsights(aiInsights)
+    } else {
+      return generateBasicRecommendations(data)
+    }
+  }
+  
+  @available(iOS 18.0, *)
+  private func convertAIInsights(_ insights: [AIInsight]) -> [InsightRecommendation] {
+    return insights.prefix(3).map { insight in
+      InsightRecommendation(
+        title: insight.title,
+        description: insight.description,
+        icon: insight.category.icon,
+        color: insight.priority.color
+      )
+    }
+  }
+  
+  private func generateBasicRecommendations(_ data: DashboardData) -> [InsightRecommendation] {
+    var recs: [InsightRecommendation] = []
+    
+    // Survey completion recommendations
+    let completionRate = surveyCompletionRate(data)
+    let alignmentRate = planAlignmentRate(data)
+    
+    if completionRate < 0.7 {
+      let missingCount = data.totalStudents - data.surveysCompleted
+      recs.append(InsightRecommendation(
+        title: "Increase survey completion rate",
+        description: "\(missingCount) students haven't completed their interest surveys. Consider sending reminder notifications.",
+        icon: "bell.fill",
+        color: .orange
+      ))
+    }
+    
+    // Plan alignment recommendations
+    if alignmentRate < 0.6 {
+      let unalignedCount = data.totalStudents - data.plansAligned
+      recs.append(InsightRecommendation(
+        title: "Improve plan alignment",
+        description: "\(unalignedCount) students need aligned TMI plans. Schedule individual meetings to assess their needs.",
+        icon: "person.2.fill",
+        color: .blue
+      ))
+    }
+    
+    // Interest identification recommendations
+    if data.interestsIdentified < data.totalStudents * 2 {
+      recs.append(InsightRecommendation(
+        title: "Expand interest exploration",
+        description: "Students show limited interest diversity. Consider organizing career exploration workshops.",
+        icon: "lightbulb.fill",
+        color: .yellow
+      ))
+    }
+    
+    // Recent activity recommendations
+    if data.recentActivities.count < 3 {
+      recs.append(InsightRecommendation(
+        title: "Boost student engagement",
+        description: "Low recent activity detected. Plan interactive sessions to re-engage students.",
+        icon: "chart.line.uptrend.xyaxis",
+        color: .green
+      ))
+    }
+    
+    // Positive recommendations
+    if completionRate > 0.8 && alignmentRate > 0.7 {
+      recs.append(InsightRecommendation(
+        title: "Excellent progress!",
+        description: "High completion and alignment rates. Consider expanding to advanced tracking features.",
+        icon: "star.fill",
+        color: .teal
+      ))
+    }
+    
+    return Array(recs.prefix(3)) // Limit to 3 recommendations
+  }
+
+  private func generateDashboardReport(_ data: DashboardData) -> String {
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateStyle = .full
+    dateFormatter.timeStyle = .none
+    
+    let report = """
+    TMI Dashboard Report
+    Generated: \(dateFormatter.string(from: Date()))
+    
+    PERFORMANCE OVERVIEW
+    • Total Students: \(data.totalStudents)
+    • Active TMI Plans: \(data.activeTMIPlans)
+    • Surveys Completed: \(data.surveysCompleted)
+    • Interests Identified: \(data.interestsIdentified)
+    • Plans Aligned: \(data.plansAligned)
+    
+    KEY METRICS
+    • Survey Completion Rate: \(Int(surveyCompletionRate(data) * 100))%
+    • Plan Alignment Rate: \(Int(planAlignmentRate(data) * 100))%
+    • Plan Effectiveness: \(Int(planEffectiveness(data) * 100))%
+    
+    RECENT ACTIVITIES (\(data.recentActivities.count))
+    \(data.recentActivities.map { "• \($0.title): \($0.description)" }.joined(separator: "\n"))
+    
+    RECOMMENDATIONS
+    \(recommendations(data).map { "• \($0.title): \($0.description)" }.joined(separator: "\n"))
+    
+    ---
+    Report generated by TMI Education Platform
+    """
+    
+    return report
+  }
+}
+
+// MARK: - AI Insight Row
+
+@available(iOS 18.0, *)
+struct AIInsightRow: View {
+  let insight: AIInsight
+  @State private var isHovered = false
+  
+  var body: some View {
+    HStack(alignment: .top, spacing: 16) {
+      Image(systemName: insight.category.icon)
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundColor(insight.priority.color)
+        .frame(width: 30, height: 30)
+        .padding(4)
+        .background(
+          Circle()
+            .fill(insight.priority.color.opacity(0.1))
+        )
+      
+      VStack(alignment: .leading, spacing: 6) {
+        HStack {
+          Text(insight.title)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundColor(.white)
+          
+          Spacer()
+          
+          HStack(spacing: 4) {
+            Image(systemName: insight.priority.icon)
+              .font(.system(size: 10))
+            
+            Text(insight.priority.rawValue)
+              .font(.caption2.weight(.medium))
+          }
+          .foregroundColor(insight.priority.color)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .background(
+            Capsule()
+              .fill(insight.priority.color.opacity(0.1))
+          )
+        }
+        
+        Text(insight.description)
+          .font(.system(size: 14))
+          .foregroundColor(.white.opacity(0.7))
+          .lineLimit(isHovered ? nil : 2)
+        
+        if !insight.actionItems.isEmpty {
+          VStack(alignment: .leading, spacing: 4) {
+            Text("Action Items:")
+              .font(.caption.weight(.medium))
+              .foregroundColor(.white.opacity(0.8))
+            
+            ForEach(insight.actionItems.prefix(2), id: \.self) { actionItem in
+              HStack(alignment: .top, spacing: 4) {
+                Text("•")
+                  .foregroundColor(insight.priority.color)
+                Text(actionItem)
+                  .font(.caption)
+                  .foregroundColor(.white.opacity(0.6))
+              }
+            }
+          }
+          .padding(.top, 4)
+        }
+        
+        if insight.confidence > 0 {
+          HStack(spacing: 4) {
+            Text("Confidence:")
+              .font(.caption2)
+              .foregroundColor(.white.opacity(0.5))
+            
+            Text("\(Int(insight.confidence * 100))%")
+              .font(.caption2.weight(.medium))
+              .foregroundColor(.white.opacity(0.7))
+          }
+          .padding(.top, 2)
+        }
+      }
+      
+      Spacer()
+    }
+    .padding(.vertical, 10)
+    .contentShape(Rectangle())
+    .onHover { hovering in
+      withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        isHovered = hovering
+      }
+    }
+  }
+}
+
+// MARK: - Basic Recommendation Row (No Apply Button)
+
+struct BasicRecommendationRow: View {
+  let recommendation: InsightRecommendation
+  @State private var isHovered = false
+  
+  var body: some View {
+    HStack(alignment: .top, spacing: 16) {
+      Image(systemName: recommendation.icon)
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundColor(recommendation.color)
+        .frame(width: 30, height: 30)
+        .padding(4)
+        .background(
+          Circle()
+            .fill(recommendation.color.opacity(0.1))
+        )
+      
+      VStack(alignment: .leading, spacing: 4) {
+        Text(recommendation.title)
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundColor(.white)
+        
+        Text(recommendation.description)
+          .font(.system(size: 14))
+          .foregroundColor(.white.opacity(0.7))
+          .lineLimit(isHovered ? nil : 2)
+      }
+      
+      Spacer()
+    }
+    .padding(.vertical, 10)
+    .contentShape(Rectangle())
+    .onHover { hovering in
+      withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        isHovered = hovering
+      }
+    }
+  }
 }
 
 // MARK: - Preview
@@ -847,3 +1357,4 @@ struct AllActivitiesView: View {
     .preferredColorScheme(.dark)
   }
 }
+
