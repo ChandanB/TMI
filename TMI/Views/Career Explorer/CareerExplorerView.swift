@@ -395,7 +395,7 @@ struct CareerExplorerView: View {
             
             Spacer()
             
-            if let insights = searchInsights {
+              if searchInsights != nil {
               Button("View Insights") {
                 showingInsightsSheet = true
               }

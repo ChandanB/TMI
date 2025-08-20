@@ -2,7 +2,7 @@
 //  AccessibilityManager.swift
 //  TMI
 //
-//  Created by Chandan Brown on 8/20/25.
+//  Created by Claude Code on 8/19/25.
 //
 
 import SwiftUI
@@ -172,7 +172,9 @@ final class AccessibilityManager: Sendable {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.updateAccessibilitySettings()
+            Task { @MainActor in
+                self?.updateAccessibilitySettings()
+            }
         }
         
         notificationCenter.addObserver(
@@ -180,7 +182,9 @@ final class AccessibilityManager: Sendable {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.updateAccessibilitySettings()
+            Task { @MainActor in
+                self?.updateAccessibilitySettings()
+            }
         }
         
         notificationCenter.addObserver(
@@ -188,7 +192,9 @@ final class AccessibilityManager: Sendable {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.updateAccessibilitySettings()
+            Task { @MainActor in
+                self?.updateAccessibilitySettings()
+            }
         }
         
         notificationCenter.addObserver(
@@ -196,7 +202,9 @@ final class AccessibilityManager: Sendable {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.updateAccessibilitySettings()
+            Task { @MainActor in
+                self?.updateAccessibilitySettings()
+            }
         }
     }
     
@@ -238,6 +246,79 @@ struct AccessibilityNotification {
 
 // MARK: - Accessibility View Modifiers
 
+private struct ConditionalAccessibilityAction: ViewModifier {
+    let action: (() -> Void)?
+    func body(content: Content) -> some View {
+        if let action = action {
+            content.accessibilityAction { action() }
+        } else {
+            content
+        }
+    }
+}
+
+// MARK: AccessibleTapTargetModifier
+
+private struct AccessibleTapTargetModifier: ViewModifier {
+    @Environment(\.accessibilityManager) private var manager
+    
+    func body(content: Content) -> some View {
+        let size = manager?.minimumTapTargetSize ?? CGSize(width: 44, height: 44)
+        content.frame(minWidth: size.width, minHeight: size.height)
+    }
+}
+
+// MARK: MotionAwareAnimationModifier
+
+private struct MotionAwareAnimationModifier<V: Equatable>: ViewModifier {
+    @Environment(\.accessibilityManager) private var manager
+    let animation: Animation?
+    let value: V
+    
+    func body(content: Content) -> some View {
+        let isReduceMotion = manager?.isReduceMotionEnabled ?? false
+        let accessibleAnimation = isReduceMotion ? nil : animation
+        content.animation(accessibleAnimation, value: value)
+    }
+}
+
+// MARK: AccessibilityAwareOpacityModifier
+
+private struct AccessibilityAwareOpacityModifier: ViewModifier {
+    @Environment(\.accessibilityManager) private var manager
+    let opacity: Double
+    
+    func body(content: Content) -> some View {
+        let isReduceTransparency = manager?.isReduceTransparencyEnabled ?? false
+        let adjustedOpacity = isReduceTransparency ? min(opacity + 0.3, 1.0) : opacity
+        content.opacity(adjustedOpacity)
+    }
+}
+
+// MARK: HighContrastAwareModifier
+
+private struct HighContrastAwareModifier: ViewModifier {
+    @Environment(\.accessibilityManager) private var manager
+    let color: Color
+    
+    func body(content: Content) -> some View {
+        let adjustedColor = manager?.accessibleColor(color) ?? color
+        content.foregroundColor(adjustedColor)
+    }
+}
+
+// MARK: DynamicTypeScaledModifier
+
+private struct DynamicTypeScaledModifier: ViewModifier {
+    @Environment(\.accessibilityManager) private var manager
+    let baseSize: CGFloat
+    
+    func body(content: Content) -> some View {
+        let scaledSize = manager?.scaledFontSize(baseSize) ?? (baseSize * 1.0)
+        content.font(.system(size: scaledSize))
+    }
+}
+
 extension View {
     /// Apply comprehensive accessibility configuration
     func accessibilityOptimized(
@@ -247,53 +328,38 @@ extension View {
         traits: AccessibilityTraits = [],
         action: (() -> Void)? = nil
     ) -> some View {
-        var modified: some View {
-            var base = self
-                .accessibilityLabel(label)
-                .accessibilityHint(hint ?? "")
-                .accessibilityValue(value ?? "")
-                .accessibilityAddTraits(traits)
-            if let action = action {
-                base = base.accessibilityAction { action() }
-            }
-            return base.accessibilityElement(children: .combine)
-        }
-        return modified
+        self
+            .accessibilityLabel(label)
+            .accessibilityHint(hint ?? "")
+            .accessibilityValue(value ?? "")
+            .accessibilityAddTraits(traits)
+            .modifier(ConditionalAccessibilityAction(action: action))
+            .accessibilityElement(children: .combine)
     }
     
     /// Apply minimum tap target size for accessibility
     func accessibleTapTarget() -> some View {
-        let manager = AccessibilityManager.shared
-        return self
-            .frame(minWidth: manager.minimumTapTargetSize.width, 
-                   minHeight: manager.minimumTapTargetSize.height)
+        modifier(AccessibleTapTargetModifier())
     }
     
     /// Apply motion-aware animations
     func motionAwareAnimation<V: Equatable>(_ animation: Animation?, value: V) -> some View {
-        let manager = AccessibilityManager.shared
-        let accessibleAnimation = manager.isReduceMotionEnabled ? nil : animation
-        return self.animation(accessibleAnimation, value: value)
+        modifier(MotionAwareAnimationModifier(animation: animation, value: value))
     }
     
     /// Apply accessibility-aware opacity
     func accessibilityAwareOpacity(_ opacity: Double) -> some View {
-        let manager = AccessibilityManager.shared
-        let adjustedOpacity = manager.isReduceTransparencyEnabled ? min(opacity + 0.3, 1.0) : opacity
-        return self.opacity(adjustedOpacity)
+        modifier(AccessibilityAwareOpacityModifier(opacity: opacity))
     }
     
     /// Apply high contrast colors when needed
     func highContrastAware(color: Color) -> some View {
-        let manager = AccessibilityManager.shared
-        return self.foregroundColor(manager.accessibleColor(color))
+        modifier(HighContrastAwareModifier(color: color))
     }
     
     /// Apply dynamic type scaling
     func dynamicTypeScaled(baseSize: CGFloat) -> some View {
-        let manager = AccessibilityManager.shared
-        let scaledSize = manager.scaledFontSize(baseSize)
-        return self.font(.system(size: scaledSize))
+        modifier(DynamicTypeScaledModifier(baseSize: baseSize))
     }
 }
 
@@ -306,7 +372,7 @@ struct AccessibleButton: View {
     let action: () -> Void
     let style: ButtonStyle
     
-    @Environment(AccessibilityManager.self) private var accessibilityManager
+    @Environment(\.accessibilityManager) private var accessibilityManager
     
     enum ButtonStyle {
         case primary
@@ -332,6 +398,9 @@ struct AccessibleButton: View {
     }
     
     var body: some View {
+        // fallback is false if accessibilityManager is nil
+        let isHighContrast = accessibilityManager?.isIncreaseContrastEnabled ?? false
+        
         Button(action: action) {
             HStack {
                 if let icon = icon {
@@ -343,8 +412,8 @@ struct AccessibleButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(style.backgroundColor(isHighContrast: accessibilityManager.isIncreaseContrastEnabled))
-            .foregroundColor(style.foregroundColor(isHighContrast: accessibilityManager.isIncreaseContrastEnabled))
+            .background(style.backgroundColor(isHighContrast: isHighContrast))
+            .foregroundColor(style.foregroundColor(isHighContrast: isHighContrast))
             .cornerRadius(12)
         }
         .accessibleTapTarget()
@@ -361,7 +430,7 @@ struct AccessibleTextField: View {
     @Binding var text: String
     let isSecure: Bool
     
-    @Environment(AccessibilityManager.self) private var accessibilityManager
+    @Environment(\.accessibilityManager) private var accessibilityManager
     @FocusState private var isFocused: Bool
     @AccessibilityFocusState private var isAccessibilityFocused: Bool
     
@@ -389,7 +458,7 @@ struct AccessibleTextField: View {
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(
                                 isFocused ? .blue : .gray,
-                                lineWidth: accessibilityManager.isIncreaseContrastEnabled ? 2 : 1
+                                lineWidth: accessibilityManager?.isIncreaseContrastEnabled == true ? 2 : 1
                             )
                     )
             )
@@ -404,7 +473,7 @@ struct AccessibleTextField: View {
 // MARK: - Environment Extensions
 
 extension EnvironmentValues {
-    @Entry var accessibilityManager: AccessibilityManager = AccessibilityManager.shared
+    @Entry var accessibilityManager: AccessibilityManager?
 }
 
 // MARK: - ContentSizeCategory Extension

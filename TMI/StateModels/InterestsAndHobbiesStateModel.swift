@@ -311,7 +311,7 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
         case .category:
             return interests.sorted { (a: Interest, b: Interest) in (a.category.first?.rawValue ?? "") < (b.category.first?.rawValue ?? "") }
         case .dateCreated:
-            return interests.sorted { (a: Interest, b: Interest) in (a.createdAt ?? Date.distantPast) > (b.createdAt ?? Date.distantPast) }
+            return interests.sorted { (a: Interest, b: Interest) in (a.createdAt) > (b.createdAt) }
         case .popularity:
             return interests.sorted { (a: Interest, b: Interest) in (a.popularityScore ?? 0) > (b.popularityScore ?? 0) }
         }
@@ -324,7 +324,7 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
         case .category:
             return hobbies.sorted { (a: Hobby, b: Hobby) in (a.category.first?.rawValue ?? "") < (b.category.first?.rawValue ?? "") }
         case .dateCreated:
-            return hobbies.sorted { (a: Hobby, b: Hobby) in (a.createdAt ?? Date.distantPast) > (b.createdAt ?? Date.distantPast) }
+            return hobbies.sorted { (a: Hobby, b: Hobby) in (a.createdAt) > (b.createdAt) }
         case .popularity:
             return hobbies.sorted { (a: Hobby, b: Hobby) in (a.popularityScore ?? 0) > (b.popularityScore ?? 0) }
         }

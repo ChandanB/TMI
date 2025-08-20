@@ -1,8 +1,8 @@
 //
-//  InterestAssociatedData.swift
+//  InterestsAndHobbiesHelpers.swift
 //  TMI
 //
-//  Created by Chandan Brown on 8/20/25.
+//  Helper functions and utilities for InterestsAndHobbies feature
 //
 
 import SwiftUI

@@ -378,7 +378,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                             placeholder: "Display Name",
                             text: Binding(
                                 get: { profileData.displayName },
-                                set: { stateModel.updateDisplayName($0) }
+                                set: { newValue in Task { @MainActor in stateModel.updateDisplayName(newValue) } }
                             )
                         )
                     }
@@ -423,8 +423,10 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                     icon: "rectangle.portrait.and.arrow.right",
                     style: .destructive,
                     action: {
-                        stateModel.signOut()
-                        dismiss()
+                        Task { @MainActor in
+                            stateModel.signOut()
+                            dismiss()
+                        }
                     }
                 )
             }
@@ -521,3 +523,4 @@ struct ChangeEmailView: View {
 #Preview {
     UserProfileView()
 }
+
