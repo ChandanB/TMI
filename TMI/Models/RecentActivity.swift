@@ -12,7 +12,7 @@ import FirebaseAuth
 import FirebaseFirestore
 
 /// Represents a recent activity in the application
-struct RecentActivity: Identifiable, Equatable {
+struct RecentActivity: Identifiable, Equatable, @unchecked Sendable {
     // MARK: - Properties
     
     /// Firestore document ID

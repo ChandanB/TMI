@@ -26,6 +26,7 @@ final class Hobby: Identifiable, Hashable, Codable, @unchecked Sendable {
     var academicRelevance: [AcademicSubject]
     var popularityScore: Int?
     var isFeatured: Bool
+    var createdAt: Date // Add createdAt property
     
     // MARK: - TMI Specific Properties
     var academicBenefits: String?
@@ -47,6 +48,7 @@ final class Hobby: Identifiable, Hashable, Codable, @unchecked Sendable {
         academicRelevance: [AcademicSubject] = [],
         popularityScore: Int? = nil,
         isFeatured: Bool = false,
+        createdAt: Date = Date(), // Add createdAt with default value
         academicBenefits: String? = nil,
         skillsDeveloped: [Skill]? = nil,
         relatedInterests: [String]? = nil,
@@ -62,6 +64,7 @@ final class Hobby: Identifiable, Hashable, Codable, @unchecked Sendable {
         self.academicRelevance = academicRelevance
         self.popularityScore = popularityScore
         self.isFeatured = isFeatured
+        self.createdAt = createdAt // Assign createdAt
         self.academicBenefits = academicBenefits
         self.skillsDeveloped = skillsDeveloped
         self.relatedInterests = relatedInterests
@@ -70,15 +73,15 @@ final class Hobby: Identifiable, Hashable, Codable, @unchecked Sendable {
         self.schemaVersion = schemaVersion
     }
     
-    // Simple initializer with category
+    // Simple initializer with category (update to include createdAt)
     convenience init(name: String, category: HobbyCategory) {
-        self.init(name: name, category: [category])
+        self.init(name: name, category: [category], createdAt: Date())
     }
     
     // MARK: - Codable Implementation
     enum CodingKeys: String, CodingKey {
         case id, firestoreID, name, category, description, academicRelevance
-        case popularityScore, isFeatured, academicBenefits, skillsDeveloped
+        case popularityScore, isFeatured, createdAt, academicBenefits, skillsDeveloped // Add createdAt
         case relatedInterests, educationalActivities, relatedStudents, schemaVersion
     }
     
@@ -93,6 +96,7 @@ final class Hobby: Identifiable, Hashable, Codable, @unchecked Sendable {
         academicRelevance = try container.decodeIfPresent([AcademicSubject].self, forKey: .academicRelevance) ?? []
         popularityScore = try container.decodeIfPresent(Int.self, forKey: .popularityScore)
         isFeatured = try container.decodeIfPresent(Bool.self, forKey: .isFeatured) ?? false
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date() // Decode createdAt
         academicBenefits = try container.decodeIfPresent(String.self, forKey: .academicBenefits)
         skillsDeveloped = try container.decodeIfPresent([Skill].self, forKey: .skillsDeveloped)
         relatedInterests = try container.decodeIfPresent([String].self, forKey: .relatedInterests)
@@ -112,6 +116,7 @@ final class Hobby: Identifiable, Hashable, Codable, @unchecked Sendable {
         try container.encode(academicRelevance, forKey: .academicRelevance)
         try container.encodeIfPresent(popularityScore, forKey: .popularityScore)
         try container.encode(isFeatured, forKey: .isFeatured)
+        try container.encode(createdAt, forKey: .createdAt) // Encode createdAt
         try container.encodeIfPresent(academicBenefits, forKey: .academicBenefits)
         try container.encodeIfPresent(skillsDeveloped, forKey: .skillsDeveloped)
         try container.encodeIfPresent(relatedInterests, forKey: .relatedInterests)
@@ -144,6 +149,9 @@ final class Hobby: Identifiable, Hashable, Codable, @unchecked Sendable {
             skills = skillStrings.compactMap { Skill(rawValue: $0) }
         }
         
+        let createdAtTimestamp = data["createdAt"] as? Timestamp ?? Timestamp(date: Date()) // Decode createdAt from Timestamp
+        let createdAtDate = createdAtTimestamp.dateValue()
+
         return Hobby(
             id: UUID(uuidString: data["id"] as? String ?? UUID().uuidString) ?? UUID(),
             firestoreID: id,
@@ -153,6 +161,7 @@ final class Hobby: Identifiable, Hashable, Codable, @unchecked Sendable {
             academicRelevance: subjects,
             popularityScore: data["popularityScore"] as? Int,
             isFeatured: data["isFeatured"] as? Bool ?? false,
+            createdAt: createdAtDate, // Assign decoded createdAt
             academicBenefits: data["academicBenefits"] as? String,
             skillsDeveloped: skills,
             relatedInterests: data["relatedInterests"] as? [String],
@@ -170,7 +179,8 @@ final class Hobby: Identifiable, Hashable, Codable, @unchecked Sendable {
             "category": category.map { $0.rawValue },
             "academicRelevance": academicRelevance.map { $0.rawValue },
             "isFeatured": isFeatured,
-            "schemaVersion": schemaVersion
+            "schemaVersion": schemaVersion,
+            "createdAt": Timestamp(date: createdAt) // Encode createdAt as Timestamp
         ]
         
         if let description = description { data["description"] = description }
@@ -221,7 +231,7 @@ final class Hobby: Identifiable, Hashable, Codable, @unchecked Sendable {
 
 // MARK: - HobbyCategory Extension
 
-enum HobbyCategory: String, CaseIterable, Identifiable, Codable {
+enum HobbyCategory: String, CaseIterable, Identifiable, Codable, Sendable {
     case sports = "Sports"
     case arts = "Arts & Crafts"
     case music = "Music"

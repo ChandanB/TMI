@@ -630,7 +630,7 @@ struct TMIButton: View {
     var cornerRadius: CGFloat {
       switch self {
       case .floating: return 30
-      case .filter: return 14
+      case .filter: return 24
       case .icon: return 12
       default: return 14
       }
@@ -639,7 +639,7 @@ struct TMIButton: View {
     var height: CGFloat {
       switch self {
       case .floating: return 60
-      case .filter: return 40
+      case .filter: return 48
       case .icon: return 44
       default: return 56
       }
@@ -692,10 +692,28 @@ struct TMIButton: View {
           }
         }
       }
+      .padding(.horizontal, {
+        switch style {
+        case .filter: return 20
+        case .floating, .icon: return 16
+        default: return 24
+        }
+      }())
       .foregroundColor(style.foregroundColor)
       .frame(
-        minWidth: style == .floating ? style.height : nil,
-        maxWidth: style == .floating || style == .icon ? nil : .infinity
+        minWidth: {
+          switch style {
+          case .floating: return style.height
+          case .filter: return 80 // Minimum width for filter buttons
+          default: return nil
+          }
+        }(),
+        maxWidth: {
+          switch style {
+          case .floating, .icon, .filter: return nil
+          default: return .infinity
+          }
+        }()
       )
       .frame(height: style.height)
       .background(
@@ -884,11 +902,11 @@ extension View {
 #if DEBUG
   #Preview("TMI Background Variants") {
     VStack {
-      TMIBackgroundView(variant: .auth)
+      TMIBackgroundView(variant: TMIBackgroundView.BackgroundVariant.auth)
         .frame(height: 200)
         .overlay(Text("Auth Background").foregroundColor(.white))
 
-      TMIBackgroundView(variant: .dashboard)
+      TMIBackgroundView(variant: TMIBackgroundView.BackgroundVariant.dashboard)
         .frame(height: 200)
         .overlay(Text("Dashboard Background").foregroundColor(.white))
     }
@@ -896,7 +914,7 @@ extension View {
 
   #Preview("TMI Glass Cards") {
     ZStack {
-      TMIBackgroundView(variant: .dashboard)
+      TMIBackgroundView(variant: TMIBackgroundView.BackgroundVariant.dashboard)
 
       VStack(spacing: 20) {
         TMIGlassCard(style: .default) {
@@ -923,7 +941,7 @@ extension View {
 
   #Preview("TMI Buttons") {
     ZStack {
-      TMIBackgroundView(variant: .dashboard)
+      TMIBackgroundView(variant: TMIBackgroundView.BackgroundVariant.dashboard)
 
       VStack(spacing: 16) {
         TMIButton(text: "Primary Button", style: .primary) {}

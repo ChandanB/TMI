@@ -139,10 +139,8 @@ final class AsyncTaskHandler<State, Result> {
         currentTask?.cancel()
         currentTask = nil
         
-        // Reset running state on the main thread
-        Task { @MainActor in
-            isRunning = false
-        }
+        // Reset running state directly since we're already on MainActor
+        isRunning = false
     }
     
     deinit {

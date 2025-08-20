@@ -4,7 +4,7 @@ import Foundation
 import SwiftData
 import FirebaseFirestore
 
-enum TMIPlanModel: String, CaseIterable, Codable {
+enum TMIPlanModel: String, CaseIterable, Codable, Sendable {
     case chaseYourSpace = "Chase Your Space"
     case acknowledgeInterests = "Acknowledge Your Interests and Hobbies"
     case alignYourMind = "Align Your Mind"
@@ -30,7 +30,7 @@ enum TMIPlanModel: String, CaseIterable, Codable {
     }
 }
 
-struct TMIPlan: Codable, Identifiable, Hashable {
+struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     @DocumentID var id: String?
     var student: Student
     var students: [Student]
@@ -168,13 +168,13 @@ extension TMIPlan {
     }
 }
 
-enum GoalStatus: String, Codable, CaseIterable {
+enum GoalStatus: String, Codable, CaseIterable, Sendable {
     case notStarted = "Not Started"
     case inProgress = "In Progress"
     case completed = "Completed"
 }
 
-struct Goal: Identifiable, Codable {
+struct Goal: Identifiable, Codable, Sendable {
     let id: UUID
     var description: String
     var dueDate: Date?

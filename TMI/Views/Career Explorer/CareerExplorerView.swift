@@ -1,32 +1,53 @@
 import SwiftUI
+import Foundation
 
 struct CareerExplorerView: View {
-  @State private var careers: [Career] = []
-  @State private var trendingCareers: [Career] = []
+  // Search-focused state
   @State private var searchText = ""
-  @State private var selectedField: String?
-  @State private var isFilterSheetPresented = false
-  @State private var salaryFilter: ClosedRange<Double> = 30000...150000
-  @State private var selectedSkills: Set<String> = []
-  @State private var animateCards = false
-  @State private var isLoading = false
-  @State private var error: Error?
-  @State private var careerStatistics: CareerStatistics?
-  @State private var showTrendingSection = true
-
-  // Animation states
-  @State private var headerAppeared = false
-  @State private var filtersAppeared = false
-  @State private var searchAppeared = false
-  @State private var statsAppeared = false
+  @State private var searchResults: [Career] = []
+  @State private var searchInsights: CareerDiscoveryInsights? = nil
+  @State private var isSearching = false
+  @State private var hasSearched = false
+  @State private var lastSearchQuery = ""
   
-  // Student selection and personalization
+  // Student context
   @State private var selectedStudent: Student? = nil
-  @State private var personalizedRecommendations: [Career] = []
-  @State private var careerInsights: CareerDiscoveryInsights? = nil
-  @State private var showPersonalizedSection = false
   @State private var showingStudentPicker = false
   @State private var showingInsightsSheet = false
+  
+  // Animation states
+  @State private var searchBoxAppeared = false
+  @State private var resultsAppeared = false
+  @State private var headerAppeared = false
+  
+  // Search suggestions
+  @State private var showingSuggestions = false
+  @State private var searchSuggestions: [String] = [
+    "Software Engineer", "Nurse", "Teacher", "Doctor", "Designer",
+    "Technology", "Healthcare", "Education", "Business", "Arts",
+    "Biology", "Mathematics", "Psychology", "Computer Science", "Art"
+  ]
+  
+  // Legacy state variables for compatibility
+  @State private var careers: [Career] = []
+  @State private var trendingCareers: [Career] = []
+  @State private var personalizedRecommendations: [Career] = []
+  @State private var careerInsights: CareerDiscoveryInsights? = nil
+  @State private var careerStatistics: CareerStatistics? = nil
+  @State private var selectedField: String? = nil
+  @State private var selectedSkills: Set<String> = []
+  @State private var salaryFilter: ClosedRange<Double> = 30000...150000
+  @State private var isLoading = false
+  @State private var error: Error? = nil
+  @State private var isFilterSheetPresented = false
+  @State private var showPersonalizedSection = false
+  @State private var showTrendingSection = true
+  
+  // Animation state
+  @State private var searchAppeared = false
+  @State private var filtersAppeared = false
+  @State private var statsAppeared = false
+  @State private var animateCards = false
 
   private let careerService = CareerService.shared
 
@@ -35,50 +56,19 @@ struct CareerExplorerView: View {
     Array(Set(careers.flatMap { $0.skills })).sorted()
   }
   
-  // Break up the complex body expression to fix compiler timeout
-  private var mainContent: some View {
-    VStack(spacing: 0) {
-      // Search bar with enhanced design
-      enhancedSearchBar
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
-        .opacity(searchAppeared ? 1 : 0)
-        .offset(y: searchAppeared ? 0 : -20)
-        .animation(
-          .spring(response: 0.6, dampingFraction: 0.7).delay(0.2),
-          value: searchAppeared)
-
-      // Enhanced career field picker
-      enhancedCareerFieldPicker
-        .padding(.bottom, 16)
-        .opacity(filtersAppeared ? 1 : 0)
-        .offset(y: filtersAppeared ? 0 : -15)
-        .animation(
-          .spring(response: 0.6, dampingFraction: 0.7).delay(0.3),
-          value: filtersAppeared)
-
-      scrollableContent
-    }
-  }
-  
-  private var scrollableContent: some View {
-    ZStack {
-      // Main content with glass morphism effect
-      ScrollView {
-        VStack(alignment: .leading, spacing: 16) {
-          if isLoading {
-            // Loading state
-            loadingView
-          } else if !filteredCareers.isEmpty {
-            careerContent
-          } else {
-            // Enhanced empty state
-            enhancedEmptyStateView
-          }
+  // Simplified body for search-first interface
+  private var legacyCareerContent: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 16) {
+        if isLoading {
+          loadingView
+        } else if !filteredCareers.isEmpty {
+          careerContent
+        } else {
+          enhancedEmptyStateView
         }
-        .padding(20)
       }
+      .padding(20)
     }
     .background(glassMorphismBackground)
     .cornerRadius(28, corners: [.topLeft, .topRight])
@@ -167,35 +157,386 @@ struct CareerExplorerView: View {
       )
   }
 
-  private var studentPickerBackground: some View {
-    RoundedRectangle(cornerRadius: 18)
-      .fill((selectedStudent != nil) ? Color.tmiSecondary.opacity(0.3) : Color.white.opacity(0.1))
-      .background(
-        RoundedRectangle(cornerRadius: 18)
-          .fill(.ultraThinMaterial)
-          .opacity(0.3)
-      )
-  }
+  // Remove legacy student picker styling
   
-  private var studentPickerOverlay: some View {
-    RoundedRectangle(cornerRadius: 18)
-      .stroke(
-        (selectedStudent != nil) ? Color.tmiSecondary.opacity(0.5) : Color.white.opacity(0.2),
-        lineWidth: 1
-      )
-  }
+  // Remove legacy student picker menu
   
-  private var studentPickerMenu: some View {
-    Menu {
-      Button("Select Student for Recommendations") {
-        showingStudentPicker = true
+  // Remove legacy filter button styling
+  
+  // Remove legacy filter button
+
+  // Remove legacy navigation view
+
+  var body: some View {
+    ZStack {
+      // Background
+      TMIBackgroundView(variant: .career)
+        .ignoresSafeArea()
+      
+      if !hasSearched {
+        // Initial search-focused view
+        searchHomeView
+      } else {
+        // Results view
+        searchResultsView
+      }
+    }
+    .navigationTitle("Career Explorer")
+    .navigationBarTitleDisplayMode(.large)
+    .foregroundColor(.white)
+    .toolbar {
+      ToolbarItem(placement: .navigationBarLeading) {
+        studentPickerButton
       }
       
-      if selectedStudent != nil {
-        Button("View Career Insights") {
-          showingInsightsSheet = true
+      if hasSearched {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button("New Search") {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+              resetSearch()
+            }
+          }
+          .foregroundColor(.white)
         }
       }
+    }
+    .sheet(isPresented: $showingStudentPicker) {
+      studentPickerSheet
+    }
+    .sheet(isPresented: $showingInsightsSheet) {
+      if let insights = searchInsights {
+        CareerInsightsSheet(insights: insights, student: selectedStudent)
+      }
+    }
+    .preferredColorScheme(.dark)
+    .onAppear {
+      performInitialAnimation()
+    }
+  }
+  
+  // MARK: - Search Home View
+  
+  private var searchHomeView: some View {
+    VStack(spacing: 0) {
+      Spacer()
+      
+      VStack(spacing: 40) {
+        // Header
+        VStack(spacing: 16) {
+          Text("Discover Your Career Path")
+            .font(.system(size: 32, weight: .bold, design: .rounded))
+            .foregroundColor(.white)
+            .multilineTextAlignment(.center)
+            .opacity(headerAppeared ? 1 : 0)
+            .offset(y: headerAppeared ? 0 : -20)
+            .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1), value: headerAppeared)
+          
+          Text("Search for any career, field, or subject and get AI-powered insights")
+            .font(.system(size: 18))
+            .foregroundColor(.white.opacity(0.8))
+            .multilineTextAlignment(.center)
+            .opacity(headerAppeared ? 1 : 0)
+            .offset(y: headerAppeared ? 0 : -15)
+            .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.2), value: headerAppeared)
+        }
+        .padding(.horizontal, 40)
+        
+        // Main search box
+        VStack(spacing: 20) {
+          ZStack {
+            RoundedRectangle(cornerRadius: 24)
+              .fill(Color.white.opacity(0.1))
+              .background(
+                RoundedRectangle(cornerRadius: 24)
+                  .fill(.ultraThinMaterial)
+                  .opacity(0.6)
+              )
+              .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                  .stroke(
+                    LinearGradient(
+                      colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                      startPoint: .topLeading,
+                      endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                  )
+              )
+              .frame(height: 60)
+            
+            HStack(spacing: 16) {
+              Image(systemName: "magnifyingglass")
+                .font(.system(size: 20))
+                .foregroundColor(.white.opacity(0.7))
+              
+              TextField("Search careers, fields, or subjects...", text: $searchText)
+                .font(.system(size: 18))
+                .foregroundColor(.white)
+                .onSubmit {
+                  performSearch()
+                }
+                .onTapGesture {
+                  showingSuggestions = true
+                }
+              
+              if isSearching {
+                ProgressView()
+                  .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                  .scaleEffect(0.8)
+              } else if !searchText.isEmpty {
+                Button(action: performSearch) {
+                  Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(.tmiSecondary)
+                }
+                .buttonStyle(ScaleButtonStyle())
+              }
+            }
+            .padding(.horizontal, 20)
+          }
+          .opacity(searchBoxAppeared ? 1 : 0)
+          .offset(y: searchBoxAppeared ? 0 : 30)
+          .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.3), value: searchBoxAppeared)
+          
+          // Search suggestions
+          if showingSuggestions && searchText.isEmpty {
+            searchSuggestionsView
+              .transition(.move(edge: .top).combined(with: .opacity))
+          }
+        }
+        .padding(.horizontal, 30)
+      }
+      
+      Spacer()
+      Spacer()
+    }
+  }
+  
+  // MARK: - Search Results View
+  
+  private var searchResultsView: some View {
+    VStack(spacing: 0) {
+      // Search bar at top
+      VStack(spacing: 16) {
+        HStack(spacing: 12) {
+          ZStack {
+            RoundedRectangle(cornerRadius: 16)
+              .fill(Color.white.opacity(0.1))
+              .background(
+                RoundedRectangle(cornerRadius: 16)
+                  .fill(.ultraThinMaterial)
+                  .opacity(0.3)
+              )
+              .frame(height: 44)
+            
+            HStack(spacing: 12) {
+              Image(systemName: "magnifyingglass")
+                .font(.system(size: 16))
+                .foregroundColor(.white.opacity(0.7))
+              
+              TextField("Search careers...", text: $searchText)
+                .font(.system(size: 16))
+                .foregroundColor(.white)
+                .onSubmit {
+                  performSearch()
+                }
+              
+              if isSearching {
+                ProgressView()
+                  .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                  .scaleEffect(0.7)
+              }
+            }
+            .padding(.horizontal, 16)
+          }
+          
+          Button("Search") {
+            performSearch()
+          }
+          .font(.system(size: 16, weight: .semibold))
+          .padding(.horizontal, 20)
+          .padding(.vertical, 12)
+          .background(
+            LinearGradient(
+              colors: [Color.tmiSecondary, Color.tmiSecondary.opacity(0.8)],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            )
+          )
+          .foregroundColor(.white)
+          .cornerRadius(16)
+          .disabled(isSearching)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        
+        // Results header
+        if !searchResults.isEmpty {
+          HStack {
+            VStack(alignment: .leading, spacing: 4) {
+              Text("Results for \"\(lastSearchQuery)\"")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.white)
+              
+              HStack(spacing: 8) {
+                Image(systemName: "brain")
+                  .font(.system(size: 12))
+                  .foregroundColor(.tmiSecondary)
+                Text("AI-Generated Careers")
+                  .font(.system(size: 14))
+                  .foregroundColor(.tmiSecondary)
+                Text("•")
+                  .foregroundColor(.white.opacity(0.5))
+                Text("\(searchResults.count) careers found")
+                  .font(.system(size: 14))
+                  .foregroundColor(.white.opacity(0.7))
+              }
+            }
+            
+            Spacer()
+            
+            if let insights = searchInsights {
+              Button("View Insights") {
+                showingInsightsSheet = true
+              }
+              .font(.system(size: 14, weight: .medium))
+              .foregroundColor(.tmiSecondary)
+            }
+          }
+          .padding(.horizontal, 20)
+        }
+      }
+      
+      // Results content
+      if isSearching {
+        Spacer()
+        VStack(spacing: 16) {
+          ProgressView()
+            .scaleEffect(1.5)
+            .tint(.white)
+          Text("Loading careers for \"\(searchText)\"...")
+            .font(.headline)
+            .foregroundColor(.white)
+        }
+        Spacer()
+      } else if searchResults.isEmpty && hasSearched {
+        emptySearchResults
+      } else {
+        ScrollView {
+          LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 170), spacing: 16)],
+            spacing: 20
+          ) {
+            ForEach(searchResults.indices, id: \.self) { index in
+              let career = searchResults[index]
+              NavigationLink(destination: CareerDetailView(career: career)) {
+                PremiumCareerCard(career: career)
+                  .opacity(resultsAppeared ? 1 : 0)
+                  .offset(y: resultsAppeared ? 0 : 20)
+                  .animation(
+                    .spring(response: 0.4, dampingFraction: 0.7)
+                      .delay(Double(index % 6) * 0.05),
+                    value: resultsAppeared
+                  )
+              }
+              .buttonStyle(PlainButtonStyle())
+            }
+          }
+          .padding(20)
+          .padding(.bottom, 80)
+        }
+      }
+    }
+  }
+  
+  // MARK: - Supporting Views
+  
+  private var searchSuggestionsView: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Popular Searches")
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundColor(.white.opacity(0.8))
+        .padding(.horizontal, 20)
+      
+      LazyVGrid(columns: [
+        GridItem(.adaptive(minimum: 140), spacing: 8)
+      ], spacing: 8) {
+        ForEach(searchSuggestions, id: \.self) { suggestion in
+          Button(action: {
+            searchText = suggestion
+            showingSuggestions = false
+            performSearch()
+          }) {
+            Text(suggestion)
+              .font(.system(size: 14))
+              .padding(.horizontal, 12)
+              .padding(.vertical, 8)
+              .background(
+                RoundedRectangle(cornerRadius: 12)
+                  .fill(Color.white.opacity(0.1))
+              )
+              .foregroundColor(.white.opacity(0.9))
+          }
+          .buttonStyle(ScaleButtonStyle())
+        }
+      }
+      .padding(.horizontal, 20)
+    }
+    .padding(.vertical, 16)
+    .background(
+      RoundedRectangle(cornerRadius: 16)
+        .fill(Color.white.opacity(0.05))
+        .background(
+          RoundedRectangle(cornerRadius: 16)
+            .fill(.ultraThinMaterial)
+            .opacity(0.3)
+        )
+    )
+    .padding(.horizontal, 30)
+  }
+  
+  private var emptySearchResults: some View {
+    VStack(spacing: 24) {
+      Spacer()
+      
+      Image(systemName: "magnifyingglass")
+        .font(.system(size: 60))
+        .foregroundColor(.white.opacity(0.5))
+      
+      Text("No careers found")
+        .font(.system(size: 22, weight: .semibold))
+        .foregroundColor(.white)
+      
+      Text("Try searching for a different career, field, or subject")
+        .font(.system(size: 16))
+        .foregroundColor(.white.opacity(0.7))
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 40)
+      
+      Button("Try Again") {
+        searchText = ""
+        showingSuggestions = true
+      }
+      .font(.system(size: 16, weight: .semibold))
+      .padding(.horizontal, 24)
+      .padding(.vertical, 12)
+      .background(
+        LinearGradient(
+          colors: [Color.tmiSecondary, Color.tmiSecondary.opacity(0.8)],
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
+        )
+      )
+      .foregroundColor(.white)
+      .cornerRadius(14)
+      
+      Spacer()
+    }
+  }
+  
+  private var studentPickerButton: some View {
+    Button {
+      showingStudentPicker = true
     } label: {
       HStack(spacing: 6) {
         Image(systemName: "person.circle")
@@ -209,120 +550,96 @@ struct CareerExplorerView: View {
       }
       .frame(height: 36)
       .padding(.horizontal, 12)
-      .background(studentPickerBackground)
-      .overlay(studentPickerOverlay)
-    }
-  }
-  
-  private var filterButtonBackground: some View {
-    Circle()
-      .fill(
-        hasActiveFilters
-          ? Color.tmiSecondary.opacity(0.3)
-          : Color.white.opacity(0.1)
-      )
       .background(
-        Circle()
-          .fill(.ultraThinMaterial)
-          .opacity(0.3)
+        RoundedRectangle(cornerRadius: 18)
+          .fill((selectedStudent != nil) ? Color.tmiSecondary.opacity(0.3) : Color.white.opacity(0.1))
+          .background(
+            RoundedRectangle(cornerRadius: 18)
+              .fill(.ultraThinMaterial)
+              .opacity(0.3)
+          )
       )
+      .overlay(
+        RoundedRectangle(cornerRadius: 18)
+          .stroke(
+            (selectedStudent != nil) ? Color.tmiSecondary.opacity(0.5) : Color.white.opacity(0.2),
+            lineWidth: 1
+          )
+      )
+    }
   }
   
-  private var filterButtonOverlay: some View {
-    Circle()
-      .stroke(
-        hasActiveFilters
-          ? Color.tmiSecondary.opacity(0.5)
-          : Color.white.opacity(0.2),
-        lineWidth: 1
-      )
-  }
+  // MARK: - Actions
   
-  private var filterButton: some View {
-    Button(action: {
-      isFilterSheetPresented = true
-    }) {
-      HStack(spacing: 6) {
-        if hasActiveFilters {
-          Text("\(activeFiltersCount)")
-            .font(.caption)
-            .fontWeight(.bold)
-            .foregroundColor(.white)
-            .frame(width: 20, height: 20)
-            .background(Circle().fill(Color.tmiSecondary))
+  private func performSearch() {
+    guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      print("[CareerExplorer] Empty search text, skipping search")
+      return
+    }
+    
+    print("[CareerExplorer] Starting search for: '\(searchText)'")
+    isSearching = true
+    showingSuggestions = false
+    lastSearchQuery = searchText
+    
+    Task {
+      do {
+        print("[CareerExplorer] Calling careerService.searchCareersWithAI with query: '\(searchText)', student: \(selectedStudent?.name ?? "none")")
+        let response = try await careerService.searchCareersWithAI(query: searchText, student: selectedStudent)
+        
+        await MainActor.run {
+          print("[CareerExplorer] Received response - careers: \(response.careers.count), insights available: \(response.insights != nil)")
+          
+          searchResults = response.careers
+          searchInsights = response.insights
+          hasSearched = true
+          isSearching = false
+          
+          withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+            resultsAppeared = true
+          }
+          
+          print("[CareerExplorer] Search completed successfully - Found \(response.careers.count) AI-generated careers for '\(searchText)'")
+          
+          // Debug: Print first few career titles
+          for (index, career) in response.careers.prefix(3).enumerated() {
+            print("[CareerExplorer] Career \(index + 1): \(career.title) in \(career.field)")
+          }
         }
-
-        Image(systemName: "slider.horizontal.3")
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundColor(.white)
-          .frame(width: 36, height: 36)
-          .background(filterButtonBackground)
-          .overlay(filterButtonOverlay)
-          .contentShape(Circle())
+      } catch {
+        await MainActor.run {
+          isSearching = false
+          hasSearched = true // Show empty state instead of search home
+          print("[CareerExplorer] Search failed with error: \(error)")
+          print("[CareerExplorer] Error type: \(type(of: error))")
+        }
       }
     }
-    .buttonStyle(.plain)
-  }
-
-  private var navigationView: some View {
-    ZStack {
-        // Animated background - using unified TMIBackgroundView
-        TMIBackgroundView(variant: .career)
-          .ignoresSafeArea()
-
-        mainContent
-      }
-      .navigationTitle("Career Explorer")
-      .navigationBarTitleDisplayMode(.large)
-      .foregroundColor(.white)
-      .toolbar {
-        ToolbarItem(placement: .navigationBarLeading) {
-          studentPickerMenu
-        }
-        
-        ToolbarItem(placement: .navigationBarTrailing) {
-          filterButton
-        }
-      }
-  }
-
-  var body: some View {
-    viewWithSheets
   }
   
-  private var viewWithSheets: some View {
-    navigationView
-      .sheet(isPresented: $isFilterSheetPresented) {
-        filterSheet
-      }
-      .sheet(isPresented: $showingStudentPicker) {
-        studentPickerSheet
-      }
-      .sheet(isPresented: $showingInsightsSheet) {
-        insightsSheet
-      }
-      .preferredColorScheme(.dark)
-      .task {
-        await loadCareerData()
-      }
-      .onAppear {
-        performAppearAnimation()
-      }
-      .refreshable {
-        await loadCareerData(forceRefresh: true)
-      }
+  private func resetSearch() {
+    searchText = ""
+    searchResults = []
+    searchInsights = nil
+    hasSearched = false
+    lastSearchQuery = ""
+    resultsAppeared = false
+    showingSuggestions = false
   }
   
-  private var filterSheet: some View {
-    EnhancedFilterSheet(
-      salaryFilter: $salaryFilter,
-      selectedSkills: $selectedSkills,
-      allSkills: allSkills
-    )
-    .presentationDetents([.medium, .large])
-    .presentationDragIndicator(.visible)
-    .presentationCornerRadius(30)
+  private func performInitialAnimation() {
+    withAnimation(.easeInOut(duration: 0.6).delay(0.1)) {
+      headerAppeared = true
+    }
+    
+    withAnimation(.easeInOut(duration: 0.6).delay(0.3)) {
+      searchBoxAppeared = true
+    }
   }
+  
+  // Remove legacy view with sheets
+  
+  // Remove legacy filter sheet
   
   private var studentPickerSheet: some View {
     StudentPickerSheet(
@@ -331,21 +648,30 @@ struct CareerExplorerView: View {
         selectedStudent = student
         showPersonalizedSection = true
         showingStudentPicker = false
-        // Load personalized recommendations
+        // Load personalized recommendations using AI-powered CareerService
         Task {
-          // Load personalized recommendations based on student interests  
-          personalizedRecommendations = Array(careers.prefix(5))
-          
-          // Generate simple insights - using placeholder data
-          careerInsights = CareerDiscoveryInsights(
-            totalCareersExplored: 5,
-            personalizedRecommendations: 5,
-            topInterestCategory: "Technology",
-            strongestCareerFields: ["Technology", "Business"],
-            emergingOpportunities: [],
-            skillGaps: [],
-            nextSteps: []
-          )
+          do {
+            // Get AI-powered personalized recommendations
+            personalizedRecommendations = try await careerService.getCareerRecommendations(for: student)
+            
+            // Get AI-powered career insights
+            careerInsights = try await careerService.getCareerDiscoveryInsights(for: student)
+            
+            print("[CareerExplorer] Loaded \(personalizedRecommendations.count) AI-powered recommendations for \(student.name)")
+          } catch {
+            print("[CareerExplorer] Failed to load AI-powered career data: \(error)")
+            // Fallback to basic recommendations from existing careers
+            personalizedRecommendations = Array(careers.prefix(5))
+            careerInsights = CareerDiscoveryInsights(
+              totalCareersExplored: careers.count,
+              personalizedRecommendations: 5,
+              topInterestCategory: student.interests.first?.category.first?.rawValue ?? "General",
+              strongestCareerFields: Array(Set(careers.map { $0.field }).prefix(3)),
+              emergingOpportunities: [],
+              skillGaps: [],
+              nextSteps: ["Explore online courses", "Attend career fairs", "Connect with professionals"]
+            )
+          }
         }
       }
     )
@@ -353,75 +679,17 @@ struct CareerExplorerView: View {
     .presentationDragIndicator(.visible)
   }
   
-  @ViewBuilder
-  private var insightsSheet: some View {
-    if let insights = careerInsights {
-      CareerInsightsSheet(insights: insights, student: selectedStudent)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-  }
+  // Remove legacy insights sheet
   
-  private func performAppearAnimation() {
-    // Animate elements sequentially when view appears
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-      headerAppeared = true
-    }
+  // Remove legacy animation function
 
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-      searchAppeared = true
-    }
-
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-      filtersAppeared = true
-    }
-
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-      statsAppeared = true
-    }
-
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-      animateCards = true
-    }
-  }
-
-  // MARK: - Data Loading
-
+  // MARK: - Data Loading (simplified for search-first interface)
+  
   @MainActor
-  private func loadCareerData(forceRefresh: Bool = false) async {
-    isLoading = true
-    error = nil
-
-    do {
-      async let careersLoad = careerService.fetchAllCareers(forceRefresh: forceRefresh)
-      async let trendingLoad = careerService.fetchTrendingCareers()
-      async let statisticsLoad = careerService.getCareerStatistics()
-
-      careers = try await careersLoad
-      trendingCareers = try await trendingLoad
-      careerStatistics = try await statisticsLoad
-      
-      // Load personalized recommendations if student is selected
-      if let student = selectedStudent {
-        personalizedRecommendations = try await careerService.getCareerRecommendations(for: student)
-        careerInsights = try await careerService.getCareerDiscoveryInsights(for: student)
-        showPersonalizedSection = !personalizedRecommendations.isEmpty
-      } else {
-        showPersonalizedSection = false
-        personalizedRecommendations = []
-        careerInsights = nil
-      }
-    } catch {
-      self.error = error
-      // Fallback to sample data
-      careers = Career.sampleCareers
-      trendingCareers = Array(Career.sampleCareers.prefix(5))
-      showPersonalizedSection = false
-      personalizedRecommendations = []
-      careerInsights = nil
-    }
-
-    isLoading = false
+  private func loadBasicCareerData() async {
+    // Load sample data for legacy components that might still be referenced
+    careers = Career.sampleCareers
+    trendingCareers = Array(Career.sampleCareers.prefix(5))
   }
 
   // MARK: - UI Components
@@ -437,6 +705,22 @@ struct CareerExplorerView: View {
         Text("For \((selectedStudent?.name.components(separatedBy: " ").first) ?? "You")")
           .font(.system(size: 18, weight: .bold))
           .foregroundColor(.white)
+
+        // AI-powered indicator
+        HStack(spacing: 4) {
+          Image(systemName: "brain")
+            .font(.system(size: 12))
+            .foregroundColor(.tmiSecondary)
+          Text("AI")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(.tmiSecondary)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(
+          Capsule()
+            .fill(Color.tmiSecondary.opacity(0.2))
+        )
 
         Spacer()
 
@@ -469,7 +753,7 @@ struct CareerExplorerView: View {
         .scaleEffect(1.5)
         .tint(.white)
 
-      Text("Discovering careers...")
+      Text("AI-powered career discovery...")
         .font(.headline)
         .foregroundColor(.white)
     }
@@ -767,7 +1051,7 @@ struct CareerExplorerView: View {
     }
   }
 
-  // MARK: - Filter State
+  // MARK: - Filter State (legacy compatibility)
 
   private var hasActiveFilters: Bool {
     selectedField != nil || !selectedSkills.isEmpty || salaryFilter.lowerBound > 30000
@@ -2038,11 +2322,31 @@ struct CareerInsightsSheet: View {
             // Header
             if let student = student {
               VStack(alignment: .leading, spacing: 8) {
-                Text("Career Insights for \(student.name)")
-                  .font(.title2.bold())
-                  .foregroundColor(.white)
+                HStack {
+                  Text("Career Insights for \(student.name)")
+                    .font(.title2.bold())
+                    .foregroundColor(.white)
+                  
+                  Spacer()
+                  
+                  // AI-powered indicator
+                  HStack(spacing: 4) {
+                    Image(systemName: "brain")
+                      .font(.system(size: 14))
+                      .foregroundColor(.tmiSecondary)
+                    Text("AI-Powered")
+                      .font(.system(size: 12, weight: .semibold))
+                      .foregroundColor(.tmiSecondary)
+                  }
+                  .padding(.horizontal, 8)
+                  .padding(.vertical, 4)
+                  .background(
+                    Capsule()
+                      .fill(Color.tmiSecondary.opacity(0.2))
+                  )
+                }
                 
-                Text("Based on interests and personality assessment")
+                Text("AI analysis based on interests, academic performance, and TMI profile")
                   .font(.caption)
                   .foregroundColor(.white.opacity(0.7))
               }

@@ -9,21 +9,30 @@ import FirebaseAuth
 import FirebaseFirestore
 import Foundation
 import Observation
+import SwiftUI
 
+// MARK: - Environment Key (defined in InterestsAndHobbiesHelpers.swift)
+
+// MARK: - Enhanced State Model
 @Observable
-class InterestsAndHobbiesStateModel {
-    private let db = Firestore.firestore()
+final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesData, IdentifiableError> {
+    // MARK: - Dependencies
+    private let interestService = InterestService()
+    private let hobbyService = HobbyService()
+    private let studentService = StudentService()
+    private let tmiPlanService = TMIPlanService()
     
-    // MARK: - Published State
-    var interests: [Interest] = []
-    var hobbies: [Hobby] = []
-    var isLoading = false
-    var errorMessage: String?
-    
-    // UI State
-    var searchText = ""
-    var showingAddSheet = false
-    var selectedSegment: ViewSegment = .interests
+    // MARK: - Initialization
+    override init() {
+        super.init()
+        
+        // Initialize UI state
+        ui.set("searchText", value: "")
+        ui.set("showingAddSheet", value: false)
+        ui.set("selectedSegment", value: ViewSegment.interests)
+        ui.set("selectedSortOption", value: SortOption.alphabetical)
+        ui.set("selectedFilter", value: FilterOption.all)
+    }
     
     enum ViewSegment: String, CaseIterable, Identifiable {
         case interests = "Interests"
@@ -32,91 +41,153 @@ class InterestsAndHobbiesStateModel {
         var id: String { self.rawValue }
     }
     
+    enum SortOption: String, CaseIterable, Identifiable {
+        case alphabetical = "Alphabetical"
+        case category = "Category"
+        case dateCreated = "Date Created"
+        case popularity = "Popularity"
+        
+        var id: String { self.rawValue }
+    }
+    
+    enum FilterOption: String, CaseIterable, Identifiable {
+        case all = "All"
+        case academics = "Academics"
+        case creative = "Creative"
+        case technology = "Technology"
+        case sports = "Sports"
+        case social = "Social"
+        
+        var id: String { self.rawValue }
+    }
+    
+    // MARK: - UI State Accessors
+    var searchText: String {
+        get { ui.get("searchText") ?? "" }
+        set { ui.set("searchText", value: newValue) }
+    }
+    
+    var showingAddSheet: Bool {
+        get { ui.get("showingAddSheet") ?? false }
+        set { ui.set("showingAddSheet", value: newValue) }
+    }
+    
+    var selectedSegment: ViewSegment {
+        get { ui.get("selectedSegment") ?? .interests }
+        set { ui.set("selectedSegment", value: newValue) }
+    }
+    
+    var selectedSortOption: SortOption {
+        get { ui.get("selectedSortOption") ?? .alphabetical }
+        set { ui.set("selectedSortOption", value: newValue) }
+    }
+    
+    var selectedFilter: FilterOption {
+        get { ui.get("selectedFilter") ?? .all }
+        set { ui.set("selectedFilter", value: newValue) }
+    }
+    
     // MARK: - Computed Properties
     var filteredInterests: [Interest] {
-        if searchText.isEmpty {
-            return interests
-        }
-        return interests.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        guard case .loaded(let data) = state else { return [] }
+        return filterAndSort(interests: data.interests)
     }
     
     var filteredHobbies: [Hobby] {
-        if searchText.isEmpty {
-            return hobbies
-        }
-        return hobbies.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        guard case .loaded(let data) = state else { return [] }
+        return filterAndSort(hobbies: data.hobbies)
     }
     
     var interestsByCategory: [InterestCategory: [Interest]] {
-        Dictionary(grouping: interests) { interest in
+        Dictionary(grouping: filteredInterests) { interest in
             interest.category.first ?? .academics
         }
     }
     
     var hobbiesByCategory: [HobbyCategory: [Hobby]] {
-        Dictionary(grouping: hobbies) { hobby in
+        Dictionary(grouping: filteredHobbies) { hobby in
             hobby.category.first ?? .other
         }
+    }
+    
+    var totalItems: Int {
+        guard case .loaded(let data) = state else { return 0 }
+        return selectedSegment == .interests ? data.interests.count : data.hobbies.count
+    }
+    
+    var categoryCount: Int {
+        selectedSegment == .interests ? interestsByCategory.keys.count : hobbiesByCategory.keys.count
     }
     
     // MARK: - Data Operations
     
     @MainActor
-    func fetch() async {
-        isLoading = true
-        errorMessage = nil
+    override func fetch() async {
+        updateState(.loading)
         
         do {
-            async let interestsTask = fetchInterestsFromFirestore()
-            async let hobbiesTask = fetchHobbiesFromFirestore()
+            async let interestsTask = interestService.fetchInterests()
+            async let hobbiesTask = hobbyService.fetchHobbies()
             
-            interests = try await interestsTask
-            hobbies = try await hobbiesTask
+            let (interests, hobbies) = try await (interestsTask, hobbiesTask)
+            
+            let data = InterestsAndHobbiesData(
+                interests: interests,
+                hobbies: hobbies
+            )
+            
+            updateState(.loaded(data))
         } catch {
-            print("[InterestsAndHobbiesStateModel] Failed to fetch from Firestore, using sample data: \(error)")
-            // Fallback to sample data
-            interests = Interest.sampleInterests
-            hobbies = Hobby.sampleHobbies
-            errorMessage = "Using offline data. \(error.localizedDescription)"
+            print("[InterestsAndHobbiesStateModel] Error fetching data: \(error)")
+            handleError(error, userFriendlyMessage: "Failed to load interests and hobbies")
         }
-        
-        isLoading = false
     }
     
     @MainActor
     func addInterest(_ interest: Interest) async {
         do {
-            let savedInterest = try await saveInterestToFirestore(interest)
-            interests.append(savedInterest)
+            let savedInterest = try await interestService.saveInterest(interest)
+            
+            guard case .loaded(var data) = state else { return }
+            data.interests.append(savedInterest)
+            updateState(.loaded(data))
+            
             showingAddSheet = false
         } catch {
-            errorMessage = "Failed to save interest: \(error.localizedDescription)"
+            handleError(error, userFriendlyMessage: "Failed to save interest")
         }
     }
     
     @MainActor
     func addHobby(_ hobby: Hobby) async {
         do {
-            let savedHobby = try await saveHobbyToFirestore(hobby)
-            hobbies.append(savedHobby)
+            let savedHobby = try await hobbyService.saveHobby(hobby)
+            
+            guard case .loaded(var data) = state else { return }
+            data.hobbies.append(savedHobby)
+            updateState(.loaded(data))
+            
             showingAddSheet = false
         } catch {
-            errorMessage = "Failed to save hobby: \(error.localizedDescription)"
+            handleError(error, userFriendlyMessage: "Failed to save hobby")
         }
     }
     
     @MainActor
     func deleteInterest(_ interest: Interest) async {
         guard let interestId = interest.id else {
-            errorMessage = "Cannot delete interest: missing ID"
+            handleError(InterestHobbyError.invalidData, userFriendlyMessage: "Cannot delete interest: missing ID")
             return
         }
         
         do {
-            try await deleteInterestFromFirestore(interestId)
-            interests.removeAll { $0.id == interestId }
+            try await interestService.deleteInterest(interestId)
+            
+            guard case .loaded(var data) = state else { return }
+            data.interests.removeAll { $0.id == interestId }
+            updateState(.loaded(data))
         } catch {
-            errorMessage = "Failed to delete interest: \(error.localizedDescription)"
+            handleError(error, userFriendlyMessage: "Failed to delete interest")
         }
     }
     
@@ -125,88 +196,230 @@ class InterestsAndHobbiesStateModel {
         let hobbyId = hobby.id.uuidString
         
         do {
-            try await deleteHobbyFromFirestore(hobbyId)
-            hobbies.removeAll { $0.id == hobby.id }
+            try await hobbyService.deleteHobby(hobbyId)
+            
+            guard case .loaded(var data) = state else { return }
+            data.hobbies.removeAll { $0.id == hobby.id }
+            updateState(.loaded(data))
         } catch {
-            errorMessage = "Failed to delete hobby: \(error.localizedDescription)"
+            handleError(error, userFriendlyMessage: "Failed to delete hobby")
         }
     }
     
-    // MARK: - Private Firestore Operations
+    @MainActor
+    override func refresh() async {
+        await fetch()
+    }
     
-    private func fetchInterestsFromFirestore() async throws -> [Interest] {
+    @MainActor
+    func fetchAssociatedData(for interest: Interest) async -> InterestAssociatedData {
+        do {
+            async let studentsTask = studentService.fetchStudentsWithInterest(interest)
+            async let plansTask = tmiPlanService.fetchPlansWithInterest(interest)
+            
+            let (students, plans) = try await (studentsTask, plansTask)
+            
+            return InterestAssociatedData(
+                associatedStudents: students,
+                connectedTMIPlans: plans,
+                engagementMetrics: nil
+            )
+        } catch {
+            print("[InterestsAndHobbiesStateModel] Error fetching associated data: \(error)")
+            return InterestAssociatedData(associatedStudents: [], connectedTMIPlans: [], engagementMetrics: nil)
+        }
+    }
+    
+    @MainActor
+    func fetchAssociatedData(for hobby: Hobby) async -> HobbyAssociatedData {
+        do {
+            async let studentsTask = studentService.fetchStudentsWithHobby(hobby)
+            async let plansTask = tmiPlanService.fetchPlansWithHobby(hobby)
+            
+            let (students, plans) = try await (studentsTask, plansTask)
+            
+            return HobbyAssociatedData(
+                associatedStudents: students,
+                connectedTMIPlans: plans,
+                engagementMetrics: nil
+            )
+        } catch {
+            print("[InterestsAndHobbiesStateModel] Error fetching associated data: \(error)")
+            return HobbyAssociatedData(associatedStudents: [], connectedTMIPlans: [], engagementMetrics: nil)
+        }
+    }
+    
+    // MARK: - Private Helper Methods
+    
+    private func filterAndSort(interests: [Interest]) -> [Interest] {
+        var filtered = interests
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            filtered = filtered.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        }
+        
+        // Apply category filter
+        if selectedFilter != .all {
+            filtered = filtered.filter { interest in
+                interest.category.contains { category in
+                    matchesFilter(category: category.rawValue)
+                }
+            }
+        }
+        
+        // Apply sorting
+        return sortInterests(filtered, by: selectedSortOption)
+    }
+    
+    private func filterAndSort(hobbies: [Hobby]) -> [Hobby] {
+        var filtered = hobbies
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            filtered = filtered.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        }
+        
+        // Apply category filter
+        if selectedFilter != .all {
+            filtered = filtered.filter { hobby in
+                hobby.category.contains { category in
+                    matchesFilter(category: category.rawValue)
+                }
+            }
+        }
+        
+        // Apply sorting
+        return sortHobbies(filtered, by: selectedSortOption)
+    }
+    
+    private func matchesFilter(category: String) -> Bool {
+        switch selectedFilter {
+        case .all: return true
+        case .academics: return category.lowercased().contains("academic")
+        case .creative: return category.lowercased().contains("creative") || category.lowercased().contains("art")
+        case .technology: return category.lowercased().contains("technology") || category.lowercased().contains("tech")
+        case .sports: return category.lowercased().contains("sport") || category.lowercased().contains("physical")
+        case .social: return category.lowercased().contains("social")
+        }
+    }
+    
+    private func sortInterests(_ interests: [Interest], by option: SortOption) -> [Interest] {
+        switch option {
+        case .alphabetical:
+            return interests.sorted { (a: Interest, b: Interest) in a.name < b.name }
+        case .category:
+            return interests.sorted { (a: Interest, b: Interest) in (a.category.first?.rawValue ?? "") < (b.category.first?.rawValue ?? "") }
+        case .dateCreated:
+            return interests.sorted { (a: Interest, b: Interest) in (a.createdAt ?? Date.distantPast) > (b.createdAt ?? Date.distantPast) }
+        case .popularity:
+            return interests.sorted { (a: Interest, b: Interest) in (a.popularityScore ?? 0) > (b.popularityScore ?? 0) }
+        }
+    }
+    
+    private func sortHobbies(_ hobbies: [Hobby], by option: SortOption) -> [Hobby] {
+        switch option {
+        case .alphabetical:
+            return hobbies.sorted { (a: Hobby, b: Hobby) in a.name < b.name }
+        case .category:
+            return hobbies.sorted { (a: Hobby, b: Hobby) in (a.category.first?.rawValue ?? "") < (b.category.first?.rawValue ?? "") }
+        case .dateCreated:
+            return hobbies.sorted { (a: Hobby, b: Hobby) in (a.createdAt ?? Date.distantPast) > (b.createdAt ?? Date.distantPast) }
+        case .popularity:
+            return hobbies.sorted { (a: Hobby, b: Hobby) in (a.popularityScore ?? 0) > (b.popularityScore ?? 0) }
+        }
+    }
+}
+
+// MARK: - Data Models
+
+struct InterestsAndHobbiesData: Equatable {
+    var interests: [Interest]
+    var hobbies: [Hobby]
+}
+
+// InterestAssociatedData and HobbyAssociatedData are defined in InterestsAndHobbiesHelpers.swift
+
+// MARK: - Service Extensions
+
+extension StudentService {
+    func fetchStudentsWithInterest(_ interest: Interest) async throws -> [Student] {
+        let students = try await fetchStudents()
+        return students.filter { student in
+            student.interests.contains { $0.name == interest.name }
+        }
+    }
+    
+    func fetchStudentsWithHobby(_ hobby: Hobby) async throws -> [Student] {
+        let students = try await fetchStudents()
+        return students.filter { student in
+            student.hobbies.contains { $0.name == hobby.name }
+        }
+    }
+}
+
+extension TMIPlanService {
+    func fetchPlansWithInterest(_ interest: Interest) async throws -> [TMIPlan] {
+        let plans = try await fetchPlans()
+        return plans.filter { plan in
+            plan.student.interests.contains { $0.name == interest.name }
+        }
+    }
+    
+    func fetchPlansWithHobby(_ hobby: Hobby) async throws -> [TMIPlan] {
+        let plans = try await fetchPlans()
+        return plans.filter { plan in
+            plan.student.hobbies.contains { $0.name == hobby.name }
+        }
+    }
+}
+
+// MARK: - Service Classes
+
+class InterestService {
+    private let db = Firestore.firestore()
+    
+    func fetchInterests() async throws -> [Interest] {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            print("[InterestService] No authenticated user, returning sample data")
+            return Interest.sampleInterests
+        }
+        
+        do {
+            let collection = db.collection("users").document(uid).collection("interests")
+            let querySnapshot = try await collection.getDocuments()
+            
+            let interests = querySnapshot.documents.compactMap { document -> Interest? in
+                do {
+                    let interest = try document.data(as: Interest.self)
+                    interest.id = document.documentID
+                    return interest
+                } catch {
+                    print("[InterestService] Failed to decode interest: \(error)")
+                    return nil
+                }
+            }
+            
+            return interests.isEmpty ? Interest.sampleInterests : interests
+        } catch {
+            print("[InterestService] Firestore error, returning sample data: \(error)")
+            return Interest.sampleInterests
+        }
+    }
+    
+    func saveInterest(_ interest: Interest) async throws -> Interest {
         guard let uid = Auth.auth().currentUser?.uid else {
             throw InterestHobbyError.userNotAuthenticated
         }
         
         let collection = db.collection("users").document(uid).collection("interests")
-        let querySnapshot = try await collection.getDocuments()
+        let docRef = try await collection.addDocument(data: interest.toFirestoreData())
+        interest.id = docRef.documentID
         
-        return querySnapshot.documents.compactMap { document -> Interest? in
-            do {
-                let interest = try document.data(as: Interest.self)
-                interest.id = document.documentID
-                return interest
-            } catch {
-                print("[InterestsAndHobbiesStateModel] Failed to decode interest: \(error)")
-                return nil
-            }
-        }
+        return interest
     }
     
-    private func fetchHobbiesFromFirestore() async throws -> [Hobby] {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw InterestHobbyError.userNotAuthenticated
-        }
-        
-        let collection = db.collection("users").document(uid).collection("hobbies")
-        let querySnapshot = try await collection.getDocuments()
-        
-        return querySnapshot.documents.compactMap { document -> Hobby? in
-            do {
-                let hobby = try document.data(as: Hobby.self)
-                hobby.id = UUID(uuidString: document.documentID) ?? UUID()
-                return hobby
-            } catch {
-                print("[InterestsAndHobbiesStateModel] Failed to decode hobby: \(error)")
-                return nil
-            }
-        }
-    }
-    
-    private func saveInterestToFirestore(_ interest: Interest) async throws -> Interest {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw InterestHobbyError.userNotAuthenticated
-        }
-        
-        let collection = db.collection("users").document(uid).collection("interests")
-        
-        let interestToSave = interest
-        // Set creation timestamp (handled in toFirestoreData())
-        
-        let docRef = try await collection.addDocument(data: interestToSave.toFirestoreData())
-        interestToSave.id = docRef.documentID
-        
-        return interestToSave
-    }
-    
-    private func saveHobbyToFirestore(_ hobby: Hobby) async throws -> Hobby {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw InterestHobbyError.userNotAuthenticated
-        }
-        
-        let collection = db.collection("users").document(uid).collection("hobbies")
-        
-        let hobbyToSave = hobby
-        // Set creation timestamp (handled in toFirestoreData())
-        
-        let docRef = try await collection.addDocument(data: hobbyToSave.toFirestoreData())
-        hobbyToSave.id = UUID(uuidString: docRef.documentID) ?? hobbyToSave.id
-        
-        return hobbyToSave
-    }
-    
-    private func deleteInterestFromFirestore(_ interestId: String) async throws {
+    func deleteInterest(_ interestId: String) async throws {
         guard let uid = Auth.auth().currentUser?.uid else {
             throw InterestHobbyError.userNotAuthenticated
         }
@@ -214,8 +427,52 @@ class InterestsAndHobbiesStateModel {
         let collection = db.collection("users").document(uid).collection("interests")
         try await collection.document(interestId).delete()
     }
+}
+
+class HobbyService {
+    private let db = Firestore.firestore()
     
-    private func deleteHobbyFromFirestore(_ hobbyId: String) async throws {
+    func fetchHobbies() async throws -> [Hobby] {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            print("[HobbyService] No authenticated user, returning sample data")
+            return Hobby.sampleHobbies
+        }
+        
+        do {
+            let collection = db.collection("users").document(uid).collection("hobbies")
+            let querySnapshot = try await collection.getDocuments()
+            
+            let hobbies = querySnapshot.documents.compactMap { document -> Hobby? in
+                do {
+                    let hobby = try document.data(as: Hobby.self)
+                    hobby.id = UUID(uuidString: document.documentID) ?? UUID()
+                    return hobby
+                } catch {
+                    print("[HobbyService] Failed to decode hobby: \(error)")
+                    return nil
+                }
+            }
+            
+            return hobbies.isEmpty ? Hobby.sampleHobbies : hobbies
+        } catch {
+            print("[HobbyService] Firestore error, returning sample data: \(error)")
+            return Hobby.sampleHobbies
+        }
+    }
+    
+    func saveHobby(_ hobby: Hobby) async throws -> Hobby {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw InterestHobbyError.userNotAuthenticated
+        }
+        
+        let collection = db.collection("users").document(uid).collection("hobbies")
+        let docRef = try await collection.addDocument(data: hobby.toFirestoreData())
+        hobby.id = UUID(uuidString: docRef.documentID) ?? hobby.id
+        
+        return hobby
+    }
+    
+    func deleteHobby(_ hobbyId: String) async throws {
         guard let uid = Auth.auth().currentUser?.uid else {
             throw InterestHobbyError.userNotAuthenticated
         }

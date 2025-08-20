@@ -28,6 +28,7 @@ struct TMIApp: App {
             ContentView()
                 .environment(\.simpleAuthStateModel, SimpleAuthStateModel())
                 .environment(\.dashboardStateModel, DashboardStateModel())
+                .environment(\.interestsStateModel, InterestsAndHobbiesStateModel())
                 .preferredColorScheme(.dark)
         }
     }

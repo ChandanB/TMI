@@ -149,7 +149,7 @@ enum ValidationError: Error, LocalizedError {
 }
 
 struct FormFieldValidator {
-    static let validators: [FieldType: (AnyCodable) -> Bool] = [
+    static let validators: [FieldType: @Sendable (AnyCodable) -> Bool] = [
         .text: { $0.value is String },
         .number: { $0.value is Int || $0.value is Double },
         .date: { $0.value is Date },
@@ -169,7 +169,9 @@ struct FormFieldValidator {
         },
         .url: {
             guard let urlString = $0.value as? String, let url = URL(string: urlString) else { return false }
-            return UIApplication.shared.canOpenURL(url)
+            return DispatchQueue.main.sync {
+                UIApplication.shared.canOpenURL(url)
+            }
         },
         .file: { $0.value is String } // Assuming file value is a string (e.g., a URL to the file); might require custom validation
     ]

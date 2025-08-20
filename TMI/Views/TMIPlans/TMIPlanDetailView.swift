@@ -1376,8 +1376,7 @@ struct EditTMIPlanView: View {
   }
   
   var body: some View {
-    NavigationStack {
-      ZStack {
+    ZStack {
         TMIBackgroundView(variant: .default)
           .ignoresSafeArea()
         
@@ -1509,9 +1508,8 @@ struct EditTMIPlanView: View {
           .disabled(isUpdating)
         }
       }
+      .preferredColorScheme(.dark)
     }
-    .preferredColorScheme(.dark)
-  }
   
   private func toggleInterest(_ interest: Interest) {
     if selectedInterests.contains(interest) {

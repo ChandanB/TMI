@@ -47,7 +47,6 @@ struct NewTMIPlanView: View {
       // Background
       planCreationBackgroundView
 
-      NavigationStack {
         VStack(spacing: 0) {
           // Header and progress bar
           VStack(spacing: 16) {
@@ -116,12 +115,11 @@ struct NewTMIPlanView: View {
         .alert(alertMessage, isPresented: $showingAlert) {
           Button("OK", role: .cancel) {}
         }
-      }
-    }
-    .preferredColorScheme(.dark)
-    .onAppear {
-      animateViews()
-      Task { await fetchAllData() }
+        .preferredColorScheme(.dark)
+        .onAppear {
+          animateViews()
+          Task { await fetchAllData() }
+        }
     }
   }
 
@@ -602,13 +600,13 @@ struct NewTMIPlanView: View {
       students = try await studentService.fetchStudents()
       
       // Fetch interests and hobbies using the existing logic
-      guard let uid = Auth.auth().currentUser?.uid else { 
+      guard let uid = Auth.auth().currentUser?.uid else {
         print("No authenticated user found")
         students = Student.comprehensiveSampleStudents
         interests = Interest.expandedSampleInterests
         hobbies = Hobby.expandedSampleHobbies
         isLoadingData = false
-        return 
+        return
       }
       
       let db = FirebaseManager.shared.firestore

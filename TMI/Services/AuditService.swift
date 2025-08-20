@@ -12,15 +12,15 @@ import Observation
 // MARK: - TEMPORARY TYPE STUBS FOR AUDIT & COMPLIANCE MODELS
 // These are minimal definitions to unblock compilation. Please refine and move to dedicated files.
 
-enum RiskLevel: String, Codable {
+enum RiskLevel: String, Codable, Sendable {
     case low, medium, high, critical
 }
 
-enum AuditResult: String, Codable {
+enum AuditResult: String, Codable, Sendable {
     case success, failure
 }
 
-struct DeviceInfo: Codable {
+struct DeviceInfo: Codable, Sendable {
     let deviceType: DeviceType
     let operatingSystem: String
     let osVersion: String
@@ -32,11 +32,11 @@ struct DeviceInfo: Codable {
     // Add more fields as needed
 }
 
-enum DeviceType: String, Codable {
+enum DeviceType: String, Codable, Sendable {
     case iPhone, iPad, Mac, unknown
 }
 
-struct AuditEvent: Codable {
+struct AuditEvent: Codable, Sendable {
     var id: String = UUID().uuidString
     var eventID: String = UUID().uuidString
     var timestamp: Date = Date()
@@ -55,7 +55,7 @@ struct AuditEvent: Codable {
     var riskLevel: RiskLevel
 }
 
-enum AuditAction: String, Codable {
+enum AuditAction: String, Codable, Sendable {
     case login, logout, loginFailed, consentGranted, consentRevoked
     // Add more actions as appropriate
     var displayName: String {
@@ -76,11 +76,11 @@ enum AuditAction: String, Codable {
     }
 }
 
-enum ComplianceReportType: String, Codable {
+enum ComplianceReportType: String, Codable, Sendable {
     case coppa, ferpa, general
 }
 
-struct ComplianceReport: Codable {
+struct ComplianceReport: Codable, Sendable {
     var reportType: ComplianceReportType
     var generatedBy: String
     var timeRange: DateInterval
@@ -89,19 +89,19 @@ struct ComplianceReport: Codable {
     var consentCompliance: ConsentCompliance
 }
 
-struct AuditSummary: Codable {
+struct AuditSummary: Codable, Sendable {
     var totalEvents: Int
     var timeRange: DateInterval
 }
 
-struct DataRetentionCompliance: Codable {
+struct DataRetentionCompliance: Codable, Sendable {
     var compliantRecords: Int
     var violatingRecords: Int
     var expiringSoon: Int
     var totalRecords: Int
 }
 
-struct ConsentCompliance: Codable {
+struct ConsentCompliance: Codable, Sendable {
     var usersWithValidConsent: Int
     var usersWithExpiredConsent: Int
     var usersWithMissingConsent: Int
@@ -115,7 +115,7 @@ struct ConsentCompliance: Codable {
 // MARK: - Audit Service
 
 @Observable
-final class AuditService {
+final class AuditService: @unchecked Sendable {
 
   // MARK: - Dependencies
   private let firestore: Firestore
@@ -291,7 +291,7 @@ final class AuditService {
 
 // MARK: - Device Info Provider
 
-class DeviceInfoProvider {
+final class DeviceInfoProvider: Sendable {
   func getCurrentDeviceInfo() async -> DeviceInfo {
     return DeviceInfo(
       deviceType: .iPhone,

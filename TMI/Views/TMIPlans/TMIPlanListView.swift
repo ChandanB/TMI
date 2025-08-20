@@ -28,7 +28,6 @@ struct TMIPlanListView: View {
       // Background
       planBackgroundView
 
-      NavigationStack {
         ZStack(alignment: .bottomTrailing) {
           // Content
           ScrollView {
@@ -127,7 +126,6 @@ struct TMIPlanListView: View {
           .presentationDragIndicator(.visible)
           .presentationCornerRadius(30)
         }
-      }
     }
     .preferredColorScheme(.dark)
     .onAppear {
@@ -585,8 +583,7 @@ struct PlanFilterView: View {
   @Environment(\.dismiss) var dismiss
 
   var body: some View {
-    NavigationStack {
-      ZStack {
+    ZStack {
         // Background
         Color(red: 0.08, green: 0.08, blue: 0.15)
           .ignoresSafeArea()
@@ -624,7 +621,6 @@ struct PlanFilterView: View {
         }
       }
     }
-  }
 }
 
 struct TMIPlanFilterOptionCard: View {
@@ -756,9 +752,8 @@ struct ImportPlansView: View {
   @State private var showingFilePicker = false
   
   var body: some View {
-    NavigationStack {
-      ZStack {
-        TMIBackgroundView(variant: .default)
+    ZStack {
+      TMIBackgroundView(variant: .default)
           .ignoresSafeArea()
         
         VStack(spacing: 24) {
@@ -917,9 +912,8 @@ struct ImportPlansView: View {
           .foregroundColor(.white)
         }
       }
-    }
-    .preferredColorScheme(.dark)
-    .fileImporter(
+      .preferredColorScheme(.dark)
+      .fileImporter(
       isPresented: $showingFilePicker,
       allowedContentTypes: [.json],
       onCompletion: { result in

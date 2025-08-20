@@ -11,7 +11,7 @@ import CoreTransferable
 import FirebaseFirestore
 import UniformTypeIdentifiers
 
-struct ValidationRule: Codable, Identifiable {
+struct ValidationRule: Codable, Identifiable, @unchecked Sendable {
     @DocumentID var id: String?
     var rule: ValidationType
     var message: String
@@ -25,7 +25,7 @@ struct ValidationRule: Codable, Identifiable {
     }
 }
 
-enum ValidationType: String, Codable, CaseIterable {
+enum ValidationType: String, Codable, CaseIterable, Sendable {
     case minLength = "Minimum Length"
     case maxLength = "Maximum Length"
     case minValue = "Minimum Numeric Value"
@@ -141,7 +141,7 @@ enum ValidationType: String, Codable, CaseIterable {
     }
 }
 
-enum FieldType: String, Codable, CaseIterable {
+enum FieldType: String, Codable, CaseIterable, Sendable {
     case text
     case longText
     case number

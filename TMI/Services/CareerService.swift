@@ -10,9 +10,9 @@ import FirebaseFirestore
 import FirebaseAuth
 
 @Observable
-class CareerService {
+final class CareerService: @unchecked Sendable {
   static let shared = CareerService()
-  private let firestore = FIRESTORE_DATABASE
+  nonisolated(unsafe) private let firestore = FirebaseManager.shared.firestore
   
   // In-memory cache for performance
   private var careerCache: [Career] = []
@@ -24,6 +24,38 @@ class CareerService {
     careerCache = Career.sampleCareers
   }
   
+  // MARK: - AI-Powered Career Search
+
+  /// Search for careers using AI-powered generation based on query
+  func searchCareersWithAI(query: String, student: Student? = nil) async throws -> AICareerResponse {
+    print("[CareerService] searchCareersWithAI called with query: '\(query)'")
+    
+    guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      print("[CareerService] Empty query provided")
+      throw CareerServiceError.invalidCareerData
+    }
+    
+    if #available(iOS 26.0, *) {
+      print("[CareerService] iOS 26+ available, attempting AI search")
+      do {
+        let aiResponse = try await AIInsightsService.shared.generateCareerDataFromSearch(query: query, student: student)
+        print("[CareerService] AI search successful - Generated \(aiResponse.careers.count) AI careers for query: '\(query)'")
+        return aiResponse
+      } catch {
+        print("[CareerService] AI career search failed for '\(query)': \(error)")
+        print("[CareerService] Falling back to enhanced AI career generation")
+        // Enhanced fallback using AICareerGenerator
+        return AIInsightsService.shared.generateSampleCareerSearchResponse(query: query, student: student)
+      }
+    } else {
+      print("[CareerService] iOS 26+ not available, using enhanced AI career generation fallback")
+      // Enhanced fallback using AICareerGenerator with intelligent career generation
+      let aiResponse = AIInsightsService.shared.generateSampleCareerSearchResponse(query: query, student: student)
+      print("[CareerService] Enhanced fallback generated \(aiResponse.careers.count) careers for query: '\(query)'")
+      return aiResponse
+    }
+  }
+
   // MARK: - Enhanced Career Data Management
   
   /// Fetch all available careers with enhanced caching and analytics
@@ -481,7 +513,7 @@ class CareerService {
       // Filter resources relevant to this career
       return allResources.filter { resource in
         // Check if resource tags match career field or skills
-        let careerKeywords = [career.field.lowercased(), career.title.lowercased()] + 
+        let careerKeywords = [career.field.lowercased(), career.title.lowercased()] +
                            career.skills.map { $0.lowercased() }
         
         return resource.tags.contains { tag in
@@ -508,7 +540,7 @@ class CareerService {
       
       return allResources.filter { resource in
         // Check if resource is relevant to recommended career fields
-        let resourceKeywords = resource.tags.map { $0.lowercased() } + 
+        let resourceKeywords = resource.tags.map { $0.lowercased() } +
                               [resource.title.lowercased()]
         
         return relevantFields.contains { field in
@@ -526,7 +558,7 @@ class CareerService {
 
 // MARK: - Supporting Models
 
-struct CareerStatistics: Codable {
+struct CareerStatistics: Codable, Sendable {
   let totalCareers: Int
   let uniqueFields: Int
   let uniqueSkills: Int
@@ -535,7 +567,7 @@ struct CareerStatistics: Codable {
   let fieldDistribution: [String: Int]
 }
 
-struct CareerDiscoveryInsights: Codable {
+struct CareerDiscoveryInsights: Codable, Sendable {
   let totalCareersExplored: Int
   let personalizedRecommendations: Int
   let topInterestCategory: String
@@ -557,14 +589,14 @@ struct CareerDiscoveryInsights: Codable {
   }
 }
 
-struct CareerBookmark: Codable, Identifiable {
+struct CareerBookmark: Codable, Identifiable, @unchecked Sendable {
   @DocumentID var id: String?
   let careerTitle: String
   let careerField: String
   let bookmarkedAt: Date
 }
 
-struct CareerExploration: Codable {
+struct CareerExploration: Codable, @unchecked Sendable {
   @DocumentID var id: String?
   let careerTitle: String
   let careerField: String
@@ -572,7 +604,7 @@ struct CareerExploration: Codable {
   let timestamp: Date
 }
 
-enum CareerExplorationAction: String, Codable, CaseIterable {
+enum CareerExplorationAction: String, Codable, CaseIterable, Sendable {
   case viewed = "viewed"
   case bookmarked = "bookmarked"
   case sharedDetails = "shared_details"

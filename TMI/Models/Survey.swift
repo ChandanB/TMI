@@ -8,7 +8,7 @@
 import Foundation
 import FirebaseFirestore
 
-struct Survey: Codable, Identifiable {
+struct Survey: Codable, Identifiable, @unchecked Sendable {
     @DocumentID var id: String?
     var title: String
     var studentId: String
@@ -17,7 +17,7 @@ struct Survey: Codable, Identifiable {
     var completed: Bool
     var surveyType: SurveyType
     
-    enum SurveyType: String, Codable, CaseIterable {
+    enum SurveyType: String, Codable, CaseIterable, Sendable {
         case interests
         case hobbies
         case career
@@ -25,14 +25,14 @@ struct Survey: Codable, Identifiable {
         case behavioral
     }
     
-    struct Question: Codable, Identifiable {
+    struct Question: Codable, Identifiable, Sendable {
         var id: String
         var text: String
         var answerType: AnswerType
         var answer: String?
         var options: [String]?
         
-        enum AnswerType: String, Codable {
+        enum AnswerType: String, Codable, Sendable {
             case text
             case multipleChoice
             case scale

@@ -6,13 +6,13 @@
 //
 
 import Firebase
-import FirebaseAuth
-import FirebaseFirestore
-import FirebaseStorage
+@preconcurrency import FirebaseAuth
+@preconcurrency import FirebaseFirestore
+@preconcurrency import FirebaseStorage
 
 struct FirestoreConstants {
     // Authentication
-    static let currentUser = Auth.auth().currentUser
+    static var currentUser: User? { Auth.auth().currentUser }
     static let uid = "uid"
 
     // User Fields
@@ -122,19 +122,36 @@ enum FirestoreCollection: String {
     case tmiPlans
     case resources
     
-    func reference() -> CollectionReference {
+    nonisolated func reference() -> CollectionReference {
         FirebaseManager.shared.firestore.collection(self.rawValue)
     }
 }
 
 // MARK: - Storage Constants
 struct StorageConstants {
-    static let storageRootRef = FirebaseManager.shared.storage.reference()
-    static let storageChatImagesRef = storageRootRef.child(FirestoreConstants.chatImages)
-    static let storageProfileImagesRef = storageRootRef.child(FirestoreConstants.profileImages)
-    static let storageMessageImagesRef = storageRootRef.child(FirestoreConstants.messageImages)
-    static let storagePostImagesRef = storageRootRef.child(FirestoreConstants.contentImages)
-    static let storageVideoMessageRef = storageRootRef.child(FirestoreConstants.videoMessage)
+    static var storageRootRef: StorageReference {
+        FirebaseManager.shared.storage.reference()
+    }
+    
+    static var storageChatImagesRef: StorageReference {
+        storageRootRef.child(FirestoreConstants.chatImages)
+    }
+    
+    static var storageProfileImagesRef: StorageReference {
+        storageRootRef.child(FirestoreConstants.profileImages)
+    }
+    
+    static var storageMessageImagesRef: StorageReference {
+        storageRootRef.child(FirestoreConstants.messageImages)
+    }
+    
+    static var storagePostImagesRef: StorageReference {
+        storageRootRef.child(FirestoreConstants.contentImages)
+    }
+    
+    static var storageVideoMessageRef: StorageReference {
+        storageRootRef.child(FirestoreConstants.videoMessage)
+    }
 }
 
 struct FirestoreDecodingValues {
@@ -145,5 +162,4 @@ struct FirestoreDecodingValues {
     static let commentMentionIntValue = 4
     static let contentMentionIntValue = 5
 }
-
 

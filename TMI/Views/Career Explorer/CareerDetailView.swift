@@ -324,8 +324,8 @@ struct CareerDetailView: View {
   private var tabSelector: some View {
     ScrollView(.horizontal, showsIndicators: false) {
       HStack(spacing: 4) {
-        ForEach(Array(zip(["Overview", "Skills", "Education", "Pathway"], 
-                         ["info.circle", "star.fill", "graduationcap.fill", "arrow.up.right"])), 
+        ForEach(Array(zip(["Overview", "Skills", "Education", "Pathway"],
+                         ["info.circle", "star.fill", "graduationcap.fill", "arrow.up.right"])),
                 id: \.0) { tab, icon in
           let index = ["Overview", "Skills", "Education", "Pathway"].firstIndex(of: tab) ?? 0
           
@@ -1535,8 +1535,8 @@ struct CareerDetailView: View {
     } catch {
       self.error = error
       // Fallback to sample data
-      relatedCareers = Career.sampleCareers.filter { 
-        $0.field == career.field && $0.title != career.title 
+      relatedCareers = Career.sampleCareers.filter {
+        $0.field == career.field && $0.title != career.title
       }.prefix(3).map { $0 }
     }
     
@@ -2084,8 +2084,7 @@ struct CareerResourcesView: View {
   @Environment(\.dismiss) private var dismiss
 
   var body: some View {
-    NavigationStack {
-      ZStack {
+    ZStack {
         TMIBackgroundView(variant: .default)
           .ignoresSafeArea()
 
@@ -2111,8 +2110,7 @@ struct CareerResourcesView: View {
           .foregroundColor(.white)
         }
       }
-    }
-    .preferredColorScheme(.dark)
+      .preferredColorScheme(.dark)
   }
 }
 

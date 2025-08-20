@@ -9,9 +9,9 @@ import SwiftUI
 import SwiftData
 import Foundation
 import CoreTransferable
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 
-struct FormSubmission: Codable, Identifiable {
+struct FormSubmission: Codable, Identifiable, @unchecked Sendable { // @unchecked Sendable retained for potential cross-actor usage
     @DocumentID var id: String?
     var formId: String
     var data: [String: AnyCodable]
@@ -25,7 +25,7 @@ struct FormSubmission: Codable, Identifiable {
       }
 }
 
-struct FormSection: Codable, Identifiable, Transferable {
+struct FormSection: Codable, Identifiable, Transferable, @unchecked Sendable {
     @DocumentID var id: String?
     var title: String
     var fields: [FormField]
@@ -44,7 +44,7 @@ struct FormSection: Codable, Identifiable, Transferable {
     }
 }
 
-struct FormField: Codable, Identifiable, Transferable {
+struct FormField: Codable, Identifiable, Transferable, @unchecked Sendable {
     @DocumentID var id: String?
     var label: String
     var type: FieldType
@@ -71,7 +71,7 @@ struct FormField: Codable, Identifiable, Transferable {
     }
 }
 
-struct FormTemplate: Codable, Identifiable {
+struct FormTemplate: Codable, Identifiable, @unchecked Sendable {
     @DocumentID var id: String?
     var name: String
     var templateDescription: String
@@ -148,6 +148,7 @@ struct FormTemplate: Codable, Identifiable {
 // MARK: - Parental Incarceration Support Module Template
 
 extension FormTemplate {
+    @MainActor
     static let parentalIncarcerationSupportTemplate = FormTemplate(
         name: "Parental Incarceration Support",
         templateDescription: "This module addresses the unique challenges faced by students who have experienced parental incarceration, offering targeted support, assessment, and resources.",

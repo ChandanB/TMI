@@ -9,10 +9,10 @@ import Foundation
 import FirebaseFirestore
 import FirebaseAuth
 
-class ResourceService {
-  static let shared = ResourceService()
-  private let firestore = FIRESTORE_DATABASE
-  
+final class ResourceService: @unchecked Sendable {
+    static let shared = ResourceService()
+    private let firestore = FIRESTORE_DATABASE
+    
   private init() {}
   
   // MARK: - Add Resource
@@ -267,7 +267,7 @@ class ResourceService {
   }
   
   // MARK: - Listen to Resource Changes
-  func listenToResources(completion: @escaping (Result<[Resource], Error>) -> Void) -> ListenerRegistration? {
+  func listenToResources(completion: @escaping @Sendable (Result<[Resource], Error>) -> Void) -> ListenerRegistration? {
     guard let currentUser = Auth.auth().currentUser else {
       completion(.failure(ResourceServiceError.userNotAuthenticated))
       return nil
@@ -337,8 +337,8 @@ class ResourceService {
   }
   
   // MARK: - Completion-based methods for backward compatibility
-  func fetchResources(category: String, completion: @escaping (Result<[Resource], Error>) -> Void) {
-    Task {
+  func fetchResources(category: String, completion: @escaping @Sendable (Result<[Resource], Error>) -> Void) {
+    Task { @Sendable in
       do {
         // Convert string to ResourceCategory
         guard let resourceCategory = Resource.ResourceCategory(rawValue: category.lowercased()) else {
@@ -354,7 +354,7 @@ class ResourceService {
     }
   }
   
-  func addResource(_ resource: Resource, completion: @escaping (Result<Void, Error>) -> Void) {
+  func addResource(_ resource: Resource, completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
     Task {
       do {
         _ = try await addResource(resource)
@@ -367,7 +367,7 @@ class ResourceService {
 }
 
 // MARK: - Resource Analytics Model
-struct ResourceAnalytics: Codable {
+struct ResourceAnalytics: Codable, Sendable {
   let totalResources: Int
   let featuredResources: Int
   let resourcesByCategory: [Resource.ResourceCategory: Int]

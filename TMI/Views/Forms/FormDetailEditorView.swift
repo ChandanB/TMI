@@ -41,8 +41,7 @@ struct FormDetailEditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
+        Form {
                 Section(header: Text("Details")) {
                     TextField("Name", text: $viewModel.template.name)
                     TextField("Description", text: $viewModel.template.templateDescription)
@@ -58,7 +57,6 @@ struct FormDetailEditorView: View {
                     presentationMode.wrappedValue.dismiss()
                 }
             )
-        }
     }
 }
 

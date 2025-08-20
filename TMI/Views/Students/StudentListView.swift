@@ -409,9 +409,8 @@ struct BulkActionsView: View {
     @State private var actionCompleted = false
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                TMIBackgroundView(variant: .default)
+        ZStack {
+            TMIBackgroundView(variant: .default)
                     .ignoresSafeArea()
                 
                 VStack(spacing: 24) {
@@ -550,8 +549,7 @@ struct BulkActionsView: View {
                     .foregroundColor(.white)
                 }
             }
-        }
-        .preferredColorScheme(.dark)
+            .preferredColorScheme(.dark)
     }
     
     @MainActor
@@ -643,10 +641,9 @@ struct ExportStudentsView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                TMIBackgroundView(variant: .default)
-                    .ignoresSafeArea()
+        ZStack {
+            TMIBackgroundView(variant: .default)
+                .ignoresSafeArea()
                 
                 VStack(spacing: 24) {
                     // Header
@@ -801,8 +798,7 @@ struct ExportStudentsView: View {
                     .foregroundColor(.white)
                 }
             }
-        }
-        .preferredColorScheme(.dark)
+            .preferredColorScheme(.dark)
     }
     
     @MainActor

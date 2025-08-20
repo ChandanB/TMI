@@ -8,7 +8,7 @@
 import Foundation
 
 @Observable
-class RecommendationsService {
+final class RecommendationsService: @unchecked Sendable {
     static let shared = RecommendationsService()
     
     private let careerService = CareerService.shared

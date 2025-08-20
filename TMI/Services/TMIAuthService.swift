@@ -5,9 +5,9 @@
 //  Created by Chandan Brown on 8/7/25.
 //
 
-import Firebase
-import FirebaseFirestore
-import FirebaseAuth
+@preconcurrency import Firebase
+@preconcurrency import FirebaseFirestore
+@preconcurrency import FirebaseAuth
 import Observation
 import Combine
 
@@ -152,7 +152,7 @@ class FirebaseTMIAuthService: TMIAuthService {
     private var _authState: TMIAuthState = .initializing
     var authState: TMIAuthState {
         get { _authState }
-        set { 
+        set {
             _authState = newValue
         }
     }
@@ -163,7 +163,7 @@ class FirebaseTMIAuthService: TMIAuthService {
     
     // MARK: - Initialization
     
-    init(firebaseManager: FirebaseManager = FIREBASE_MANAGER) {
+    nonisolated init(firebaseManager: FirebaseManager = FirebaseManager.shared) {
         self.firebaseManager = firebaseManager
         setupAuthStateListener()
     }
@@ -194,12 +194,19 @@ class FirebaseTMIAuthService: TMIAuthService {
                 print("🔐 TMI Auth state changed: User \(user.uid) logged in")
                 self.updateAuthState(.authenticated(user))
                 
-                Task {
-                    print("📲 Loading TMI user for: \(user.uid)")
-                    if let tmiUser = self.currentTMIUser {
-                        self.currentTMIUser = tmiUser
-                        self.updateAuthState(.userReady(tmiUser))
-                    } else {
+                let userID = user.uid
+                print("📲 Loading TMI user for: \(userID)")
+                
+                // Check if we already have a TMI user
+                if let tmiUser = self.currentTMIUser {
+                    self.currentTMIUser = tmiUser
+                    self.updateAuthState(.userReady(tmiUser))
+                    self.isHandlingAuthChange = false
+                } else {
+                    // Load TMI user asynchronously
+                    Task { @MainActor [weak self, user] in
+                        guard let self = self else { return }
+                        
                         do {
                             let tmiUser = try await self.fetchCurrentTMIUser()
                             self.currentTMIUser = tmiUser
@@ -209,8 +216,9 @@ class FirebaseTMIAuthService: TMIAuthService {
                             // User authenticated but profile load failed - they can still use basic features
                             self.updateAuthState(.needsProfileSetup(user))
                         }
+                        
+                        self.isHandlingAuthChange = false
                     }
-                    self.isHandlingAuthChange = false
                 }
                 
             } else {
@@ -502,7 +510,7 @@ class FirebaseTMIAuthService: TMIAuthService {
     /// Fetches the currently authenticated user
     /// - Returns: The current user's TMIUser
     /// - Throws: Authentication or fetch errors
-    func fetchCurrentTMIUser() async throws -> TMIUser {
+    nonisolated(nonsending) func fetchCurrentTMIUser() async throws -> TMIUser {
         guard let userID = currentUser?.uid else { throw FirebaseError.userNotAuthenticated }
         
         do {

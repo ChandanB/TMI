@@ -3,7 +3,7 @@ import SwiftUI
 
 // MARK: - Models
 
-struct Resource: Identifiable, Codable {
+struct Resource: Identifiable, Codable, @unchecked Sendable {
   @DocumentID var id: String?
   let title: String
   let description: String
@@ -16,7 +16,7 @@ struct Resource: Identifiable, Codable {
   var isFeatured: Bool = false
   var thumbnail: String? = nil
 
-  enum ResourceCategory: String, CaseIterable, Codable {
+  enum ResourceCategory: String, CaseIterable, Codable, Sendable {
     case article, video, course, book, tool, interactiveContent
 
     var color: Color {
@@ -404,56 +404,54 @@ struct ResourcesView: View {
       // Background
       resourceBackgroundView
 
-      NavigationStack {
-        ZStack {
-          // Main content
-          mainContent
+      ZStack {
+        // Main content
+        mainContent
 
-          // Floating Add Button
-          floatingAddButton
+        // Floating Add Button
+        floatingAddButton
+      }
+      .navigationTitle("Resource Library")
+      .foregroundColor(.white)
+      .navigationBarTitleDisplayMode(.large)
+      .toolbarBackground(.hidden, for: .navigationBar)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          studentPickerButton
         }
-        .navigationTitle("Resource Library")
-        .foregroundColor(.white)
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar {
-          ToolbarItem(placement: .navigationBarLeading) {
-            studentPickerButton
-          }
-          
-          ToolbarItem(placement: .navigationBarTrailing) {
-            Menu {
-              Button(action: {
-                stateModel.showingAddResource = true
-              }) {
-                Label("Add Resource", systemImage: "plus")
-              }
-
-              Button(action: {
-                // Implement import function
-              }) {
-                Label("Import Resources", systemImage: "square.and.arrow.down")
-              }
-
-              Button(action: {
-                // Implement filtering options
-              }) {
-                Label("Filter Options", systemImage: "line.3.horizontal.decrease.circle")
-              }
-            } label: {
-              Image(systemName: "ellipsis.circle")
-                .font(.system(size: 20))
-                .foregroundColor(.white)
+        
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Menu {
+            Button(action: {
+              stateModel.showingAddResource = true
+            }) {
+              Label("Add Resource", systemImage: "plus")
             }
+
+            Button(action: {
+              // Implement import function
+            }) {
+              Label("Import Resources", systemImage: "square.and.arrow.down")
+            }
+
+            Button(action: {
+              // Implement filtering options
+            }) {
+              Label("Filter Options", systemImage: "line.3.horizontal.decrease.circle")
+            }
+          } label: {
+            Image(systemName: "ellipsis.circle")
+              .font(.system(size: 20))
+              .foregroundColor(.white)
           }
         }
-        .sheet(isPresented: $stateModel.showingAddResource) {
-          AddResourceView(onResourceAdded: { resource in
-            Task {
-              await stateModel.addResource(resource)
-            }
-          })
-        }
+      }
+      .sheet(isPresented: $stateModel.showingAddResource) {
+        AddResourceView(onResourceAdded: { resource in
+          Task {
+            await stateModel.addResource(resource)
+          }
+        })
       }
     }
     .onAppear {
@@ -1030,98 +1028,96 @@ struct AddResourceView: View {
   @State private var showAnimation = false
 
   var body: some View {
-    NavigationStack {
-      ZStack {
-        // Background
-        resourceBackgroundView
+    ZStack {
+      // Background
+      resourceBackgroundView
 
-        ScrollView {
-          VStack(spacing: 24) {
-            // Form fields in glass cards
-            Group {
-              // Title
-              ResourceFormField(
-                title: "Title",
-                placeholder: "Enter resource title",
-                text: $title
-              )
+      ScrollView {
+        VStack(spacing: 24) {
+          // Form fields in glass cards
+          Group {
+            // Title
+            ResourceFormField(
+              title: "Title",
+              placeholder: "Enter resource title",
+              text: $title
+            )
 
-              // Description
-              LongResourceFormField(
-                title: "Description",
-                placeholder: "Enter a detailed description of the resource",
-                text: $description
-              )
+            // Description
+            LongResourceFormField(
+              title: "Description",
+              placeholder: "Enter a detailed description of the resource",
+              text: $description
+            )
 
-              // Category picker
-              CategoryPickerView(category: $category)
+            // Category picker
+            CategoryPickerView(category: $category)
 
-              // URL
-              ResourceFormField(
-                title: "URL",
-                placeholder: "Enter resource URL",
-                icon: "link",
-                text: $url
-              )
+            // URL
+            ResourceFormField(
+              title: "URL",
+              placeholder: "Enter resource URL",
+              icon: "link",
+              text: $url
+            )
 
-              // Tags
-              ResourceFormField(
-                title: "Tags",
-                placeholder: "Enter comma-separated tags",
-                icon: "tag",
-                text: $tags
-              )
+            // Tags
+            ResourceFormField(
+              title: "Tags",
+              placeholder: "Enter comma-separated tags",
+              icon: "tag",
+              text: $tags
+            )
 
-              // Recommended For
-              ResourceFormField(
-                title: "Recommended For",
-                placeholder: "Enter comma-separated roles",
-                icon: "person.2",
-                text: $recommendedFor
-              )
+            // Recommended For
+            ResourceFormField(
+              title: "Recommended For",
+              placeholder: "Enter comma-separated roles",
+              icon: "person.2",
+              text: $recommendedFor
+            )
 
-              // Featured toggle
-              FeatureToggleView(isFeatured: $isFeatured)
-            }
-            .opacity(showAnimation ? 1 : 0)
-            .offset(y: showAnimation ? 0 : 20)
-
-            // Save button
-            Button {
-              saveResource()
-            } label: {
-              Text("Save Resource")
-                .font(.system(size: 16, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                  RoundedRectangle(cornerRadius: 12)
-                    .fill(isFormValid ? Color.tmiSecondary : Color.gray.opacity(0.3))
-                )
-                .foregroundColor(.white)
-            }
-            .disabled(!isFormValid)
-            .padding(.top, 20)
-            .opacity(showAnimation ? 1 : 0)
-            .offset(y: showAnimation ? 0 : 20)
+            // Featured toggle
+            FeatureToggleView(isFeatured: $isFeatured)
           }
-          .padding(20)
-        }
-      }
-      .navigationTitle("Add Resource")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .navigationBarLeading) {
-          Button("Cancel") {
-            dismiss()
+          .opacity(showAnimation ? 1 : 0)
+          .offset(y: showAnimation ? 0 : 20)
+
+          // Save button
+          Button {
+            saveResource()
+          } label: {
+            Text("Save Resource")
+              .font(.system(size: 16, weight: .semibold))
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 16)
+              .background(
+                RoundedRectangle(cornerRadius: 12)
+                  .fill(isFormValid ? Color.tmiSecondary : Color.gray.opacity(0.3))
+              )
+              .foregroundColor(.white)
           }
-          .foregroundColor(.white)
+          .disabled(!isFormValid)
+          .padding(.top, 20)
+          .opacity(showAnimation ? 1 : 0)
+          .offset(y: showAnimation ? 0 : 20)
         }
+        .padding(20)
       }
-      .onAppear {
-        withAnimation(.easeInOut(duration: 0.5).delay(0.1)) {
-          showAnimation = true
+    }
+    .navigationTitle("Add Resource")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .navigationBarLeading) {
+        Button("Cancel") {
+          dismiss()
         }
+        .foregroundColor(.white)
+      }
+    }
+    .onAppear {
+      withAnimation(.easeInOut(duration: 0.5).delay(0.1)) {
+        showAnimation = true
       }
     }
     .preferredColorScheme(.dark)

@@ -9,7 +9,7 @@
 import Foundation
 
 // Helper type to encode/decode 'Any' values in Codable structs
-struct AnyCodable: Codable {
+struct AnyCodable: Codable, @unchecked Sendable {
     var value: Any
     
     init(_ value: Any) {

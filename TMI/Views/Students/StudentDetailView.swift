@@ -23,9 +23,8 @@ struct StudentDetailView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                TMIBackgroundView(variant: .default)
+        ZStack {
+            TMIBackgroundView(variant: .default)
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -46,7 +45,6 @@ struct StudentDetailView: View {
                             .padding(.horizontal, 20)
                     }
                 }
-            }
             .navigationTitle("Student Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -523,10 +521,9 @@ struct EditStudentInterestsView: View {
     @State private var selectedHobbies: [Hobby] = []
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                TMIBackgroundView(variant: .default)
-                    .ignoresSafeArea()
+        ZStack {
+            TMIBackgroundView(variant: .default)
+                .ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -619,12 +616,11 @@ struct EditStudentInterestsView: View {
                     .font(.system(.caption, weight: .semibold))
                 }
             }
-        }
-        .preferredColorScheme(.dark)
-        .onAppear {
-            selectedInterests = student.interests
-            selectedHobbies = student.hobbies
-        }
+            .preferredColorScheme(.dark)
+            .onAppear {
+                selectedInterests = student.interests
+                selectedHobbies = student.hobbies
+            }
     }
     
     private func toggleInterest(_ interest: Interest) {

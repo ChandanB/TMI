@@ -11,7 +11,7 @@ import SwiftUI
 
 // MARK: - Dashboard Data Model
 
-struct DashboardData: Equatable {
+struct DashboardData: Equatable, Sendable {
   var engagementData: [EngagementData] = []
   var totalStudents: Int = 0
   var activeTMIPlans: Int = 0
@@ -189,7 +189,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     // Don't update selectedTimeFrame here to avoid infinite loop
     // The UI binding will handle the selectedTimeFrame state
     
-    // Instead of refetching all data, just regenerate the dashboard data 
+    // Instead of refetching all data, just regenerate the dashboard data
     // with the new timeframe applied to existing data
     guard case .loaded(let currentData) = state else {
       // If no data is loaded yet, fetch it
@@ -263,9 +263,9 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     
     return months.enumerated().map { index, month in
       // Calculate alignment based on surveys completed and plans aligned
-      let completionRate = dashboardData.totalStudents > 0 ? 
+      let completionRate = dashboardData.totalStudents > 0 ?
         Double(dashboardData.surveysCompleted) / Double(dashboardData.totalStudents) : 0.0
-      let planRate = dashboardData.totalStudents > 0 ? 
+      let planRate = dashboardData.totalStudents > 0 ?
         Double(dashboardData.plansAligned) / Double(dashboardData.totalStudents) : 0.0
       
       // Add some variance and progression over time
@@ -813,7 +813,7 @@ struct DashboardView: View {
           )
 
           StatCircle(
-            value: "\(Int(planAlignmentRate(data) * 100))%", 
+            value: "\(Int(planAlignmentRate(data) * 100))%",
             title: "Plan\nAlignment",
             color: Color.tmiSecondary,
             icon: "person.fill.checkmark"
@@ -821,7 +821,7 @@ struct DashboardView: View {
 
           StatCircle(
             value: "\(Int(planEffectiveness(data) * 100))%",
-            title: "Plan\nEffectiveness", 
+            title: "Plan\nEffectiveness",
             color: .orange,
             icon: "star.fill"
           )
@@ -1014,7 +1014,7 @@ struct DashboardView: View {
 
   private func planEffectiveness(_ data: DashboardData) -> Double {
     // Calculate plan effectiveness based on plans vs students ratio and activity
-    let planRatio = data.totalStudents > 0 ? 
+    let planRatio = data.totalStudents > 0 ?
       Double(data.activeTMIPlans) / Double(data.totalStudents) : 0.0
     let activityBonus = data.recentActivities.count > 0 ? 0.15 : 0.0
     return min(1.0, planRatio * 0.8 + activityBonus)
@@ -1307,8 +1307,7 @@ struct AllActivitiesView: View {
   @Environment(\.dismiss) private var dismiss
   
   var body: some View {
-    NavigationStack {
-      ZStack {
+    ZStack {
         TMIBackgroundView(variant: .dashboard)
           .ignoresSafeArea()
         
@@ -1353,7 +1352,6 @@ struct AllActivitiesView: View {
           .foregroundColor(.white)
         }
       }
-    }
     .preferredColorScheme(.dark)
   }
 }

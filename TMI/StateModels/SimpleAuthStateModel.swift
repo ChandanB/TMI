@@ -192,7 +192,7 @@ final class SimpleAuthStateModel: BaseStateModel<TMIAuthState, IdentifiableError
             "lastLoginDate": user.lastLoginDate as Any
         ]
         
-        try await FIREBASE_MANAGER.firestore
+        try await FirebaseManager.shared.firestore
             .collection("users")
             .document(user.id!)
             .setData(userData)

@@ -9,9 +9,9 @@ import Foundation
 import FirebaseFirestore
 import FirebaseAuth
 
-class SurveyService {
+final class SurveyService: @unchecked Sendable {
   static let shared = SurveyService()
-  private let firestore = FIRESTORE_DATABASE
+  nonisolated(unsafe) private let firestore = FirebaseManager.shared.firestore
   
   private init() {}
   
@@ -292,7 +292,7 @@ class SurveyService {
   }
   
   // MARK: - Completion-based methods for backward compatibility
-  func submitSurvey(_ survey: Survey, completion: @escaping (Result<Void, Error>) -> Void) {
+  func submitSurvey(_ survey: Survey, completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
     Task {
       do {
         _ = try await submitSurvey(survey)
@@ -303,7 +303,7 @@ class SurveyService {
     }
   }
   
-  func fetchSurvey(id: String, completion: @escaping (Result<Survey, Error>) -> Void) {
+  func fetchSurvey(id: String, completion: @escaping @Sendable (Result<Survey, Error>) -> Void) {
     Task {
       do {
         let survey = try await fetchSurvey(id: id)
@@ -316,7 +316,7 @@ class SurveyService {
 }
 
 // MARK: - Survey Analytics Model
-struct SurveyAnalytics: Codable {
+struct SurveyAnalytics: Codable, Sendable {
   let totalSurveys: Int
   let completedSurveys: Int
   let draftSurveys: Int

@@ -56,10 +56,38 @@ struct FirebaseManager {
   }
 }
 
+extension FirebaseManager {
+  /// Performs Firebase configuration checks and prints setup status and instructions.
+  /// Call this from your app's startup (e.g., AppDelegate, SceneDelegate, or main SwiftUI entry point) after FirebaseManager has been initialized.
+  @MainActor
+  static func configureIfNeeded() async {
+    let configStatus = FirebaseConfigurationHelper.shared.checkFirebaseConfiguration()
+    let message = FirebaseConfigurationHelper.shared.getUserFriendlyMessage(for: configStatus)
+    print("Firebase Status: \(message)")
+    
+    if configStatus.canWorkOffline {
+      FirebaseConfigurationHelper.shared.enableOfflineMode()
+    }
+    
+    if !configStatus.isWorking {
+      let instructions = FirebaseConfigurationHelper.shared.getDeveloperInstructions(for: configStatus)
+      print("🔧 Developer Instructions:")
+      for instruction in instructions {
+        print("   \(instruction)")
+      }
+      print("\n")
+      let completeInstructions = FirebaseConfigurationHelper.shared.getCompleteSetupInstructions()
+      for instruction in completeInstructions {
+        print(instruction)
+      }
+    }
+  }
+}
+
 // MARK: - User Session Service
 extension FirebaseManager {
-  func signIn(withEmail email: String, password: String) async throws {
-    let configStatus = FirebaseConfigurationHelper.shared.checkFirebaseConfiguration()
+  nonisolated(nonsending) func signIn(withEmail email: String, password: String) async throws {
+    let configStatus = await FirebaseConfigurationHelper.shared.checkFirebaseConfiguration()
     
     // If Firebase is not properly configured, use mock authentication for development
     if !configStatus.isWorking && isDevelopmentMode() {
@@ -73,7 +101,7 @@ extension FirebaseManager {
       try await auth.signIn(withEmail: email, password: password)
     } catch {
       // Use FirebaseConfigurationHelper to handle errors gracefully
-      let errorResponse = FirebaseConfigurationHelper.shared.handleFirebaseError(error)
+      let errorResponse = await FirebaseConfigurationHelper.shared.handleFirebaseError(error)
       
       switch errorResponse {
       case .databaseNotConfigured:
@@ -95,7 +123,7 @@ extension FirebaseManager {
   }
   
   /// Check if running in development mode
-  private func isDevelopmentMode() -> Bool {
+  nonisolated private func isDevelopmentMode() -> Bool {
     #if DEBUG
     return true
     #else
@@ -103,7 +131,7 @@ extension FirebaseManager {
     #endif
   }
 
-  func signUp(withEmail email: String, password: String) async throws -> String {
+  nonisolated(nonsending) func signUp(withEmail email: String, password: String) async throws -> String {
     do {
       let authResult = try await auth.createUser(withEmail: email, password: password)
       let uid = authResult.user.uid
@@ -131,12 +159,12 @@ extension FirebaseManager {
     }
   }
   
-  func resetPassword(email: String) async throws {
+  nonisolated(nonsending) func resetPassword(email: String) async throws {
     do {
       try await auth.sendPasswordReset(withEmail: email)
     } catch {
       // Use FirebaseConfigurationHelper to handle errors gracefully
-      let errorResponse = FirebaseConfigurationHelper.shared.handleFirebaseError(error)
+      let errorResponse = await FirebaseConfigurationHelper.shared.handleFirebaseError(error)
       
       switch errorResponse {
       case .databaseNotConfigured:
@@ -157,7 +185,7 @@ extension FirebaseManager {
     }
   }
 
-  func getCurrentUserProfile() async throws -> [String: Any]? {
+  nonisolated(nonsending) func getCurrentUserProfile() async throws -> [String: Any]? {
     guard let currentUser = auth.currentUser else {
       throw FirebaseManagerError.userNotLoggedIn
     }
@@ -172,7 +200,7 @@ extension FirebaseManager {
     }
   }
 
-  func updateUserProfile(data: [String: Any]) async throws {
+  nonisolated(nonsending) func updateUserProfile(data: [String: Any]) async throws {
     guard let currentUser = auth.currentUser else {
       throw FirebaseManagerError.userNotLoggedIn
     }
@@ -182,7 +210,7 @@ extension FirebaseManager {
   
   // MARK: - Educator Data Seeding
   /// Seeds sample students, interests, and hobbies for a newly authenticated educator if missing.
-  func seedInitialEducatorDataIfNeeded() async throws {
+  nonisolated(nonsending) func seedInitialEducatorDataIfNeeded() async throws {
     guard let userID = auth.currentUser?.uid else { return }
     let studentsCollection = firestore.collection("users").document(userID).collection("students")
     let studentSnapshot = try await studentsCollection.limit(to: 1).getDocuments()
@@ -264,4 +292,3 @@ extension FirebaseManager {
     }
   }
 }
-

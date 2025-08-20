@@ -70,7 +70,7 @@ struct DashboardInsightsView: View {
                 )
 
                 StatCircle(
-                  value: "\(Int(planAlignmentRate * 100))%", 
+                  value: "\(Int(planAlignmentRate * 100))%",
                   title: "Plan\nAlignment",
                   color: Color.tmiSecondary,
                   icon: "person.fill.checkmark"
@@ -78,7 +78,7 @@ struct DashboardInsightsView: View {
 
                 StatCircle(
                   value: "\(Int(planEffectiveness * 100))%",
-                  title: "Plan\nEffectiveness", 
+                  title: "Plan\nEffectiveness",
                   color: .orange,
                   icon: "star.fill"
                 )
@@ -207,7 +207,7 @@ struct DashboardInsightsView: View {
   
   private var planEffectiveness: Double {
     // Calculate plan effectiveness based on plans vs students ratio and activity
-    let planRatio = dashboardData.totalStudents > 0 ? 
+    let planRatio = dashboardData.totalStudents > 0 ?
       Double(dashboardData.activeTMIPlans) / Double(dashboardData.totalStudents) : 0.0
     let activityBonus = dashboardData.recentActivities.count > 0 ? 0.15 : 0.0
     return min(1.0, planRatio * 0.8 + activityBonus)
@@ -330,8 +330,7 @@ struct LegacyInsightsView: View {
   @Environment(\.dismiss) private var dismiss
   
   var body: some View {
-    NavigationStack {
-      ZStack {
+    ZStack {
         TMIBackgroundView(variant: .dashboard)
           .ignoresSafeArea()
         
@@ -357,15 +356,14 @@ struct LegacyInsightsView: View {
           .padding(20)
         }
       }
-      .navigationTitle("Legacy Insights")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .navigationBarTrailing) {
-          Button("Done") {
-            dismiss()
-          }
-          .foregroundColor(.white)
+    .navigationTitle("Legacy Insights")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .navigationBarTrailing) {
+        Button("Done") {
+          dismiss()
         }
+        .foregroundColor(.white)
       }
     }
     .preferredColorScheme(.dark)
@@ -375,9 +373,9 @@ struct LegacyInsightsView: View {
     // This would be the same logic as the original recommendations
     var recs: [InsightRecommendation] = []
     
-    let completionRate = dashboardData.totalStudents > 0 ? 
+    let completionRate = dashboardData.totalStudents > 0 ?
       Double(dashboardData.surveysCompleted) / Double(dashboardData.totalStudents) : 0
-    let alignmentRate = dashboardData.totalStudents > 0 ? 
+    let alignmentRate = dashboardData.totalStudents > 0 ?
       Double(dashboardData.plansAligned) / Double(dashboardData.totalStudents) : 0
     
     if completionRate < 0.7 {

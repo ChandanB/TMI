@@ -1,4 +1,3 @@
-
 //
 //  NavigationCoordinator.swift
 //  TMI
@@ -10,7 +9,8 @@ import SwiftUI
 import Observation
 
 @Observable
-final class NavigationCoordinator {
+@MainActor
+final class NavigationCoordinator: @unchecked Sendable {
     static let shared = NavigationCoordinator()
     
     var path = NavigationPath()

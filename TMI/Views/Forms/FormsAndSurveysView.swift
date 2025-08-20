@@ -19,7 +19,7 @@ struct FormsAndSurveysView: View {
 
   enum FormFilter: String, CaseIterable {
     case all = "All"
-    case surveys = "Forms & Surveys"
+    case surveys = "Surveys"
     case otherForms = "Other Forms"
   }
 
@@ -31,16 +31,15 @@ struct FormsAndSurveysView: View {
       VStack(spacing: 0) {
         // Search and Filter - Using unified TMITextField
         searchAndFilterBar
-          .padding(.top, 10)
-          .padding(.horizontal)
+          .padding(.top, 16)
+          .padding(.horizontal, 20)
           .opacity(isLoaded ? 1 : 0)
           .offset(y: isLoaded ? 0 : -20)
           .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1), value: isLoaded)
 
         // Categories
         categoryView
-          .padding(.top, 15)
-          .padding(.horizontal)
+          .padding(.top, 16)
           .opacity(isLoaded ? 1 : 0)
           .offset(y: isLoaded ? 0 : 20)
           .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: isLoaded)
@@ -72,8 +71,8 @@ struct FormsAndSurveysView: View {
           )
           .offset(y: isLoaded ? 0 : 100)
           .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5), value: isLoaded)
-          .padding(.trailing, 20)
-          .padding(.bottom, 20)
+          .padding(.trailing, 24)
+          .padding(.bottom, 24)
         }
       }
     }
@@ -136,7 +135,7 @@ struct FormsAndSurveysView: View {
 
   private var categoryView: some View {
     ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: 12) {
+      HStack(spacing: 16) {
         ForEach(FormFilter.allCases, id: \.self) { filter in
           TMIButton(
             text: filter.rawValue,
@@ -147,10 +146,11 @@ struct FormsAndSurveysView: View {
               }
             }
           )
+          .fixedSize(horizontal: true, vertical: false)
         }
       }
-      .padding(.horizontal, 4)
-      .padding(.bottom, 10)
+      .padding(.horizontal, 20)
+      .padding(.vertical, 8)
     }
   }
 
@@ -175,8 +175,9 @@ struct FormsAndSurveysView: View {
           .buttonStyle(PlainButtonStyle())
         }
       }
-      .padding(20)
-      .padding(.bottom, 80)  // Add extra padding for the FAB
+      .padding(.horizontal, 20)
+      .padding(.top, 12)
+      .padding(.bottom, 100)  // Extra padding for the FAB
     }
   }
 
@@ -196,7 +197,7 @@ struct FormsAndSurveysView: View {
   // MARK: - Empty State (Updated)
 
   private var emptyStateView: some View {
-    VStack(spacing: 24) {
+    VStack(spacing: 32) {
       // Empty illustration
       ZStack {
         Circle()
@@ -214,7 +215,7 @@ struct FormsAndSurveysView: View {
           .font(.system(size: 80))
           .foregroundColor(.white.opacity(0.7))
       }
-      .padding(.top, 60)
+      .padding(.top, 80)
 
       Text("No Forms Found")
         .font(.system(size: 22, weight: .semibold, design: .rounded))
@@ -234,11 +235,12 @@ struct FormsAndSurveysView: View {
           showingFormCreation = true
         }
       )
-      .padding(.top, 10)
+      .padding(.top, 16)
 
       Spacer()
     }
-    .padding(.top, 60)
+    .padding(.horizontal, 20)
+    .padding(.top, 40)
     .opacity(isLoaded ? 1 : 0)
     .offset(y: isLoaded ? 0 : 20)
     .animation(.easeInOut(duration: 0.5).delay(0.3), value: isLoaded)
@@ -253,9 +255,9 @@ struct FormsAndSurveysView: View {
       case .all:
         matchesFilter = true
       case .surveys:
-        matchesFilter = template.category == "Survey"
+        matchesFilter = template.category?.lowercased() == "survey" || template.category?.lowercased().contains("survey") == true
       case .otherForms:
-        matchesFilter = template.category != "Survey"
+        matchesFilter = template.category?.lowercased() != "survey" && !(template.category?.lowercased().contains("survey") == true)
       }
 
       let matchesSearch =
@@ -276,33 +278,35 @@ struct FormStoreCardView: View {
 
   var body: some View {
     TMIGlassCard(style: .default) {
-      HStack(alignment: .top, spacing: 16) {
+      HStack(alignment: .top, spacing: 20) {
         // Icon with category color
         ZStack {
           Circle()
             .fill(template.themeColor.opacity(0.2))
-            .frame(width: 50, height: 50)
+            .frame(width: 56, height: 56)
 
           Image(systemName: categoryIcon)
-            .font(.system(size: 22))
+            .font(.system(size: 26))
             .foregroundColor(template.themeColor)
         }
 
         // Content
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
           // Title and badge
-          HStack {
+          HStack(alignment: .top) {
             Text(template.name)
-              .font(.system(size: 17, weight: .semibold))
+              .font(.system(size: 18, weight: .semibold))
               .foregroundColor(.white)
+              .lineLimit(2)
+              .multilineTextAlignment(.leading)
 
             Spacer()
 
             if template.isActive {
               Text("Active")
                 .font(.system(size: 12, weight: .medium))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(
                   Capsule()
                     .fill(Color.green.opacity(0.2))
@@ -314,31 +318,38 @@ struct FormStoreCardView: View {
           // Description
           if !template.templateDescription.isEmpty {
             Text(template.templateDescription)
-              .font(.system(size: 14))
-              .foregroundColor(.white.opacity(0.7))
-              .lineLimit(2)
+              .font(.system(size: 15))
+              .foregroundColor(.white.opacity(0.8))
+              .lineLimit(3)
+              .multilineTextAlignment(.leading)
           }
 
           // Metadata
-          HStack(spacing: 16) {
-            // Sections
-            Label("\(template.sections.count) sections", systemImage: "list.bullet")
-              .font(.system(size: 13))
-              .foregroundColor(.white.opacity(0.6))
-
-            // Category
-            if let category = template.category {
-              Label(category, systemImage: "tag")
+          VStack(spacing: 8) {
+            HStack(spacing: 16) {
+              // Sections
+              Label("\(template.sections.count) sections", systemImage: "list.bullet")
                 .font(.system(size: 13))
                 .foregroundColor(.white.opacity(0.6))
+
+              // Category
+              if let category = template.category {
+                Label(category, systemImage: "tag")
+                  .font(.system(size: 13))
+                  .foregroundColor(.white.opacity(0.6))
+              }
+              
+              Spacer()
             }
-
-            Spacer()
-
-            // Date
-            Text((template.updatedAt ?? template.createdAt) ?? Date(), style: .date)
-              .font(.system(size: 13))
-              .foregroundColor(.white.opacity(0.6))
+            
+            HStack {
+              // Date
+              Text((template.updatedAt ?? template.createdAt) ?? Date(), style: .date)
+                .font(.system(size: 13))
+                .foregroundColor(.white.opacity(0.6))
+              
+              Spacer()
+            }
           }
           .padding(.top, 4)
         }
@@ -985,8 +996,7 @@ struct FormCreationView: View {
   let categories = ["Survey", "Assessment", "Feedback", "Registration", "Other"]
 
   var body: some View {
-    NavigationStack {
-      ZStack {
+    ZStack {
         TMIBackgroundView(variant: .default)
           .ignoresSafeArea()
 
@@ -1114,7 +1124,6 @@ struct FormCreationView: View {
         }
       }
       .preferredColorScheme(.dark)
-    }
   }
 }
 
@@ -1124,8 +1133,7 @@ struct FormBuilderView: View {
   @Environment(\.dismiss) private var dismiss
   
   var body: some View {
-    NavigationStack {
-      ZStack {
+    ZStack {
         TMIBackgroundView(variant: .default)
           .ignoresSafeArea()
         
@@ -1193,7 +1201,6 @@ struct FormBuilderView: View {
         }
       }
       .preferredColorScheme(.dark)
-    }
   }
 }
 
@@ -1206,8 +1213,7 @@ struct FormPreviewView: View {
   @State private var fieldValues: [String: Any] = [:]
   
   var body: some View {
-    NavigationStack {
-      ZStack {
+    ZStack {
         TMIBackgroundView(variant: .default)
           .ignoresSafeArea()
         
@@ -1314,7 +1320,6 @@ struct FormPreviewView: View {
         }
       }
       .preferredColorScheme(.dark)
-    }
   }
 }
 
@@ -1326,8 +1331,7 @@ struct FormImportView: View {
   @State private var showingFilePicker = false
   
   var body: some View {
-    NavigationStack {
-      ZStack {
+    ZStack {
         TMIBackgroundView(variant: .default)
           .ignoresSafeArea()
         
@@ -1442,7 +1446,6 @@ struct FormImportView: View {
           print("Error selecting file: \(error)")
         }
       }
-    }
   }
 }
 

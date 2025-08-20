@@ -8,7 +8,7 @@
 import FirebaseFirestore
 import SwiftUI
 
-struct Career: Identifiable, Codable {
+struct Career: Identifiable, Codable, Sendable {
     let id: UUID
     let title: String
     let field: String
@@ -20,7 +20,7 @@ struct Career: Identifiable, Codable {
     let growthRate: Double
 
     // Custom CodingKeys for salaryRange
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, Sendable {
         case id, title, field, description, skills, education, jobOutlook, growthRate
         case salaryRangeLowerBound
         case salaryRangeUpperBound
@@ -72,7 +72,7 @@ struct Career: Identifiable, Codable {
     }
 
     // Sample careers for preview
-    static var sampleCareers: [Career] = [
+    static let sampleCareers: [Career] = [
         Career(
             title: "Software Developer",
             field: "Technology",

@@ -26,6 +26,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
     var interventionModels: [InterventionModel]
     var popularityScore: Int?
     var isFeatured: Bool
+    var createdAt: Date // Add createdAt property
     
     // MARK: - TMI Specific Properties
     var academicBenefits: String?
@@ -48,6 +49,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         interventionModels: [InterventionModel] = [],
         popularityScore: Int? = nil,
         isFeatured: Bool = false,
+        createdAt: Date = Date(), // Add createdAt with default value
         academicBenefits: String? = nil,
         careerPathways: [CareerPathway]? = nil,
         educationalActivities: [String]? = nil,
@@ -64,6 +66,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         self.interventionModels = interventionModels
         self.popularityScore = popularityScore
         self.isFeatured = isFeatured
+        self.createdAt = createdAt // Assign createdAt
         self.academicBenefits = academicBenefits
         self.careerPathways = careerPathways
         self.educationalActivities = educationalActivities
@@ -73,15 +76,15 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         self.schemaVersion = schemaVersion
     }
     
-    // Simple initializer with category
+    // Simple initializer with category (update to include createdAt)
     convenience init(name: String, category: InterestCategory) {
-        self.init(name: name, category: [category])
+        self.init(name: name, category: [category], createdAt: Date())
     }
     
     // MARK: - Codable Implementation
     enum CodingKeys: String, CodingKey {
         case id, firestoreID, name, category, description, academicRelevance, interventionModels
-        case popularityScore, isFeatured, academicBenefits, careerPathways, educationalActivities
+        case popularityScore, isFeatured, createdAt, academicBenefits, careerPathways, educationalActivities // Add createdAt
         case behavioralBenefits, skillsDeveloped, tierRelevance, schemaVersion
     }
     
@@ -96,6 +99,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         interventionModels = try container.decodeIfPresent([InterventionModel].self, forKey: .interventionModels) ?? []
         popularityScore = try container.decodeIfPresent(Int.self, forKey: .popularityScore)
         isFeatured = try container.decodeIfPresent(Bool.self, forKey: .isFeatured) ?? false
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date() // Decode createdAt
         academicBenefits = try container.decodeIfPresent(String.self, forKey: .academicBenefits)
         careerPathways = try container.decodeIfPresent([CareerPathway].self, forKey: .careerPathways)
         educationalActivities = try container.decodeIfPresent([String].self, forKey: .educationalActivities)
@@ -116,6 +120,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         try container.encode(interventionModels, forKey: .interventionModels)
         try container.encodeIfPresent(popularityScore, forKey: .popularityScore)
         try container.encode(isFeatured, forKey: .isFeatured)
+        try container.encode(createdAt, forKey: .createdAt) // Encode createdAt
         try container.encodeIfPresent(academicBenefits, forKey: .academicBenefits)
         try container.encodeIfPresent(careerPathways, forKey: .careerPathways)
         try container.encodeIfPresent(educationalActivities, forKey: .educationalActivities)
@@ -157,6 +162,9 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
             tiers = [.tier1, .tier2]
         }
         
+        let createdAtTimestamp = data["createdAt"] as? Timestamp ?? Timestamp(date: Date()) // Decode createdAt from Timestamp
+        let createdAtDate = createdAtTimestamp.dateValue()
+
         return Interest(
             id: id,
             name: name,
@@ -166,6 +174,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
             interventionModels: models,
             popularityScore: data["popularityScore"] as? Int,
             isFeatured: data["isFeatured"] as? Bool ?? false,
+            createdAt: createdAtDate, // Assign decoded createdAt
             academicBenefits: data["academicBenefits"] as? String,
             careerPathways: parseCareerPathways(data["careerPathways"]),
             educationalActivities: data["educationalActivities"] as? [String],
@@ -196,7 +205,8 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
             "interventionModels": interventionModels.map { $0.rawValue },
             "tierRelevance": tierRelevance.map { $0.rawValue },
             "isFeatured": isFeatured,
-            "schemaVersion": schemaVersion
+            "schemaVersion": schemaVersion,
+            "createdAt": Timestamp(date: createdAt) // Encode createdAt as Timestamp
         ]
         
         if let description = description { data["description"] = description }
@@ -276,7 +286,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
 
 // MARK: - Support Enums and Types
 
-enum InterventionModel: String, Codable, CaseIterable, Identifiable {
+enum InterventionModel: String, Codable, CaseIterable, Identifiable, Sendable {
     case chaseYourSpace = "Chase Your Space"
     case acknowledgeInterests = "Acknowledge Your Interests"
     case alignYourMind = "Align Your Mind"
@@ -315,7 +325,7 @@ enum InterventionModel: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-enum InterventionTier: String, Codable, CaseIterable, Identifiable {
+enum InterventionTier: String, Codable, CaseIterable, Identifiable, Sendable {
     case tier1 = "Tier 1"
     case tier2 = "Tier 2"
     
@@ -331,7 +341,7 @@ enum InterventionTier: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-enum AcademicSubject: String, Codable, CaseIterable, Identifiable {
+enum AcademicSubject: String, Codable, CaseIterable, Identifiable, Sendable {
     case mathematics = "Mathematics"
     case english = "English Language Arts"
     case science = "Science"
@@ -361,7 +371,7 @@ enum AcademicSubject: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-enum CareerPathway: String, Codable, CaseIterable, Identifiable {
+enum CareerPathway: String, Codable, CaseIterable, Identifiable, Sendable {
     case stem = "STEM"
     case healthcare = "Healthcare"
     case business = "Business & Entrepreneurship"
@@ -374,7 +384,7 @@ enum CareerPathway: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum Skill: String, Codable, CaseIterable, Identifiable {
+enum Skill: String, Codable, CaseIterable, Identifiable, Sendable {
     case criticalThinking = "Critical Thinking"
     case communication = "Communication"
     case teamwork = "Teamwork"
@@ -391,7 +401,7 @@ enum Skill: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - InterestCategory Extension
 
-enum InterestCategory: String, CaseIterable, Identifiable, Codable, Comparable, Equatable {
+enum InterestCategory: String, CaseIterable, Identifiable, Codable, Comparable, Equatable, Sendable {
     static func < (lhs: InterestCategory, rhs: InterestCategory) -> Bool {
         lhs.rawValue < rhs.rawValue
     }

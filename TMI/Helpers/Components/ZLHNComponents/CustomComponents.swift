@@ -80,12 +80,12 @@ struct KeyboardAvoiding: ViewModifier {
       guard let userInfo = notification.userInfo else { return }
       guard let keyboardEndFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
       else { return }
-      keyboardHeight = keyboardEndFrame.height
+      Task { @MainActor in keyboardHeight = keyboardEndFrame.height }
     }
     NotificationCenter.default.addObserver(
       forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main
     ) { (_) in
-      keyboardHeight = 0
+      Task { @MainActor in keyboardHeight = 0 }
     }
   }
 

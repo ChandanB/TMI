@@ -6,7 +6,7 @@ import SwiftUI
 import FirebaseFirestore
 import Combine
 
-struct Student: Codable, Identifiable, Hashable {
+struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
     // MARK: - Firebase Properties
     @DocumentID var id: String?
     
@@ -276,13 +276,13 @@ struct Student: Codable, Identifiable, Hashable {
 
 // MARK: - Supporting Types
 
-enum EngagementTrend: String, Codable {
+enum EngagementTrend: String, Codable, Sendable {
     case improving = "Improving"
     case stable = "Stable"
     case declining = "Declining"
 }
 
-enum AvatarColor: String, Codable {
+enum AvatarColor: String, Codable, Sendable {
     case blue
     case green
     case orange
@@ -292,13 +292,13 @@ enum AvatarColor: String, Codable {
     case indigo
 }
 
-struct EngagementRecord: Codable, Hashable {
+struct EngagementRecord: Codable, Hashable, Sendable {
     var date: Date
     var score: Double
     var source: EngagementSource
     var notes: String?
     
-    enum EngagementSource: String, Codable {
+    enum EngagementSource: String, Codable, Sendable {
         case survey
         case activityCompletion
         case teacherInput
@@ -306,28 +306,28 @@ struct EngagementRecord: Codable, Hashable {
     }
 }
 
-struct AcademicPerformance: Codable, Hashable {
+struct AcademicPerformance: Codable, Hashable, Sendable {
     var gpa: Double?
     var subjects: [SubjectPerformance]
     var strengths: [String]
     var areasForImprovement: [String]
 }
 
-struct SubjectPerformance: Codable, Hashable {
+struct SubjectPerformance: Codable, Hashable, Sendable {
     var name: String
     var grade: String
     var score: Double
     var interestAlignment: Double
 }
 
-struct StudentNote: Codable, Hashable, Identifiable {
+struct StudentNote: Codable, Hashable, Identifiable, Sendable {
     var id = UUID()
     var date: Date
     var author: String
     var content: String
     var category: NoteCategory
     
-    enum NoteCategory: String, Codable {
+    enum NoteCategory: String, Codable, Sendable {
         case general
         case academic
         case behavioral
@@ -335,14 +335,14 @@ struct StudentNote: Codable, Hashable, Identifiable {
     }
 }
 
-struct SurveyResult: Codable, Hashable, Identifiable {
+struct SurveyResult: Codable, Hashable, Identifiable, Sendable {
     var id: String
     var surveyName: String
     var date: Date
     var isComplete: Bool
     var responses: [SurveyResponse]
     
-    struct SurveyResponse: Codable, Hashable {
+    struct SurveyResponse: Codable, Hashable, Sendable {
         var questionID: String
         var question: String
         var answer: String

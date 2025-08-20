@@ -138,7 +138,7 @@ final class PaginationManager<T> {
 
 /// A specialized state model for paginated data
 @Observable
-class PaginatedStateModel<T, E: Error>: BaseStateModel<[T], E> {
+class PaginatedStateModel<T: Sendable, E: Error & Sendable>: BaseStateModel<[T], E> {
     // MARK: - Properties
     
     /// Manager for handling pagination
@@ -191,13 +191,13 @@ class PaginatedStateModel<T, E: Error>: BaseStateModel<[T], E> {
     override func refresh() async {
         guard !paginationManager.isLoading else { return }
         
-        resetState()
+        reset()
         await fetch()
     }
     
     /// Resets the state and pagination manager
-    override func resetState() {
-        super.resetState()
+    func reset() {
+        resetState()
         paginationManager.reset()
     }
     
@@ -272,3 +272,4 @@ class PaginatedStateModel<T, E: Error>: BaseStateModel<[T], E> {
         removeItem(at: index)
     }
 }
+
