@@ -1,23 +1,169 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Modern Swift Development
 
-## Build and Development Commands
+Write idiomatic SwiftUI code following Apple's latest architectural recommendations and best practices.
 
-### Building the Project
-```bash
-# Build the project (use xcodebuild since this is an iOS app)
-xcodebuild -project TMI.xcodeproj -scheme TMI -configuration Debug build
+## Core Philosophy
 
-# Build for specific platform
-xcodebuild -project TMI.xcodeproj -scheme TMI -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' build
+- SwiftUI is the default UI paradigm for Apple platforms - embrace its declarative nature
+- Avoid legacy UIKit patterns and unnecessary abstractions
+- Focus on simplicity, clarity, and native data flow
+- Let SwiftUI handle the complexity - don't fight the framework
 
-# Clean build folder
-xcodebuild -project TMI.xcodeproj -scheme TMI clean
+## Architecture Guidelines
+
+### 1. Embrace Native State Management
+
+Use SwiftUI's built-in property wrappers appropriately:
+- `@State` - Local, ephemeral view state
+- `@Binding` - Two-way data flow between views
+- `@Observable` - Shared state (iOS 17+)
+- `@Environment` - Dependency injection for app-wide concerns
+
+### 2. State Ownership Principles
+
+- Views own their local state unless sharing is required
+- State flows down, actions flow up
+- Keep state as close to where it's used as possible
+- Extract shared state only when multiple views need it
+
+### 3. Modern Async Patterns
+
+- Use `async/await` as the default for asynchronous operations
+- Leverage `.task` modifier for lifecycle-aware async work
+- Avoid Combine unless absolutely necessary
+- Handle errors gracefully with try/catch
+
+### 4. View Composition
+
+- Build UI with small, focused views
+- Extract reusable components naturally
+- Use view modifiers to encapsulate common styling
+- Prefer composition over inheritance
+
+### 5. Code Organization
+
+- Organize by feature, not by type (avoid Views/, Models/, ViewModels/ folders)
+- Keep related code together in the same file when appropriate
+- Use extensions to organize large files
+- Follow Swift naming conventions consistently
+
+## Implementation Patterns
+
+### Simple State Example
+```swift
+struct CounterView: View {
+    @State private var count = 0
+    
+    var body: some View {
+        VStack {
+            Text("Count: \(count)")
+            Button("Increment") { 
+                count += 1 
+            }
+        }
+    }
+}
 ```
 
-### Firebase Setup
-The project uses Firebase extensively. Ensure `GoogleService-Info.plist` is present in the project root for Firebase to work properly. The app has a comprehensive Firebase configuration helper that will log detailed setup instructions if configuration is missing.
+### Shared State with @Observable
+```swift
+@Observable
+class UserSession {
+    var isAuthenticated = false
+    var currentUser: User?
+    
+    func signIn(user: User) {
+        currentUser = user
+        isAuthenticated = true
+    }
+}
+
+struct MyApp: App {
+    @State private var session = UserSession()
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environment(session)
+        }
+    }
+}
+```
+
+### Async Data Loading
+```swift
+struct ProfileView: View {
+    @State private var profile: Profile?
+    @State private var isLoading = false
+    @State private var error: Error?
+    
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView()
+            } else if let profile {
+                ProfileContent(profile: profile)
+            } else if let error {
+                ErrorView(error: error)
+            }
+        }
+        .task {
+            await loadProfile()
+        }
+    }
+    
+    private func loadProfile() async {
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            profile = try await ProfileService.fetch()
+        } catch {
+            self.error = error
+        }
+    }
+}
+```
+
+## Best Practices
+
+### DO:
+- Write self-contained views when possible
+- Use property wrappers as intended by Apple
+- Test logic in isolation, preview UI visually
+- Handle loading and error states explicitly
+- Keep views focused on presentation
+- Use Swift's type system for safety
+
+### DON'T:
+- Create ViewModels for every view
+- Move state out of views unnecessarily
+- Add abstraction layers without clear benefit
+- Use Combine for simple async operations
+- Fight SwiftUI's update mechanism
+- Overcomplicate simple features
+
+## Testing Strategy
+
+- Unit test business logic and data transformations
+- Use SwiftUI Previews for visual testing
+- Test @Observable classes independently
+- Keep tests simple and focused
+- Don't sacrifice code clarity for testability
+
+## Modern Swift Features
+
+- Use Swift Concurrency (async/await, actors)
+- Leverage Swift 6 data race safety when available
+- Utilize property wrappers effectively
+- Embrace value types where appropriate
+- Use protocols for abstraction, not just for testing
+
+## Summary
+
+Write SwiftUI code that looks and feels like SwiftUI. The framework has matured significantly - trust its patterns and tools. Focus on solving user problems rather than implementing architectural patterns from other platforms.
 
 ## Architecture Overview
 
@@ -64,18 +210,8 @@ The application is in MVP state focusing on the educator experience:
 User Authentication → AuthStateModel → MainTabView → [Students|TMIPlans]View → ViewModel → Firebase
 ```
 
-### Security Rules
-Firestore security implemented in `firestore.rules` with user-scoped data access:
-```javascript
-match /users/{userId} {
-  allow read, write: if request.auth.uid == userId;
-  match /students/{studentId} { allow read, write: if request.auth.uid == userId; }
-  match /tmiPlans/{planId} { allow read, write: if request.auth.uid == userId; }
-}
-```
-
 ### Environment Dependencies
-- **SwiftUI**: iOS 15+ (uses latest SwiftUI features)
+- **SwiftUI**: iOS 26+ (uses latest SwiftUI features)
 - **Firebase SDK 11.2.0**: Full Firebase suite including Auth, Firestore, Analytics
 - **SDWebImageSwiftUI**: Image loading and caching
 - **Charts**: SwiftUI Charts for data visualization
@@ -143,8 +279,16 @@ TMIButton(text: "Save", style: .primary, action: { ... })
 - Implement toFirestoreData() methods for complex models
 - Use comprehensive sample data for development/testing
 
-### Recent Major Changes
-1. **Component Unification**: Consolidated 22+ duplicate components into 8 unified types
-2. **MVP Implementation**: Simplified to educator-focused Students + TMI Plans experience  
-3. **Firebase Integration**: Complete migration from sample data to real Firestore operations
-4. **Authentication Overhaul**: Multi-role system with compliance tracking
+* Aim to build all functionality using SwiftUI.
+* Design UI in a way that is idiomatic for the macOS platform and follows Apple Human Interface Guidelines.
+* Use SF Symbols for iconography.
+* Use the most modern macOS APIs. Since there is no backward compatibility constraint, this app can target the latest macOS version with the newest APIs.
+* Use the most modern Swift language features and conventions. Target Swift 6 and use Swift concurrency (async/await, actors) and Swift macros where applicable.
+
+## Visual Development
+
+### Comprehensive Design Review
+Invoke the `@design-review-agent.md` subagent for thorough design validation when:
+- Completing significant UI/UX features
+- Before finalizing PRs with visual changes
+- Needing comprehensive accessibility and responsiveness testing
