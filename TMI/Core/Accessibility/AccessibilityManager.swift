@@ -472,8 +472,22 @@ struct AccessibleTextField: View {
 
 // MARK: - Environment Extensions
 
+// Default is nil so that the manager can be injected at app startup for flexibility
+private struct AccessibilityManagerKey: EnvironmentKey {
+    static let defaultValue: AccessibilityManager? = nil
+}
+
 extension EnvironmentValues {
-    @Entry var accessibilityManager: AccessibilityManager?
+    var accessibilityManager: AccessibilityManager? {
+        get { self[AccessibilityManagerKey.self] }
+        set { self[AccessibilityManagerKey.self] = newValue }
+    }
+}
+
+extension View {
+    func accessibilityManagerEnvironment(_ manager: AccessibilityManager) -> some View {
+        environment(\.accessibilityManager, manager)
+    }
 }
 
 // MARK: - ContentSizeCategory Extension

@@ -1538,7 +1538,7 @@ struct EditTMIPlanView: View {
         updatedPlan.hobbies = selectedHobbies
         updatedPlan.lastUpdated = Date()
         
-        try await TMIPlanService().updatePlan(updatedPlan)
+        _ = try await TMIPlanService().updatePlan(updatedPlan)
         
         await MainActor.run {
           onPlanUpdated(updatedPlan)

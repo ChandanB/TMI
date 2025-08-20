@@ -588,7 +588,7 @@ struct CareerExplorerView: View {
         let response = try await careerService.searchCareersWithAI(query: searchText, student: selectedStudent)
         
         await MainActor.run {
-          print("[CareerExplorer] Received response - careers: \(response.careers.count), insights available: \(response.insights != nil)")
+          print("[CareerExplorer] Received response - careers: \(response.careers.count), insights available: \(response.insights)")
           
           searchResults = response.careers
           searchInsights = response.insights

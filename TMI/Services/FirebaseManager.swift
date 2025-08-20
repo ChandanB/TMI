@@ -87,7 +87,7 @@ extension FirebaseManager {
 // MARK: - User Session Service
 extension FirebaseManager {
   nonisolated(nonsending) func signIn(withEmail email: String, password: String) async throws {
-    let configStatus = await FirebaseConfigurationHelper.shared.checkFirebaseConfiguration()
+    let configStatus = FirebaseConfigurationHelper.shared.checkFirebaseConfiguration()
     
     // If Firebase is not properly configured, use mock authentication for development
     if !configStatus.isWorking && isDevelopmentMode() {
@@ -101,7 +101,7 @@ extension FirebaseManager {
       try await auth.signIn(withEmail: email, password: password)
     } catch {
       // Use FirebaseConfigurationHelper to handle errors gracefully
-      let errorResponse = await FirebaseConfigurationHelper.shared.handleFirebaseError(error)
+      let errorResponse = FirebaseConfigurationHelper.shared.handleFirebaseError(error)
       
       switch errorResponse {
       case .databaseNotConfigured:
@@ -164,7 +164,7 @@ extension FirebaseManager {
       try await auth.sendPasswordReset(withEmail: email)
     } catch {
       // Use FirebaseConfigurationHelper to handle errors gracefully
-      let errorResponse = await FirebaseConfigurationHelper.shared.handleFirebaseError(error)
+      let errorResponse = FirebaseConfigurationHelper.shared.handleFirebaseError(error)
       
       switch errorResponse {
       case .databaseNotConfigured:

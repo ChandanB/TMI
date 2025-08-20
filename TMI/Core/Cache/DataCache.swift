@@ -133,9 +133,15 @@ actor DataCache: Sendable {
     
     // MARK: - Initialization
     
-    init(configuration: CacheConfiguration = .default) {
+    private init(configuration: CacheConfiguration = .default) {
         self.configuration = configuration
-        startCleanupTask()
+    }
+
+    /// Async factory to properly initialize DataCache (starts cleanup task in actor context)
+    static func create(configuration: CacheConfiguration = .default) async -> DataCache {
+        let cache = DataCache(configuration: configuration)
+        await cache.startCleanupTask()
+        return cache
     }
     
     deinit {
@@ -240,7 +246,7 @@ actor DataCache: Sendable {
     // MARK: - Private Methods
     
     private func cleanupIfNeeded() async {
-        let stats = await getStatistics()
+        let stats = getStatistics()
         
         // Check if cleanup is needed
         let needsCleanup = storage.count > configuration.maxEntries ||
@@ -248,7 +254,7 @@ actor DataCache: Sendable {
                           stats.expiredEntries > 0
         
         if needsCleanup {
-            await performCleanup()
+            performCleanup()
         }
     }
     
@@ -307,7 +313,7 @@ actor DataCache: Sendable {
                 try? await Task.sleep(for: .seconds(configuration.cleanupInterval))
                 
                 if !Task.isCancelled {
-                    await performCleanup()
+                    performCleanup()
                 }
             }
         }
@@ -402,12 +408,4 @@ extension DataCache {
         collection.removeAll { $0.id == itemId }
         await set(key: collectionKey, value: collection)
     }
-}
-
-// MARK: - Global Cache Instance
-
-/// Global cache instance for the TMI app
-@globalActor
-actor TMICache: GlobalActor {
-    static let shared = DataCache(configuration: .default)
 }
