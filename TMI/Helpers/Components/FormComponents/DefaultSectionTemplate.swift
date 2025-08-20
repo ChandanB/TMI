@@ -36,7 +36,13 @@ struct DefaultSectionTemplates {
             FormField( label: "Street Address", type: .text, isRequired: true),
             FormField( label: "City", type: .text, isRequired: true),
             FormField( label: "State/Province/Region", type: .text, isRequired: true),
-            FormField( label: "Postal Code", type: .text, isRequired: true, validationRules: [ValidationRule( rule: .regex, message: "Enter a valid postal code", value: AnyCodable("\\d{5}(-\\d{4})?"))]),
+            FormField( label: "Postal Code", type: .text, isRequired: true, validationRules: [
+                ValidationRule.custom(message: "Enter a valid postal code", validator: { value in
+                    guard let text = value as? String else { return false }
+                    let pattern = "\\d{5}(-\\d{4})?"
+                    return text.range(of: pattern, options: .regularExpression) != nil
+                })
+            ]),
             FormField( label: "Country", type: .dropdown, isRequired: true,options: ["United States", "Canada", "Mexico", "Other"])
         ]
     )
@@ -55,8 +61,16 @@ struct DefaultSectionTemplates {
         fields: [
             FormField( label: "Emergency Contact Name", type: .text, isRequired: true),
             FormField( label: "Relationship to Camper", type: .text, isRequired: true),
-            FormField( label: "Emergency Contact Phone", type: .phoneNumber, isRequired: true, validationRules: [ValidationRule( rule: .regex, message: "Enter a valid phone number", value: AnyCodable("^[+\\d]?(?:[\\d-\\.\\s()]*)$"))]),
-            FormField( label: "Email Address", type: .email, isRequired: true, validationRules: [ValidationRule( rule: .email, message: "Enter a valid email address")])
+            FormField( label: "Emergency Contact Phone", type: .phoneNumber, isRequired: true, validationRules: [
+                ValidationRule.custom(message: "Enter a valid phone number", validator: { value in
+                    guard let text = value as? String else { return false }
+                    let pattern = "^[+\\d]?(?:[\\d-\\.\\s()]*)$"
+                    return text.range(of: pattern, options: .regularExpression) != nil
+                })
+            ]),
+            FormField( label: "Email Address", type: .email, isRequired: true, validationRules: [
+                ValidationRule.email(message: "Enter a valid email address")
+            ])
         ]
     )
     
@@ -64,7 +78,9 @@ struct DefaultSectionTemplates {
         title: "Consent",
         fields: [
             FormField(label: "Photo Consent", type: .checkbox, isRequired: false, validationRules: []),
-            FormField( label: "I agree to the Terms and Conditions", type: .checkbox, isRequired: true, validationRules: [ValidationRule( rule: .required, message: "You must agree to the terms and conditions to register")])
+            FormField( label: "I agree to the Terms and Conditions", type: .checkbox, isRequired: true, validationRules: [
+                ValidationRule.required(message: "You must agree to the terms and conditions to register")
+            ])
         ]
     )
     
@@ -89,7 +105,9 @@ struct DefaultSectionTemplates {
     
     static let declaration = FormSection(
         title: "Declaration",
-        fields: [FormField( label: "I declare that the information provided is true and complete to the best of my knowledge.", type: .checkbox, isRequired: true, validationRules: [ValidationRule( rule: .required, message: "You must declare the information is true to submit the application")])
+        fields: [FormField( label: "I declare that the information provided is true and complete to the best of my knowledge.", type: .checkbox, isRequired: true, validationRules: [
+            ValidationRule.required(message: "You must declare the information is true to submit the application")
+        ])
         ]
     )
     

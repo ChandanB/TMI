@@ -1,0 +1,430 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  XCODE_VERSION: '15.0'
+  IOS_VERSION: '17.0'
+  DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
+
+jobs:
+  lint:
+    name: SwiftLint & Code Quality
+    runs-on: macos-13
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Install SwiftLint
+        run: |
+          brew install swiftlint
+          swiftlint version
+      
+      - name: Run SwiftLint
+        run: |
+          swiftlint --strict --reporter github-actions-logging
+          
+      - name: Check for TODO/FIXME
+        run: |
+          # Fail if there are critical TODOs
+          if grep -r "TODO.*CRITICAL\|FIXME.*CRITICAL" --include="*.swift" .; then
+            echo "❌ Critical TODOs found"
+            exit 1
+          fi
+          
+          # Count non-critical TODOs for reporting
+          TODO_COUNT=$(grep -r "TODO\|FIXME" --include="*.swift" . | wc -l || echo "0")
+          echo "📝 Found $TODO_COUNT TODO/FIXME comments"
+          
+      - name: Check File Headers
+        run: |
+          # Ensure all Swift files have proper headers
+          find . -name "*.swift" -not -path "./Pods/*" | while read file; do
+            if ! head -5 "$file" | grep -q "TMI"; then
+              echo "❌ Missing header in $file"
+              exit 1
+            fi
+          done
+
+  security:
+    name: Security Scan
+    runs-on: macos-13
+    needs: lint
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Install Security Tools
+        run: |
+          # Install truffleHog for secret scanning
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+          
+      - name: Scan for Secrets
+        run: |
+          truffleHog filesystem . --no-update --fail --exclude-paths .trufflehogignore
+          
+      - name: Check for Hardcoded Credentials
+        run: |
+          # Check for potential hardcoded secrets
+          if grep -r -i "password\s*=\|api_key\s*=\|secret\s*=" --include="*.swift" . --exclude-dir=TMITests; then
+            echo "❌ Potential hardcoded credentials found"
+            exit 1
+          fi
+          
+      - name: Validate Firebase Config
+        run: |
+          if [ -f "TMI/Resources/GoogleService-Info.plist" ]; then
+            echo "✅ Firebase config found"
+          else
+            echo "⚠️  Firebase config not found (expected for CI)"
+          fi
+
+  test:
+    name: Test Suite
+    runs-on: macos-13
+    needs: [lint, security]
+    
+    strategy:
+      matrix:
+        destination:
+          - 'platform=iOS Simulator,OS=17.0,name=iPhone 15 Pro'
+          - 'platform=iOS Simulator,OS=17.0,name=iPad Pro (12.9-inch) (6th generation)'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+        
+      - name: Show Xcode Version
+        run: xcodebuild -version
+        
+      - name: Install Dependencies
+        run: |
+          # Create Podfile if it doesn't exist
+          if [ ! -f Podfile ]; then
+            cat > Podfile << EOF
+          platform :ios, '17.0'
+          use_frameworks!
+          
+          target 'TMI' do
+            # Firebase
+            pod 'Firebase/Analytics'
+            pod 'Firebase/Auth'
+            pod 'Firebase/Firestore'
+            pod 'Firebase/Storage'
+            
+            # UI
+            pod 'SDWebImageSwiftUI'
+          end
+          
+          target 'TMITests' do
+            inherit! :search_paths
+          end
+          EOF
+          fi
+          
+          # Install pods
+          sudo gem install cocoapods
+          pod install --repo-update
+          
+      - name: Create Test GoogleService-Info.plist
+        run: |
+          mkdir -p TMI/Resources
+          cat > TMI/Resources/GoogleService-Info.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CLIENT_ID</key>
+            <string>test-client-id</string>
+            <key>REVERSED_CLIENT_ID</key>
+            <string>test-reversed-client-id</string>
+            <key>API_KEY</key>
+            <string>test-api-key</string>
+            <key>GCM_SENDER_ID</key>
+            <string>123456789</string>
+            <key>PROJECT_ID</key>
+            <string>tmi-test</string>
+            <key>STORAGE_BUCKET</key>
+            <string>tmi-test.appspot.com</string>
+            <key>IS_ADS_ENABLED</key>
+            <false/>
+            <key>IS_ANALYTICS_ENABLED</key>
+            <false/>
+            <key>IS_APPINVITE_ENABLED</key>
+            <true/>
+            <key>IS_GCM_ENABLED</key>
+            <true/>
+            <key>IS_SIGNIN_ENABLED</key>
+            <true/>
+            <key>GOOGLE_APP_ID</key>
+            <string>1:123456789:ios:test</string>
+          </dict>
+          </plist>
+          EOF
+        
+      - name: Build for Testing
+        run: |
+          set -o pipefail
+          xcodebuild clean build-for-testing \
+            -workspace TMI.xcworkspace \
+            -scheme TMI \
+            -destination '${{ matrix.destination }}' \
+            -configuration Debug \
+            -derivedDataPath DerivedData \
+            | xcpretty
+            
+      - name: Run Unit Tests
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -workspace TMI.xcworkspace \
+            -scheme TMI \
+            -destination '${{ matrix.destination }}' \
+            -configuration Debug \
+            -derivedDataPath DerivedData \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults.xcresult \
+            | xcpretty --report junit --output junit.xml
+            
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.destination }}
+          path: |
+            junit.xml
+            TestResults.xcresult
+            
+      - name: Upload Coverage Reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: TestResults.xcresult
+          flags: ios
+          name: TMI-iOS-${{ matrix.destination }}
+          fail_ci_if_error: false
+          verbose: true
+
+  ui-tests:
+    name: UI Tests
+    runs-on: macos-13
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+        
+      - name: Install Dependencies
+        run: |
+          sudo gem install cocoapods
+          pod install --repo-update
+          
+      - name: Create Test Firebase Config
+        run: |
+          mkdir -p TMI/Resources
+          # Use the same test config as unit tests
+          cp TMI/Resources/GoogleService-Info.plist TMI/Resources/GoogleService-Info-Test.plist
+        
+      - name: Run UI Tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -workspace TMI.xcworkspace \
+            -scheme TMI \
+            -destination 'platform=iOS Simulator,OS=17.0,name=iPhone 15 Pro' \
+            -configuration Debug \
+            -only-testing:TMIUITests \
+            -resultBundlePath UITestResults.xcresult \
+            | xcpretty
+            
+      - name: Upload UI Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: ui-test-results
+          path: UITestResults.xcresult
+
+  performance:
+    name: Performance Tests
+    runs-on: macos-13
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+        
+      - name: Install Dependencies
+        run: |
+          sudo gem install cocoapods
+          pod install --repo-update
+          
+      - name: Run Performance Tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -workspace TMI.xcworkspace \
+            -scheme TMI \
+            -destination 'platform=iOS Simulator,OS=17.0,name=iPhone 15 Pro' \
+            -configuration Release \
+            -testPlan PerformanceTests \
+            -resultBundlePath PerformanceResults.xcresult \
+            | xcpretty
+            
+      - name: Analyze Performance
+        run: |
+          # Extract performance metrics
+          xcrun xcresulttool get --path PerformanceResults.xcresult --format json > performance_results.json
+          
+          # Check if any performance tests failed
+          if grep -q "failed" performance_results.json; then
+            echo "⚠️ Some performance tests failed"
+          else
+            echo "✅ All performance tests passed"
+          fi
+          
+      - name: Upload Performance Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: |
+            PerformanceResults.xcresult
+            performance_results.json
+
+  build:
+    name: Archive Build
+    runs-on: macos-13
+    needs: [test, ui-tests, performance]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+        
+      - name: Install Dependencies
+        run: |
+          sudo gem install cocoapods
+          pod install --repo-update
+          
+      - name: Setup Provisioning
+        env:
+          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
+          CERTIFICATE: ${{ secrets.CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          # Decode and install certificate
+          echo $CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p "" build.keychain
+          security import certificate.p12 -k build.keychain -P $CERTIFICATE_PASSWORD -T /usr/bin/codesign
+          security list-keychains -s build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+          
+          # Install provisioning profile
+          echo $PROVISIONING_PROFILE | base64 --decode > profile.mobileprovision
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+        
+      - name: Archive
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -workspace TMI.xcworkspace \
+            -scheme TMI \
+            -configuration Release \
+            -archivePath TMI.xcarchive \
+            -destination generic/platform=iOS \
+            -allowProvisioningUpdates \
+            | xcpretty
+            
+      - name: Export IPA
+        run: |
+          # Create export options plist
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>YOUR_TEAM_ID</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>compileBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+          
+          xcodebuild -exportArchive \
+            -archivePath TMI.xcarchive \
+            -exportPath . \
+            -exportOptionsPlist ExportOptions.plist
+            
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-build
+          path: |
+            TMI.ipa
+            TMI.xcarchive/dSYMs/
+
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [lint, security, test, ui-tests, performance, build]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Determine Status
+        id: status
+        run: |
+          if [[ "${{ needs.lint.result }}" == "success" && 
+                "${{ needs.security.result }}" == "success" && 
+                "${{ needs.test.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ All CI checks passed!" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=❌ Some CI checks failed" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Create Summary
+        run: |
+          echo "# TMI CI/CD Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Lint**: ${{ needs.lint.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security**: ${{ needs.security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **UI Tests**: ${{ needs.ui-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Performance**: ${{ needs.performance.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build**: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Status**: ${{ steps.status.outputs.message }}" >> $GITHUB_STEP_SUMMARY

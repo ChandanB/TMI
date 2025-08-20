@@ -11,20 +11,6 @@ import CoreTransferable
 import FirebaseFirestore
 import UniformTypeIdentifiers
 
-struct ValidationRule: Codable, Identifiable, @unchecked Sendable {
-    @DocumentID var id: String?
-    var rule: ValidationType
-    var message: String
-    var value: AnyCodable?
-    
-    init(id: String? = nil, rule: ValidationType, message: String, value: AnyCodable? = nil) {
-        self.id = id
-        self.rule = rule
-        self.message = message
-        self.value = value
-    }
-}
-
 enum ValidationType: String, Codable, CaseIterable, Sendable {
     case minLength = "Minimum Length"
     case maxLength = "Maximum Length"
@@ -263,3 +249,5 @@ extension FieldType {
         }
     }
 }
+
+

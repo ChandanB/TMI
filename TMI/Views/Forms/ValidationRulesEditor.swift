@@ -18,9 +18,8 @@ struct ValidationRulesEditor: View {
                 .padding()
             
             ForEach($validationRules.indices, id: \.self) { index in
-                if validationRules[index].rule.isApplicable(to: fieldType) {
-                    ValidationRuleEditor(validationRule: $validationRules[index], fieldType: fieldType)
-                }
+                // Removed filtering by isApplicable(to:)
+                ValidationRuleEditor(validationRule: $validationRules[index], fieldType: fieldType)
             }
             .onDelete(perform: removeValidationRule)
             
@@ -40,8 +39,22 @@ struct ValidationRulesEditor: View {
     }
     
     private func addValidationRule() {
-        let defaultRule = ValidationType.defaultRule(for: fieldType)
-        validationRules.append(ValidationRule(id: UUID().uuidString, rule: defaultRule, message: "Validation Error"))
+        // Updated to create proper ValidationRule instances depending on fieldType
+        let newRule: ValidationRule
+        
+        switch fieldType {
+        case .text, .longText:
+            // Use textLength with default min/max and fieldName
+            newRule = ValidationRule.textLength(min: 0, max: 100, fieldName: "Field", message: "Validation Error")
+        case .number:
+            // Use numericRange with default min/max and fieldName (0 to 100 as default)
+            newRule = ValidationRule.numericRange(min: 0, max: 100, fieldName: "Field", message: "Validation Error")
+        default:
+            // Default fallback to required
+            newRule = ValidationRule.required(message: "Validation Error")
+        }
+        
+        validationRules.append(newRule)
     }
 }
 
@@ -53,21 +66,115 @@ struct ValidationRuleEditor: View {
     var body: some View {
         VStack(alignment: .leading) {
             HStack {
-                Picker("Validation Type", selection: $validationRule.rule) {
-                    ForEach(ValidationType.allCases.filter { $0.isApplicable(to: fieldType) }, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
+                Picker("Validation Type", selection: $validationRule.ruleType) {
+                    ForEach(ValidationRuleType.allCases, id: \.self) { type in
+                        Text(type.displayName).tag(type)
                     }
                 }
                 .pickerStyle(MenuPickerStyle())
                 
-                ValidationInfoButton(showAlert: $showAlert, rule: validationRule.rule)
+                ValidationInfoButton(showAlert: $showAlert, ruleType: validationRule.ruleType)
             }
             
-            if validationRule.rule.requiresValue {
-                let placeholder = validationRule.rule.placeholderText
-                TextField(placeholder, text: binding(forValue: validationRule.value))
-                    .padding(.horizontal)
-                Divider()
+            // UI for editing parameters for textLength and numericRange using validationRule.parameters
+            
+            switch validationRule.ruleType {
+            case .textLength:
+                Text("Min Length")
+                TextField(
+                    "Min",
+                    text: Binding(
+                        get: {
+                            if case let .textLength(min, _, _) = validationRule.parameters {
+                                return String(min)
+                            }
+                            return ""
+                        },
+                        set: { newValue in
+                            let minVal = Int(newValue) ?? 0
+                            if case let .textLength(_, max, fieldName) = validationRule.parameters {
+                                validationRule.parameters = .textLength(min: minVal, max: max, fieldName: fieldName)
+                            } else {
+                                validationRule.parameters = .textLength(min: minVal, max: 100, fieldName: "Field")
+                            }
+                        }
+                    )
+                )
+                .keyboardType(.numberPad)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                
+                Text("Max Length")
+                TextField(
+                    "Max",
+                    text: Binding(
+                        get: {
+                            if case let .textLength(_, max, _) = validationRule.parameters {
+                                return String(max)
+                            }
+                            return ""
+                        },
+                        set: { newValue in
+                            let maxVal = Int(newValue) ?? 100
+                            if case let .textLength(min, _, fieldName) = validationRule.parameters {
+                                validationRule.parameters = .textLength(min: min, max: maxVal, fieldName: fieldName)
+                            } else {
+                                validationRule.parameters = .textLength(min: 0, max: maxVal, fieldName: "Field")
+                            }
+                        }
+                    )
+                )
+                .keyboardType(.numberPad)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                
+            case .numericRange:
+                Text("Min Value")
+                TextField(
+                    "Min",
+                    text: Binding(
+                        get: {
+                            if case let .numericRange(min, _, _) = validationRule.parameters {
+                                return String(min)
+                            }
+                            return ""
+                        },
+                        set: { newValue in
+                            let minVal = Double(newValue) ?? 0
+                            if case let .numericRange(_, max, fieldName) = validationRule.parameters {
+                                validationRule.parameters = .numericRange(min: Int(minVal), max: max, fieldName: fieldName)
+                            } else {
+                                validationRule.parameters = .numericRange(min: Int(minVal), max: 100, fieldName: "Field")
+                            }
+                        }
+                    )
+                )
+                .keyboardType(.decimalPad)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                
+                Text("Max Value")
+                TextField(
+                    "Max",
+                    text: Binding(
+                        get: {
+                            if case let .numericRange(_, max, _) = validationRule.parameters {
+                                return String(max)
+                            }
+                            return ""
+                        },
+                        set: { newValue in
+                            let maxVal = Double(newValue) ?? 100
+                            if case let .numericRange(min, _, fieldName) = validationRule.parameters {
+                                validationRule.parameters = .numericRange(min: min, max: Int(maxVal), fieldName: fieldName)
+                            } else {
+                                validationRule.parameters = .numericRange(min: 0, max: Int(maxVal), fieldName: "Field")
+                            }
+                        }
+                    )
+                )
+                .keyboardType(.decimalPad)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                
+            default:
+                EmptyView()
             }
             
             ZLHNMultilineTextField(placeholder: "Error Message", text: $validationRule.message, limit: 60)
@@ -77,18 +184,11 @@ struct ValidationRuleEditor: View {
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.white))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
     }
-    
-    private func binding(forValue value: AnyCodable?) -> Binding<String> {
-        Binding<String>(
-            get: { value?.value as? String ?? "" },
-            set: { validationRule.value = AnyCodable($0) }
-        )
-    }
 }
 
 struct ValidationInfoButton: View {
     @Binding var showAlert: Bool
-    var rule: ValidationType
+    var ruleType: ValidationRuleType
     
     var body: some View {
         Button(action: {
@@ -102,7 +202,7 @@ struct ValidationInfoButton: View {
         .alert(isPresented: $showAlert) {
             Alert(
                 title: Text("Validation Rule Info"),
-                message: Text(rule.description),
+                message: Text(ruleType.displayName),
                 dismissButton: .default(Text("OK"))
             )
         }

@@ -1121,13 +1121,6 @@ enum AuthenticationMethod {
   case mfa
 }
 
-enum SecurityLevel {
-  case basic
-  case standard
-  case enhanced
-  case maximum
-}
-
 struct RegistrationData {
   var selectedRole: UserRole?
   var dateOfBirth: Date?

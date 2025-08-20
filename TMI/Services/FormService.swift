@@ -96,56 +96,90 @@ extension FirebaseManager {
     // MARK: - Validation Helper
     
     private func validateFieldRule(value: AnyCodable, rule: ValidationRule, fieldId: String) throws {
-        switch rule.rule {
-        case .minLength:
-            if let string = value.value as? String,
-               let minLength = rule.value?.value as? Int,
-               string.count < minLength {
-                throw ValidationError.validationFailed(fieldId, rule.message)
+        switch rule.ruleType {
+        case .required:
+            if value.value == nil {
+                throw ValidationError.validationFailed(field: fieldId, message: rule.message)
             }
-        case .maxLength:
-            if let string = value.value as? String,
-               let maxLength = rule.value?.value as? Int,
-               string.count > maxLength {
-                throw ValidationError.validationFailed(fieldId, rule.message)
+        case .email:
+            if let string = value.value as? String {
+                let result = ValidationRules.email(string)
+                if !result.isValid {
+                    throw ValidationError.validationFailed(field: fieldId, message: result.errorMessage ?? rule.message)
+                }
             }
-        case .minValue:
-            if let number = value.value as? Double,
-               let minValue = rule.value?.value as? Double,
-               number < minValue {
-                throw ValidationError.validationFailed(fieldId, rule.message)
+        case .url:
+            if let string = value.value as? String {
+                let result = ValidationRules.url(string)
+                if !result.isValid {
+                    throw ValidationError.validationFailed(field: fieldId, message: result.errorMessage ?? rule.message)
+                }
             }
-        case .maxValue:
-            if let number = value.value as? Double,
-               let maxValue = rule.value?.value as? Double,
-               number > maxValue {
-                throw ValidationError.validationFailed(fieldId, rule.message)
+        case .name:
+            if let string = value.value as? String {
+                let result = ValidationRules.name(string)
+                if !result.isValid {
+                    throw ValidationError.validationFailed(field: fieldId, message: result.errorMessage ?? rule.message)
+                }
             }
-        // case .custom:
-            // Custom validation would be implemented based on specific requirements
-            // break
-        default:
-            break
+        case .schoolName:
+            if let string = value.value as? String {
+                let result = ValidationRules.schoolName(string)
+                if !result.isValid {
+                    throw ValidationError.validationFailed(field: fieldId, message: result.errorMessage ?? rule.message)
+                }
+            }
+        case .phone:
+            if let string = value.value as? String {
+                let result = ValidationRules.phoneNumber(string)
+                if !result.isValid {
+                    throw ValidationError.validationFailed(field: fieldId, message: result.errorMessage ?? rule.message)
+                }
+            }
+        case .textLength:
+            if let params = rule.parameters, case let .textLength(min, max, fieldName) = params, let string = value.value as? String {
+                let result = ValidationRules.textLength(string, min: min, max: max, fieldName: fieldName)
+                if !result.isValid {
+                    throw ValidationError.validationFailed(field: fieldId, message: result.errorMessage ?? rule.message)
+                }
+            }
+        case .numericRange:
+            if let params = rule.parameters, case let .numericRange(min, max, fieldName) = params {
+                if let intVal = value.value as? Int {
+                    let result = ValidationRules.numericRange(intVal, min: min, max: max, fieldName: fieldName)
+                    if !result.isValid {
+                        throw ValidationError.validationFailed(field: fieldId, message: result.errorMessage ?? rule.message)
+                    }
+                } else if let doubleVal = value.value as? Double {
+                    let result = ValidationRules.numericRange(doubleVal, min: Double(min), max: Double(max), fieldName: fieldName)
+                    if !result.isValid {
+                        throw ValidationError.validationFailed(field: fieldId, message: result.errorMessage ?? rule.message)
+                    }
+                }
+            }
+        case .collectionSize:
+            if let params = rule.parameters, case let .collectionSize(min, max, fieldName) = params, let collection = value.value as? [Any] {
+                let result = ValidationRules.collectionSize(collection, min: min, max: max, fieldName: fieldName)
+                if !result.isValid {
+                    throw ValidationError.validationFailed(field: fieldId, message: result.errorMessage ?? rule.message)
+                }
+            }
+        case .date:
+            if let params = rule.parameters, case let .date(after, before, fieldName) = params, let dateVal = value.value as? Date {
+                let result = ValidationRules.date(dateVal, after: after, before: before, fieldName: fieldName)
+                if !result.isValid {
+                    throw ValidationError.validationFailed(field: fieldId, message: result.errorMessage ?? rule.message)
+                }
+            }
+        case .custom:
+            if let params = rule.parameters, case let .custom(validator) = params {
+                if !validator(value.value) {
+                    throw ValidationError.validationFailed(field: fieldId, message: rule.message)
+                }
+            }
         }
     }
 
-}
-
-enum ValidationError: Error, LocalizedError {
-    case missingRequiredField(String)
-    case invalidDataType(String)
-    case validationFailed(String, String)
-    
-    var errorDescription: String? {
-        switch self {
-        case .missingRequiredField(let fieldId):
-            return "Missing required field: \(fieldId)"
-        case .invalidDataType(let fieldId):
-            return "Invalid data type for field: \(fieldId)"
-        case .validationFailed(let fieldId, let message):
-            return "Validation failed for field \(fieldId): \(message)"
-        }
-    }
 }
 
 struct FormFieldValidator {

@@ -301,59 +301,6 @@ enum UserRole: String, CaseIterable, Codable, Identifiable, Sendable {
   }
 }
 
-// MARK: - Data Classification
-
-enum DataClassification: String, CaseIterable, Codable, Identifiable, Sendable {
-  case publicData = "public"
-  case internalData = "internal"
-  case personal = "personal"
-  case educational = "educational"
-  case sensitive = "sensitive"
-  case traumaRelated = "trauma_related"
-  
-  var id: String { rawValue }
-  
-  var displayName: String {
-    switch self {
-    case .publicData: return "Public"
-    case .internalData: return "Internal"
-    case .personal: return "Personal"
-    case .educational: return "Educational"
-    case .sensitive: return "Sensitive"
-    case .traumaRelated: return "Trauma-Related"
-    }
-  }
-  
-  var description: String {
-    switch self {
-    case .publicData: return "Information that can be freely shared"
-    case .internalData: return "Information for internal organizational use"
-    case .personal: return "Personal identifying information"
-    case .educational: return "Educational records and assessments"
-    case .sensitive: return "Sensitive personal information requiring special protection"
-    case .traumaRelated: return "Trauma-informed data requiring highest level of protection"
-    }
-  }
-  
-  var retentionPeriod: TimeInterval {
-    switch self {
-    case .publicData: return 365 * 24 * 60 * 60 // 1 year
-    case .internalData: return 3 * 365 * 24 * 60 * 60 // 3 years
-    case .personal: return 7 * 365 * 24 * 60 * 60 // 7 years
-    case .educational: return 7 * 365 * 24 * 60 * 60 // 7 years (FERPA)
-    case .sensitive: return 10 * 365 * 24 * 60 * 60 // 10 years
-    case .traumaRelated: return 25 * 365 * 24 * 60 * 60 // 25 years
-    }
-  }
-  
-  var encryptionRequired: Bool {
-    switch self {
-    case .publicData, .internalData: return false
-    case .personal, .educational, .sensitive, .traumaRelated: return true
-    }
-  }
-}
-
 // MARK: - Permission System
 
 enum Permission: String, CaseIterable, Codable, Identifiable, Sendable {

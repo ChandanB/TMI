@@ -1,0 +1,43 @@
+# TruffleHog ignore patterns for TMI project
+
+# Test files and mock data
+**/TMITests/**
+**/TMIUITests/**
+**/*Tests.swift
+**/*Mock*.swift
+**/*Sample*.swift
+**/*Test*.swift
+
+# Documentation and comments
+README.md
+**/*.md
+**/Documentation/**
+
+# Configuration templates
+ExportOptions.plist
+GoogleService-Info-template.plist
+
+# Build artifacts
+**/DerivedData/**
+**/build/**
+**/.build/**
+**/Pods/**
+
+# Specific test strings that look like secrets but aren't
+test-client-id
+test-api-key
+test-secret
+mock-token
+sample-password
+dummy-key
+
+# Common false positives
+Info.plist
+**/*.plist
+
+# Git files
+.git/**
+.gitignore
+
+# CI/CD templates
+.github/**

@@ -72,6 +72,8 @@ extension TMIError {
         case dataCorrupted = "data_corrupted"
         case invalidDataFormat = "invalid_data_format"
         case dataValidationFailed = "data_validation_failed"
+        case dataStorageFailed = "data_storage_failed"
+        case dataRetrievalFailed = "data_retrieval_failed"
         
         // Network Errors
         case networkUnavailable = "network_unavailable"
@@ -109,6 +111,7 @@ extension TMIError {
         case internalError = "internal_error"
         case featureUnavailable = "feature_unavailable"
         case maintenanceMode = "maintenance_mode"
+        case securityError = "security_error"
         
         var userFriendlyMessage: String {
             switch self {
@@ -185,6 +188,10 @@ extension TMIError {
                 return "This feature is currently unavailable"
             case .maintenanceMode:
                 return "The app is undergoing maintenance. Please try again later"
+            case .securityError:
+                return "A security error occurred. Please contact support."
+            @unknown default:
+                return "An unexpected error occurred"
             }
         }
         
@@ -208,6 +215,8 @@ extension TMIError {
                 return "Review the highlighted fields and correct any errors"
             case .duplicateStudent:
                 return "Check if the student already exists or use different information"
+            case .securityError:
+                return "Try refreshing the app or contact support for further assistance."
             default:
                 return "Try refreshing the app or contact support if the problem persists"
             }
@@ -227,6 +236,8 @@ extension TMIError {
                 return "Firebase SDK configuration is invalid"
             case .insufficientPermissions:
                 return "User role does not have required permissions"
+            case .securityError:
+                return "A security-related failure occurred."
             default:
                 return nil
             }
@@ -244,6 +255,8 @@ extension TMIError {
                 return "student-management-help"
             case .planCreationFailed, .planUpdateFailed, .planDeleteFailed:
                 return "tmi-plan-help"
+            case .securityError:
+                return "security-help"
             default:
                 return "general-help"
             }

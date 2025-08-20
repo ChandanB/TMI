@@ -173,8 +173,7 @@ extension FormTemplate {
                         type: .number,
                         isRequired: true,
                         validationRules: [
-                            ValidationRule(rule: .minValue, message: "Age must be at least 0", value: AnyCodable(0)),
-                            ValidationRule(rule: .maxValue, message: "Age must be 25 or younger", value: AnyCodable(25))
+                            ValidationRule.numericRange(min: 0, max: 25, fieldName: "Age", message: "Age must be between 0 and 25")
                         ],
                         placeholder: "Enter your age at the time"
                     )
@@ -232,4 +231,5 @@ extension FormTemplate {
 }
 
 // End of Parental Incarceration Support Module Template
+
 

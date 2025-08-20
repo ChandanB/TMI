@@ -556,18 +556,29 @@ struct NewTMIPlanView: View {
     
     Task {
       do {
+        let planTitle = "New TMI Plan"  // You may want to prompt the user for a title
+        let planStartDate = Date()
+        let planEndDate: Date? = nil // You may want to add an option for this
+        let planCreatedBy = Auth.auth().currentUser?.uid ?? "unknown"
+
         let newPlan = TMIPlan(
-          id: nil, // Let Firestore generate the ID
+          title: planTitle,
+          description: nil,
           student: student,
           students: [student],
           model: model,
           interests: selectedInterests,
           hobbies: selectedHobbies,
+          startDate: planStartDate,
+          endDate: planEndDate,
           creationDate: Date(),
           lastUpdated: Date(),
           goals: [],
           progress: 0.0,
-          notes: notes
+          notes: notes,
+          strategies: nil,
+          progressTracking: nil,
+          createdBy: planCreatedBy
         )
         
         let planService = TMIPlanService()
@@ -1051,3 +1062,4 @@ struct HobbySelectionCard: View {
 #Preview {
   NewTMIPlanView()
 }
+

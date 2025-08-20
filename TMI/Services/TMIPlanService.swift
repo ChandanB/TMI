@@ -139,18 +139,29 @@ class TMIPlanService {
                         goals = []
                     }
                     
+                    let title = data["title"] as? String ?? ""
+                    let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
+                    let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
+                    let createdBy = data["createdBy"] as? String ?? ""
                     let plan = TMIPlan(
                         id: document.documentID,
+                        title: title,
+                        description: data["description"] as? String,
                         student: student,
                         students: students,
                         model: model,
                         interests: interests,
                         hobbies: hobbies,
+                        startDate: startDate,
+                        endDate: endDate,
                         creationDate: creationDate,
                         lastUpdated: lastUpdated,
                         goals: goals,
                         progress: progress,
-                        notes: notes
+                        notes: notes,
+                        strategies: data["strategies"] as? [String],
+                        progressTracking: nil,
+                        createdBy: createdBy
                     )
                     
                     print("[TMIPlanService] Successfully reconstructed plan: \(plan.model.rawValue)")
@@ -341,18 +352,29 @@ class TMIPlanService {
                     goals = []
                 }
                 
+                let title = data["title"] as? String ?? ""
+                let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
+                let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
+                let createdBy = data["createdBy"] as? String ?? ""
                 return TMIPlan(
                     id: document.documentID,
+                    title: title,
+                    description: data["description"] as? String,
                     student: student,
                     students: students,
                     model: model,
                     interests: interests,
                     hobbies: hobbies,
+                    startDate: startDate,
+                    endDate: endDate,
                     creationDate: creationDate,
                     lastUpdated: lastUpdated,
                     goals: goals,
                     progress: progress,
-                    notes: notes
+                    notes: notes,
+                    strategies: data["strategies"] as? [String],
+                    progressTracking: nil,
+                    createdBy: createdBy
                 )
             } else {
                 return nil
@@ -478,18 +500,29 @@ class TMIPlanService {
                         goals = []
                     }
                     
+                    let title = data["title"] as? String ?? ""
+                    let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
+                    let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
+                    let createdBy = data["createdBy"] as? String ?? ""
                     let plan = TMIPlan(
                         id: document.documentID,
+                        title: title,
+                        description: data["description"] as? String,
                         student: student,
                         students: students,
                         model: model,
                         interests: interests,
                         hobbies: hobbies,
+                        startDate: startDate,
+                        endDate: endDate,
                         creationDate: creationDate,
                         lastUpdated: lastUpdated,
                         goals: goals,
                         progress: progress,
-                        notes: notes
+                        notes: notes,
+                        strategies: data["strategies"] as? [String],
+                        progressTracking: nil,
+                        createdBy: createdBy
                     )
                     
                     print("[TMIPlanService] Successfully reconstructed plan: \(plan.model.rawValue)")
@@ -532,3 +565,4 @@ enum TMIPlanServiceError: Error, LocalizedError {
         }
     }
 }
+
