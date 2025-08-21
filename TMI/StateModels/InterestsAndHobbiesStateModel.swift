@@ -119,6 +119,16 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
         selectedSegment == .interests ? interestsByCategory.keys.count : hobbiesByCategory.keys.count
     }
     
+    var hobbies: [Hobby] {
+        guard case .loaded(let data) = state else { return [] }
+        return data.hobbies
+    }
+    
+    var interests: [Interest] {
+        guard case .loaded(let data) = state else { return [] }
+        return data.interests
+    }
+    
     // MARK: - Data Operations
     
     @MainActor
@@ -188,6 +198,21 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
             updateState(.loaded(data))
         } catch {
             handleError(error, userFriendlyMessage: "Failed to delete interest")
+        }
+    }
+    
+    @MainActor
+    func updateHobby(_ hobby: Hobby) async {
+        do {
+            let updatedHobby = try await hobbyService.updateHobby(hobby)
+            
+            guard case .loaded(var data) = state else { return }
+            if let index = data.hobbies.firstIndex(where: { $0.id == hobby.id }) {
+                data.hobbies[index] = updatedHobby
+                updateState(.loaded(data))
+            }
+        } catch {
+            handleError(error, userFriendlyMessage: "Failed to update hobby")
         }
     }
     
@@ -391,8 +416,8 @@ class InterestService {
             
             let interests = querySnapshot.documents.compactMap { document -> Interest? in
                 do {
+                    // @DocumentID will be automatically populated by Firestore
                     let interest = try document.data(as: Interest.self)
-                    interest.id = document.documentID
                     return interest
                 } catch {
                     print("[InterestService] Failed to decode interest: \(error)")
@@ -414,9 +439,10 @@ class InterestService {
         
         let collection = db.collection("users").document(uid).collection("interests")
         let docRef = try await collection.addDocument(data: interest.toFirestoreData())
-        interest.id = docRef.documentID
         
-        return interest
+        // Re-fetch the document to get the auto-populated @DocumentID
+        let savedInterest = try await docRef.getDocument(as: Interest.self)
+        return savedInterest
     }
     
     func deleteInterest(_ interestId: String) async throws {
@@ -444,8 +470,8 @@ class HobbyService {
             
             let hobbies = querySnapshot.documents.compactMap { document -> Hobby? in
                 do {
+                    // @DocumentID will be automatically populated by Firestore
                     let hobby = try document.data(as: Hobby.self)
-                    hobby.id = UUID(uuidString: document.documentID) ?? UUID()
                     return hobby
                 } catch {
                     print("[HobbyService] Failed to decode hobby: \(error)")
@@ -467,7 +493,20 @@ class HobbyService {
         
         let collection = db.collection("users").document(uid).collection("hobbies")
         let docRef = try await collection.addDocument(data: hobby.toFirestoreData())
-        hobby.id = UUID(uuidString: docRef.documentID) ?? hobby.id
+        
+        // Re-fetch the document to get the auto-populated @DocumentID
+        let savedHobby = try await docRef.getDocument(as: Hobby.self)
+        return savedHobby
+    }
+    
+    func updateHobby(_ hobby: Hobby) async throws -> Hobby {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw InterestHobbyError.userNotAuthenticated
+        }
+        
+        let collection = db.collection("users").document(uid).collection("hobbies")
+        let hobbyId = hobby.id.uuidString
+        try await collection.document(hobbyId).setData(hobby.toFirestoreData())
         
         return hobby
     }

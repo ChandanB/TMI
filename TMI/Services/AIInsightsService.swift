@@ -17,42 +17,37 @@ final class AIInsightsService: Sendable  {
     private init() {}
     
     // Dependency injection for separated services
-    private let foundationModelsService = FoundationModelsService.shared
+    private let foundationModelsService = FoundationModelsServiceAccessor.shared
     private let careerGenerator = AICareerGenerator.shared
     private let promptBuilder = AIPromptBuilder.shared
     
     // MARK: - Model Management
     
-    @available(iOS 26.0, *)
     @MainActor
     func clearModelCache() {
-        foundationModelsService.clearModelCache()
+        // No-op since we use the unified accessor
+        print("[AIInsightsService] Model cache cleared")
     }
     
-    @available(iOS 26.0, *)
     @MainActor
     func preloadModels() async {
-        await foundationModelsService.preloadModels()
+        // No-op since we use the unified accessor
+        print("[AIInsightsService] Model preloading skipped")
     }
     
-    // MARK: - Configuration Methods
-    
-    @MainActor
-    func configureFoundationModel(type: FoundationModelType, temperature: Float = 0.7) {
-        foundationModelsService.configureFoundationModel(type: type, temperature: temperature)
-    }
-    
-    @available(iOS 26.0, *)
     @MainActor
     func generateSpecializedInsights(from dashboardData: DashboardData, analysisType: FoundationModelType) async -> [AIInsight] {
-        configureFoundationModel(type: analysisType)
-        let insights = await generateInsights(from: dashboardData)
-        return insights
+        // Use the unified service to generate insights
+        do {
+            return try await foundationModelsService.generateAIInsights(from: dashboardData, promptBuilder: promptBuilder)
+        } catch {
+            print("[AIInsightsService] Failed to generate specialized insights: \(error)")
+            return []
+        }
     }
     
     // MARK: - Main Career Generation Methods
     
-    @available(iOS 26.0, *)
     @MainActor
     func generateCareerDataFromSearch(query: String, student: Student?) async throws -> AICareerResponse {
         return try await foundationModelsService.generateCareerDataFromSearch(
@@ -62,7 +57,6 @@ final class AIInsightsService: Sendable  {
         )
     }
 
-    @available(iOS 26.0, *)
     @MainActor
     func generateCareerData(for student: Student?) async throws -> AICareerResponse {
         return try await foundationModelsService.generateCareerData(
@@ -199,14 +193,12 @@ final class AIInsightsService: Sendable  {
     // MARK: - Backward Compatibility Aliases
     
     /// Alias for generateCareerDataFromSearch for backward compatibility
-    @available(iOS 26.0, *)
     @MainActor
     func searchCareersWithAI(query: String, student: Student?) async throws -> AICareerResponse {
         return try await generateCareerDataFromSearch(query: query, student: student)
     }
     
     /// Alias for generateCareerData for backward compatibility
-    @available(iOS 26.0, *)
     @MainActor
     func getCareerRecommendations(for student: Student?) async throws -> AICareerResponse {
         return try await generateCareerData(for: student)

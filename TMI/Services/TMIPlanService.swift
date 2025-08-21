@@ -193,10 +193,8 @@ class TMIPlanService {
             
             print("[TMIPlanService] TMI plan added with ID: \(documentRef.documentID)")
             
-            // Return the plan with the generated ID
-            var savedPlan = plan
-            savedPlan.id = documentRef.documentID
-            
+            // Re-fetch the document to get the auto-populated @DocumentID
+            let savedPlan = try await documentRef.getDocument(as: TMIPlan.self)
             return savedPlan
         } catch {
             print("[TMIPlanService] Error adding TMI plan: \(error)")

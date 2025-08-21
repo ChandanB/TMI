@@ -73,10 +73,8 @@ class StudentService {
             
             print("[StudentService] Student added with ID: \(documentRef.documentID)")
             
-            // Return the student with the generated ID
-            var savedStudent = student
-            savedStudent.id = documentRef.documentID
-            
+            // Re-fetch the document to get the auto-populated @DocumentID
+            let savedStudent = try await documentRef.getDocument(as: Student.self)
             return savedStudent
         } catch {
             print("[StudentService] Error adding student: \(error)")

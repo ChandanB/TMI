@@ -207,7 +207,9 @@ struct InterestsAndHobbiesView: View {
         HStack(spacing: 0) {
             ForEach(InterestsAndHobbiesStateModel.ViewSegment.allCases, id: \.self) { segment in
                 Button {
-                    stateModel.selectedSegment = segment
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        stateModel.selectedSegment = segment
+                    }
                 } label: {
                     Text(segment.rawValue)
                         .font(.system(size: 16, weight: .medium))
@@ -219,7 +221,7 @@ struct InterestsAndHobbiesView: View {
                                 .fill(stateModel.selectedSegment == segment ? Color.white.opacity(0.1) : Color.clear)
                         )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PlainButtonStyle())
             }
         }
         .padding(4)
@@ -316,7 +318,9 @@ struct InterestsAndHobbiesView: View {
         ) {
             if stateModel.selectedSegment == .interests {
                 ForEach(stateModel.filteredInterests) { interest in
-                    NavigationLink(destination: InterestDetailView(interest: interest)) {
+                    NavigationLink {
+                        InterestDetailView(interest: interest)
+                    } label: {
                         TMIGlassCard(style: .default) {
                             VStack(spacing: 12) {
                                 HStack {
@@ -348,12 +352,13 @@ struct InterestsAndHobbiesView: View {
                             }
                         }
                     }
-                    .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel("View details for \(interest.name)")
                 }
             } else {
                 ForEach(stateModel.filteredHobbies) { hobby in
-                    NavigationLink(destination: HobbyDetailView(hobby: hobby)) {
+                    NavigationLink {
+                        HobbyDetailView(hobby: hobby)
+                    } label: {
                         TMIGlassCard(style: .default) {
                             VStack(spacing: 12) {
                                 HStack {
@@ -385,7 +390,6 @@ struct InterestsAndHobbiesView: View {
                             }
                         }
                     }
-                    .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel("View details for \(hobby.name)")
                 }
             }

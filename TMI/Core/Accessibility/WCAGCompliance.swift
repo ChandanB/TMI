@@ -109,7 +109,7 @@ struct WCAGCompliance {
         
         var expectedLevel = 1
         
-        for (index, heading) in headings.enumerated() {
+        for (_, heading) in headings.enumerated() {
             // Check if heading level skips (e.g., H1 to H3)
             if heading.level > expectedLevel + 1 {
                 violations.append(WCAGViolation(
@@ -388,7 +388,7 @@ final class AccessibilityTester {
     
     /// Test color contrast for all UI elements
     func testColorContrast(in view: any View) async -> [WCAGViolation] {
-        var violations: [WCAGViolation] = []
+        let violations: [WCAGViolation] = []
         
         // This would need to be implemented to traverse the view hierarchy
         // and extract color combinations for testing
@@ -474,3 +474,4 @@ private struct WCAGComplianceModifier: ViewModifier {
             .allowsTightening(false) // Prevent text compression for readability
     }
 }
+

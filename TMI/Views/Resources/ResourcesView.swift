@@ -425,7 +425,7 @@ struct ResourcesView: View {
             Button(action: {
               stateModel.showingAddResource = true
             }) {
-              Label("Add Resource", systemImage: "plus")
+                Image(systemName: "plus")
             }
 
             Button(action: {

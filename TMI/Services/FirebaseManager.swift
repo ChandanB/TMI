@@ -220,11 +220,8 @@ extension FirebaseManager {
       // Seed sample students
       let students = Student.comprehensiveSampleStudents
       for student in students {
-        let studentID = student.id ?? UUID().uuidString
-        var studentWithID = student
-        studentWithID.id = studentID
-        let doc = studentsCollection.document(studentID)
-        try await doc.setData(studentWithID.toFirestoreData())
+        // Don't manually set @DocumentID - let Firestore manage it
+        let _ = try await studentsCollection.addDocument(data: student.toFirestoreData())
       }
       
       // Seed interests

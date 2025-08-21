@@ -127,7 +127,13 @@ class FirebaseTMIAuthService: TMIAuthService {
     private let auth = Auth.auth()
     private let firebaseManager: FirebaseManager
     private var authStateHandler: AuthStateDidChangeListenerHandle?
-    private var isHandlingAuthChange = false
+    private var _isHandlingAuthChange = false
+    private let handlingQueue = DispatchQueue(label: "com.tmi.auth.handling", attributes: .concurrent)
+    
+    private var isHandlingAuthChange: Bool {
+        get { return handlingQueue.sync { _isHandlingAuthChange } }
+        set { handlingQueue.async(flags: .barrier) { self._isHandlingAuthChange = newValue } }
+    }
     
     private let userSubject = CurrentValueSubject<TMIUser?, Never>(nil)
     
@@ -140,26 +146,48 @@ class FirebaseTMIAuthService: TMIAuthService {
     var currentUserID: String? { auth.currentUser?.uid }
     var currentUser: User? { auth.currentUser }
     var currentTMIUser: TMIUser? {
-        get { _currentTMIUser }
+        get { 
+            return userQueue.sync { _currentTMIUser }
+        }
         set {
-            _currentTMIUser = newValue
+            userQueue.async(flags: .barrier) {
+                self._currentTMIUser = newValue
+            }
             userSubject.send(newValue)
         }
     }
     private var _currentTMIUser: TMIUser?
+    private let userQueue = DispatchQueue(label: "com.tmi.auth.user", attributes: .concurrent)
     
     // Auth state property
     private var _authState: TMIAuthState = .initializing
+    private let authStateQueue = DispatchQueue(label: "com.tmi.auth.state", attributes: .concurrent)
+    
     var authState: TMIAuthState {
-        get { _authState }
+        get { 
+            return authStateQueue.sync { _authState }
+        }
         set {
-            _authState = newValue
+            authStateQueue.async(flags: .barrier) {
+                self._authState = newValue
+            }
         }
     }
     
-    // Statistics for debugging
-    private var authStateChanges = 0
-    private var lastAuthChange: Date?
+    // Statistics for debugging (thread-safe)
+    private var _authStateChanges = 0
+    private var _lastAuthChange: Date?
+    private let statsQueue = DispatchQueue(label: "com.tmi.auth.stats", attributes: .concurrent)
+    
+    private var authStateChanges: Int {
+        get { return statsQueue.sync { _authStateChanges } }
+        set { statsQueue.async(flags: .barrier) { self._authStateChanges = newValue } }
+    }
+    
+    private var lastAuthChange: Date? {
+        get { return statsQueue.sync { _lastAuthChange } }
+        set { statsQueue.async(flags: .barrier) { self._lastAuthChange = newValue } }
+    }
     
     // MARK: - Initialization
     
@@ -239,7 +267,8 @@ class FirebaseTMIAuthService: TMIAuthService {
     }
     
     func updateAuthState(_ newState: TMIAuthState) {
-        self._authState = newState
+        // Use the thread-safe property accessor
+        self.authState = newState
         
         if case .userReady(let tmiUser) = newState {
             self.currentTMIUser = tmiUser
@@ -255,9 +284,11 @@ class FirebaseTMIAuthService: TMIAuthService {
         case .needsAuthentication:
             stateDescription = "Needs Authentication"
         case .authenticated(let user):
-            stateDescription = "Authenticated (\(user.uid))"
+            let uid = user.uid // Safely capture uid to avoid EXC_BAD_ACCESS
+            stateDescription = "Authenticated (\(uid))"
         case .needsProfileSetup(let user):
-            stateDescription = "Needs Profile Setup (\(user.uid))"
+            let uid = user.uid // Safely capture uid to avoid EXC_BAD_ACCESS
+            stateDescription = "Needs Profile Setup (\(uid))"
         case .userReady(let tmiUser):
             stateDescription = "User Ready (\(tmiUser.email))"
         case .error(let error):

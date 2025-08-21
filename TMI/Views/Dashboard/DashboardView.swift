@@ -8,6 +8,9 @@ import FirebaseFirestore
 import Foundation
 import Observation
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 // MARK: - Dashboard Data Model
 
@@ -927,18 +930,7 @@ struct DashboardView: View {
     HStack(spacing: 16) {
       Button {
         // Open calendar app for scheduling
-        if let calendarURL = URL(string: "calshow://") {
-          #if os(iOS)
-          if UIApplication.shared.canOpenURL(calendarURL) {
-            UIApplication.shared.open(calendarURL)
-          } else {
-            // Fallback to default calendar URL
-            if let fallbackURL = URL(string: "calendar://") {
-              UIApplication.shared.open(fallbackURL)
-            }
-          }
-          #endif
-        }
+        openCalendarApp()
       } label: {
         HStack {
           Image(systemName: "calendar.badge.plus")
@@ -961,21 +953,7 @@ struct DashboardView: View {
 
       Button {
         // Export report action - share dashboard data
-        let reportText = generateDashboardReport(data)
-        let activityController = UIActivityViewController(
-          activityItems: [reportText],
-          applicationActivities: nil
-        )
-        
-        #if os(iOS)
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first,
-           let rootViewController = window.rootViewController {
-          activityController.popoverPresentationController?.sourceView = window
-          activityController.popoverPresentationController?.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
-          rootViewController.present(activityController, animated: true)
-        }
-        #endif
+        exportDashboardReport(data)
       } label: {
         HStack {
           Image(systemName: "square.and.arrow.up")
@@ -1151,6 +1129,56 @@ struct DashboardView: View {
     """
     
     return report
+  }
+  
+  // MARK: - Platform-Specific Actions
+  
+  private func exportDashboardReport(_ data: DashboardData) {
+    let reportText = generateDashboardReport(data)
+    
+    #if os(iOS)
+    let activityController = UIActivityViewController(
+      activityItems: [reportText],
+      applicationActivities: nil
+    )
+    
+    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+       let window = windowScene.windows.first,
+       let rootViewController = window.rootViewController {
+      activityController.popoverPresentationController?.sourceView = window
+      activityController.popoverPresentationController?.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
+      rootViewController.present(activityController, animated: true)
+    }
+    #elseif os(macOS)
+    // macOS sharing implementation
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    pasteboard.setString(reportText, forType: .string)
+    
+    // Show a temporary notification that the report was copied
+    // You could also open the save dialog here
+    print("Dashboard report copied to clipboard")
+    #endif
+  }
+  
+  private func openCalendarApp() {
+    #if os(iOS)
+    if let calendarURL = URL(string: "calshow://") {
+      if UIApplication.shared.canOpenURL(calendarURL) {
+        UIApplication.shared.open(calendarURL)
+      } else {
+        // Fallback to default calendar URL
+        if let fallbackURL = URL(string: "calendar://") {
+          UIApplication.shared.open(fallbackURL)
+        }
+      }
+    }
+    #elseif os(macOS)
+    // macOS Calendar app opening
+    if let calendarURL = URL(string: "x-apple-calendar://") {
+      NSWorkspace.shared.open(calendarURL)
+    }
+    #endif
   }
 }
 

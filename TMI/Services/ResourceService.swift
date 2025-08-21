@@ -21,17 +21,16 @@ final class ResourceService: @unchecked Sendable {
       throw ResourceServiceError.userNotAuthenticated
     }
     
-    let resourceID = resource.id ?? UUID().uuidString
-    var resourceToSave = resource
-    resourceToSave.id = resourceID
+    // Don't manually set @DocumentID - let Firestore manage it
+    let resourceToSave = resource
     
     let collection = firestore
       .collection(FirestoreCollection.users.rawValue)
       .document(currentUser.uid)
       .collection(FirestoreCollection.resources.rawValue)
     
-    try collection.document(resourceID).setData(from: resourceToSave)
-    return resourceID
+    let docRef = try await collection.addDocument(from: resourceToSave)
+    return docRef.documentID
   }
   
   // MARK: - Fetch Resource
@@ -315,24 +314,19 @@ final class ResourceService: @unchecked Sendable {
     
     var resourceIDs: [String] = []
     
-    // Use batch writes for better performance
-    let batch = firestore.batch()
-    
+    // Use sequential addDocument calls since batch doesn't support addDocument
     for resource in resources {
-      let resourceID = resource.id ?? UUID().uuidString
-      var resourceToSave = resource
-      resourceToSave.id = resourceID
+      // Don't manually set @DocumentID - let Firestore manage it
+      let resourceToSave = resource
       
-      let document = collection.document(resourceID)
       do {
-        try batch.setData(from: resourceToSave, forDocument: document)
-        resourceIDs.append(resourceID)
+        let docRef = try await collection.addDocument(from: resourceToSave)
+        resourceIDs.append(docRef.documentID)
       } catch {
-        throw ResourceServiceError.saveFailed("Failed to prepare resource \(resourceID): \(error.localizedDescription)")
+        throw ResourceServiceError.saveFailed("Failed to save resource: \(error.localizedDescription)")
       }
     }
     
-    try await batch.commit()
     return resourceIDs
   }
   

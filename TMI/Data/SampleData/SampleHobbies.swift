@@ -12,7 +12,6 @@ extension Hobby {
         return [
             // MARK: - Sports & Physical Activities
             Hobby(
-                id: UUID(),
                 name: "Basketball",
                 category: [.sports],
                 description: "Playing basketball recreationally and competitively",
@@ -31,7 +30,6 @@ extension Hobby {
             ),
             
             Hobby(
-                id: UUID(),
                 name: "Soccer/Football",
                 category: [.sports],
                 description: "Playing soccer at recreational and competitive levels",
@@ -50,7 +48,6 @@ extension Hobby {
             ),
             
             Hobby(
-                id: UUID(),
                 name: "Swimming & Water Sports",
                 category: [.sports],
                 description: "Swimming laps, competitive swimming, or water sports activities",
@@ -68,7 +65,6 @@ extension Hobby {
             ),
             
             Hobby(
-                id: UUID(),
                 name: "Martial Arts & Self-Defense",
                 category: [.sports],
                 description: "Practicing martial arts like karate, taekwondo, jiu-jitsu, or boxing",
@@ -86,7 +82,6 @@ extension Hobby {
             ),
             
             Hobby(
-                id: UUID(),
                 name: "Running & Track Sports",
                 category: [.sports],
                 description: "Distance running, sprinting, cross-country, or track and field events",
@@ -105,7 +100,6 @@ extension Hobby {
             
             // MARK: - Creative Arts & Crafts
             Hobby(
-                id: UUID(),
                 name: "Drawing & Sketching",
                 category: [.arts, .creative],
                 description: "Creating artwork through pencil drawing, sketching, and illustration",
@@ -124,7 +118,6 @@ extension Hobby {
             ),
             
             Hobby(
-                id: UUID(),
                 name: "Digital Art & Design",
                 category: [.arts, .creative, .technology],
                 description: "Creating digital artwork using software like Photoshop, Procreate, or Illustrator",

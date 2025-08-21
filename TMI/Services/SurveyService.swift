@@ -11,7 +11,7 @@ import FirebaseAuth
 
 final class SurveyService: @unchecked Sendable {
   static let shared = SurveyService()
-  nonisolated(unsafe) private let firestore = FirebaseManager.shared.firestore
+  private let firestore = FirebaseManager.shared.firestore
   
   private init() {}
   
@@ -21,9 +21,8 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
     
-    let surveyID = survey.id ?? UUID().uuidString
+    // Don't manually set @DocumentID - let Firestore manage it
     var surveyToSave = survey
-    surveyToSave.id = surveyID
     surveyToSave.completed = true
     
     let collection = firestore
@@ -31,8 +30,8 @@ final class SurveyService: @unchecked Sendable {
       .document(currentUser.uid)
       .collection(FirestoreCollection.surveys.rawValue)
     
-    try collection.document(surveyID).setData(from: surveyToSave)
-    return surveyID
+    let docRef = try await collection.addDocument(from: surveyToSave)
+    return docRef.documentID
   }
   
   // MARK: - Save Survey Draft
@@ -41,9 +40,8 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
     
-    let surveyID = survey.id ?? UUID().uuidString
+    // Don't manually set @DocumentID - let Firestore manage it
     var surveyToSave = survey
-    surveyToSave.id = surveyID
     surveyToSave.completed = false
     
     let collection = firestore
@@ -51,8 +49,8 @@ final class SurveyService: @unchecked Sendable {
       .document(currentUser.uid)
       .collection(FirestoreCollection.surveys.rawValue)
     
-    try collection.document(surveyID).setData(from: surveyToSave)
-    return surveyID
+    let docRef = try await collection.addDocument(from: surveyToSave)
+    return docRef.documentID
   }
   
   // MARK: - Fetch Survey

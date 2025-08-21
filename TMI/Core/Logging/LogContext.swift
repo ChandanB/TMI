@@ -163,7 +163,7 @@ extension LogContext {
         )
         
         Task {
-            await addBreadcrumb(breadcrumb)
+            addBreadcrumb(breadcrumb)
         }
     }
     
@@ -176,7 +176,7 @@ extension LogContext {
         )
         
         Task {
-            await addBreadcrumb(breadcrumb)
+            addBreadcrumb(breadcrumb)
         }
     }
     
@@ -193,7 +193,7 @@ extension LogContext {
         )
         
         Task {
-            await addBreadcrumb(breadcrumb)
+            addBreadcrumb(breadcrumb)
         }
     }
 }

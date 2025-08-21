@@ -12,7 +12,7 @@ import FirebaseAuth
 @Observable
 final class CareerService: @unchecked Sendable {
   static let shared = CareerService()
-  nonisolated(unsafe) private let firestore = FirebaseManager.shared.firestore
+  private let firestore = FirebaseManager.shared.firestore
   
   // In-memory cache for performance
   private var careerCache: [Career] = []
