@@ -193,8 +193,127 @@ class TMIPlanService {
             
             print("[TMIPlanService] TMI plan added with ID: \(documentRef.documentID)")
             
-            // Re-fetch the document to get the auto-populated @DocumentID
-            let savedPlan = try await documentRef.getDocument(as: TMIPlan.self)
+            // Re-fetch the document using manual parsing to avoid Codable issues
+            let document = try await documentRef.getDocument()
+            guard document.exists, let docData = document.data() else {
+                throw TMIPlanServiceError.saveFailed("Document was not created successfully")
+            }
+            
+            // Use the same manual reconstruction logic as in fetchPlans
+            guard let modelRaw = docData["model"] as? String,
+                  let model = TMIPlanModel(rawValue: modelRaw),
+                  let progress = docData["progress"] as? Double,
+                  let notes = docData["notes"] as? String,
+                  let creationTimestamp = docData["creationDate"] as? Double,
+                  let lastUpdatedTimestamp = docData["lastUpdated"] as? Double,
+                  let studentData = docData["student"] as? [String: Any] else {
+                throw TMIPlanServiceError.saveFailed("Invalid document structure")
+            }
+            
+            let creationDate = Date(timeIntervalSince1970: creationTimestamp)
+            let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
+            
+            let student = Student(
+                id: studentData["id"] as? String,
+                name: studentData["name"] as? String ?? "Unknown",
+                grade: studentData["grade"] as? String ?? "",
+                school: "",
+                dateOfBirth: Date()
+            )
+            
+            let students: [Student]
+            if let studentsData = docData["students"] as? [[String: Any]] {
+                students = studentsData.map { studentInfo in
+                    Student(
+                        id: studentInfo["id"] as? String,
+                        name: studentInfo["name"] as? String ?? "Unknown",
+                        grade: studentInfo["grade"] as? String ?? "",
+                        school: "",
+                        dateOfBirth: Date()
+                    )
+                }
+            } else {
+                students = [student]
+            }
+            
+            let interests: [Interest]
+            if let interestsData = docData["interests"] as? [[String: Any]] {
+                interests = interestsData.compactMap { interestData in
+                    Interest.fromFirestore(id: interestData["id"] as? String ?? "", data: interestData)
+                }
+            } else {
+                interests = []
+            }
+            
+            let hobbies: [Hobby]
+            if let hobbiesData = docData["hobbies"] as? [[String: Any]] {
+                hobbies = hobbiesData.compactMap { hobbyData in
+                    guard let idString = hobbyData["id"] as? String else { return nil }
+                    return Hobby.fromFirestore(id: idString, data: hobbyData)
+                }
+            } else {
+                hobbies = []
+            }
+            
+            let goals: [Goal]
+            if let goalsData = docData["goals"] as? [[String: Any]] {
+                goals = goalsData.compactMap { goalData in
+                    guard let idString = goalData["id"] as? String,
+                          let id = UUID(uuidString: idString),
+                          let description = goalData["description"] as? String,
+                          let statusString = goalData["status"] as? String,
+                          let status = GoalStatus(rawValue: statusString),
+                          let goalProgress = goalData["progress"] as? Double else {
+                        return nil
+                    }
+                    
+                    let goalNotes = goalData["notes"] as? String
+                    let dueDate: Date?
+                    if let dueDateTimestamp = goalData["dueDate"] as? Double {
+                        dueDate = Date(timeIntervalSince1970: dueDateTimestamp)
+                    } else {
+                        dueDate = nil
+                    }
+                    
+                    return Goal(
+                        id: id,
+                        description: description,
+                        dueDate: dueDate,
+                        status: status,
+                        progress: goalProgress,
+                        notes: goalNotes
+                    )
+                }
+            } else {
+                goals = []
+            }
+            
+            let title = docData["title"] as? String ?? ""
+            let startDate = (docData["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
+            let endDate = (docData["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
+            let createdBy = docData["createdBy"] as? String ?? ""
+            
+            let savedPlan = TMIPlan(
+                id: document.documentID,
+                title: title,
+                description: docData["description"] as? String,
+                student: student,
+                students: students,
+                model: model,
+                interests: interests,
+                hobbies: hobbies,
+                startDate: startDate,
+                endDate: endDate,
+                creationDate: creationDate,
+                lastUpdated: lastUpdated,
+                goals: goals,
+                progress: progress,
+                notes: notes,
+                strategies: docData["strategies"] as? [String],
+                progressTracking: nil,
+                createdBy: createdBy
+            )
+            
             return savedPlan
         } catch {
             print("[TMIPlanService] Error adding TMI plan: \(error)")

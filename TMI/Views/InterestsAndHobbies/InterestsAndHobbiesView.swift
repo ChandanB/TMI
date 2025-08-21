@@ -54,6 +54,12 @@ struct InterestsAndHobbiesView: View {
         .preferredColorScheme(.dark)
         .task {
             await stateModel.fetch()
+            print("[DEBUG] After fetch - totalItems: \(stateModel.totalItems)")
+            print("[DEBUG] Filtered interests count: \(stateModel.filteredInterests.count)")
+            print("[DEBUG] Filtered hobbies count: \(stateModel.filteredHobbies.count)")
+            print("[DEBUG] Selected segment: \(stateModel.selectedSegment)")
+            print("[DEBUG] Selected filter: \(stateModel.selectedFilter)")
+            print("[DEBUG] Search text: '\(stateModel.searchText)'")
         }
         .refreshable {
             await stateModel.refresh()
@@ -318,6 +324,8 @@ struct InterestsAndHobbiesView: View {
         ) {
             if stateModel.selectedSegment == .interests {
                 ForEach(stateModel.filteredInterests) { interest in
+                    // Debug: This should print for each interest being rendered
+                    let _ = print("[DEBUG] Rendering interest: \(interest.name)")
                     NavigationLink {
                         InterestDetailView(interest: interest)
                     } label: {

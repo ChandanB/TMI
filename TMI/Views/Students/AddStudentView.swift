@@ -32,151 +32,99 @@ struct AddStudentView: View {
                     // Content
                     ScrollView {
                         VStack(spacing: 24) {
-                            // Header
-                            VStack(spacing: 8) {
-                                Image(systemName: currentStateModel.isEditing ? "person.fill.checkmark" : "person.badge.plus")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.tmiSecondary)
-                                    .padding(.top, 20)
+                            // Enhanced Header
+                            VStack(spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(.tmiSecondary.opacity(0.2))
+                                        .frame(width: 80, height: 80)
+                                    
+                                    Image(systemName: currentStateModel.isEditing ? "person.fill.checkmark" : "person.badge.plus")
+                                        .font(.system(size: 36, weight: .medium))
+                                        .foregroundColor(.tmiSecondary)
+                                }
+                                .padding(.top, 10)
                                 
-                                Text(currentStateModel.isEditing ? "Edit Student" : "Add New Student")
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.white)
-                                
-                                Text(currentStateModel.isEditing ? "Update the student's information" : "Enter the student's basic information")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(.white.opacity(0.7))
-                                    .multilineTextAlignment(.center)
+                                VStack(spacing: 8) {
+                                    Text(currentStateModel.isEditing ? "Edit Student" : "Add New Student")
+                                        .font(.system(size: 28, weight: .bold))
+                                        .foregroundColor(.white)
+                                    
+                                    Text(currentStateModel.isEditing ? "Update the student's information below" : "Let's get to know this student better")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 30)
+                                }
                             }
-                            .padding(.bottom, 10)
+                            .padding(.bottom, 20)
                             
-                            // Form
-                            TMIGlassCard(style: .default) {
-                                VStack(spacing: 20) {
-                                    // Name field
-                                    TMITextField(
-                                        icon: "person.fill",
-                                        placeholder: "Student Name",
-                                        text: Binding(get: { currentStateModel.name }, set: { currentStateModel.name = $0 })
-                                    )
-                                    
-                                    // Grade field
-                                    TMITextField(
-                                        icon: "number.square",
-                                        placeholder: "Grade Level",
-                                        text: Binding(get: { currentStateModel.grade }, set: { currentStateModel.grade = $0 })
-                                    )
-                                    
-                                    // Student ID field
-                                    TMITextField(
-                                        icon: "barcode",
-                                        placeholder: "Student ID (optional)",
-                                        text: Binding(get: { currentStateModel.studentID }, set: { currentStateModel.studentID = $0 })
-                                    )
-                                    
-                                    // Date of Birth
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Label("Date of Birth", systemImage: "calendar")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.9))
-                                        
-                                        DatePicker(
-                                            "Date of Birth",
-                                            selection: Binding(get: { currentStateModel.dateOfBirth }, set: { currentStateModel.dateOfBirth = $0 }),
-                                            in: Calendar.current.date(byAdding: .year, value: -25, to: Date())!...Calendar.current.date(byAdding: .year, value: -3, to: Date())!,
-                                            displayedComponents: .date
+                            // Basic Information Section
+                            VStack(spacing: 16) {
+                                TMISectionHeader(title: "Basic Information", icon: "person.text.rectangle")
+                                
+                                TMIGlassCard(style: .form) {
+                                    VStack(spacing: 18) {
+                                        TMITextField(
+                                            icon: "person.fill",
+                                            placeholder: "Student Name",
+                                            text: Binding(get: { currentStateModel.name }, set: { currentStateModel.name = $0 })
                                         )
-                                        .datePickerStyle(.compact)
-                                        .accentColor(.tmiSecondary)
-                                        .labelsHidden()
-                                    }
-                                    .padding(.vertical, 8)
-                                    
-                                    // Interests Section
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Label("Interests (\(currentStateModel.interests.count))", systemImage: "heart")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.9))
                                         
-                                        Button(action: {
-                                            currentStateModel.showingInterestPicker = true
-                                        }) {
-                                            HStack {
-                                                Text(currentStateModel.interests.isEmpty ? "Add interests" : currentStateModel.interests.map { $0.name }.joined(separator: ", "))
-                                                    .foregroundColor(currentStateModel.interests.isEmpty ? .white.opacity(0.6) : .white)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                                
-                                                Image(systemName: "chevron.right")
-                                                    .foregroundColor(.white.opacity(0.6))
-                                                    .font(.system(size: 14))
-                                            }
-                                            .padding(16)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .fill(Color.white.opacity(0.05))
-                                                    .background(
-                                                        RoundedRectangle(cornerRadius: 12)
-                                                            .fill(.ultraThinMaterial)
-                                                            .opacity(0.3)
-                                                    )
-                                            )
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .stroke(
-                                                        LinearGradient(
-                                                            colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                                                            startPoint: .topLeading,
-                                                            endPoint: .bottomTrailing
-                                                        ),
-                                                        lineWidth: 1
-                                                    )
-                                            )
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                    
-                                    // Hobbies Section
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Label("Hobbies (\(currentStateModel.hobbies.count))", systemImage: "gamecontroller")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.9))
+                                        TMITextField(
+                                            icon: "number.square",
+                                            placeholder: "Grade Level",
+                                            text: Binding(get: { currentStateModel.grade }, set: { currentStateModel.grade = $0 })
+                                        )
                                         
-                                        Button(action: {
-                                            currentStateModel.showingHobbyPicker = true
-                                        }) {
-                                            HStack {
-                                                Text(currentStateModel.hobbies.isEmpty ? "Add hobbies" : currentStateModel.hobbies.map { $0.name }.joined(separator: ", "))
-                                                    .foregroundColor(currentStateModel.hobbies.isEmpty ? .white.opacity(0.6) : .white)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                                
-                                                Image(systemName: "chevron.right")
-                                                    .foregroundColor(.white.opacity(0.6))
-                                                    .font(.system(size: 14))
-                                            }
-                                            .padding(16)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .fill(Color.white.opacity(0.05))
-                                                    .background(
-                                                        RoundedRectangle(cornerRadius: 12)
-                                                            .fill(.ultraThinMaterial)
-                                                            .opacity(0.3)
-                                                    )
+                                        TMITextField(
+                                            icon: "barcode",
+                                            placeholder: "Student ID (optional)",
+                                            text: Binding(get: { currentStateModel.studentID }, set: { currentStateModel.studentID = $0 })
+                                        )
+                                        
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Label("Date of Birth", systemImage: "calendar")
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundColor(.white.opacity(0.9))
+                                            
+                                            DatePicker(
+                                                "Date of Birth",
+                                                selection: Binding(get: { currentStateModel.dateOfBirth }, set: { currentStateModel.dateOfBirth = $0 }),
+                                                in: Calendar.current.date(byAdding: .year, value: -25, to: Date())!...Calendar.current.date(byAdding: .year, value: -3, to: Date())!,
+                                                displayedComponents: .date
                                             )
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .stroke(
-                                                        LinearGradient(
-                                                            colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                                                            startPoint: .topLeading,
-                                                            endPoint: .bottomTrailing
-                                                        ),
-                                                        lineWidth: 1
-                                                    )
-                                            )
+                                            .datePickerStyle(.compact)
+                                            .accentColor(.tmiSecondary)
+                                            .labelsHidden()
                                         }
-                                        .buttonStyle(.plain)
+                                        .padding(.vertical, 4)
                                     }
+                                }
+                            }
+                            
+                            // Personal Interests Section
+                            VStack(spacing: 16) {
+                                TMISectionHeader(title: "Personal Interests", icon: "heart.circle")
+                                
+                                VStack(spacing: 16) {
+                                    TMISelectionSection(
+                                        title: "Interests",
+                                        icon: "heart.fill",
+                                        count: currentStateModel.interests.count,
+                                        selectedItems: currentStateModel.interests.map { $0.name },
+                                        placeholder: "Add interests to help personalize learning",
+                                        onTap: { currentStateModel.showingInterestPicker = true }
+                                    )
+                                    
+                                    TMISelectionSection(
+                                        title: "Hobbies",
+                                        icon: "gamecontroller.fill",
+                                        count: currentStateModel.hobbies.count,
+                                        selectedItems: currentStateModel.hobbies.map { $0.name },
+                                        placeholder: "Add hobbies to connect learning to their passions",
+                                        onTap: { currentStateModel.showingHobbyPicker = true }
+                                    )
                                 }
                             }
                             
@@ -268,44 +216,118 @@ struct InterestSelectionView: View {
     @Binding var selectedInterests: [Interest]
     let onDismiss: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+    
+    private var filteredInterests: [Interest] {
+        if searchText.isEmpty {
+            return Interest.expandedSampleInterests
+        } else {
+            return Interest.expandedSampleInterests.filter { 
+                $0.name.localizedCaseInsensitiveContains(searchText) 
+            }
+        }
+    }
     
     var body: some View {
-        ZStack {
-            TMIBackgroundView(variant: .default)
-                .ignoresSafeArea()
-            
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
-                    ForEach(Interest.sampleInterests) { interest in
-                        InterestPickerCard(
-                            interest: interest,
-                            isSelected: selectedInterests.contains(interest),
-                            onTap: { toggleInterest(interest) }
-                        )
+        NavigationView {
+            ZStack {
+                TMIBackgroundView(variant: .default)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    // Header with selection count
+                    TMIGlassCard(style: .form) {
+                        VStack(spacing: 12) {
+                            HStack {
+                                Image(systemName: "heart.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.tmiSecondary)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Select Interests")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    
+                                    Text("\(selectedInterests.count) selected")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                                
+                                Spacer()
+                            }
+                            
+                            // Search bar
+                            TMITextField(
+                                icon: "magnifyingglass",
+                                placeholder: "Search interests...",
+                                text: $searchText
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    
+                    // Selected interests summary
+                    if !selectedInterests.isEmpty {
+                        TMIGlassCard(style: .form) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Selected Interests")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.9))
+                                
+                                TMISelectedItemsView(items: selectedInterests.map { $0.name })
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    
+                    // Interests grid
+                    ScrollView {
+                        LazyVGrid(columns: [
+                            GridItem(.adaptive(minimum: 140, maximum: 180))
+                        ], spacing: 16) {
+                            ForEach(filteredInterests) { interest in
+                                InterestPickerCard(
+                                    interest: interest,
+                                    isSelected: selectedInterests.contains(interest),
+                                    onTap: { toggleInterest(interest) }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 100)
                     }
                 }
-                .padding()
             }
-        }
-        .navigationTitle("Select Interests")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Done") {
-                    onDismiss()
-                    dismiss()
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
                 }
-                .foregroundColor(.white)
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        onDismiss()
+                        dismiss()
+                    }
+                    .foregroundColor(.tmiSecondary)
+                    .fontWeight(.semibold)
+                }
             }
+            .preferredColorScheme(.dark)
         }
-        .preferredColorScheme(.dark)
     }
     
     private func toggleInterest(_ interest: Interest) {
-        if selectedInterests.contains(interest) {
-            selectedInterests.removeAll { $0.id == interest.id }
-        } else {
-            selectedInterests.append(interest)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            if selectedInterests.contains(interest) {
+                selectedInterests.removeAll { $0.id == interest.id }
+            } else {
+                selectedInterests.append(interest)
+            }
         }
     }
 }
@@ -315,84 +337,328 @@ struct HobbySelectionView: View {
     @Binding var selectedHobbies: [Hobby]
     let onDismiss: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+    
+    private var filteredHobbies: [Hobby] {
+        if searchText.isEmpty {
+            return Hobby.expandedSampleHobbies
+        } else {
+            return Hobby.expandedSampleHobbies.filter { 
+                $0.name.localizedCaseInsensitiveContains(searchText) 
+            }
+        }
+    }
     
     var body: some View {
-        ZStack {
-            TMIBackgroundView(variant: .default)
-                .ignoresSafeArea()
-            
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
-                    ForEach(Hobby.sampleHobbies) { hobby in
-                        HobbyPickerCard(
-                            hobby: hobby,
-                            isSelected: selectedHobbies.contains(hobby),
-                            onTap: { toggleHobby(hobby) }
-                        )
+        NavigationView {
+            ZStack {
+                TMIBackgroundView(variant: .default)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    // Header with selection count
+                    TMIGlassCard(style: .form) {
+                        VStack(spacing: 12) {
+                            HStack {
+                                Image(systemName: "gamecontroller.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.tmiSecondary)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Select Hobbies")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    
+                                    Text("\(selectedHobbies.count) selected")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                                
+                                Spacer()
+                            }
+                            
+                            // Search bar
+                            TMITextField(
+                                icon: "magnifyingglass",
+                                placeholder: "Search hobbies...",
+                                text: $searchText
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    
+                    // Selected hobbies summary
+                    if !selectedHobbies.isEmpty {
+                        TMIGlassCard(style: .form) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Selected Hobbies")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.9))
+                                
+                                TMISelectedItemsView(items: selectedHobbies.map { $0.name })
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    
+                    // Hobbies grid
+                    ScrollView {
+                        LazyVGrid(columns: [
+                            GridItem(.adaptive(minimum: 140, maximum: 180))
+                        ], spacing: 16) {
+                            ForEach(filteredHobbies) { hobby in
+                                HobbyPickerCard(
+                                    hobby: hobby,
+                                    isSelected: selectedHobbies.contains(hobby),
+                                    onTap: { toggleHobby(hobby) }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 100)
                     }
                 }
-                .padding()
             }
-        }
-        .navigationTitle("Select Hobbies")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Done") {
-                    onDismiss()
-                    dismiss()
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
                 }
-                .foregroundColor(.white)
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        onDismiss()
+                        dismiss()
+                    }
+                    .foregroundColor(.tmiSecondary)
+                    .fontWeight(.semibold)
+                }
             }
+            .preferredColorScheme(.dark)
         }
-        .preferredColorScheme(.dark)
     }
     
     private func toggleHobby(_ hobby: Hobby) {
-        if selectedHobbies.contains(hobby) {
-            selectedHobbies.removeAll { $0.id == hobby.id }
-        } else {
-            selectedHobbies.append(hobby)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            if selectedHobbies.contains(hobby) {
+                selectedHobbies.removeAll { $0.id == hobby.id }
+            } else {
+                selectedHobbies.append(hobby)
+            }
         }
     }
 }
 
-// MARK: - Picker Cards
+// MARK: - Enhanced Components
+
+/// Section header component for form organization
+struct TMISectionHeader: View {
+    let title: String
+    let icon: String
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundColor(.tmiSecondary)
+            
+            Text(title)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.white)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
+/// Unified selection section component for interests, hobbies, etc.
+struct TMISelectionSection: View {
+    let title: String
+    let icon: String
+    let count: Int
+    let selectedItems: [String]
+    let placeholder: String
+    let onTap: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with count
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(.tmiSecondary)
+                
+                Text("\(title) (\(count))")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+            }
+            
+            // Selection button with enhanced styling
+            Button(action: onTap) {
+                TMIGlassCard(style: .form) {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if selectedItems.isEmpty {
+                                Text(placeholder)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.6))
+                                    .multilineTextAlignment(.leading)
+                            } else {
+                                // Show selected items as tags
+                                TMISelectedItemsView(items: selectedItems)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.tmiSecondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+/// Display selected items as styled tags
+struct TMISelectedItemsView: View {
+    let items: [String]
+    let maxItemsToShow = 3
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // First row of tags
+            let displayItems = Array(items.prefix(maxItemsToShow))
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 6) {
+                ForEach(displayItems, id: \.self) { item in
+                    TMISelectionTag(text: item)
+                }
+            }
+            
+            // Show count if there are more items
+            if items.count > maxItemsToShow {
+                Text("+ \(items.count - maxItemsToShow) more")
+                    .font(.system(size: 12))
+                    .foregroundColor(.tmiSecondary)
+                    .padding(.top, 2)
+            }
+        }
+    }
+}
+
+/// Individual selection tag
+struct TMISelectionTag: View {
+    let text: String
+    
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(.tmiSecondary.opacity(0.2))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(.tmiSecondary.opacity(0.4), lineWidth: 1)
+                    )
+            )
+            .lineLimit(1)
+    }
+}
+
+// MARK: - Unified Picker Card
+
+/// Generic picker card that works for both interests and hobbies
+struct TMIPickerCard<T: Identifiable & Equatable>: View {
+    let item: T
+    let isSelected: Bool
+    let onTap: () -> Void
+    let iconName: String
+    let displayName: String
+    
+    var body: some View {
+        Button(action: onTap) {
+            TMIGlassCard(style: .form) {
+                VStack(spacing: 12) {
+                    // Icon with enhanced styling
+                    ZStack {
+                        Circle()
+                            .fill(.tmiSecondary.opacity(isSelected ? 0.2 : 0.1))
+                            .frame(width: 50, height: 50)
+                        
+                        Image(systemName: iconName)
+                            .font(.system(size: 24, weight: .medium))
+                            .foregroundColor(isSelected ? .tmiSecondary : .white.opacity(0.8))
+                    }
+                    
+                    Text(displayName)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .frame(minHeight: 36) // Consistent height
+                    
+                    // Selection indicator
+                    if isSelected {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.tmiSecondary)
+                            
+                            Text("Selected")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.tmiSecondary)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(.tmiSecondary.opacity(0.1))
+                        )
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        isSelected ? .tmiSecondary : .clear,
+                        lineWidth: 2
+                    )
+            )
+            .scaleEffect(isSelected ? 1.02 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Updated Picker Cards using unified component
+
 struct InterestPickerCard: View {
     let interest: Interest
     let isSelected: Bool
     let onTap: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 12) {
-                Image(systemName: interest.iconName)
-                    .font(.system(size: 30))
-                    .foregroundColor(isSelected ? .tmiSecondary : .white.opacity(0.7))
-                
-                Text(interest.name)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-            }
-            .padding(.vertical, 16)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(isSelected ? 0.1 : 0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(
-                                isSelected ? Color.tmiSecondary : Color.white.opacity(0.2),
-                                lineWidth: isSelected ? 2 : 1
-                            )
-                    )
-            )
-            .scaleEffect(isSelected ? 1.05 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-        }
-        .buttonStyle(.plain)
+        TMIPickerCard(
+            item: interest,
+            isSelected: isSelected,
+            onTap: onTap,
+            iconName: interest.iconName,
+            displayName: interest.name
+        )
     }
 }
 
@@ -402,35 +668,13 @@ struct HobbyPickerCard: View {
     let onTap: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 12) {
-                Image(systemName: hobby.iconName)
-                    .font(.system(size: 30))
-                    .foregroundColor(isSelected ? .tmiSecondary : .white.opacity(0.7))
-                
-                Text(hobby.name)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-            }
-            .padding(.vertical, 16)
-            .frame(maxWidth:.infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(isSelected ? 0.1 : 0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(
-                                isSelected ? Color.tmiSecondary : Color.white.opacity(0.2),
-                                lineWidth: isSelected ? 2 : 1
-                            )
-                    )
-            )
-            .scaleEffect(isSelected ? 1.05 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-        }
-        .buttonStyle(.plain)
+        TMIPickerCard(
+            item: hobby,
+            isSelected: isSelected,
+            onTap: onTap,
+            iconName: hobby.iconName,
+            displayName: hobby.name
+        )
     }
 }
 

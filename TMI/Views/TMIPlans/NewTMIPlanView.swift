@@ -643,17 +643,23 @@ struct NewTMIPlanView: View {
   private func fetchInterestsFromFirestore(db: Firestore, uid: String) async throws -> [Interest] {
     let collection = db.collection("users").document(uid).collection("interests")
     let querySnapshot = try await collection.getDocuments()
-    return querySnapshot.documents.compactMap { document -> Interest? in
+    let firestoreInterests = querySnapshot.documents.compactMap { document -> Interest? in
       Interest.fromFirestore(id: document.documentID, data: document.data())
     }
+    
+    // If no interests found in Firestore, return expanded sample data
+    return firestoreInterests.isEmpty ? Interest.expandedSampleInterests : firestoreInterests
   }
 
   private func fetchHobbiesFromFirestore(db: Firestore, uid: String) async throws -> [Hobby] {
     let collection = db.collection("users").document(uid).collection("hobbies")
     let querySnapshot = try await collection.getDocuments()
-    return querySnapshot.documents.compactMap { document -> Hobby? in
+    let firestoreHobbies = querySnapshot.documents.compactMap { document -> Hobby? in
       Hobby.fromFirestore(id: document.documentID, data: document.data())
     }
+    
+    // If no hobbies found in Firestore, return expanded sample data
+    return firestoreHobbies.isEmpty ? Hobby.expandedSampleHobbies : firestoreHobbies
   }
 
 
@@ -883,7 +889,7 @@ struct ModelCard: View {
   private var modelIcon: String {
     switch model {
     case .chaseYourSpace:
-      return "rocket.fill"
+      return "figure.run.circle.fill"
     case .acknowledgeInterests:
       return "heart.fill"
     case .alignYourMind:
@@ -893,7 +899,7 @@ struct ModelCard: View {
     case .bullyToBoss:
       return "person.fill.badge.plus"
     case .meekToProtector:
-      return "person.fill.turn.up"
+      return "shield.lefthalf.filled"
     }
   }
 

@@ -73,8 +73,9 @@ class StudentService {
             
             print("[StudentService] Student added with ID: \(documentRef.documentID)")
             
-            // Re-fetch the document to get the auto-populated @DocumentID
-            let savedStudent = try await documentRef.getDocument(as: Student.self)
+            // Re-fetch the document using our custom parser
+            let document = try await documentRef.getDocument()
+            let savedStudent = try parseStudent(from: document)
             return savedStudent
         } catch {
             print("[StudentService] Error adding student: \(error)")
@@ -175,13 +176,14 @@ class StudentService {
         let interests = (data["interests"] as? [[String: Any]] ?? []).compactMap { interestData -> Interest? in
             guard let name = interestData["name"] as? String else { return nil }
             let id = interestData["id"] as? String
-            return Interest(id: id, name: name, category: [])
+            return Interest(id: id, name: name, category: [.academics])
         }
         
         // Parse hobbies
         let hobbies = (data["hobbies"] as? [[String: Any]] ?? []).compactMap { hobbyData -> Hobby? in
             guard let name = hobbyData["name"] as? String else { return nil }
-            return Hobby(name: name, category: [])
+            let id = hobbyData["id"] as? String
+            return Hobby(id: UUID(uuidString: id ?? UUID().uuidString) ?? UUID(), name: name, category: [.other])
         }
         
         // Parse survey results
@@ -289,13 +291,14 @@ class StudentService {
         let interests = (data["interests"] as? [[String: Any]] ?? []).compactMap { interestData -> Interest? in
             guard let name = interestData["name"] as? String else { return nil }
             let id = interestData["id"] as? String
-            return Interest(id: id, name: name, category: [])
+            return Interest(id: id, name: name, category: [.academics])
         }
         
         // Parse hobbies
         let hobbies = (data["hobbies"] as? [[String: Any]] ?? []).compactMap { hobbyData -> Hobby? in
             guard let name = hobbyData["name"] as? String else { return nil }
-            return Hobby(name: name, category: [])
+            let id = hobbyData["id"] as? String
+            return Hobby(id: UUID(uuidString: id ?? UUID().uuidString) ?? UUID(), name: name, category: [.other])
         }
         
         // Parse survey results

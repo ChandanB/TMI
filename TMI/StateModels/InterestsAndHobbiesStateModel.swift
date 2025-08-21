@@ -133,6 +133,7 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
     
     @MainActor
     override func fetch() async {
+        print("[DEBUG] StateModel fetch() called")
         updateState(.loading)
         
         do {
@@ -141,13 +142,17 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
             
             let (interests, hobbies) = try await (interestsTask, hobbiesTask)
             
+            print("[DEBUG] Fetched \(interests.count) interests and \(hobbies.count) hobbies")
+            
             let data = InterestsAndHobbiesData(
                 interests: interests,
                 hobbies: hobbies
             )
             
             updateState(.loaded(data))
+            print("[DEBUG] State updated to loaded with data")
         } catch {
+            print("[DEBUG] Fetch failed with error: \(error)")
             print("[InterestsAndHobbiesStateModel] Error fetching data: \(error)")
             handleError(error, userFriendlyMessage: "Failed to load interests and hobbies")
         }
@@ -321,11 +326,32 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
     private func matchesFilter(category: String) -> Bool {
         switch selectedFilter {
         case .all: return true
-        case .academics: return category.lowercased().contains("academic")
-        case .creative: return category.lowercased().contains("creative") || category.lowercased().contains("art")
-        case .technology: return category.lowercased().contains("technology") || category.lowercased().contains("tech")
-        case .sports: return category.lowercased().contains("sport") || category.lowercased().contains("physical")
-        case .social: return category.lowercased().contains("social")
+        case .academics: 
+            return category.lowercased().contains("academic") || 
+                   category.lowercased().contains("science") ||
+                   category.lowercased().contains("discovery") ||
+                   category.lowercased().contains("literature") ||
+                   category.lowercased().contains("reading") ||
+                   category.lowercased().contains("writing")
+        case .creative: 
+            return category.lowercased().contains("creative") || 
+                   category.lowercased().contains("art") ||
+                   category.lowercased().contains("creativity") ||
+                   category.lowercased().contains("music") ||
+                   category.lowercased().contains("literature")
+        case .technology: 
+            return category.lowercased().contains("technology") || 
+                   category.lowercased().contains("tech")
+        case .sports: 
+            return category.lowercased().contains("sport") || 
+                   category.lowercased().contains("athletic") ||
+                   category.lowercased().contains("physical") ||
+                   category.lowercased().contains("wellness")
+        case .social: 
+            return category.lowercased().contains("social") ||
+                   category.lowercased().contains("causes") ||
+                   category.lowercased().contains("leadership") ||
+                   category.lowercased().contains("entertainment")
         }
     }
     
@@ -405,9 +431,15 @@ class InterestService {
     private let db = Firestore.firestore()
     
     func fetchInterests() async throws -> [Interest] {
+        // Temporarily force return expanded sample data for debugging
+        print("[InterestService] Returning expanded sample data for debugging - count: \(Interest.expandedSampleInterests.count)")
+        return Interest.expandedSampleInterests
+        
+        // Original logic commented out for debugging
+        /*
         guard let uid = Auth.auth().currentUser?.uid else {
-            print("[InterestService] No authenticated user, returning sample data")
-            return Interest.sampleInterests
+            print("[InterestService] No authenticated user, returning expanded sample data")
+            return Interest.expandedSampleInterests
         }
         
         do {
@@ -425,11 +457,12 @@ class InterestService {
                 }
             }
             
-            return interests.isEmpty ? Interest.sampleInterests : interests
+            return interests.isEmpty ? Interest.expandedSampleInterests : interests
         } catch {
-            print("[InterestService] Firestore error, returning sample data: \(error)")
-            return Interest.sampleInterests
+            print("[InterestService] Firestore error, returning expanded sample data: \(error)")
+            return Interest.expandedSampleInterests
         }
+        */
     }
     
     func saveInterest(_ interest: Interest) async throws -> Interest {
@@ -459,9 +492,15 @@ class HobbyService {
     private let db = Firestore.firestore()
     
     func fetchHobbies() async throws -> [Hobby] {
+        // Temporarily force return expanded sample data for debugging
+        print("[HobbyService] Returning expanded sample data for debugging - count: \(Hobby.expandedSampleHobbies.count)")
+        return Hobby.expandedSampleHobbies
+        
+        // Original logic commented out for debugging
+        /*
         guard let uid = Auth.auth().currentUser?.uid else {
-            print("[HobbyService] No authenticated user, returning sample data")
-            return Hobby.sampleHobbies
+            print("[HobbyService] No authenticated user, returning expanded sample data")
+            return Hobby.expandedSampleHobbies
         }
         
         do {
@@ -479,11 +518,12 @@ class HobbyService {
                 }
             }
             
-            return hobbies.isEmpty ? Hobby.sampleHobbies : hobbies
+            return hobbies.isEmpty ? Hobby.expandedSampleHobbies : hobbies
         } catch {
-            print("[HobbyService] Firestore error, returning sample data: \(error)")
-            return Hobby.sampleHobbies
+            print("[HobbyService] Firestore error, returning expanded sample data: \(error)")
+            return Hobby.expandedSampleHobbies
         }
+        */
     }
     
     func saveHobby(_ hobby: Hobby) async throws -> Hobby {

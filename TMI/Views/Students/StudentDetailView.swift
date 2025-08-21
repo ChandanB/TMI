@@ -551,7 +551,7 @@ struct EditStudentInterestsView: View {
                             }
                             
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: 12) {
-                                ForEach(Interest.sampleInterests) { interest in
+                                ForEach(Interest.expandedSampleInterests) { interest in
                                     InterestPickerCard(
                                         interest: interest,
                                         isSelected: selectedInterests.contains(interest),
@@ -573,7 +573,7 @@ struct EditStudentInterestsView: View {
                             }
                             
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: 12) {
-                                ForEach(Hobby.sampleHobbies) { hobby in
+                                ForEach(Hobby.expandedSampleHobbies) { hobby in
                                     HobbyPickerCard(
                                         hobby: hobby,
                                         isSelected: selectedHobbies.contains(hobby),

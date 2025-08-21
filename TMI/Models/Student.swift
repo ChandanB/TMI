@@ -196,7 +196,7 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
         // Convert interests to basic data
         data["interests"] = interests.map { interest in
             [
-                "id": interest.id ?? "",
+                "id": interest.id ?? UUID().uuidString,
                 "name": interest.name
             ]
         }

@@ -108,14 +108,22 @@ final class AddStudentStateModel {
         do {
             let savedStudent: Student
             if isEditing {
+                print("[DEBUG] Updating student: \(studentToSave.name)")
                 savedStudent = try await studentService.updateStudent(studentToSave)
+                print("[DEBUG] Student updated successfully: \(savedStudent.name)")
             } else {
+                print("[DEBUG] Adding student: \(studentToSave.name)")
                 savedStudent = try await studentService.addStudent(studentToSave)
+                print("[DEBUG] Student added successfully: \(savedStudent.name)")
             }
             isLoading = false
+            print("[DEBUG] Save operation completed successfully")
             return savedStudent
         } catch {
             isLoading = false
+            print("[DEBUG] Save failed with error: \(error)")
+            print("[DEBUG] Error type: \(type(of: error))")
+            print("[DEBUG] Error localized description: \(error.localizedDescription)")
             errorMessage = "Failed to save student: \(error.localizedDescription)"
             showingAlert = true
             return nil

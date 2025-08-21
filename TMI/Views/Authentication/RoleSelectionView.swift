@@ -16,6 +16,7 @@ struct Institution: Identifiable, Equatable {
 
 struct RoleSelectionView: View {
   @State private var selectedRole: UserRole?
+  @State private var selectedCategory: SimplifiedRoleCategory?
   @State private var showingAgeVerification = false
   @State private var institutionCode = ""
   @State private var selectedInstitution: Institution? = nil
@@ -58,7 +59,7 @@ struct RoleSelectionView: View {
             )
 
           // Role selection grid
-          RoleSelectionGrid(selectedRole: $selectedRole)
+          RoleSelectionGrid(selectedRole: $selectedRole, selectedCategory: $selectedCategory)
             .opacity(animateCards ? 1.0 : 0)
             .offset(y: animateCards ? 0 : 30)
             .animation(
@@ -68,7 +69,7 @@ struct RoleSelectionView: View {
             )
 
           // Institution verification section (when applicable)
-          if let role = selectedRole, role.requiresInstitutionalAffiliation {
+          if selectedCategory == .staff {
             InstitutionVerificationSection(
               code: $institutionCode,
               selectedInstitution: $selectedInstitution
@@ -256,14 +257,62 @@ struct TraumaInformedWelcomeSection: View {
   }
 }
 
+// MARK: - Simplified Role Category
+
+enum SimplifiedRoleCategory: String, CaseIterable, Identifiable {
+  case student = "student"
+  case staff = "staff"
+  case parentGuardian = "parent_guardian"
+  
+  var id: String { rawValue }
+  
+  var displayName: String {
+    switch self {
+    case .student: return "Student"
+    case .staff: return "Staff"
+    case .parentGuardian: return "Parent/Guardian"
+    }
+  }
+  
+  var iconName: String {
+    switch self {
+    case .student: return "graduationcap"
+    case .staff: return "person.badge.key"
+    case .parentGuardian: return "figure.2.and.child.holdinghands"
+    }
+  }
+  
+  var shortDescription: String {
+    switch self {
+    case .student: return "Learning and growing"
+    case .staff: return "Educator or administrator"
+    case .parentGuardian: return "Supporting my child"
+    }
+  }
+  
+  var defaultUserRole: UserRole {
+    switch self {
+    case .student: return .student
+    case .staff: return .teacher
+    case .parentGuardian: return .parent
+    }
+  }
+  
+  var requiresInstitutionalAffiliation: Bool {
+    switch self {
+    case .staff: return true
+    case .student, .parentGuardian: return false
+    }
+  }
+}
+
 // MARK: - Role Selection Grid
 
 struct RoleSelectionGrid: View {
   @Binding var selectedRole: UserRole?
+  @Binding var selectedCategory: SimplifiedRoleCategory?
 
-  private let roles: [UserRole] = [
-    .student, .teacher, .counselor, .administrator, .socialWorker, .parent, .legalGuardian,
-  ]
+  private let categories = SimplifiedRoleCategory.allCases
 
   var body: some View {
     TMIGlassCard(style: .form) {
@@ -276,15 +325,17 @@ struct RoleSelectionGrid: View {
           columns: [
             GridItem(.flexible(), spacing: 12),
             GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12),
           ], spacing: 12
         ) {
-          ForEach(roles, id: \.self) { role in
-            RoleSelectionCard(
-              role: role,
-              isSelected: selectedRole == role,
+          ForEach(categories, id: \.self) { category in
+            SimplifiedRoleSelectionCard(
+              category: category,
+              isSelected: selectedCategory == category,
               onTap: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                  selectedRole = role
+                  selectedCategory = category
+                  selectedRole = category.defaultUserRole
                 }
               }
             )
@@ -297,10 +348,10 @@ struct RoleSelectionGrid: View {
   }
 }
 
-// MARK: - Role Selection Card
+// MARK: - Simplified Role Selection Card
 
-struct RoleSelectionCard: View {
-  let role: UserRole
+struct SimplifiedRoleSelectionCard: View {
+  let category: SimplifiedRoleCategory
   let isSelected: Bool
   let onTap: () -> Void
 
@@ -308,18 +359,18 @@ struct RoleSelectionCard: View {
     Button(action: onTap) {
       VStack(spacing: 12) {
         // Role icon
-        Image(systemName: role.iconName)
+        Image(systemName: category.iconName)
           .font(.system(size: 28))
           .foregroundColor(isSelected ? Color.tmiPrimary : .white.opacity(0.8))
 
         // Role name
-        Text(role.displayName)
+        Text(category.displayName)
           .font(.system(size: 14, weight: .medium))
           .foregroundColor(isSelected ? .white : .white.opacity(0.9))
           .multilineTextAlignment(.center)
 
         // Role description
-        Text(role.shortDescription)
+        Text(category.shortDescription)
           .font(.system(size: 11))
           .foregroundColor(.white.opacity(0.6))
           .multilineTextAlignment(.center)
@@ -761,7 +812,7 @@ struct InfoCard: View {
   }
 }
 
-// MARK: - UserRole Extensions
+// MARK: - UserRole Extensions (Legacy - for compatibility)
 
 extension UserRole {
   var iconName: String {

@@ -1457,7 +1457,7 @@ struct EditTMIPlanView: View {
                   .foregroundColor(.white)
                 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 12) {
-                  ForEach(Interest.sampleInterests) { interest in
+                  ForEach(Interest.expandedSampleInterests) { interest in
                     InterestToggleCard(
                       interest: interest,
                       isSelected: selectedInterests.contains(interest),
@@ -1476,7 +1476,7 @@ struct EditTMIPlanView: View {
                   .foregroundColor(.white)
                 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 12) {
-                  ForEach(Hobby.sampleHobbies) { hobby in
+                  ForEach(Hobby.expandedSampleHobbies) { hobby in
                     HobbyToggleCard(
                       hobby: hobby,
                       isSelected: selectedHobbies.contains(hobby),

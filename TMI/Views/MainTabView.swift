@@ -14,6 +14,9 @@ struct MainTabView: View {
   // Sheet state
   @State private var showingUserProfile = false
   @State private var showingSignOutConfirmation = false
+  
+  // State models
+  @State private var interestsStateModel = InterestsAndHobbiesStateModel()
 
   enum Tab: String, CaseIterable, Identifiable {
     case dashboard, students, tmiPlans, forms, careerExplorer, interests, resources, settings
@@ -29,9 +32,9 @@ struct MainTabView: View {
       case .tmiPlans:
         return [.teacher, .counselor, .administrator, .admin, .socialWorker]
       case .forms:
-        return [.teacher, .counselor, .administrator, .admin, .socialWorker]
+        return [] // Temporarily disabled for MVP
       case .careerExplorer:
-        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .student]
+        return [] // Temporarily disabled for MVP
       case .interests:
         return [.teacher, .counselor, .administrator, .admin, .socialWorker, .student]
       case .resources:
@@ -146,6 +149,7 @@ struct MainTabView: View {
       CareerExplorerView()
     case .interests:
         InterestsAndHobbiesView()
+            .environment(\.interestsStateModel, interestsStateModel)
     case .resources:
       ResourcesView()
     case .settings:
