@@ -872,7 +872,7 @@ struct TMIPlanDetailView: View {
     let timeBasedProgress = Double(currentPeriod - 1) / Double(totalPeriods - 1)
     
     // Factor in engagement score and goal completion
-    let engagementFactor = plan.student.engagementScore
+    let engagementFactor = plan.primaryStudent?.engagementScore ?? 0.5
     let goalCompletionFactor = calculateGoalCompletionRate()
     let interestAlignmentFactor = calculateInterestAlignment()
     
@@ -1415,9 +1415,9 @@ struct EditTMIPlanView: View {
                   }
                   
                   HStack {
-                    Text("Student:")
+                    Text("Primary Student:")
                       .foregroundColor(.white.opacity(0.7))
-                    Text(plan.student.name)
+                    Text(plan.primaryStudent?.name ?? "No student assigned")
                       .foregroundColor(.white)
                       .fontWeight(.medium)
                   }

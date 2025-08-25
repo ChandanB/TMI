@@ -34,7 +34,6 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     @DocumentID var id: String?
     var title: String
     var description: String?
-    var student: Student
     var students: [Student]
     var model: TMIPlanModel
     var interests: [Interest]
@@ -51,11 +50,10 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     var createdBy: String
 
 
-    init(id: String? = nil, title: String, description: String? = nil, student: Student, students: [Student], model: TMIPlanModel, interests: [Interest], hobbies: [Hobby], startDate: Date, endDate: Date?, creationDate: Date, lastUpdated: Date, goals: [Goal], progress: Double, notes: String, strategies: [String]? = nil, progressTracking: [ProgressEntry]? = nil, createdBy: String) {
+    init(id: String? = nil, title: String, description: String? = nil, students: [Student], model: TMIPlanModel, interests: [Interest], hobbies: [Hobby], startDate: Date, endDate: Date?, creationDate: Date, lastUpdated: Date, goals: [Goal], progress: Double, notes: String, strategies: [String]? = nil, progressTracking: [ProgressEntry]? = nil, createdBy: String) {
         self.id = id
         self.title = title
         self.description = description
-        self.student = student
         self.students = students
         self.model = model
         self.interests = interests
@@ -80,6 +78,13 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
         hasher.combine(id)
     }
 
+    // MARK: - Computed Properties
+    
+    /// Primary student (first student in the list for backward compatibility)
+    var primaryStudent: Student? {
+        return students.first
+    }
+
     // MARK: - Firestore Conversion
 
     func toFirestoreData() -> [String: Any] {
@@ -94,13 +99,6 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
             "progress": progress,
             "notes": notes,
             "createdBy": createdBy
-        ]
-
-        // Convert student to basic data (just ID and name to avoid circular references)
-        data["student"] = [
-            "id": student.id ?? "",
-            "name": student.name,
-            "grade": student.grade
         ]
 
         // Convert students array
@@ -152,8 +150,7 @@ extension TMIPlan {
         return TMIPlan(
             title: "Chase Your Space Sample Plan",
             description: "A sample plan for chasing your space.",
-            student: Student.sampleStudents[0],
-            students: Student.sampleStudents,
+            students: [Student.sampleStudents[0]],
             model: .chaseYourSpace,
             interests: [],
             hobbies: [],
@@ -175,8 +172,7 @@ extension TMIPlan {
         let plan2 = TMIPlan(
             title: "Acknowledge Interests Sample Plan",
             description: "A sample plan for acknowledging interests.",
-            student: Student.sampleStudents[1],
-            students: Student.sampleStudents,
+            students: [Student.sampleStudents[1]],
             model: .acknowledgeInterests,
             interests: student.interests,
             hobbies: student.hobbies,
@@ -192,8 +188,7 @@ extension TMIPlan {
         let plan3 = TMIPlan(
             title: "Align Your Mind Sample Plan",
             description: "A sample plan for aligning your mind.",
-            student: Student.sampleStudents[2],
-            students: Student.sampleStudents,
+            students: [Student.sampleStudents[2]],
             model: .alignYourMind,
             interests: student.interests,
             hobbies: student.hobbies,

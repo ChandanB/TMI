@@ -73,8 +73,8 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       let surveysCompleted = students.filter { !($0.surveyResults?.isEmpty ?? true) }.count
       let interestsIdentified = students.reduce(0) { $0 + $1.interests.count }
       
-      // Calculate plans aligned (students with plans vs total students)
-      let studentsWithPlans = Set(plans.map { $0.student.id ?? "" }).count
+      // Calculate plans aligned (students with plans vs total students)  
+      let studentsWithPlans = Set(plans.flatMap { $0.students.compactMap { $0.id } }).count
       let plansAligned = studentsWithPlans
       
       // Generate engagement data and recent activities
@@ -148,10 +148,15 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     let recentPlans = plans.compactMap { plan -> RecentActivity? in
       guard plan.lastUpdated > Date().addingTimeInterval(-7 * 24 * 60 * 60) else { return nil } // Last 7 days
       
+      let studentNames = plan.students.map { $0.name }.joined(separator: ", ")
+      let description = plan.students.count == 1 
+        ? "Plan for \(studentNames) was updated"
+        : "Plan for \(plan.students.count) students was updated"
+      
       return RecentActivity(
         icon: "doc.fill",
         title: "TMI Plan Updated",
-        description: "Plan for \(plan.student.name) was updated",
+        description: description,
         date: plan.lastUpdated,
         iconColor: .blue,
         showProgress: true,

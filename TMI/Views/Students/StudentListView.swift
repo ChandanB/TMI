@@ -496,39 +496,16 @@ struct BulkActionsView: View {
                                     .font(.headline)
                                     .foregroundColor(.white)
                                 
-                                VStack(spacing: 12) {
-                                    BulkActionButton(
-                                        icon: "bell.fill",
-                                        title: "Send Reminder",
-                                        description: "Coming soon - Survey completion reminders",
-                                        color: .orange.opacity(0.6),
-                                        isPerforming: false,
-                                        action: {
-                                            // Disabled - feature not yet implemented
-                                        }
-                                    )
+                                VStack(spacing: 16) {
+                                    Text("Bulk actions will be available in a future update.")
+                                        .font(.body)
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .multilineTextAlignment(.center)
                                     
-                                    BulkActionButton(
-                                        icon: "doc.fill.badge.plus",
-                                        title: "Create TMI Plans",
-                                        description: "Coming soon - Bulk TMI plan generation",
-                                        color: .blue.opacity(0.6),
-                                        isPerforming: false,
-                                        action: {
-                                            // Disabled - feature not yet implemented
-                                        }
-                                    )
-                                    
-                                    BulkActionButton(
-                                        icon: "star.fill",
-                                        title: "Update Engagement",
-                                        description: "Coming soon - Bulk engagement updates",
-                                        color: .green.opacity(0.6),
-                                        isPerforming: false,
-                                        action: {
-                                            // Disabled - feature not yet implemented
-                                        }
-                                    )
+                                    Text("For now, please manage students individually through their detail pages.")
+                                        .font(.subheadline)
+                                        .foregroundColor(.white.opacity(0.5))
+                                        .multilineTextAlignment(.center)
                                 }
                             }
                         }
@@ -559,69 +536,6 @@ struct BulkActionsView: View {
     }
 }
 
-// MARK: - Bulk Action Button
-
-struct BulkActionButton: View {
-    let icon: String
-    let title: String
-    let description: String
-    let color: Color
-    let isPerforming: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button {
-            action()
-        } label: {
-            HStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.2))
-                        .frame(width: 40, height: 40)
-                    
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(color)
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundColor(.white.opacity(description.contains("Coming soon") ? 0.5 : 1.0))
-                    
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-                
-                Spacer()
-                
-                if isPerforming {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                        .tint(.white)
-                } else if description.contains("Coming soon") {
-                    Image(systemName: "clock")
-                        .foregroundColor(.white.opacity(0.3))
-                } else {
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(.white.opacity(0.5))
-                }
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(description.contains("Coming soon") ? 0.02 : 0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(color.opacity(0.3), lineWidth: 1)
-                    )
-            )
-        }
-        .disabled(isPerforming || description.contains("Coming soon"))
-        .buttonStyle(.plain)
-    }
-}
 
 // MARK: - Export Students View
 

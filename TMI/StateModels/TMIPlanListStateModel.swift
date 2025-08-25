@@ -177,7 +177,6 @@ final class TMIPlanListStateModel: BaseStateModel<[TMIPlan], IdentifiableError> 
     
     private func matchesSearch(plan: TMIPlan, searchText: String) -> Bool {
         plan.model.rawValue.localizedCaseInsensitiveContains(searchText) ||
-        plan.student.name.localizedCaseInsensitiveContains(searchText) ||
         plan.notes.localizedCaseInsensitiveContains(searchText) ||
         plan.students.contains { $0.name.localizedCaseInsensitiveContains(searchText) }
     }

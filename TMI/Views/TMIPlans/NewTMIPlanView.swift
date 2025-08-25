@@ -564,7 +564,6 @@ struct NewTMIPlanView: View {
         let newPlan = TMIPlan(
           title: planTitle,
           description: nil,
-          student: student,
           students: [student],
           model: model,
           interests: selectedInterests,

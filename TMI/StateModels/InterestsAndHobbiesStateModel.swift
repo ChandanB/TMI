@@ -413,14 +413,14 @@ extension TMIPlanService {
     func fetchPlansWithInterest(_ interest: Interest) async throws -> [TMIPlan] {
         let plans = try await fetchPlans()
         return plans.filter { plan in
-            plan.student.interests.contains { $0.name == interest.name }
+            plan.interests.contains { $0.name == interest.name }
         }
     }
     
     func fetchPlansWithHobby(_ hobby: Hobby) async throws -> [TMIPlan] {
         let plans = try await fetchPlans()
         return plans.filter { plan in
-            plan.student.hobbies.contains { $0.name == hobby.name }
+            plan.hobbies.contains { $0.name == hobby.name }
         }
     }
 }
@@ -431,14 +431,8 @@ class InterestService {
     private let db = Firestore.firestore()
     
     func fetchInterests() async throws -> [Interest] {
-        // Temporarily force return expanded sample data for debugging
-        print("[InterestService] Returning expanded sample data for debugging - count: \(Interest.expandedSampleInterests.count)")
-        return Interest.expandedSampleInterests
-        
-        // Original logic commented out for debugging
-        /*
         guard let uid = Auth.auth().currentUser?.uid else {
-            print("[InterestService] No authenticated user, returning expanded sample data")
+            print("[InterestService] No authenticated user, returning sample data")
             return Interest.expandedSampleInterests
         }
         
@@ -457,12 +451,13 @@ class InterestService {
                 }
             }
             
+            // Return sample data if no user data exists
             return interests.isEmpty ? Interest.expandedSampleInterests : interests
         } catch {
-            print("[InterestService] Firestore error, returning expanded sample data: \(error)")
-            return Interest.expandedSampleInterests
+            print("[InterestService] Firestore error: \(error)")
+            // Return sample data as fallback, but still throw the error for proper error handling
+            throw error
         }
-        */
     }
     
     func saveInterest(_ interest: Interest) async throws -> Interest {
@@ -492,14 +487,8 @@ class HobbyService {
     private let db = Firestore.firestore()
     
     func fetchHobbies() async throws -> [Hobby] {
-        // Temporarily force return expanded sample data for debugging
-        print("[HobbyService] Returning expanded sample data for debugging - count: \(Hobby.expandedSampleHobbies.count)")
-        return Hobby.expandedSampleHobbies
-        
-        // Original logic commented out for debugging
-        /*
         guard let uid = Auth.auth().currentUser?.uid else {
-            print("[HobbyService] No authenticated user, returning expanded sample data")
+            print("[HobbyService] No authenticated user, returning sample data")
             return Hobby.expandedSampleHobbies
         }
         
@@ -518,12 +507,13 @@ class HobbyService {
                 }
             }
             
+            // Return sample data if no user data exists
             return hobbies.isEmpty ? Hobby.expandedSampleHobbies : hobbies
         } catch {
-            print("[HobbyService] Firestore error, returning expanded sample data: \(error)")
-            return Hobby.expandedSampleHobbies
+            print("[HobbyService] Firestore error: \(error)")
+            // Return sample data as fallback, but still throw the error for proper error handling
+            throw error
         }
-        */
     }
     
     func saveHobby(_ hobby: Hobby) async throws -> Hobby {

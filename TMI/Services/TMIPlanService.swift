@@ -54,21 +54,6 @@ class TMIPlanService {
                     let creationDate = Date(timeIntervalSince1970: creationTimestamp)
                     let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
                     
-                    // Reconstruct student from simplified data
-                    let student: Student
-                    if let studentData = data["student"] as? [String: Any] {
-                        student = Student(
-                            id: studentData["id"] as? String,
-                            name: studentData["name"] as? String ?? "Unknown",
-                            grade: studentData["grade"] as? String ?? "",
-                            school: "",
-                            dateOfBirth: Date()
-                        )
-                    } else {
-                        print("[TMIPlanService] Missing student data in document \(document.documentID)")
-                        return nil
-                    }
-                    
                     // Reconstruct students array from simplified data
                     let students: [Student]
                     if let studentsData = data["students"] as? [[String: Any]] {
@@ -82,7 +67,8 @@ class TMIPlanService {
                             )
                         }
                     } else {
-                        students = [student] // Fallback to main student
+                        print("[TMIPlanService] Missing students data in document \(document.documentID)")
+                        return nil
                     }
                     
                     // Reconstruct interests from full objects
@@ -147,7 +133,6 @@ class TMIPlanService {
                         id: document.documentID,
                         title: title,
                         description: data["description"] as? String,
-                        student: student,
                         students: students,
                         model: model,
                         interests: interests,
@@ -205,21 +190,12 @@ class TMIPlanService {
                   let progress = docData["progress"] as? Double,
                   let notes = docData["notes"] as? String,
                   let creationTimestamp = docData["creationDate"] as? Double,
-                  let lastUpdatedTimestamp = docData["lastUpdated"] as? Double,
-                  let studentData = docData["student"] as? [String: Any] else {
+                  let lastUpdatedTimestamp = docData["lastUpdated"] as? Double else {
                 throw TMIPlanServiceError.saveFailed("Invalid document structure")
             }
             
             let creationDate = Date(timeIntervalSince1970: creationTimestamp)
             let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
-            
-            let student = Student(
-                id: studentData["id"] as? String,
-                name: studentData["name"] as? String ?? "Unknown",
-                grade: studentData["grade"] as? String ?? "",
-                school: "",
-                dateOfBirth: Date()
-            )
             
             let students: [Student]
             if let studentsData = docData["students"] as? [[String: Any]] {
@@ -233,7 +209,7 @@ class TMIPlanService {
                     )
                 }
             } else {
-                students = [student]
+                students = [] // No students if the data is missing
             }
             
             let interests: [Interest]
@@ -297,7 +273,6 @@ class TMIPlanService {
                 id: document.documentID,
                 title: title,
                 description: docData["description"] as? String,
-                student: student,
                 students: students,
                 model: model,
                 interests: interests,
@@ -477,7 +452,6 @@ class TMIPlanService {
                     id: document.documentID,
                     title: title,
                     description: data["description"] as? String,
-                    student: student,
                     students: students,
                     model: model,
                     interests: interests,
@@ -511,7 +485,7 @@ class TMIPlanService {
         do {
             print("[TMIPlanService] Fetching TMI plans for student: \(studentId)")
             let querySnapshot = try await collection
-                .whereField("student.id", isEqualTo: studentId)
+                .whereField("students", arrayContains: ["id": studentId])
                 .getDocuments()
             
             let plans = querySnapshot.documents.compactMap { document -> TMIPlan? in
@@ -532,21 +506,6 @@ class TMIPlanService {
                     let creationDate = Date(timeIntervalSince1970: creationTimestamp)
                     let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
                     
-                    // Reconstruct student from simplified data
-                    let student: Student
-                    if let studentData = data["student"] as? [String: Any] {
-                        student = Student(
-                            id: studentData["id"] as? String,
-                            name: studentData["name"] as? String ?? "Unknown",
-                            grade: studentData["grade"] as? String ?? "",
-                            school: "",
-                            dateOfBirth: Date()
-                        )
-                    } else {
-                        print("[TMIPlanService] Missing student data in document \(document.documentID)")
-                        return nil
-                    }
-                    
                     // Reconstruct students array from simplified data
                     let students: [Student]
                     if let studentsData = data["students"] as? [[String: Any]] {
@@ -560,7 +519,8 @@ class TMIPlanService {
                             )
                         }
                     } else {
-                        students = [student] // Fallback to main student
+                        print("[TMIPlanService] Missing students data in document \(document.documentID)")
+                        return nil
                     }
                     
                     // Reconstruct interests from full objects
@@ -625,7 +585,6 @@ class TMIPlanService {
                         id: document.documentID,
                         title: title,
                         description: data["description"] as? String,
-                        student: student,
                         students: students,
                         model: model,
                         interests: interests,
