@@ -266,7 +266,9 @@ struct RegistrationView: View {
 
     Task {
       do {
-        let _ = try await FIREBASE_MANAGER.signUp(withEmail: email, password: password)
+        // Use proper auth service instead of direct Firebase manager
+        let authService = FirebaseTMIAuthService()
+        let _ = try await authService.signUp(email: email, password: password)
         isRegistering = false
         dismiss()
       } catch {

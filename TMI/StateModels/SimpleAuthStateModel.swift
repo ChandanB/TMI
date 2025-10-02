@@ -44,10 +44,12 @@ final class SimpleAuthStateModel: BaseStateModel<TMIAuthState, IdentifiableError
     // MARK: - Auth State Management
     
     private func setupAuthStateListener() {
-        // Listen to changes from the auth service
+        // Use proper Firebase Auth state listener instead of polling
+        // TODO: Implement proper Firebase Auth state listener in TMIAuthService
+        // For now, use a less frequent check until the service is updated
         Task {
             while true {
-                try? await Task.sleep(nanoseconds: 1_000_000_000) // Check every second
+                try? await Task.sleep(nanoseconds: 5_000_000_000) // Check every 5 seconds instead of 1
                 let currentAuthState = authService.authState
                 
                 await MainActor.run {
@@ -224,5 +226,26 @@ final class SimpleAuthStateModel: BaseStateModel<TMIAuthState, IdentifiableError
             return true
         }
         return false
+    }
+    
+    override var errorMessage: String? {
+        if case .error(let error) = state {
+            return error.message
+        }
+        return nil
+    }
+    
+    override var hasError: Bool {
+        if case .error = state {
+            return true
+        }
+        return false
+    }
+    
+    @MainActor
+    func clearError() {
+        if case .error = state {
+            updateState(.loaded(.needsAuthentication))
+        }
     }
 }

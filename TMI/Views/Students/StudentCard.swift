@@ -18,7 +18,7 @@ struct StudentCard: View {
             .overlay(Circle().stroke(Color.tmiPrimary, lineWidth: 2))
             .shadow(radius: 3)
         } else {
-          Text(student.initials)
+          Text(studentInitials)
             .font(.system(size: 32, weight: .bold))
             .foregroundColor(.white)
             .frame(width: 80, height: 80)
@@ -56,9 +56,22 @@ struct StudentCard: View {
 
   // Helper to retrieve student's avatar image
   private var studentAvatar: Image? {
-    // If you have avatar image data, implement the retrieval here.
-    // For this example, we'll return nil to use the initials instead.
+    // Check if student has photo URL
+    if student.photoURL != nil {
+      // In a real implementation, you would use AsyncImage or SDWebImageSwiftUI
+      // For now, return nil to show that avatar loading is being handled
+      // TODO: Implement AsyncImage loading from photoURL
+      return nil
+    }
+    // No image data available, return nil to use initials
     return nil
+  }
+  
+  // Generate initials from student name
+  private var studentInitials: String {
+    let components = student.name.components(separatedBy: " ")
+    let initials = components.compactMap { $0.first }.prefix(2)
+    return String(initials).uppercased()
   }
 }
 

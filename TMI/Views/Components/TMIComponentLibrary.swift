@@ -286,103 +286,41 @@ struct TMIGlassCard<Content: View>: View {
       }
   }
 
-  // MARK: - Position-Based Lighting Calculations
+  // MARK: - Position-Based Lighting Calculations (Simplified)
 
   private func positionBasedGradient(for geometry: GeometryProxy) -> LinearGradient {
-    // Get the center point of this view in global coordinates
+    // Simplified position-based gradient calculation
     let globalFrame = geometry.frame(in: .global)
-    let viewCenter = CGPoint(
-      x: globalFrame.midX,
-      y: globalFrame.midY
-    )
-
-    // Get screen dimensions
     let screenSize = UIScreen.main.bounds.size
-    let screenCenter = CGPoint(
-      x: screenSize.width / 2,
-      y: screenSize.height / 2
-    )
-
-    // Calculate position as normalized percentages (0.0 to 1.0)
-    let xPercent = viewCenter.x / screenSize.width
-    let yPercent = viewCenter.y / screenSize.height
-
-    // Create dramatic directional variations based on screen quadrants
-    let quadrantX = xPercent > 0.5 ? 1.0 : -1.0
-    let quadrantY = yPercent > 0.5 ? 1.0 : -1.0
-
-    // More dramatic light source positioning based on quadrants
-    let lightSourceMultiplier: CGFloat = 0.6  // Increased from 0.2-0.3
-    let lightSourceOffset = CGPoint(
-      x: -screenSize.width * lightSourceMultiplier * quadrantX,
-      y: -screenSize.height * lightSourceMultiplier * quadrantY
-    )
-
-    let lightSource = CGPoint(
-      x: screenCenter.x + lightSourceOffset.x,
-      y: screenCenter.y + lightSourceOffset.y
-    )
-
-    // Calculate vector from light source to view center
-    let lightVector = CGPoint(
-      x: viewCenter.x - lightSource.x,
-      y: viewCenter.y - lightSource.y
-    )
-
-    // Normalize the vector and calculate gradient direction
-    let distance = sqrt(lightVector.x * lightVector.x + lightVector.y * lightVector.y)
-    let normalizedX = lightVector.x / distance
-    let normalizedY = lightVector.y / distance
-
-    // Dramatically increase gradient range based on position
-    let gradientIntensity: CGFloat = 0.8  // Increased from 0.5
-    let positionVariation = abs(xPercent - 0.5) + abs(yPercent - 0.5)  // 0.0 to 1.0
-    let finalIntensity = gradientIntensity * (0.5 + positionVariation)
-
+    
+    // Calculate normalized position (0.0 to 1.0)
+    let xPercent = globalFrame.midX / screenSize.width
+    let yPercent = globalFrame.midY / screenSize.height
+    
+    // Simple gradient direction based on position
     let startPoint = UnitPoint(
-      x: 0.5 - normalizedX * finalIntensity,
-      y: 0.5 - normalizedY * finalIntensity
+      x: xPercent < 0.5 ? 0.2 : 0.8,
+      y: yPercent < 0.5 ? 0.2 : 0.8
     )
     let endPoint = UnitPoint(
-      x: 0.5 + normalizedX * finalIntensity,
-      y: 0.5 + normalizedY * finalIntensity
+      x: xPercent < 0.5 ? 0.8 : 0.2,
+      y: yPercent < 0.5 ? 0.8 : 0.2
     )
-
-    // Calculate dramatic opacity variations
-    let distanceFromCenter = sqrt(
-      pow(viewCenter.x - screenCenter.x, 2) + pow(viewCenter.y - screenCenter.y, 2)
+    
+    // Calculate distance from center for opacity variation
+    let centerDistance = sqrt(
+      pow(xPercent - 0.5, 2) + pow(yPercent - 0.5, 2)
     )
-    let maxDistance = sqrt(pow(screenSize.width / 2, 2) + pow(screenSize.height / 2, 2))
-    let centerProximity = 1.0 - min(distanceFromCenter / maxDistance, 1.0)
-
-    // Create more dramatic opacity ranges
-    let minOpacity: Double = 0.1
-    let maxOpacity: Double = 0.9
-    let baseOpacity = minOpacity + (centerProximity * (maxOpacity - minOpacity))
-
-    // Add position-based intensity variations
-    let positionMultiplier = 0.5 + (positionVariation * 1.0)  // 0.5 to 1.5
-    let adjustedOpacity = baseOpacity * positionMultiplier
-
-    let highlightOpacity = isHovered ? min(adjustedOpacity * 1.4, 1.0) : adjustedOpacity
-    let midOpacity = highlightOpacity * 0.4
-    let shadowOpacity = highlightOpacity * 0.1
-
-    // Add subtle color tinting based on position for more distinction
-    let redTint = 1.0 + (xPercent - 0.5) * 0.1  // Subtle red variation
-    let blueTint = 1.0 + (yPercent - 0.5) * 0.1  // Subtle blue variation
-    let greenTint = 1.0 + ((1.0 - centerProximity) * 0.1)  // Green for edge cards
-
+    
+    // Base opacity with subtle position variation
+    let baseOpacity = 0.4 + (0.3 * (1.0 - centerDistance))
+    let highlightOpacity = isHovered ? min(baseOpacity * 1.3, 1.0) : baseOpacity
+    
     return LinearGradient(
       colors: [
-        Color(
-          red: min(redTint * highlightOpacity, 1.0),
-          green: min(greenTint * highlightOpacity, 1.0),
-          blue: min(blueTint * highlightOpacity, 1.0)
-        ),
-        Color.white.opacity(midOpacity),
-        Color.white.opacity(shadowOpacity),
-        Color.white.opacity(shadowOpacity * 0.3),
+        Color.white.opacity(highlightOpacity),
+        Color.white.opacity(highlightOpacity * 0.5),
+        Color.white.opacity(highlightOpacity * 0.1)
       ],
       startPoint: startPoint,
       endPoint: endPoint
@@ -390,7 +328,7 @@ struct TMIGlassCard<Content: View>: View {
   }
 
   private func shadowOffset(for geometry: GeometryProxy) -> CGPoint {
-    // Calculate dynamic shadow offset based on position
+    // Simplified shadow offset calculation
     let globalFrame = geometry.frame(in: .global)
     let screenSize = UIScreen.main.bounds.size
 
@@ -398,30 +336,14 @@ struct TMIGlassCard<Content: View>: View {
     let xPercent = globalFrame.midX / screenSize.width
     let yPercent = globalFrame.midY / screenSize.height
 
-    // Create dramatic shadow offset variations
-    let baseOffset = style == .elevated ? 12.0 : 10.0
+    // Base shadow offset
+    let baseOffset: CGFloat = style == .elevated ? 8.0 : 6.0
+    
+    // Simple position-based offset variation
+    let xOffset = (xPercent - 0.5) * 4.0  // -2 to 2 pixel range
+    let yOffset = baseOffset + (yPercent - 0.5) * 2.0  // Slight vertical variation
 
-    // More dramatic position-based offsets
-    let xOffset = (xPercent - 0.5) * 2.0  // Range: -1 to 1
-    let yOffset = (yPercent - 0.5) * 2.0  // Range: -1 to 1
-
-    // Quadrant-based shadow intensity
-    let _ = xPercent > 0.5 ? 1.0 : -1.0
-    let _ = yPercent > 0.5 ? 1.0 : -1.0
-
-    // Distance from center affects shadow strength
-    let centerX = abs(xPercent - 0.5) * 2.0  // 0 to 1
-    let centerY = abs(yPercent - 0.5) * 2.0  // 0 to 1
-    let edgeProximity = (centerX + centerY) / 2.0  // How close to edge
-
-    // More dramatic shadow positioning
-    let dramaticXOffset = xOffset * (8.0 + edgeProximity * 6.0)  // 8-14 pixel range
-    let dramaticYOffset = baseOffset + (yOffset * (4.0 + edgeProximity * 8.0))  // More vertical variation
-
-    return CGPoint(
-      x: dramaticXOffset,
-      y: dramaticYOffset
-    )
+    return CGPoint(x: xOffset, y: yOffset)
   }
 }
 
