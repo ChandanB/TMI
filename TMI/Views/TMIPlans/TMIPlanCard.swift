@@ -122,9 +122,9 @@ struct TMIPlanCard: View {
             )
 
             StatIcon(
-              count: plan.hobbies.count,
-              icon: "gamecontroller.fill",
-              color: .green.opacity(0.8)
+              count: plan.students.count,
+              icon: "person.fill",
+              color: .blue.opacity(0.8)
             )
           }
         }

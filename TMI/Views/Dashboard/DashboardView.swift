@@ -1,5 +1,8 @@
 //
-//  Created by Chandan Brown on 9/10/24.
+//  DashboardViewRedesigned.swift
+//  TMI
+//
+//  Simplified, purposeful dashboard with unified insight panel
 //
 
 import Charts
@@ -73,7 +76,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       let surveysCompleted = students.filter { !($0.surveyResults?.isEmpty ?? true) }.count
       let interestsIdentified = students.reduce(0) { $0 + $1.interests.count }
       
-      // Calculate plans aligned (students with plans vs total students)  
+      // Calculate plans aligned (students with plans vs total students)
       let studentsWithPlans = Set(plans.flatMap { $0.students.compactMap { $0.id } }).count
       let plansAligned = studentsWithPlans
       
@@ -149,7 +152,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       guard plan.lastUpdated > Date().addingTimeInterval(-7 * 24 * 60 * 60) else { return nil } // Last 7 days
       
       let studentNames = plan.students.map { $0.name }.joined(separator: ", ")
-      let description = plan.students.count == 1 
+      let description = plan.students.count == 1
         ? "Plan for \(studentNames) was updated"
         : "Plan for \(plan.students.count) students was updated"
       
@@ -399,993 +402,604 @@ struct DashboardActivityRow: View {
   }
 }
 
-// MARK: - Redesigned Dashboard View
-
 struct DashboardView: View {
-  @Environment(\.dashboardStateModel) var stateModel
-  @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dashboardStateModel) var stateModel
+    @State private var studentStateModel = StudentListStateModel()
+    @State private var selectedTimeFrame: TimeFrame = .week
+    @State private var showingAllActivities = false
+    @State private var showingAddStudent = false
 
-  @State private var selectedTimeFrame: TimeFrame = .week
-  @State private var showingInsightsSheet = false
-  @State private var showingUserProfile = false
-  @State private var headerAnimation = false
-  @State private var cardsAnimation = false
-  @State private var chartAnimation = false
-  @State private var buttonAnimation = false
-  
-  // AI Insights state
-  @State private var aiInsights: [AIInsight] = []
-  @State private var isLoadingInsights = false
+    var body: some View {
+        ZStack {
+            Color.tmiBackground
+                .ignoresSafeArea()
 
-  var body: some View {
-    ZStack {
-      // Dynamic background - Using unified TMIBackgroundView
-      TMIBackgroundView(variant: .dashboard)
-
-      Group {
-        switch stateModel.state {
-        case .idle, .loading:
-          loadingView
-
-        case .loaded(let dashboardData):
-          dashboardContent(dashboardData)
-
-        case .error(let error):
-          errorView(error)
-        }
-      }
-    }
-    .navigationTitle("TMI Dashboard")
-    .foregroundColor(.white)
-    .foregroundStyle(.white)
-    .navigationBarTitleDisplayMode(.large)
-    .toolbar {
-      ToolbarItem(placement: .navigationBarTrailing) {
-        Button {
-          showingUserProfile = true
-        } label: {
-          HStack(spacing: 8) {
-            Text("Educator")
-              .font(.system(size: 16, weight: .medium))
-              .foregroundColor(.white)
-
-            Image(systemName: "person.crop.circle.fill")
-              .font(.system(size: 24))
-              .foregroundStyle(
-                LinearGradient(
-                  colors: [.white, .white.opacity(0.8)],
-                  startPoint: .top,
-                  endPoint: .bottom
-                )
-              )
-              .symbolRenderingMode(.hierarchical)
-              .overlay(
-                Circle()
-                  .stroke(
-                    LinearGradient(
-                      colors: [Color.tmiSecondary.opacity(0.8), Color.tmiSecondary.opacity(0.4)],
-                      startPoint: .topLeading,
-                      endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 2
-                  )
-                  .padding(-4)
-              )
-          }
-          .padding(8)
-          .background(
-            Capsule()
-              .fill(.ultraThinMaterial.opacity(0.5))
-          )
-        }
-        .buttonStyle(ScaleButtonStyle())
-      }
-    }
-    .sheet(isPresented: binding(stateModel, \.showingAllActivities)) {
-      if case .loaded(let dashboardData) = stateModel.state {
-        AllActivitiesView(activities: dashboardData.recentActivities)
-          .presentationDetents([PresentationDetent.medium, PresentationDetent.large])
-          .presentationDragIndicator(.visible)
-      }
-    }
-    .sheet(isPresented: $showingUserProfile) {
-      UserProfileView()
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-    }
-    .task {
-      // Initialize the local selectedTimeFrame with the stateModel's value
-      selectedTimeFrame = stateModel.selectedTimeFrame
-      await stateModel.fetch()
-      
-      // Load AI insights after dashboard data is available
-      if case .loaded(let dashboardData) = stateModel.state {
-        await loadAIInsights(for: dashboardData)
-      }
-    }
-    .refreshable {
-      await stateModel.refresh()
-    }
-    .preferredColorScheme(.dark)
-  }
-
-  // MARK: - Loading View
-
-  private var loadingView: some View {
-    VStack(spacing: 24) {
-      ProgressView()
-        .scaleEffect(1.5)
-        .tint(.white)
-
-      Text("Loading your dashboard")
-        .font(.headline)
-        .foregroundColor(.white)
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-  }
-
-  // MARK: - Error View
-
-  private func errorView(_ error: IdentifiableError) -> some View {
-    VStack(spacing: 24) {
-      Image(systemName: "exclamationmark.triangle.fill")
-        .font(.system(size: 50))
-        .foregroundStyle(
-          LinearGradient(
-            colors: [.orange, .red],
-            startPoint: .top,
-            endPoint: .bottom
-          )
-        )
-        .symbolEffect(.pulse, options: .repeating)
-
-      Text("Unable to Load Dashboard")
-        .font(.title2.bold())
-        .foregroundColor(.white)
-
-      Text(error.message)
-        .multilineTextAlignment(.center)
-        .foregroundColor(.white.opacity(0.7))
-        .padding(.horizontal, 40)
-
-      Button {
-        Task {
-          await stateModel.fetch()
-        }
-      } label: {
-        Text("Try Again")
-          .font(.headline)
-          .padding(.horizontal, 30)
-          .padding(.vertical, 12)
-          .background(
-            RoundedRectangle(cornerRadius: 12)
-              .fill(Color.tmiSecondary)
-          )
-          .foregroundColor(.white)
-      }
-      .buttonStyle(ScaleButtonStyle())
-    }
-    .padding()
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-  }
-
-  // MARK: - Dashboard Content
-
-  @ViewBuilder
-  private func dashboardContent(_ data: DashboardData) -> some View {
-    ScrollView {
-      VStack(spacing: 24) {
-        // Welcome header
-        welcomeHeader
-          .padding(.top, 16)
-          .offset(y: headerAnimation ? 0 : -20)
-          .opacity(headerAnimation ? 1 : 0)
-          .animation(
-            .spring(response: 0.6, dampingFraction: 0.7).delay(0.1),
-            value: headerAnimation
-          )
-
-        // Time frame selector
-        TimeFrameSelector(selection: $selectedTimeFrame)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.top, 8)
-          .opacity(headerAnimation ? 1 : 0)
-          .animation(
-            .spring(response: 0.6, dampingFraction: 0.7).delay(0.2),
-            value: headerAnimation
-          )
-          .onChange(of: selectedTimeFrame) { _, newTimeFrame in
-            Task {
-              await stateModel.fetchDataForTimeFrame(newTimeFrame)
-            }
-          }
-
-        // Dashboard cards
-        if sizeClass == .regular {
-          HStack(alignment: .top, spacing: 20) {
-            quickStatsView(data)
-              .frame(maxWidth: .infinity)
-            recentActivitiesView(data)
-              .frame(maxWidth: .infinity)
-          }
-          .opacity(cardsAnimation ? 1 : 0)
-          .offset(y: cardsAnimation ? 0 : 30)
-          .animation(
-            .spring(response: 0.6, dampingFraction: 0.7).delay(0.3),
-            value: cardsAnimation
-          )
-        } else {
-          VStack(spacing: 20) {
-            quickStatsView(data)
-            recentActivitiesView(data)
-          }
-          .opacity(cardsAnimation ? 1 : 0)
-          .offset(y: cardsAnimation ? 0 : 30)
-          .animation(
-            .spring(response: 0.6, dampingFraction: 0.7).delay(0.3),
-            value: cardsAnimation
-          )
-        }
-
-        // Alignment chart
-        DashboardAlignmentChartView(alignmentData: stateModel.alignmentData)
-          .opacity(chartAnimation ? 1 : 0)
-          .offset(y: chartAnimation ? 0 : 30)
-          .animation(
-            .spring(response: 0.6, dampingFraction: 0.7).delay(0.4),
-            value: chartAnimation
-          )
-
-        // Performance Overview (from insights)
-        performanceOverviewView(data)
-          .opacity(buttonAnimation ? 1 : 0)
-          .offset(y: buttonAnimation ? 0 : 20)
-          .animation(
-            .spring(response: 0.6, dampingFraction: 0.7).delay(0.5),
-            value: buttonAnimation
-          )
-
-        // Insights & Recommendations (embedded)
-        insightsAndRecommendationsView(data)
-          .opacity(buttonAnimation ? 1 : 0)
-          .offset(y: buttonAnimation ? 0 : 20)
-          .animation(
-            .spring(response: 0.6, dampingFraction: 0.7).delay(0.6),
-            value: buttonAnimation
-          )
-
-        // Action buttons (from insights)
-        dashboardActionButtons(data)
-          .opacity(buttonAnimation ? 1 : 0)
-          .offset(y: buttonAnimation ? 0 : 20)
-          .animation(
-            .spring(response: 0.6, dampingFraction: 0.7).delay(0.7),
-            value: buttonAnimation
-          )
-      }
-      .padding(.horizontal, 20)
-      .padding(.bottom, 40)
-    }
-    .onAppear {
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-        headerAnimation = true
-      }
-
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-        cardsAnimation = true
-      }
-
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-        chartAnimation = true
-      }
-
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-        buttonAnimation = true
-      }
-    }
-  }
-
-  private var welcomeHeader: some View {
-    HStack {
-      VStack(alignment: .leading, spacing: 6) {
-        Text("Welcome back,")
-          .font(.system(size: 18, weight: .medium))
-          .foregroundColor(.white.opacity(0.8))
-
-        Text("Educator!")
-          .font(.system(size: 32, weight: .bold, design: .rounded))
-          .foregroundColor(.white)
-      }
-
-      Spacer()
-
-      // Date display
-      VStack(alignment: .trailing, spacing: 4) {
-        Text(Date(), style: .date)
-          .font(.system(size: 16, weight: .medium))
-          .foregroundColor(.white.opacity(0.7))
-
-        Text(Date(), style: .time)
-          .font(.system(size: 14))
-          .foregroundColor(.white.opacity(0.5))
-      }
-    }
-  }
-
-  private func quickStatsView(_ data: DashboardData) -> some View {
-    TMIGlassCard(style: .dashboard) {
-      VStack(alignment: .leading, spacing: 20) {
-        Text("Quick Stats")
-          .font(.system(size: 20, weight: .semibold))
-          .foregroundColor(.white)
-
-        VStack(spacing: 16) {
-          StatCard(
-            title: "Total Students",
-            value: "\(data.totalStudents)",
-            icon: "person.3.fill",
-            color: Color.blue
-          )
-
-          StatCard(
-            title: "Surveys Completed",
-            value: "\(data.surveysCompleted)",
-            icon: "checkmark.circle.fill",
-            color: Color.green
-          )
-
-          StatCard(
-            title: "Plans Aligned",
-            value: "\(data.plansAligned)",
-            icon: "star.fill",
-            color: Color.orange
-          )
-        }
-        .animation(
-          .spring(response: 0.4, dampingFraction: 0.8), value: stateModel.selectedTimeFrame)
-      }
-    }
-  }
-
-  private func recentActivitiesView(_ data: DashboardData) -> some View {
-    TMIGlassCard(style: .dashboard) {
-      VStack(alignment: .leading, spacing: 20) {
-        HStack {
-          Text("Recent Activities")
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundColor(.white)
-
-          Spacer()
-
-          Button {
-            // Show all activities sheet
-            stateModel.showingAllActivities = true
-          } label: {
-            HStack(spacing: 4) {
-              Text("View All")
-                .font(.system(size: 14, weight: .medium))
-
-              Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-            }
-            .foregroundColor(Color.tmiSecondary)
-          }
-          .buttonStyle(ScaleButtonStyle())
-        }
-
-        Divider()
-          .background(Color.white.opacity(0.1))
-
-        if data.recentActivities.isEmpty {
-          VStack(spacing: 16) {
-            Image(systemName: "tray.fill")
-              .font(.system(size: 30))
-              .foregroundColor(.white.opacity(0.3))
-
-            Text("No recent activities")
-              .font(.system(size: 16))
-              .foregroundColor(.white.opacity(0.6))
-          }
-          .frame(maxWidth: .infinity, minHeight: 150)
-        } else {
-          LazyVStack(spacing: 12) {
-            ForEach(data.recentActivities) { activity in
-              DashboardActivityRow(activity: activity)
-
-              if activity.id != data.recentActivities.last!.id {
-                Divider()
-                  .background(Color.white.opacity(0.1))
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // MARK: - Integrated Insights Views
-
-  private func performanceOverviewView(_ data: DashboardData) -> some View {
-    TMIGlassCard(style: .dashboard) {
-      VStack(alignment: .leading, spacing: 20) {
-        Text("Performance Overview")
-          .font(.title3.weight(.semibold))
-          .foregroundColor(.white)
-
-        HStack(spacing: 16) {
-          StatCircle(
-            value: "\(Int(surveyCompletionRate(data) * 100))%",
-            title: "Survey\nCompletion",
-            color: .green,
-            icon: "chart.bar.fill"
-          )
-
-          StatCircle(
-            value: "\(Int(planAlignmentRate(data) * 100))%",
-            title: "Plan\nAlignment",
-            color: Color.tmiSecondary,
-            icon: "person.fill.checkmark"
-          )
-
-          StatCircle(
-            value: "\(Int(planEffectiveness(data) * 100))%",
-            title: "Plan\nEffectiveness",
-            color: .orange,
-            icon: "star.fill"
-          )
-        }
-        .padding(.vertical, 10)
-      }
-    }
-  }
-
-  private func insightsAndRecommendationsView(_ data: DashboardData) -> some View {
-    Group {
-      // AI-Powered Insights & Recommendations
-      if #available(iOS 18.0, *) {
-        TMIGlassCard(style: .dashboard) {
-          VStack(alignment: .leading, spacing: 16) {
-            HStack {
-              VStack(alignment: .leading, spacing: 4) {
-                Text("AI Insights & Recommendations")
-                  .font(.title3.weight(.semibold))
-                  .foregroundColor(.white)
-                
-                Text("Generated by advanced analytics")
-                  .font(.subheadline)
-                  .foregroundColor(.white.opacity(0.7))
-              }
-              
-              Spacer()
-              
-              if isLoadingInsights {
-                ProgressView()
-                  .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                  .scaleEffect(0.8)
-              }
-            }
-            
-            Divider()
-              .background(Color.white.opacity(0.2))
-            
-            if aiInsights.isEmpty && !isLoadingInsights {
-              VStack(spacing: 12) {
-                Image(systemName: "brain.head.profile")
-                  .font(.system(size: 24))
-                  .foregroundColor(.white.opacity(0.6))
-                
-                Text("Generating AI insights...")
-                  .font(.subheadline)
-                  .foregroundColor(.white.opacity(0.7))
-                
-                Text("Analysis will appear as data becomes available")
-                  .font(.caption)
-                  .foregroundColor(.white.opacity(0.5))
-              }
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 20)
-            } else {
-              ForEach(aiInsights.prefix(3)) { insight in
-                AIInsightRow(insight: insight)
-                
-                if insight.id != aiInsights.prefix(3).last!.id {
-                  Divider()
-                    .background(Color.white.opacity(0.1))
+            Group {
+                switch stateModel.state {
+                case .idle, .loading:
+                    loadingView
+                case .loaded(let data):
+                    dashboardContent(data)
+                case .error(let error):
+                    errorView(error)
                 }
-              }
             }
-          }
         }
-      } else {
-        // Fallback for iOS < 18.0
-        TMIGlassCard(style: .dashboard) {
-          VStack(alignment: .leading, spacing: 16) {
+        .task {
+            await stateModel.fetch()
+            await studentStateModel.fetch()
+        }
+        .refreshable {
+            await stateModel.refresh()
+            await studentStateModel.fetch()
+        }
+        .sheet(isPresented: $showingAddStudent) {
+            NavigationStack {
+                AddStudentViewRedesigned(onComplete: {
+                    showingAddStudent = false
+                    // Refresh dashboard and student data
+                    Task {
+                        await studentStateModel.fetch()
+                        await stateModel.refresh()
+                    }
+                })
+            }
+        }
+    }
+
+    // MARK: - Loading State
+
+    private var loadingView: some View {
+        VStack(spacing: TMISpacing.lg) {
+            ProgressView()
+                .tint(.tmiPrimary)
+
+            Text("Loading dashboard...")
+                .font(.tmiBody)
+                .foregroundColor(.tmiTextSecondary)
+        }
+    }
+
+    // MARK: - Error State
+
+    private func errorView(_ error: IdentifiableError) -> some View {
+        TMIEmptyStateRedesigned(
+            icon: "exclamationmark.triangle",
+            title: "Unable to Load",
+            message: error.message,
+            action: {
+                Task { await stateModel.fetch() }
+            },
+            actionLabel: "Try Again"
+        )
+    }
+
+    // MARK: - Main Content
+
+    @ViewBuilder
+    private func dashboardContent(_ data: DashboardData) -> some View {
+        ScrollView {
+            VStack(spacing: TMISpacing.lg) {
+                // Hero Section - Primary Insight
+                primaryInsightCard(data)
+                    .padding(.top, TMISpacing.md)
+
+                // Quick Action Cards - NEW
+                QuickActionsGrid()
+
+                // Student Engagement Overview - NEW
+                StudentStatusWidget()
+
+                // Quick Stats Row
+                quickStatsRow(data)
+
+                // Engagement Chart (Simplified)
+                if !data.engagementData.isEmpty {
+                    engagementChart(data)
+                }
+
+                // Recent Activity Preview
+                recentActivitySection(data)
+
+                Spacer(minLength: TMISpacing.xxl)
+            }
+            .padding(.horizontal, TMISpacing.screenPadding)
+        }
+        .navigationTitle("Dashboard")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: {}) {
+                    TMIAvatar(initials: "ED", color: .tmiPrimary, size: 36)
+                }
+            }
+        }
+        .sheet(isPresented: $showingAllActivities) {
+            NavigationStack {
+                allActivitiesView(data)
+            }
+        }
+    }
+
+    // MARK: - Primary Insight Card
+
+    private func primaryInsightCard(_ data: DashboardData) -> some View {
+        let surveysPending = max(0, data.totalStudents - data.surveysCompleted)
+        let plansPending = max(0, data.totalStudents - data.plansAligned)
+        let attentionCount = studentsNeedingAttention(data) ?? 0
+        let status = computeDashboardStatus(data: data, attentionCount: attentionCount, surveysPending: surveysPending, plansPending: plansPending)
+
+        return VStack(alignment: .leading, spacing: TMISpacing.md) {
+            // Header: Status + Totals
+            HStack(alignment: .center, spacing: TMISpacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(status.color.opacity(0.15))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: status.icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(status.color)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    // "6 Students  •  4 Ready to Grow"
+                    HStack(spacing: 8) {
+                        Text("\(data.totalStudents) Students")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.tmiTextPrimary)
+                        Text("•")
+                            .foregroundColor(.tmiTextTertiary)
+                        Text("\(max(attentionCount, surveysPending + plansPending)) Ready to Grow")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.tmiWarning)
+                    }
+
+                    // Contextual status microcopy
+                    Text(status.title)
+                        .font(.tmiFootnote)
+                        .foregroundColor(.tmiTextSecondary)
+                }
+
+                Spacer()
+            }
+
+            TMIDivider()
+
+            // Priority Actions
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.tmiWarning)
+                    Text("Priority Actions")
+                        .font(.tmiCaption)
+                        .foregroundColor(.tmiTextSecondary)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    if surveysPending > 0 {
+                        Button(action: { onTapStartSurveys() }) {
+                            HStack(alignment: .center, spacing: 8) {
+                                Image(systemName: "chart.bar")
+                                    .foregroundColor(.tmiPrimary)
+                                Text("\(surveysPending) students need survey completion")
+                                    .font(.tmiBody)
+                                    .foregroundColor(.tmiTextPrimary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.tmiPrimary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if plansPending > 0 {
+                        Button(action: { onTapAssignPlans() }) {
+                            HStack(alignment: .center, spacing: 8) {
+                                Image(systemName: "target")
+                                    .foregroundColor(.tmiSecondary)
+                                Text("\(plansPending) students waiting for plan assignment")
+                                    .font(.tmiBody)
+                                    .foregroundColor(.tmiTextPrimary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.tmiSecondary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if surveysPending == 0 && plansPending == 0 {
+                        Text("Great work—everyone has a personalized pathway!")
+                            .font(.tmiCaption)
+                            .foregroundColor(.tmiSuccess)
+                    }
+                }
+            }
+
+            TMIDivider()
+
+            // Supporting Metrics (clickable + clarified)
+            HStack(spacing: TMISpacing.lg) {
+                metricPill(
+                    icon: "doc.badge.checkmark",
+                    tint: .tmiSuccess,
+                    value: "\(data.activeTMIPlans)",
+                    label: "Personalized Pathways"
+                ) { onTapPlans() }
+
+                metricPill(
+                    icon: "chart.bar.fill",
+                    tint: .tmiPrimary,
+                    value: "\(data.surveysCompleted)/\(data.totalStudents)",
+                    label: surveysPending > 0 ? "Let's discover their interests!" : "All surveys complete"
+                ) { onTapStartSurveys() }
+
+                metricPill(
+                    icon: "checkmark.seal.fill",
+                    tint: .tmiSecondary,
+                    value: "\(data.plansAligned)",
+                    label: "Aligned with goals"
+                ) { onTapAssignPlans() }
+            }
+        }
+        .tmiCard(style: .elevated)
+    }
+
+    // Helper function to calculate students needing attention
+    private func studentsNeedingAttention(_ data: DashboardData) -> Int? {
+        // Count students with engagement < 0.4 (needs support level)
+        let needsSupport = studentStateModel.students.filter { $0.engagementScore < 0.4 }.count
+        return needsSupport > 0 ? needsSupport : nil
+    }
+
+    private func supportingStat(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value)
+                .font(.tmiTitle3)
+                .foregroundColor(.tmiTextPrimary)
+
+            Text(label)
+                .font(.tmiFootnote)
+                .foregroundColor(.tmiTextSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private enum DashboardStatus {
+        case onTrack, actionNeeded, growing, needsSupport
+
+        var title: String {
+            switch self {
+            case .onTrack: return "🎯 On Track — surveys complete and plans active"
+            case .actionNeeded: return "⚡ Action Needed — missing surveys or unassigned pathways"
+            case .growing: return "🌱 Growing — progress improving"
+            case .needsSupport: return "🚨 Needs Support — multiple students at risk"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .onTrack: return "checkmark.seal.fill"
+            case .actionNeeded: return "bolt.fill"
+            case .growing: return "leaf.fill"
+            case .needsSupport: return "exclamationmark.triangle.fill"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .onTrack: return .tmiSuccess
+            case .actionNeeded: return .tmiWarning
+            case .growing: return .tmiPrimary
+            case .needsSupport: return .tmiError
+            }
+        }
+    }
+
+    private func computeDashboardStatus(data: DashboardData, attentionCount: Int, surveysPending: Int, plansPending: Int) -> (status: DashboardStatus, title: String, icon: String, color: Color) {
+        // Determine status based on urgency signals
+        if attentionCount >= 2 {
+            return (.needsSupport, DashboardStatus.needsSupport.title, DashboardStatus.needsSupport.icon, DashboardStatus.needsSupport.color)
+        }
+        if surveysPending > 0 || plansPending > 0 {
+            return (.actionNeeded, DashboardStatus.actionNeeded.title, DashboardStatus.actionNeeded.icon, DashboardStatus.actionNeeded.color)
+        }
+        // If engagement is trending up or plans exist but not all, call it growing
+        if data.activeTMIPlans > 0 && (data.activeTMIPlans < data.totalStudents) {
+            return (.growing, DashboardStatus.growing.title, DashboardStatus.growing.icon, DashboardStatus.growing.color)
+        }
+        return (.onTrack, DashboardStatus.onTrack.title, DashboardStatus.onTrack.icon, DashboardStatus.onTrack.color)
+    }
+
+    @ViewBuilder
+    private func metricPill(icon: String, tint: Color, value: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(tint.opacity(0.15))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(tint)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(value)
+                        .font(.tmiTitle3)
+                        .foregroundColor(.tmiTextPrimary)
+                    Text(label)
+                        .font(.tmiFootnote)
+                        .foregroundColor(.tmiTextSecondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // Placeholder actions to make the card actionable.
+    // In a future iteration, wire these to navigation or filters in your app.
+    private func onTapStartSurveys() {
+        // For now, show all activities as a proxy action.
+        showingAllActivities = true
+    }
+
+    private func onTapAssignPlans() {
+        // For now, show the add student flow as a proxy to plan assignment.
+        showingAddStudent = true
+    }
+
+    private func onTapPlans() {
+        // Navigate to plans list when available; using activities for now.
+        showingAllActivities = true
+    }
+
+    // MARK: - Quick Stats Row
+
+    private func quickStatsRow(_ data: DashboardData) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: TMISpacing.md) {
+                TMIStatChip(
+                    value: "\(data.surveysCompleted)",
+                    label: "Surveys Done",
+                    color: .tmiSuccess
+                )
+
+                TMIStatChip(
+                    value: "\(Int(planAlignmentRate(data) * 100))%",
+                    label: "Plan Alignment",
+                    trend: planAlignmentRate(data) > 0.7 ? .up : .neutral,
+                    color: .tmiPrimary
+                )
+
+                TMIStatChip(
+                    value: "\(data.interestsIdentified)",
+                    label: "Interests Found",
+                    color: .tmiSecondary
+                )
+            }
+        }
+    }
+
+    // MARK: - Engagement Chart
+
+    private func engagementChart(_ data: DashboardData) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            Text("Weekly Engagement")
+                .font(.tmiTitle3)
+                .foregroundColor(.tmiTextPrimary)
+
+            Chart(data.engagementData) { item in
+                LineMark(
+                    x: .value("Week", item.week),
+                    y: .value("Level", item.engagementLevel)
+                )
+                .foregroundStyle(Color.tmiPrimary)
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+
+                AreaMark(
+                    x: .value("Week", item.week),
+                    y: .value("Level", item.engagementLevel)
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.tmiPrimary.opacity(0.2), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+            }
+            .frame(height: 160)
+            .chartXAxis {
+                AxisMarks { _ in
+                    AxisValueLabel()
+                        .foregroundStyle(Color.tmiTextSecondary)
+                }
+            }
+            .chartYAxis {
+                AxisMarks { _ in
+                    AxisValueLabel()
+                        .foregroundStyle(Color.tmiTextSecondary)
+                }
+            }
+        }
+        .tmiCard()
+    }
+
+    // MARK: - Recent Activity Section
+
+    private func recentActivitySection(_ data: DashboardData) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
-              VStack(alignment: .leading, spacing: 4) {
-                Text("Insights & Recommendations")
-                  .font(.title3.weight(.semibold))
-                  .foregroundColor(.white)
-                
-                Text("Based on current data patterns")
-                  .font(.subheadline)
-                  .foregroundColor(.white.opacity(0.7))
-              }
-              
-              Spacer()
-            }
-            
-            Divider()
-              .background(Color.white.opacity(0.2))
-            
-            ForEach(recommendations(data).prefix(3)) { recommendation in
-              BasicRecommendationRow(recommendation: recommendation)
-              
-              if recommendation.id != recommendations(data).prefix(3).last!.id {
-                Divider()
-                  .background(Color.white.opacity(0.1))
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+                Text("Recent Activity")
+                    .font(.tmiTitle3)
+                    .foregroundColor(.tmiTextPrimary)
 
-  private func dashboardActionButtons(_ data: DashboardData) -> some View {
-    HStack(spacing: 16) {
-      Button {
-        // Open calendar app for scheduling
-        openCalendarApp()
-      } label: {
-        HStack {
-          Image(systemName: "calendar.badge.plus")
-          Text("Open Calendar")
+                Spacer()
+
+                if !data.recentActivities.isEmpty {
+                    Button(action: { showingAllActivities = true }) {
+                        HStack(spacing: 4) {
+                            Text("View All")
+                                .font(.tmiCaption)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(.tmiPrimary)
+                    }
+                }
+            }
+
+            if data.recentActivities.isEmpty {
+                emptyActivityState
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(data.recentActivities.prefix(3)) { activity in
+                        activityRow(activity)
+
+                        if activity.id != data.recentActivities.prefix(3).last?.id {
+                            TMIDivider()
+                                .padding(.leading, 56)
+                        }
+                    }
+                }
+            }
         }
-        .font(.system(size: 16, weight: .semibold))
-        .padding(16)
+        .tmiCard()
+    }
+
+    private func activityRow(_ activity: RecentActivity) -> some View {
+        HStack(spacing: TMISpacing.md) {
+            ZStack {
+                Circle()
+                    .fill(activity.iconColor.opacity(0.15))
+                    .frame(width: 40, height: 40)
+
+                Image(systemName: activity.icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(activity.iconColor)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(activity.title)
+                    .font(.tmiBody)
+                    .foregroundColor(.tmiTextPrimary)
+
+                Text(activity.description)
+                    .font(.tmiCaption)
+                    .foregroundColor(.tmiTextSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Text(activity.timeAgo)
+                .font(.tmiFootnote)
+                .foregroundColor(.tmiTextTertiary)
+        }
+        .padding(.vertical, TMISpacing.sm)
+    }
+
+    private var emptyActivityState: some View {
+        VStack(spacing: TMISpacing.sm) {
+            Image(systemName: "tray")
+                .font(.system(size: 32))
+                .foregroundColor(.tmiTextTertiary)
+
+            Text("No recent activity")
+                .font(.tmiCaption)
+                .foregroundColor(.tmiTextSecondary)
+        }
         .frame(maxWidth: .infinity)
-        .background(
-          RoundedRectangle(cornerRadius: 12)
-            .fill(Color.white.opacity(0.05))
-            .overlay(
-              RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+        .padding(.vertical, TMISpacing.xl)
+    }
+
+    // MARK: - All Activities Sheet
+
+    private func allActivitiesView(_ data: DashboardData) -> some View {
+        List(data.recentActivities) { activity in
+            TMIListRow(
+                title: activity.title,
+                subtitle: activity.description,
+                leading: {
+                    ZStack {
+                        Circle()
+                            .fill(activity.iconColor.opacity(0.15))
+                            .frame(width: 40, height: 40)
+
+                        Image(systemName: activity.icon)
+                            .font(.system(size: 16))
+                            .foregroundColor(activity.iconColor)
+                    }
+                },
+                trailing: {
+                    Text(activity.timeAgo)
+                        .font(.tmiFootnote)
+                        .foregroundColor(.tmiTextTertiary)
+                }
             )
-        )
-        .foregroundColor(.white)
-      }
-      .buttonStyle(ScaleButtonStyle())
-
-      Button {
-        // Export report action - share dashboard data
-        exportDashboardReport(data)
-      } label: {
-        HStack {
-          Image(systemName: "square.and.arrow.up")
-          Text("Export Report")
+            .listRowBackground(Color.tmiBackground)
         }
-        .font(.system(size: 16, weight: .semibold))
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .background(
-          RoundedRectangle(cornerRadius: 12)
-            .fill(
-              LinearGradient(
-                colors: [Color.tmiSecondary, Color.tmiSecondary.opacity(0.8)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              )
-            )
-        )
-        .foregroundColor(.white)
-      }
-      .buttonStyle(ScaleButtonStyle())
-    }
-  }
-
-  // MARK: - Insights Helper Methods
-
-  private func surveyCompletionRate(_ data: DashboardData) -> Double {
-    guard data.totalStudents > 0 else { return 0.0 }
-    return Double(data.surveysCompleted) / Double(data.totalStudents)
-  }
-
-  private func planAlignmentRate(_ data: DashboardData) -> Double {
-    guard data.totalStudents > 0 else { return 0.0 }
-    return Double(data.plansAligned) / Double(data.totalStudents)
-  }
-
-  private func planEffectiveness(_ data: DashboardData) -> Double {
-    // Calculate plan effectiveness based on plans vs students ratio and activity
-    let planRatio = data.totalStudents > 0 ?
-      Double(data.activeTMIPlans) / Double(data.totalStudents) : 0.0
-    let activityBonus = data.recentActivities.count > 0 ? 0.15 : 0.0
-    return min(1.0, planRatio * 0.8 + activityBonus)
-  }
-
-  // MARK: - AI Insights Integration
-  
-  @MainActor
-  private func loadAIInsights(for data: DashboardData) async {
-    guard !isLoadingInsights else { return }
-    
-    isLoadingInsights = true
-    
-    if #available(iOS 18.0, *) {
-      let insights = await AIInsightsService.shared.generateInsights(from: data)
-      aiInsights = insights
-      print("[DashboardView] Loaded \(insights.count) AI insights")
-    }
-    
-    isLoadingInsights = false
-  }
-  
-  private func recommendations(_ data: DashboardData) -> [InsightRecommendation] {
-    // Use AI-generated insights if available, fall back to rule-based
-    if #available(iOS 18.0, *), !aiInsights.isEmpty {
-      return convertAIInsights(aiInsights)
-    } else {
-      return generateBasicRecommendations(data)
-    }
-  }
-  
-  @available(iOS 18.0, *)
-  private func convertAIInsights(_ insights: [AIInsight]) -> [InsightRecommendation] {
-    return insights.prefix(3).map { insight in
-      InsightRecommendation(
-        title: insight.title,
-        description: insight.description,
-        icon: insight.category.icon,
-        color: insight.priority.color
-      )
-    }
-  }
-  
-  private func generateBasicRecommendations(_ data: DashboardData) -> [InsightRecommendation] {
-    var recs: [InsightRecommendation] = []
-    
-    // Survey completion recommendations
-    let completionRate = surveyCompletionRate(data)
-    let alignmentRate = planAlignmentRate(data)
-    
-    if completionRate < 0.7 {
-      let missingCount = data.totalStudents - data.surveysCompleted
-      recs.append(InsightRecommendation(
-        title: "Increase survey completion rate",
-        description: "\(missingCount) students haven't completed their interest surveys. Consider sending reminder notifications.",
-        icon: "bell.fill",
-        color: .orange
-      ))
-    }
-    
-    // Plan alignment recommendations
-    if alignmentRate < 0.6 {
-      let unalignedCount = data.totalStudents - data.plansAligned
-      recs.append(InsightRecommendation(
-        title: "Improve plan alignment",
-        description: "\(unalignedCount) students need aligned TMI plans. Schedule individual meetings to assess their needs.",
-        icon: "person.2.fill",
-        color: .blue
-      ))
-    }
-    
-    // Interest identification recommendations
-    if data.interestsIdentified < data.totalStudents * 2 {
-      recs.append(InsightRecommendation(
-        title: "Expand interest exploration",
-        description: "Students show limited interest diversity. Consider organizing career exploration workshops.",
-        icon: "lightbulb.fill",
-        color: .yellow
-      ))
-    }
-    
-    // Recent activity recommendations
-    if data.recentActivities.count < 3 {
-      recs.append(InsightRecommendation(
-        title: "Boost student engagement",
-        description: "Low recent activity detected. Plan interactive sessions to re-engage students.",
-        icon: "chart.line.uptrend.xyaxis",
-        color: .green
-      ))
-    }
-    
-    // Positive recommendations
-    if completionRate > 0.8 && alignmentRate > 0.7 {
-      recs.append(InsightRecommendation(
-        title: "Excellent progress!",
-        description: "High completion and alignment rates. Consider expanding to advanced tracking features.",
-        icon: "star.fill",
-        color: .teal
-      ))
-    }
-    
-    return Array(recs.prefix(3)) // Limit to 3 recommendations
-  }
-
-  private func generateDashboardReport(_ data: DashboardData) -> String {
-    let dateFormatter = DateFormatter()
-    dateFormatter.dateStyle = .full
-    dateFormatter.timeStyle = .none
-    
-    let report = """
-    TMI Dashboard Report
-    Generated: \(dateFormatter.string(from: Date()))
-    
-    PERFORMANCE OVERVIEW
-    • Total Students: \(data.totalStudents)
-    • Active TMI Plans: \(data.activeTMIPlans)
-    • Surveys Completed: \(data.surveysCompleted)
-    • Interests Identified: \(data.interestsIdentified)
-    • Plans Aligned: \(data.plansAligned)
-    
-    KEY METRICS
-    • Survey Completion Rate: \(Int(surveyCompletionRate(data) * 100))%
-    • Plan Alignment Rate: \(Int(planAlignmentRate(data) * 100))%
-    • Plan Effectiveness: \(Int(planEffectiveness(data) * 100))%
-    
-    RECENT ACTIVITIES (\(data.recentActivities.count))
-    \(data.recentActivities.map { "• \($0.title): \($0.description)" }.joined(separator: "\n"))
-    
-    RECOMMENDATIONS
-    \(recommendations(data).map { "• \($0.title): \($0.description)" }.joined(separator: "\n"))
-    
-    ---
-    Report generated by TMI Education Platform
-    """
-    
-    return report
-  }
-  
-  // MARK: - Platform-Specific Actions
-  
-  private func exportDashboardReport(_ data: DashboardData) {
-    let reportText = generateDashboardReport(data)
-    
-    #if os(iOS)
-    let activityController = UIActivityViewController(
-      activityItems: [reportText],
-      applicationActivities: nil
-    )
-    
-    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-       let window = windowScene.windows.first,
-       let rootViewController = window.rootViewController {
-      activityController.popoverPresentationController?.sourceView = window
-      activityController.popoverPresentationController?.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
-      rootViewController.present(activityController, animated: true)
-    }
-    #elseif os(macOS)
-    // macOS sharing implementation
-    let pasteboard = NSPasteboard.general
-    pasteboard.clearContents()
-    pasteboard.setString(reportText, forType: .string)
-    
-    // Show a temporary notification that the report was copied
-    // You could also open the save dialog here
-    print("Dashboard report copied to clipboard")
-    #endif
-  }
-  
-  private func openCalendarApp() {
-    #if os(iOS)
-    if let calendarURL = URL(string: "calshow://") {
-      if UIApplication.shared.canOpenURL(calendarURL) {
-        UIApplication.shared.open(calendarURL)
-      } else {
-        // Fallback to default calendar URL
-        if let fallbackURL = URL(string: "calendar://") {
-          UIApplication.shared.open(fallbackURL)
-        }
-      }
-    }
-    #elseif os(macOS)
-    // macOS Calendar app opening
-    if let calendarURL = URL(string: "x-apple-calendar://") {
-      NSWorkspace.shared.open(calendarURL)
-    }
-    #endif
-  }
-}
-
-// MARK: - AI Insight Row
-
-@available(iOS 18.0, *)
-struct AIInsightRow: View {
-  let insight: AIInsight
-  @State private var isHovered = false
-  
-  var body: some View {
-    HStack(alignment: .top, spacing: 16) {
-      Image(systemName: insight.category.icon)
-        .font(.system(size: 16, weight: .semibold))
-        .foregroundColor(insight.priority.color)
-        .frame(width: 30, height: 30)
-        .padding(4)
-        .background(
-          Circle()
-            .fill(insight.priority.color.opacity(0.1))
-        )
-      
-      VStack(alignment: .leading, spacing: 6) {
-        HStack {
-          Text(insight.title)
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundColor(.white)
-          
-          Spacer()
-          
-          HStack(spacing: 4) {
-            Image(systemName: insight.priority.icon)
-              .font(.system(size: 10))
-            
-            Text(insight.priority.rawValue)
-              .font(.caption2.weight(.medium))
-          }
-          .foregroundColor(insight.priority.color)
-          .padding(.horizontal, 6)
-          .padding(.vertical, 2)
-          .background(
-            Capsule()
-              .fill(insight.priority.color.opacity(0.1))
-          )
-        }
-        
-        Text(insight.description)
-          .font(.system(size: 14))
-          .foregroundColor(.white.opacity(0.7))
-          .lineLimit(isHovered ? nil : 2)
-        
-        if !insight.actionItems.isEmpty {
-          VStack(alignment: .leading, spacing: 4) {
-            Text("Action Items:")
-              .font(.caption.weight(.medium))
-              .foregroundColor(.white.opacity(0.8))
-            
-            ForEach(insight.actionItems.prefix(2), id: \.self) { actionItem in
-              HStack(alignment: .top, spacing: 4) {
-                Text("•")
-                  .foregroundColor(insight.priority.color)
-                Text(actionItem)
-                  .font(.caption)
-                  .foregroundColor(.white.opacity(0.6))
-              }
+        .listStyle(.plain)
+        .background(Color.tmiBackground)
+        .navigationTitle("All Activities")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") {
+                    showingAllActivities = false
+                }
             }
-          }
-          .padding(.top, 4)
         }
-        
-        if insight.confidence > 0 {
-          HStack(spacing: 4) {
-            Text("Confidence:")
-              .font(.caption2)
-              .foregroundColor(.white.opacity(0.5))
-            
-            Text("\(Int(insight.confidence * 100))%")
-              .font(.caption2.weight(.medium))
-              .foregroundColor(.white.opacity(0.7))
-          }
-          .padding(.top, 2)
+    }
+
+    // MARK: - Helper Methods
+
+    private func surveyCompletionRate(_ data: DashboardData) -> Double {
+        guard data.totalStudents > 0 else { return 0.0 }
+        return Double(data.surveysCompleted) / Double(data.totalStudents)
+    }
+
+    private func planAlignmentRate(_ data: DashboardData) -> Double {
+        guard data.totalStudents > 0 else { return 0.0 }
+        return Double(data.plansAligned) / Double(data.totalStudents)
+    }
+
+    private func calculateTrend(_ data: DashboardData) -> (icon: String, value: String, label: String, color: Color)? {
+        guard !data.engagementData.isEmpty, data.engagementData.count >= 2 else { return nil }
+
+        let recent = data.engagementData.suffix(2)
+        let change = recent.last!.engagementLevel - recent.first!.engagementLevel
+
+        if abs(change) < 1 {
+            return ("minus", "0", "No change", .tmiTextSecondary)
+        } else if change > 0 {
+            return ("arrow.up.right", "+\(Int(change))", "vs last week", .tmiSuccess)
+        } else {
+            return ("arrow.down.right", "\(Int(change))", "vs last week", .tmiError)
         }
-      }
-      
-      Spacer()
     }
-    .padding(.vertical, 10)
-    .contentShape(Rectangle())
-    .onHover { hovering in
-      withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-        isHovered = hovering
-      }
-    }
-  }
 }
 
-// MARK: - Basic Recommendation Row (No Apply Button)
-
-struct BasicRecommendationRow: View {
-  let recommendation: InsightRecommendation
-  @State private var isHovered = false
-  
-  var body: some View {
-    HStack(alignment: .top, spacing: 16) {
-      Image(systemName: recommendation.icon)
-        .font(.system(size: 16, weight: .semibold))
-        .foregroundColor(recommendation.color)
-        .frame(width: 30, height: 30)
-        .padding(4)
-        .background(
-          Circle()
-            .fill(recommendation.color.opacity(0.1))
-        )
-      
-      VStack(alignment: .leading, spacing: 4) {
-        Text(recommendation.title)
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundColor(.white)
-        
-        Text(recommendation.description)
-          .font(.system(size: 14))
-          .foregroundColor(.white.opacity(0.7))
-          .lineLimit(isHovered ? nil : 2)
-      }
-      
-      Spacer()
+#Preview("Light Mode") {
+    NavigationStack {
+        DashboardView()
+            .environment(\.dashboardStateModel, DashboardStateModel())
     }
-    .padding(.vertical, 10)
-    .contentShape(Rectangle())
-    .onHover { hovering in
-      withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-        isHovered = hovering
-      }
-    }
-  }
-}
-
-// MARK: - Preview
-
-#Preview {
-  DashboardView()
     .preferredColorScheme(.light)
 }
 
-#Preview {
-  DashboardView()
+#Preview("Dark Mode") {
+    NavigationStack {
+        DashboardView()
+            .environment(\.dashboardStateModel, DashboardStateModel())
+    }
     .preferredColorScheme(.dark)
-}
-
-// MARK: - All Activities View
-
-struct AllActivitiesView: View {
-  let activities: [RecentActivity]
-  @Environment(\.dismiss) private var dismiss
-  
-  var body: some View {
-    ZStack {
-        TMIBackgroundView(variant: .dashboard)
-          .ignoresSafeArea()
-        
-        ScrollView {
-          LazyVStack(spacing: 16) {
-            ForEach(activities) { activity in
-              DashboardActivityRow(activity: activity)
-                .padding(.horizontal, 20)
-            }
-            
-            if activities.isEmpty {
-              VStack(spacing: 16) {
-                Image(systemName: "tray.fill")
-                  .font(.system(size: 50))
-                  .foregroundColor(.white.opacity(0.3))
-                
-                Text("No Recent Activities")
-                  .font(.title2.bold())
-                  .foregroundColor(.white)
-                
-                Text("Activities will appear here as you and your students interact with the TMI system.")
-                  .font(.body)
-                  .foregroundColor(.white.opacity(0.7))
-                  .multilineTextAlignment(.center)
-                  .padding(.horizontal, 40)
-              }
-              .frame(maxWidth: .infinity)
-              .padding(.top, 100)
-            }
-          }
-          .padding(.top, 20)
-          .padding(.bottom, 40)
-        }
-      }
-      .navigationTitle("All Activities")
-      .navigationBarTitleDisplayMode(.large)
-      .toolbar {
-        ToolbarItem(placement: .navigationBarTrailing) {
-          Button("Done") {
-            dismiss()
-          }
-          .foregroundColor(.white)
-        }
-      }
-    .preferredColorScheme(.dark)
-  }
 }
 

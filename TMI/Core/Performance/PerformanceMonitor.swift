@@ -197,7 +197,7 @@ final class PerformanceMonitor: Sendable {
     // MARK: - Startup Performance Tracking
     
     /// Record app startup phase performance
-    func recordStartupMetric(_ phase: StartupPhase, duration: TimeInterval, metadata: [String: Any]? = nil) {
+    func recordStartupMetric(_ phase: StartupPhase, duration: TimeInterval, metadata: [String: String]? = nil) {
         let memoryUsage = getCurrentMemoryUsage()
         let metric = StartupMetric(
             id: UUID(),
@@ -411,7 +411,9 @@ final class PerformanceMonitor: Sendable {
         
         isMonitoringMemory = true
         memoryTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            self?.checkMemoryUsage()
+            Task { @MainActor in
+                self?.checkMemoryUsage()
+            }
         }
         
         logger.info("Started memory monitoring")
@@ -536,17 +538,19 @@ final class PerformanceMonitor: Sendable {
     func exportPerformanceData() async -> PerformanceExport {
         return await withCheckedContinuation { continuation in
             metricsQueue.async {
-                let export = PerformanceExport(
-                    exportDate: Date(),
-                    deviceInfo: self.getPerformanceDeviceInfo(),
-                    metrics: Array(self.metrics.values.flatMap { $0 }.suffix(500)),
-                    networkMetrics: Array(self.networkMetrics.suffix(200)),
-                    memoryMetrics: Array(self.memoryMetrics.suffix(100)),
-                    startupMetrics: self.startupMetrics,
-                    currentMemoryUsage: self.currentMemoryUsage,
-                    networkStatus: self.networkStatus
-                )
-                continuation.resume(returning: export)
+                Task { @MainActor in
+                    let export = PerformanceExport(
+                        exportDate: Date(),
+                        deviceInfo: self.getPerformanceDeviceInfo(),
+                        metrics: Array(self.metrics.values.flatMap { $0 }.suffix(500)),
+                        networkMetrics: Array(self.networkMetrics.suffix(200)),
+                        memoryMetrics: Array(self.memoryMetrics.suffix(100)),
+                        startupMetrics: self.startupMetrics,
+                        currentMemoryUsage: self.currentMemoryUsage,
+                        networkStatus: self.networkStatus
+                    )
+                    continuation.resume(returning: export)
+                }
             }
         }
     }
@@ -656,7 +660,9 @@ final class PerformanceMonitor: Sendable {
             queue: .main
         ) { [weak self] _ in
             self?.logger.info("App became active")
-            self?.startMemoryMonitoring()
+            Task { @MainActor in
+                self?.startMemoryMonitoring()
+            }
         }
         
         notificationCenter.addObserver(
@@ -674,7 +680,9 @@ final class PerformanceMonitor: Sendable {
             queue: .main
         ) { [weak self] _ in
             self?.logger.warning("Received memory warning")
-            self?.handleMemoryWarning()
+            Task { @MainActor in
+                self?.handleMemoryWarning()
+            }
         }
     }
     
@@ -802,7 +810,7 @@ struct StartupMetric: Sendable, Identifiable {
     let duration: TimeInterval
     let timestamp: Date
     let memoryUsage: MemoryUsage
-    let metadata: [String: Any]?
+    let metadata: [String: String]?
 }
 
 struct MemoryMetric: Sendable, Identifiable {

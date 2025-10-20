@@ -26,7 +26,7 @@ struct TMIApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(\.simpleAuthStateModel, SimpleAuthStateModel())
+                .environment(\.authStateModel, AuthStateModel())
                 .environment(\.dashboardStateModel, DashboardStateModel())
                 .environment(\.interestsStateModel, InterestsAndHobbiesStateModel())
                 .preferredColorScheme(.dark)
@@ -35,11 +35,11 @@ struct TMIApp: App {
 }
 
 struct ContentView: View {
-    @Environment(\.simpleAuthStateModel) var authStateModel
+    @Environment(\.authStateModel) var authStateModel
     
     var body: some View {
         Group {
-            if authStateModel.isAuthenticated {
+            if authStateModel.isLoggedIn {
                 MainTabView()
             } else {
                 AuthenticationView()
@@ -53,7 +53,7 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .environment(\.simpleAuthStateModel, SimpleAuthStateModel())
+        .environment(\.authStateModel, AuthStateModel())
         .environment(\.dashboardStateModel, DashboardStateModel())
 }
 

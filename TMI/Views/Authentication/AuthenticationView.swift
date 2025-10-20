@@ -6,7 +6,7 @@ import Observation
 import SwiftUI
 
 struct AuthenticationView: View {
-  @Environment(\.simpleAuthStateModel) var stateModel
+  @Environment(\.authStateModel) var stateModel
   @State private var showingRegistration = false
   @State private var showingForgotPassword = false
   @State private var showingRoleSelection = false
@@ -73,7 +73,7 @@ struct AuthenticationView: View {
                   placeholder: "Email",
                   text: Binding(
                     get: { stateModel.email },
-                    set: { stateModel.email = $0 }
+                    set: { stateModel.updateEmail($0) }
                   ),
                   keyboardType: .emailAddress,
                   onSubmit: {
@@ -95,7 +95,7 @@ struct AuthenticationView: View {
                   placeholder: "Password",
                   text: Binding(
                     get: { stateModel.password },
-                    set: { stateModel.password = $0 }
+                    set: { stateModel.updatePassword($0) }
                   ),
                   isSecure: true,
                   onSubmit: {
@@ -144,10 +144,10 @@ struct AuthenticationView: View {
                   text: "Log In",
                   icon: "arrow.right",
                   style: .primary,
-                  isLoading: stateModel.isLoading,
+                  isLoading: stateModel.isAuthenticating,
                   action: authenticate
                 )
-                .disabled(stateModel.isLoading)
+                .disabled(stateModel.isAuthenticating)
                 .padding(.top, 10)
                 .opacity(animateButtons ? 1.0 : 0)
                 .animation(
@@ -161,11 +161,13 @@ struct AuthenticationView: View {
                   Button(action: {
                     showingRoleSelection = true
                   }) {
-                    Text("Don't have an account? ")
-                      .foregroundColor(.white.opacity(0.7))
-                      + Text("Create Account")
-                      .foregroundColor(Color.tmiSecondary)
-                      .fontWeight(.semibold)
+                    HStack(spacing: 0) {
+                      Text("Don't have an account? ")
+                        .foregroundColor(.white.opacity(0.7))
+                      Text("Create Account")
+                        .foregroundColor(Color.tmiSecondary)
+                        .fontWeight(.semibold)
+                    }
                   }
 
                   // Support Resources Button
@@ -226,7 +228,7 @@ struct AuthenticationView: View {
       .alert("Reset Password", isPresented: $showingForgotPassword) {
         TextField("Email", text: Binding(
           get: { stateModel.email },
-          set: { stateModel.email = $0 }
+          set: { stateModel.updateEmail($0) }
         ))
         .keyboardType(.emailAddress)
         .textInputAutocapitalization(.never)
@@ -235,18 +237,19 @@ struct AuthenticationView: View {
         Button("Cancel", role: .cancel) {}
         Button("Reset") {
           Task {
-            await stateModel.handlePasswordReset()
+            await stateModel.resetPassword()
           }
         }
       } message: {
         Text("Enter your email address and we'll send you a link to reset your password.")
       }
-      .onChange(of: stateModel.isAuthenticated) { _, isAuthenticated in
+      .onChange(of: stateModel.isLoggedIn) { _, isAuthenticated in
         if isAuthenticated {
           dismiss()
         }
       }
       .preferredColorScheme(.dark)
+      .errorBoundary()
       .onAppear {
         // Set initial focus to email field after a slight delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
@@ -275,7 +278,7 @@ struct AuthenticationView: View {
 
   private func authenticate() {
     Task {
-      await stateModel.handleLogin()
+      await stateModel.signIn()
     }
   }
 }

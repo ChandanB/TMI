@@ -222,19 +222,8 @@ final class CareerService: @unchecked Sendable {
       }
       
       // Enhanced hobby-based scoring with skill alignment
-      for hobby in student.hobbies {
-        let hobbyWeight = Double(hobby.popularityScore ?? 1)
-        
-        for skill in career.skills {
-          if skill.lowercased().contains(hobby.name.lowercased()) {
-            score += hobbyWeight * 0.3 // Direct skill match
-          }
-        }
-        
-        if career.description.lowercased().contains(hobby.name.lowercased()) {
-          score += hobbyWeight * 0.15
-        }
-      }
+      // Note: Hobbies are now part of interests array
+      // Additional interest-based scoring is handled above
       
       // Enhanced academic performance scoring with subject alignment
       if let academicPerformance = student.academicPerformance {
@@ -480,7 +469,7 @@ final class CareerService: @unchecked Sendable {
   }
   
   private func identifySkillGaps(student: Student, targetCareers: [Career]) -> [String] {
-    let studentSkills = Set(student.interests.map { $0.name } + student.hobbies.map { $0.name })
+    let studentSkills = Set(student.interests.map { $0.name })
     let requiredSkills = Set(targetCareers.flatMap { $0.skills })
     return Array(requiredSkills.subtracting(studentSkills)).prefix(5).map { $0 }
   }

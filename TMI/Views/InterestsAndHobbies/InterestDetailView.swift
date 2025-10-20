@@ -142,53 +142,29 @@ struct InterestDetailView: View {
     @ViewBuilder
     private var statsCards: some View {
         Group {
-            TMIGlassCard(style: .default) {
-                VStack(spacing: 8) {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(interest.color)
-                    
-                    Text(studentCount)
-                        .font(.title2.bold())
-                        .foregroundColor(.white)
-                    
-                    Text("Students")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-            }
-            
-            TMIGlassCard(style: .default) {
-                VStack(spacing: 8) {
-                    Image(systemName: "chart.line.uptrend.xyaxis.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(interest.color)
-                    
-                    Text(averageEngagement)
-                        .font(.title2.bold())
-                        .foregroundColor(.white)
-                    
-                    Text("Avg Engagement")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-            }
-            
-            TMIGlassCard(style: .default) {
-                VStack(spacing: 8) {
-                    Image(systemName: "doc.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(interest.color)
-                    
-                    Text(planCount)
-                        .font(.title2.bold())
-                        .foregroundColor(.white)
-                    
-                    Text("TMI Plans")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-            }
+            DetailStatsCard(
+                icon: "person.2.fill",
+                value: studentCount,
+                label: "Students",
+                color: interest.color,
+                index: 0
+            )
+
+            DetailStatsCard(
+                icon: "chart.line.uptrend.xyaxis.fill",
+                value: averageEngagement,
+                label: "Avg Engagement",
+                color: interest.color,
+                index: 1
+            )
+
+            DetailStatsCard(
+                icon: "doc.fill",
+                value: planCount,
+                label: "TMI Plans",
+                color: interest.color,
+                index: 2
+            )
         }
     }
     
@@ -254,52 +230,44 @@ struct InterestDetailView: View {
     }
     
     private func studentsContent(_ students: [Student]) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             ForEach(Array(students.prefix(3))) { student in
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(interest.color.opacity(0.2))
-                        .frame(width: 40, height: 40)
-                        .overlay(
-                            Text(String(student.name.prefix(1)))
-                                .font(.headline.bold())
-                                .foregroundColor(interest.color)
-                        )
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(student.name)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white)
-                        
-                        Text("Grade \(student.grade)")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.5))
+                NavigationLink {
+                    // Navigate to student detail
+                    Text("Student Detail: \(student.name)")
+                } label: {
+                    StudentRowView(student: student, color: interest.color)
                 }
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.05))
-                )
+                .buttonStyle(PlainButtonStyle())
             }
-            
+
             if students.count > 3 {
                 NavigationLink {
                     StudentsListView(filterBy: interest)
                 } label: {
-                    TMIButton(
-                        text: "View All \(students.count) Students",
-                        style: .secondary,
-                        action: {}
+                    HStack {
+                        Text("View All \(students.count) Students")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(interest.color)
+
+                        Spacer()
+
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(interest.color)
+                    }
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(interest.color.opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(interest.color.opacity(0.3), lineWidth: 1.5)
+                            )
                     )
                 }
-                .padding(.top, 8)
+                .padding(.top, 4)
             }
         }
     }
@@ -366,67 +334,45 @@ struct InterestDetailView: View {
     }
     
     private func plansContent(_ plans: [TMIPlan]) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             ForEach(Array(plans.prefix(3))) { plan in
-                planRowView(plan: plan)
+                NavigationLink {
+                    TMIPlanDetailView(plan: plan)
+                } label: {
+                    PlanRowView(plan: plan, color: interest.color)
+                }
+                .buttonStyle(PlainButtonStyle())
             }
-            
+
             if plans.count > 3 {
-                viewAllPlansButton(count: plans.count)
+                NavigationLink {
+                    TMIPlansListView(filterBy: interest)
+                } label: {
+                    HStack {
+                        Text("View All \(plans.count) Plans")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(interest.color)
+
+                        Spacer()
+
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(interest.color)
+                    }
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(interest.color.opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(interest.color.opacity(0.3), lineWidth: 1.5)
+                            )
+                    )
+                }
+                .padding(.top, 4)
             }
         }
-    }
-    
-    private func planRowView(plan: TMIPlan) -> some View {
-        HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(interest.color.opacity(0.2))
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Image(systemName: "doc.text.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(interest.color)
-                )
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(plan.model.rawValue)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                
-                Text("Progress: \(Int(plan.progress * 100))%")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
-            }
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.5))
-        }
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.05))
-        )
-    }
-    
-    private func viewAllPlansButton(count: Int) -> some View {
-        NavigationLink {
-            TMIPlansListView(filterBy: interest)
-        } label: {
-            Text("View All \(count) Plans")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.tmiSecondary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(.tmiSecondary, lineWidth: 1)
-                )
-        }
-        .padding(.top, 8)
     }
     
     private var emptyPlansContent: some View {
@@ -654,131 +600,7 @@ struct InterestDetailView: View {
     }
 }
 
-// MARK: - Hobby Detail View
-
-struct HobbyDetailView: View {
-    let hobby: Hobby
-    
-    @Environment(\.interestsStateModel) var stateModel
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    @State private var associatedData: HobbyAssociatedData?
-    @State private var isLoadingData = false
-    @State private var showingEditSheet = false
-    @State private var showingDeleteAlert = false
-    
-    // Animation states
-    @State private var headerAppeared = false
-    @State private var statsAppeared = false
-    @State private var contentAppeared = false
-    
-    var body: some View {
-        ZStack {
-            TMIBackgroundView(variant: .default)
-                .ignoresSafeArea()
-            
-            InterestDetailBlob(color: hobby.color)
-            
-            contentView
-        }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar { toolbarContent }
-        .task {
-            await loadAssociatedData()
-        }
-        .refreshable {
-            await loadAssociatedData()
-        }
-        .onAppear {
-            animateViewEntrance()
-        }
-        .sheet(isPresented: $showingEditSheet) {
-            EditHobbySheet(hobby: hobby)
-        }
-        .alert("Delete Hobby", isPresented: $showingDeleteAlert) {
-            deleteAlertButtons
-        } message: {
-            Text("Are you sure you want to delete '\(hobby.name)'? This action cannot be undone.")
-        }
-    }
-    
-    // Similar implementation to InterestDetailView but for hobbies
-    // ... (implementation details similar to above, adjusted for Hobby type)
-    
-    @ViewBuilder
-    private var contentView: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                headerSection
-                    .padding(.top, 40)
-                    .offset(y: headerAppeared ? 0 : -30)
-                    .opacity(headerAppeared ? 1 : 0)
-                
-                // Similar layout to InterestDetailView
-                Text("Hobby details implementation here")
-                    .foregroundColor(.white)
-            }
-            .padding(.bottom, 40)
-        }
-    }
-    
-    private var headerSection: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(hobby.color.opacity(0.15))
-                    .frame(width: 100, height: 100)
-                
-                Image(systemName: hobby.iconName)
-                    .font(.system(size: 40))
-                    .foregroundColor(hobby.color)
-            }
-            
-            Text(hobby.name)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-        }
-    }
-    
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
-            Text("Hobby Details")
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-        }
-    }
-    
-    @ViewBuilder
-    private var deleteAlertButtons: some View {
-        Button("Cancel", role: .cancel) { }
-        Button("Delete", role: .destructive) {
-            Task {
-                await stateModel.deleteHobby(hobby)
-            }
-        }
-    }
-    
-    private func loadAssociatedData() async {
-        isLoadingData = true
-        let data = await stateModel.fetchAssociatedData(for: hobby)
-        await MainActor.run {
-            self.associatedData = data
-            self.isLoadingData = false
-        }
-    }
-    
-    private func animateViewEntrance() {
-        withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
-            headerAppeared = true
-        }
-        withAnimation(.easeOut(duration: 0.5).delay(0.3)) {
-            statsAppeared = true
-        }
-        withAnimation(.easeOut(duration: 0.5).delay(0.5)) {
-            contentAppeared = true
-        }
-    }
-}
+// Note: HobbyDetailView removed - now using unified InterestDetailView
 
 // MARK: - Edit Sheets
 
@@ -803,26 +625,7 @@ struct EditInterestSheet: View {
     }
 }
 
-struct EditHobbySheet: View {
-    let hobby: Hobby
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            Text("Edit Hobby: \(hobby.name)")
-                .navigationTitle("Edit Hobby")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") { dismiss() }
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Save") { dismiss() }
-                    }
-                }
-        }
-    }
-}
+// Note: EditHobbySheet removed - now using unified EditInterestSheet
 
 // MARK: - Supporting Views
 
@@ -844,11 +647,252 @@ struct TMIPlansListView: View {
     }
 }
 
+// MARK: - Detail Stats Card
+
+struct DetailStatsCard: View {
+    let icon: String
+    let value: String
+    let label: String
+    let color: Color
+    let index: Int
+
+    @State private var isHovered = false
+    @State private var hasAppeared = false
+
+    var body: some View {
+        TMIGlassCard(style: .default) {
+            VStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.2))
+                        .frame(width: 56, height: 56)
+                        .scaleEffect(isHovered ? 1.15 : 1.0)
+                        .blur(radius: isHovered ? 4 : 0)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundColor(color)
+                        .symbolEffect(.bounce, options: .speed(0.5), value: isHovered)
+                }
+
+                VStack(spacing: 4) {
+                    Text(value)
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .contentTransition(.numericText())
+
+                    Text(label)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+            }
+            .padding(.vertical, 12)
+        }
+        .scaleEffect(isHovered ? 1.06 : 1.0)
+        .shadow(
+            color: isHovered ? color.opacity(0.4) : Color.clear,
+            radius: isHovered ? 16 : 0,
+            y: isHovered ? 6 : 0
+        )
+        .scaleEffect(hasAppeared ? 1.0 : 0.7)
+        .opacity(hasAppeared ? 1.0 : 0)
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(Double(index) * 0.1)) {
+                hasAppeared = true
+            }
+        }
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
+// MARK: - Student Row View
+
+struct StudentRowView: View {
+    let student: Student
+    let color: Color
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                color.opacity(0.3),
+                                color.opacity(0.15)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 48, height: 48)
+
+                Text(String(student.name.prefix(1)))
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(color)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(student.name)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "graduationcap.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(color.opacity(0.7))
+
+                    Text("Grade \(student.grade)")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white.opacity(0.4))
+                .offset(x: isHovered ? 4 : 0)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    isHovered
+                        ? color.opacity(0.1)
+                        : Color.white.opacity(0.05)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(
+                            isHovered
+                                ? color.opacity(0.3)
+                                : Color.white.opacity(0.1),
+                            lineWidth: isHovered ? 1.5 : 1
+                        )
+                )
+        )
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .shadow(
+            color: isHovered ? color.opacity(0.2) : Color.clear,
+            radius: isHovered ? 10 : 0,
+            y: isHovered ? 4 : 0
+        )
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
+// MARK: - Plan Row View
+
+struct PlanRowView: View {
+    let plan: TMIPlan
+    let color: Color
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                color.opacity(0.3),
+                                color.opacity(0.15)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 48, height: 48)
+
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(color)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(plan.model.rawValue)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.1))
+                            .frame(width: 80, height: 6)
+
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(color)
+                            .frame(width: 80 * plan.progress, height: 6)
+                    }
+
+                    Text("\(Int(plan.progress * 100))%")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(color)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white.opacity(0.4))
+                .offset(x: isHovered ? 4 : 0)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    isHovered
+                        ? color.opacity(0.1)
+                        : Color.white.opacity(0.05)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(
+                            isHovered
+                                ? color.opacity(0.3)
+                                : Color.white.opacity(0.1),
+                            lineWidth: isHovered ? 1.5 : 1
+                        )
+                )
+        )
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .shadow(
+            color: isHovered ? color.opacity(0.2) : Color.clear,
+            radius: isHovered ? 10 : 0,
+            y: isHovered ? 4 : 0
+        )
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
 // MARK: - Background Animation
 
 struct InterestDetailBlob: View {
     var color: Color
-    
+
     @State private var animateBlob1 = false
     @State private var animateBlob2 = false
     

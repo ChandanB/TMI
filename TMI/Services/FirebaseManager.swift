@@ -231,14 +231,8 @@ extension FirebaseManager {
         let doc = interestsCollection.document(interest.id ?? UUID().uuidString)
         try await doc.setData(interest.toFirestoreData())
       }
-      
-      // Seed hobbies
-      let hobbiesCollection = firestore.collection("users").document(userID).collection("hobbies")
-      let hobbies = Hobby.expandedSampleHobbies
-      for hobby in hobbies {
-        let doc = hobbiesCollection.document(hobby.id.uuidString)
-        try await doc.setData(hobby.toFirestoreData())
-      }
+
+      // Note: Hobbies are now included in interests above
     }
   }
 }

@@ -12,13 +12,19 @@ import SwiftUI
 struct InterestsAndHobbiesView: View {
     @Environment(\.interestsStateModel) var stateModel
     @Environment(\.horizontalSizeClass) private var sizeClass
-    
+    @Namespace private var segmentNamespace
+
     // Animation states
     @State private var headerAppeared = false
     @State private var searchAppeared = false
     @State private var segmentAppeared = false
     @State private var contentAppeared = false
     @State private var fabAppeared = false
+
+    // Dynamic data
+    @State private var activeStudentCount = 0
+
+    private let studentService = StudentService()
     
     var body: some View {
         ZStack {
@@ -54,15 +60,11 @@ struct InterestsAndHobbiesView: View {
         .preferredColorScheme(.dark)
         .task {
             await stateModel.fetch()
-            print("[DEBUG] After fetch - totalItems: \(stateModel.totalItems)")
-            print("[DEBUG] Filtered interests count: \(stateModel.filteredInterests.count)")
-            print("[DEBUG] Filtered hobbies count: \(stateModel.filteredHobbies.count)")
-            print("[DEBUG] Selected segment: \(stateModel.selectedSegment)")
-            print("[DEBUG] Selected filter: \(stateModel.selectedFilter)")
-            print("[DEBUG] Search text: '\(stateModel.searchText)'")
+            await loadActiveStudentCount()
         }
         .refreshable {
             await stateModel.refresh()
+            await loadActiveStudentCount()
         }
         .onAppear {
             animateViewEntrance()
@@ -130,34 +132,36 @@ struct InterestsAndHobbiesView: View {
     
     private var loadedContentView: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: 20) {
                 headerSection
-                    .padding(.top, 16)
+                    .padding(.top, 12)
                     .padding(.horizontal, 20)
                     .offset(y: headerAppeared ? 0 : -20)
                     .opacity(headerAppeared ? 1 : 0)
-                
+
                 searchSection
                     .padding(.horizontal, 20)
                     .offset(y: searchAppeared ? 0 : -20)
                     .opacity(searchAppeared ? 1 : 0)
-                
+
                 segmentControlSection
                     .padding(.horizontal, 20)
                     .offset(y: segmentAppeared ? 0 : 10)
                     .opacity(segmentAppeared ? 1 : 0)
-                
+
                 statsSection
                     .padding(.horizontal, 20)
                     .offset(y: segmentAppeared ? 0 : 10)
                     .opacity(segmentAppeared ? 1 : 0)
-                
+
                 itemsGridSection
                     .padding(.horizontal, 20)
                     .offset(y: contentAppeared ? 0 : 30)
                     .opacity(contentAppeared ? 1 : 0)
+
+                Spacer(minLength: 80)
             }
-            .padding(.bottom, 100)
+            .padding(.bottom, 20)
         }
     }
     
@@ -191,7 +195,7 @@ struct InterestsAndHobbiesView: View {
     }
     
     private var headerSubtitle: String {
-        stateModel.selectedSegment == .interests
+        stateModel.selectedSegment == .all
             ? "Explore and manage academic and personal interests"
             : "Discover and track favorite pastimes and activities"
     }
@@ -208,38 +212,55 @@ struct InterestsAndHobbiesView: View {
     }
     
     // MARK: - Segment Control Section
-    
+
     private var segmentControlSection: some View {
         HStack(spacing: 0) {
             ForEach(InterestsAndHobbiesStateModel.ViewSegment.allCases, id: \.self) { segment in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         stateModel.selectedSegment = segment
                     }
                 } label: {
-                    Text(segment.rawValue)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(stateModel.selectedSegment == segment ? .white : .white.opacity(0.6))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(stateModel.selectedSegment == segment ? Color.white.opacity(0.1) : Color.clear)
-                        )
+                    HStack(spacing: 6) {
+                        Image(systemName: segment.iconName)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(stateModel.selectedSegment == segment ? segmentColor : .white.opacity(0.5))
+
+                        Text(segment.rawValue)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(stateModel.selectedSegment == segment ? .white : .white.opacity(0.6))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 8)
+                    .background(
+                        ZStack {
+                            if stateModel.selectedSegment == segment {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(segmentColor.opacity(0.2))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(segmentColor.opacity(0.4), lineWidth: 1.5)
+                                    )
+                                    .shadow(color: segmentColor.opacity(0.3), radius: 8, y: 2)
+                                    .matchedGeometryEffect(id: "segment_background", in: segmentNamespace)
+                            }
+                        }
+                    )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .buttonStyle(ScaleButtonStyle())
             }
         }
-        .padding(4)
+        .padding(6)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 14)
                 .fill(Color.white.opacity(0.05))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 14)
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
         )
-        .accessibilityLabel("Switch between interests and hobbies")
+        .accessibilityLabel("Switch between interest categories")
     }
     
     // MARK: - Stats Section
@@ -253,53 +274,29 @@ struct InterestsAndHobbiesView: View {
     @ViewBuilder
     private var statsCards: some View {
         Group {
-            TMIGlassCard(style: .default) {
-                VStack(spacing: 8) {
-                    Image(systemName: stateModel.selectedSegment == .interests ? "heart.fill" : "gamecontroller.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(segmentColor)
-                    
-                    Text("\(stateModel.totalItems)")
-                        .font(.title2.bold())
-                        .foregroundColor(.white)
-                    
-                    Text("Total")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-            }
-            
-            TMIGlassCard(style: .default) {
-                VStack(spacing: 8) {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(segmentColor)
-                    
-                    Text("\(stateModel.categoryCount)")
-                        .font(.title2.bold())
-                        .foregroundColor(.white)
-                    
-                    Text("Categories")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-            }
-            
-            TMIGlassCard(style: .default) {
-                VStack(spacing: 8) {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(segmentColor)
-                    
-                    Text("24")
-                        .font(.title2.bold())
-                        .foregroundColor(.white)
-                    
-                    Text("Active Students")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-            }
+            StatsCard(
+                icon: stateModel.selectedSegment.iconName,
+                value: "\(displayedInterests.count)",
+                label: stateModel.selectedSegment == .all ? "Total" : "In Category",
+                color: segmentColor,
+                index: 0
+            )
+
+            StatsCard(
+                icon: "chart.bar.fill",
+                value: "\(stateModel.categoryCount)",
+                label: "Categories",
+                color: segmentColor,
+                index: 1
+            )
+
+            StatsCard(
+                icon: "person.2.fill",
+                value: "\(activeStudentCount)",
+                label: "Students",
+                color: segmentColor,
+                index: 2
+            )
         }
     }
     
@@ -307,9 +304,7 @@ struct InterestsAndHobbiesView: View {
     
     private var itemsGridSection: some View {
         Group {
-            if stateModel.selectedSegment == .interests && stateModel.filteredInterests.isEmpty {
-                emptyStateView
-            } else if stateModel.selectedSegment == .hobbies && stateModel.filteredHobbies.isEmpty {
+            if stateModel.filteredInterests.isEmpty {
                 emptyStateView
             } else {
                 itemsGrid
@@ -320,94 +315,41 @@ struct InterestsAndHobbiesView: View {
     private var itemsGrid: some View {
         LazyVGrid(
             columns: gridColumns,
-            spacing: 20
+            spacing: 18
         ) {
-            if stateModel.selectedSegment == .interests {
-                ForEach(stateModel.filteredInterests) { interest in
-                    // Debug: This should print for each interest being rendered
-                    let _ = print("[DEBUG] Rendering interest: \(interest.name)")
-                    NavigationLink {
-                        InterestDetailView(interest: interest)
-                    } label: {
-                        TMIGlassCard(style: .default) {
-                            VStack(spacing: 12) {
-                                HStack {
-                                    Image(systemName: interest.iconName)
-                                        .font(.system(size: 24))
-                                        .foregroundColor(interest.color)
-                                    
-                                    Spacer()
-                                    
-                                    if interest.isFeatured {
-                                        Image(systemName: "star.fill")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.yellow)
-                                    }
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(interest.name)
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(.white)
-                                        .lineLimit(2)
-                                        .multilineTextAlignment(.leading)
-                                    
-                                    Text(interest.category.first?.rawValue ?? "General")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                    }
-                    .accessibilityLabel("View details for \(interest.name)")
+            ForEach(Array(displayedInterests.enumerated()), id: \.element.id) { index, interest in
+                NavigationLink {
+                    InterestDetailView(interest: interest)
+                } label: {
+                    InterestCardView(interest: interest)
                 }
-            } else {
-                ForEach(stateModel.filteredHobbies) { hobby in
-                    NavigationLink {
-                        HobbyDetailView(hobby: hobby)
-                    } label: {
-                        TMIGlassCard(style: .default) {
-                            VStack(spacing: 12) {
-                                HStack {
-                                    Image(systemName: hobby.iconName)
-                                        .font(.system(size: 24))
-                                        .foregroundColor(hobby.color)
-                                    
-                                    Spacer()
-                                    
-                                    if hobby.isFeatured {
-                                        Image(systemName: "star.fill")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.yellow)
-                                    }
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(hobby.name)
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(.white)
-                                        .lineLimit(2)
-                                        .multilineTextAlignment(.leading)
-                                    
-                                    Text(hobby.category.first?.rawValue ?? "General")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                    }
-                    .accessibilityLabel("View details for \(hobby.name)")
-                }
+                .buttonStyle(InterestCardButtonStyle())
+                .accessibilityLabel("View details for \(interest.name)")
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .opacity
+                ))
+                .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(Double(index) * 0.05), value: displayedInterests.count)
+            }
+        }
+    }
+
+    // Computed property to get interests based on selected segment
+    private var displayedInterests: [Interest] {
+        if stateModel.selectedSegment == .all {
+            return stateModel.filteredInterests
+        } else {
+            let targetCategories = stateModel.selectedSegment.categories
+            return stateModel.filteredInterests.filter { interest in
+                !Set(interest.category).isDisjoint(with: Set(targetCategories))
             }
         }
     }
     
     private var gridColumns: [GridItem] {
         sizeClass == .regular
-            ? Array(repeating: GridItem(.adaptive(minimum: 160), spacing: 20), count: 1)
-            : Array(repeating: GridItem(.adaptive(minimum: 140), spacing: 16), count: 1)
+            ? [GridItem(.adaptive(minimum: 200, maximum: 300), spacing: 20)]
+            : [GridItem(.adaptive(minimum: 160, maximum: 250), spacing: 16)]
     }
     
     // MARK: - Empty State
@@ -415,7 +357,7 @@ struct InterestsAndHobbiesView: View {
     private var emptyStateView: some View {
         TMIGlassCard(style: .default) {
             VStack(spacing: 20) {
-                Image(systemName: stateModel.selectedSegment == .interests ? "heart.slash" : "gamecontroller.fill")
+                Image(systemName: stateModel.selectedSegment == .all ? "heart.slash" : "gamecontroller.fill")
                     .font(.system(size: 50))
                     .foregroundColor(.white.opacity(0.4))
                 
@@ -450,9 +392,9 @@ struct InterestsAndHobbiesView: View {
         } else if stateModel.selectedFilter != .all {
             return "No \(stateModel.selectedSegment.rawValue.lowercased()) in this category. Try a different filter."
         } else {
-            return stateModel.selectedSegment == .interests
+            return stateModel.selectedSegment == .all
                 ? "Add your first interest to start tracking student alignments"
-                : "Add your first hobby to start exploring student activities"
+                : "Add your first interest to start exploring student activities"
         }
     }
     
@@ -471,8 +413,6 @@ struct InterestsAndHobbiesView: View {
                 sortMenu
                 Divider()
                 filterMenu
-                Divider()
-                actionMenu
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.system(size: 22))
@@ -514,25 +454,10 @@ struct InterestsAndHobbiesView: View {
         }
     }
     
-    @ViewBuilder
-    private var actionMenu: some View {
-        Button {
-            // Import functionality - future enhancement
-        } label: {
-            Label("Import", systemImage: "square.and.arrow.down")
-        }
-        
-        Button {
-            // Export functionality - future enhancement
-        } label: {
-            Label("Export", systemImage: "square.and.arrow.up")
-        }
-    }
-    
     // MARK: - Helper Properties
     
     private var segmentColor: Color {
-        stateModel.selectedSegment == .interests ? .pink : .green
+        stateModel.selectedSegment == .all ? .pink : .green
     }
     
     // MARK: - Animation Methods
@@ -541,21 +466,32 @@ struct InterestsAndHobbiesView: View {
         withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
             headerAppeared = true
         }
-        
+
         withAnimation(.easeOut(duration: 0.5).delay(0.2)) {
             searchAppeared = true
         }
-        
+
         withAnimation(.easeOut(duration: 0.5).delay(0.3)) {
             segmentAppeared = true
         }
-        
+
         withAnimation(.easeOut(duration: 0.5).delay(0.4)) {
             contentAppeared = true
         }
-        
+
         withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5)) {
             fabAppeared = true
+        }
+    }
+
+    @MainActor
+    private func loadActiveStudentCount() async {
+        do {
+            let students = try await studentService.fetchStudents()
+            activeStudentCount = students.count
+        } catch {
+            print("[InterestsAndHobbiesView] Failed to load student count: \(error)")
+            activeStudentCount = 0
         }
     }
 }
@@ -566,10 +502,8 @@ struct AddItemSheet: View {
     @Environment(\.interestsStateModel) var stateModel
     @Environment(\.dismiss) var dismiss
     
-    @State private var itemType: InterestsAndHobbiesItemType = .interest
     @State private var itemName = ""
     @State private var selectedCategory = InterestCategory.academics
-    @State private var selectedHobbyCategory = HobbyCategory.sports
     @State private var selectedIcon = "heart.fill"
     @State private var description = ""
     
@@ -580,7 +514,6 @@ struct AddItemSheet: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        typeSelectionSection
                         nameInputSection
                         categorySelectionSection
                         iconSelectionSection
@@ -592,7 +525,7 @@ struct AddItemSheet: View {
                 
                 saveButtonSection
             }
-            .navigationTitle(itemType == .interest ? "Add Interest" : "Add Hobby")
+            .navigationTitle("Add Interest")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -603,46 +536,6 @@ struct AddItemSheet: View {
                 }
             }
         }
-    
-    // MARK: - Type Selection
-    
-    private var typeSelectionSection: some View {
-        TMIGlassCard(style: .default) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Item Type")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                HStack(spacing: 0) {
-                    ForEach(InterestsAndHobbiesItemType.allCases, id: \.self) { type in
-                        Button {
-                            itemType = type
-                        } label: {
-                            Text(type.rawValue)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(itemType == type ? .white : .white.opacity(0.6))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(itemType == type ? Color.white.opacity(0.1) : Color.clear)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(4)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.05))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                        )
-                )
-            }
-        }
-    }
     
     // MARK: - Name Input
     
@@ -655,10 +548,10 @@ struct AddItemSheet: View {
                 
                 TMITextField(
                     icon: "pencil",
-                    placeholder: itemType == .interest ? "Enter interest name" : "Enter hobby name",
+                    placeholder: "Enter interest name",
                     text: $itemName
                 )
-                .accessibilityLabel("Enter \(itemType.rawValue.lowercased()) name")
+                .accessibilityLabel("Enter interest name")
             }
         }
     }
@@ -671,59 +564,31 @@ struct AddItemSheet: View {
                 Text("Category")
                     .font(.headline)
                     .foregroundColor(.white)
-                
-                if itemType == .interest {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(InterestCategory.allCases, id: \.self) { category in
-                                Button {
-                                    selectedCategory = category
-                                } label: {
-                                    Text(category.rawValue)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(selectedCategory == category ? .white : .white.opacity(0.7))
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            Capsule()
-                                                .fill(selectedCategory == category ? Color.pink.opacity(0.3) : Color.white.opacity(0.1))
-                                                .overlay(
-                                                    Capsule()
-                                                        .stroke(selectedCategory == category ? Color.pink : Color.white.opacity(0.2), lineWidth: 1)
-                                                )
-                                        )
-                                }
-                                .buttonStyle(.plain)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(InterestCategory.allCases, id: \.self) { category in
+                            Button {
+                                selectedCategory = category
+                            } label: {
+                                Text(category.rawValue)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(selectedCategory == category ? .white : .white.opacity(0.7))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        Capsule()
+                                            .fill(selectedCategory == category ? Color.pink.opacity(0.3) : Color.white.opacity(0.1))
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(selectedCategory == category ? Color.pink : Color.white.opacity(0.2), lineWidth: 1)
+                                            )
+                                    )
                             }
+                            .buttonStyle(.plain)
                         }
-                        .padding(.horizontal, 20)
                     }
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(HobbyCategory.allCases, id: \.self) { category in
-                                Button {
-                                    selectedHobbyCategory = category
-                                } label: {
-                                    Text(category.rawValue)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(selectedHobbyCategory == category ? .white : .white.opacity(0.7))
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            Capsule()
-                                                .fill(selectedHobbyCategory == category ? Color.green.opacity(0.3) : Color.white.opacity(0.1))
-                                                .overlay(
-                                                    Capsule()
-                                                        .stroke(selectedHobbyCategory == category ? Color.green : Color.white.opacity(0.2), lineWidth: 1)
-                                                )
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
+                    .padding(.horizontal, 20)
                 }
             }
         }
@@ -739,7 +604,7 @@ struct AddItemSheet: View {
                     .foregroundColor(.white)
                 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
-                    ForEach(itemType == .interest ? interestIcons : hobbyIcons, id: \.self) { icon in
+                    ForEach(interestIcons, id: \.self) { icon in
                         Button {
                             selectedIcon = icon
                         } label: {
@@ -749,10 +614,10 @@ struct AddItemSheet: View {
                                 .frame(width: 50, height: 50)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .fill(selectedIcon == icon ? (itemType == .interest ? Color.pink.opacity(0.3) : Color.green.opacity(0.3)) : Color.white.opacity(0.1))
+                                        .fill(selectedIcon == icon ? Color.pink.opacity(0.3) : Color.white.opacity(0.1))
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 12)
-                                                .stroke(selectedIcon == icon ? (itemType == .interest ? Color.pink : Color.green) : Color.white.opacity(0.2), lineWidth: 1)
+                                                .stroke(selectedIcon == icon ? Color.pink : Color.white.opacity(0.2), lineWidth: 1)
                                         )
                                 )
                         }
@@ -787,7 +652,7 @@ struct AddItemSheet: View {
                         description.isEmpty ?
                         VStack {
                             HStack {
-                                Text("Add a description to help identify this \(itemType.rawValue.lowercased())...")
+                                Text("Add a description to help identify this interest...")
                                     .foregroundColor(.white.opacity(0.5))
                                     .allowsHitTesting(false)
                                 Spacer()
@@ -808,9 +673,9 @@ struct AddItemSheet: View {
     private var saveButtonSection: some View {
         VStack {
             Spacer()
-            
+
             TMIButton(
-                text: "Save \(itemType.rawValue)",
+                text: "Save Interest",
                 style: .primary,
                 action: saveItem
             )
@@ -829,43 +694,189 @@ struct AddItemSheet: View {
     
     private func saveItem() {
         Task {
-            if itemType == .interest {
-                let newInterest = Interest(
-                    name: itemName,
-                    category: [selectedCategory],
-                    description: description.isEmpty ? nil : description
-                )
-                await stateModel.addInterest(newInterest)
-            } else {
-                let newHobby = Hobby(
-                    name: itemName,
-                    category: [selectedHobbyCategory],
-                    description: description.isEmpty ? nil : description
-                )
-                await stateModel.addHobby(newHobby)
-            }
+            let newInterest = Interest(
+                name: itemName,
+                category: [selectedCategory],
+                description: description.isEmpty ? nil : description
+            )
+            await stateModel.addInterest(newInterest)
             dismiss()
         }
     }
 }
 
-// MARK: - Supporting Types
+// MARK: - Stats Card View
 
-enum InterestsAndHobbiesItemType: String, CaseIterable, Identifiable {
-    case interest = "Interest"
-    case hobby = "Hobby"
-    
-    var id: String { self.rawValue }
+struct StatsCard: View {
+    let icon: String
+    let value: String
+    let label: String
+    let color: Color
+    let index: Int
+
+    @State private var isHovered = false
+    @State private var hasAppeared = false
+
+    var body: some View {
+        TMIGlassCard(style: .default) {
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.2))
+                        .frame(width: 50, height: 50)
+                        .scaleEffect(isHovered ? 1.1 : 1.0)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundColor(color)
+                        .symbolEffect(.bounce, options: .speed(0.5), value: isHovered)
+                }
+
+                Text(value)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .contentTransition(.numericText(value: Double(value) ?? 0))
+
+                Text(label)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.vertical, 8)
+        }
+        .scaleEffect(isHovered ? 1.05 : 1.0)
+        .shadow(
+            color: isHovered ? color.opacity(0.3) : Color.clear,
+            radius: isHovered ? 12 : 0,
+            y: isHovered ? 4 : 0
+        )
+        .scaleEffect(hasAppeared ? 1.0 : 0.8)
+        .opacity(hasAppeared ? 1.0 : 0)
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(Double(index) * 0.1)) {
+                hasAppeared = true
+            }
+        }
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                isHovered = hovering
+            }
+        }
+    }
 }
+
+// MARK: - Interest Card View
+
+struct InterestCardView: View {
+    let interest: Interest
+    @State private var isHovered = false
+
+    var body: some View {
+        TMIGlassCard(style: .default) {
+            VStack(spacing: 0) {
+                // Icon header with gradient background
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            interest.color.opacity(0.3),
+                            interest.color.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(height: 80)
+
+                    VStack {
+                        HStack {
+                            Spacer()
+
+                            if interest.isFeatured {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.yellow)
+                                    .padding(6)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.black.opacity(0.3))
+                                    )
+                            }
+                        }
+                        .padding(12)
+
+                        Spacer()
+                    }
+
+                    Image(systemName: interest.iconName)
+                        .font(.system(size: 36, weight: .light))
+                        .foregroundColor(interest.color)
+                        .symbolEffect(.pulse, options: .repeating.speed(0.5), isActive: isHovered)
+                }
+                .clipShape(UnevenRoundedRectangle(
+                    topLeadingRadius: 16,
+                    topTrailingRadius: 16
+                ))
+
+                // Content section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(interest.name)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "tag.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(interest.color.opacity(0.8))
+
+                        Text(interest.category.first?.rawValue ?? "General")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.4))
+                            .offset(x: isHovered ? 4 : 0)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .scaleEffect(isHovered ? 1.03 : 1.0)
+        .shadow(
+            color: isHovered ? interest.color.opacity(0.3) : Color.clear,
+            radius: isHovered ? 15 : 0,
+            x: 0,
+            y: isHovered ? 8 : 0
+        )
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
+// MARK: - Button Styles
+
+struct InterestCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Supporting Types
 
 private let interestIcons = [
     "heart.fill", "book.fill", "graduationcap.fill", "atom", "fossil.shell.fill",
     "leaf.fill", "globe.americas.fill", "paintbrush.fill", "ruler.fill", "guitars.fill"
-]
-
-private let hobbyIcons = [
-    "gamecontroller.fill", "figure.run", "basketball.fill", "music.note", "camera.fill",
-    "theatermasks.fill", "mountain.2.fill", "airplane", "bike", "baseball.fill"
 ]
 
 // MARK: - Preview

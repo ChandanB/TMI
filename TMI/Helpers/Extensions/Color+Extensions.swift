@@ -47,37 +47,37 @@ extension Color {
 extension Color {
 
     // MARK: - Surface Colors
-    
+
     /// Primary surface color - background for cards and elevated surfaces
     static var tmiSurface: Color {
-        return Color("TMISurface", bundle: .main)
+        Color(light: Color(hex: "#F9FAFB"), dark: Color(hex: "#1F2937"))
     }
 
     /// Secondary text color
     static var tmiTextSecondary: Color {
-        return Color("TMITextSecondary", bundle: .main)
+        Color(light: Color(hex: "#6B7280"), dark: Color(hex: "#9CA3AF"))
     }
-    
+
     // MARK: - Semantic Colors
-    
+
     /// Success color
     static var tmiSuccess: Color {
-        return Color("TMISuccess", bundle: .main)
+        Color(light: Color(hex: "#10B981"), dark: Color(hex: "#34D399"))
     }
-    
+
     /// Warning color
     static var tmiWarning: Color {
-        return Color("TMIWarning", bundle: .main)
+        Color(light: Color(hex: "#F59E0B"), dark: Color(hex: "#FBBF24"))
     }
-    
+
     /// Error color
     static var tmiError: Color {
-        return Color("TMIError", bundle: .main)
+        Color(light: Color(hex: "#EF4444"), dark: Color(hex: "#F87171"))
     }
-    
+
     /// Info color
     static var tmiInfo: Color {
-        return Color("TMIInfo", bundle: .main)
+        Color(light: Color(hex: "#3B82F6"), dark: Color(hex: "#60A5FA"))
     }
 }
 

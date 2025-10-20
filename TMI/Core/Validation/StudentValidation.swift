@@ -76,13 +76,7 @@ extension Student: Validatable {
             return .valid
         }
         
-        // Validate hobbies
-        validator.add(field: "hobbies") {
-            if self.hobbies.count > 15 {
-                return .error("Too many hobbies selected (maximum 15)")
-            }
-            return .valid
-        }
+        // Note: Hobbies are now included in interests array
         
         // Run all validations
         try validator.validate()
@@ -101,7 +95,6 @@ extension Student: Validatable {
         logger.debug("Validating business rules for student")
         
         // Example: Validate that student is not too young for selected interests
-        let ageRestrictedCategories: [InterestCategory] = [.technology]
         let hasAgeRestrictedInterests = interests.contains { interest in
             interest.careerPathways?.contains(.business) == true || interest.category.contains(.technology)
         }
@@ -201,7 +194,6 @@ extension Student {
             tmiPlans: tmiPlans,
             studentID: studentID.map(Sanitizer.sanitizeText),
             interests: interests,
-            hobbies: hobbies,
             photoURL: photoURL,
             surveyResults: surveyResults,
             academicPerformance: academicPerformance,

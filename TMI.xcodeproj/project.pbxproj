@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		115B60D52EA6BD48003A033A /* IMPLEMENTATION_STATUS.md in Resources */ = {isa = PBXBuildFile; fileRef = 115B603B2EA6BD48003A033A /* IMPLEMENTATION_STATUS.md */; };
 		1185DADA2C93A75C004616D5 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DAD92C93A75C004616D5 /* FirebaseAnalytics */; };
 		1185DADC2C93A75C004616D5 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DADB2C93A75C004616D5 /* FirebaseAnalyticsOnDeviceConversion */; };
 		1185DADE2C93A75C004616D5 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DADD2C93A75C004616D5 /* FirebaseAnalyticsWithoutAdIdSupport */; };
@@ -39,6 +40,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		115B603B2EA6BD48003A033A /* IMPLEMENTATION_STATUS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = IMPLEMENTATION_STATUS.md; sourceTree = "<group>"; };
 		1185DB0B2C93AA91004616D5 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		11C813DE2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "TMI_App_ Development_Breakdown.md"; sourceTree = "<group>"; };
 		11C813E02DB59A6D005477FC /* Apple’s Official UI_UX Design Guidelines for iOS and macOS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Apple’s Official UI_UX Design Guidelines for iOS and macOS.md"; sourceTree = "<group>"; };
@@ -91,6 +93,7 @@
 			children = (
 				11C813E02DB59A6D005477FC /* Apple’s Official UI_UX Design Guidelines for iOS and macOS.md */,
 				11C813DE2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md */,
+				115B603B2EA6BD48003A033A /* IMPLEMENTATION_STATUS.md */,
 				11C816A22DB5F5AC005477FC /* TMI */,
 				1185DB0B2C93AA91004616D5 /* GoogleService-Info.plist */,
 				11E7D1292C93A2B70021AC20 /* Assets.xcassets */,
@@ -203,6 +206,7 @@
 				11C813DF2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md in Resources */,
 				11E7D12A2C93A2B70021AC20 /* Assets.xcassets in Resources */,
 				1185DB0C2C93AA92004616D5 /* GoogleService-Info.plist in Resources */,
+				115B60D52EA6BD48003A033A /* IMPLEMENTATION_STATUS.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

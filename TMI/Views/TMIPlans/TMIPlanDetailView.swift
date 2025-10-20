@@ -508,12 +508,26 @@ struct TMIPlanDetailView: View {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 12) {
             ForEach(plan.students) { student in
-              StudentDetailCard(student: student)
+              NavigationLink(destination: StudentDetailViewRedesigned(student: student)) {
+                StudentDetailCard(student: student)
+              }
+              .buttonStyle(.plain)
             }
           }
           .padding(.horizontal, 4)
           .padding(.vertical, 8)
         }
+
+        // Quick action hint
+        HStack(spacing: 4) {
+          Image(systemName: "hand.tap")
+            .font(.system(size: 12))
+            .foregroundColor(.white.opacity(0.5))
+          Text("Tap student to view full profile")
+            .font(.system(size: 12))
+            .foregroundColor(.white.opacity(0.5))
+        }
+        .padding(.top, 4)
       }
     }
   }
@@ -535,20 +549,10 @@ struct TMIPlanDetailView: View {
           }
         }
 
-        if !plan.hobbies.isEmpty {
-          VStack(alignment: .leading, spacing: 12) {
-            Text("Hobbies")
-              .font(.system(size: 16, weight: .semibold))
-              .foregroundColor(.white)
+        // Note: Hobbies section removed - now included in interests above
 
-            WrapView(items: plan.hobbies) { hobby in
-              HobbyTag(hobby: hobby)
-            }
-          }
-        }
-
-        if plan.interests.isEmpty && plan.hobbies.isEmpty {
-          Text("No interests or hobbies associated with this plan.")
+        if plan.interests.isEmpty {
+          Text("No interests associated with this plan.")
             .font(.system(size: 15))
             .foregroundColor(.white.opacity(0.6))
             .padding(.vertical, 8)
@@ -962,34 +966,40 @@ struct DetailStat: View {
   var icon: String
   var color: Color
 
-  @State private var isAnimated = false
+  @State private var isHovered = false
+  @State private var hasAppeared = false
 
   var body: some View {
-    VStack(spacing: 8) {
+    VStack(spacing: 12) {
       ZStack {
         Circle()
-          .fill(color.opacity(0.1))
-          .frame(width: 40, height: 40)
+          .fill(color.opacity(0.2))
+          .frame(width: 48, height: 48)
+          .scaleEffect(isHovered ? 1.15 : 1.0)
+          .blur(radius: isHovered ? 4 : 0)
 
         Image(systemName: icon)
-          .font(.system(size: 18))
+          .font(.system(size: 20, weight: .medium))
           .foregroundColor(color)
+          .symbolEffect(.bounce, options: .speed(0.5), value: isHovered)
       }
 
       Text(value)
-        .font(.system(size: 15, weight: .semibold))
+        .font(.system(size: 16, weight: .bold, design: .rounded))
         .foregroundColor(.white)
         .multilineTextAlignment(.center)
         .lineLimit(1)
+        .minimumScaleFactor(0.8)
 
       Text(title)
-        .font(.system(size: 12))
+        .font(.system(size: 12, weight: .medium))
         .foregroundColor(.white.opacity(0.7))
         .multilineTextAlignment(.center)
         .lineLimit(1)
+        .minimumScaleFactor(0.8)
     }
     .frame(maxWidth: .infinity)
-    .padding(.vertical, 12)
+    .padding(.vertical, 16)
     .background(
       RoundedRectangle(cornerRadius: 16)
         .fill(Color.white.opacity(0.05))
@@ -1002,14 +1012,38 @@ struct DetailStat: View {
     .overlay(
       RoundedRectangle(cornerRadius: 16)
         .stroke(
-          LinearGradient(
-            colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          ),
-          lineWidth: 1
+          isHovered
+            ? LinearGradient(
+                colors: [color.opacity(0.4), color.opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              )
+            : LinearGradient(
+                colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              ),
+          lineWidth: isHovered ? 1.5 : 1
         )
     )
+    .scaleEffect(isHovered ? 1.05 : 1.0)
+    .shadow(
+      color: isHovered ? color.opacity(0.3) : Color.clear,
+      radius: isHovered ? 12 : 0,
+      y: isHovered ? 4 : 0
+    )
+    .scaleEffect(hasAppeared ? 1.0 : 0.8)
+    .opacity(hasAppeared ? 1.0 : 0)
+    .onAppear {
+      withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+        hasAppeared = true
+      }
+    }
+    .onHover { hovering in
+      withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+        isHovered = hovering
+      }
+    }
   }
 }
 
@@ -1163,31 +1197,7 @@ struct InterestTag: View {
   }
 }
 
-struct HobbyTag: View {
-  var hobby: Hobby
-
-  var body: some View {
-    HStack(spacing: 6) {
-      Image(systemName: hobby.iconName)
-        .font(.system(size: 12))
-        .foregroundColor(hobby.color)
-
-      Text(hobby.name)
-        .font(.system(size: 13))
-        .foregroundColor(.white)
-    }
-    .padding(.horizontal, 10)
-    .padding(.vertical, 6)
-    .background(
-      Capsule()
-        .fill(hobby.color.opacity(0.15))
-    )
-    .overlay(
-      Capsule()
-        .stroke(hobby.color.opacity(0.3), lineWidth: 1)
-    )
-  }
-}
+// Note: HobbyTag removed - hobbies are now handled through InterestTag
 
 struct WrapView<T: Identifiable, Content: View>: View {
   let items: [T]
@@ -1253,6 +1263,10 @@ struct GoalCard: View {
     return goal.status == .completed
   }
 
+  private var accentColor: Color {
+    isCompleted ? .green : .orange
+  }
+
   var body: some View {
     let cardContent = VStack(alignment: .leading, spacing: 12) {
       goalHeaderView
@@ -1267,35 +1281,44 @@ struct GoalCard: View {
     }
     .padding(16)
 
-    let backgroundShape = RoundedRectangle(cornerRadius: 12)
-      .fill(Color.white.opacity(0.05))
+    let backgroundShape = RoundedRectangle(cornerRadius: 14)
+      .fill(
+        isHovered
+          ? accentColor.opacity(0.08)
+          : Color.white.opacity(0.05)
+      )
       .background(
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: 14)
           .fill(.ultraThinMaterial)
           .opacity(0.3)
       )
 
     let overlayGradient =
-      isCompleted
+      isHovered
       ? LinearGradient(
-        colors: [Color.green.opacity(0.4), Color.green.opacity(0.1)],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-      )
+          colors: [accentColor.opacity(0.5), accentColor.opacity(0.2)],
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
+        )
       : LinearGradient(
-        colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-      )
+          colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
+        )
 
     return
       cardContent
       .background(backgroundShape)
       .overlay(
-        RoundedRectangle(cornerRadius: 12)
-          .stroke(overlayGradient, lineWidth: 1)
+        RoundedRectangle(cornerRadius: 14)
+          .stroke(overlayGradient, lineWidth: isHovered ? 1.5 : 1)
       )
       .scaleEffect(isHovered ? 1.02 : 1.0)
+      .shadow(
+        color: isHovered ? accentColor.opacity(0.2) : Color.clear,
+        radius: isHovered ? 10 : 0,
+        y: isHovered ? 4 : 0
+      )
       .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
       .onHover { hovering in
         isHovered = hovering
@@ -1364,7 +1387,7 @@ struct EditTMIPlanView: View {
   
   @State private var notes: String
   @State private var selectedInterests: [Interest]
-  @State private var selectedHobbies: [Hobby]
+  // Note: Hobbies are now included in interests
   @State private var isUpdating = false
   
   init(plan: TMIPlan, onPlanUpdated: @escaping (TMIPlan) -> Void) {
@@ -1372,7 +1395,7 @@ struct EditTMIPlanView: View {
     self.onPlanUpdated = onPlanUpdated
     _notes = State(initialValue: plan.notes)
     _selectedInterests = State(initialValue: plan.interests)
-    _selectedHobbies = State(initialValue: plan.hobbies)
+    // Note: Hobbies initialization removed - now handled through interests
   }
   
   var body: some View {
@@ -1468,24 +1491,7 @@ struct EditTMIPlanView: View {
               }
             }
             
-            // Hobbies Section
-            TMIGlassCard(style: .default) {
-              VStack(alignment: .leading, spacing: 16) {
-                Text("Associated Hobbies")
-                  .font(.title3.weight(.semibold))
-                  .foregroundColor(.white)
-                
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 12) {
-                  ForEach(Hobby.expandedSampleHobbies) { hobby in
-                    HobbyToggleCard(
-                      hobby: hobby,
-                      isSelected: selectedHobbies.contains(hobby),
-                      onToggle: { toggleHobby(hobby) }
-                    )
-                  }
-                }
-              }
-            }
+            // Note: Hobbies section removed - now handled through interests above
           }
           .padding(20)
         }
@@ -1519,13 +1525,7 @@ struct EditTMIPlanView: View {
     }
   }
   
-  private func toggleHobby(_ hobby: Hobby) {
-    if selectedHobbies.contains(hobby) {
-      selectedHobbies.removeAll { $0.id == hobby.id }
-    } else {
-      selectedHobbies.append(hobby)
-    }
-  }
+  // Note: toggleHobby function removed - hobbies now handled through interests
   
   private func updatePlan() {
     isUpdating = true
@@ -1535,7 +1535,7 @@ struct EditTMIPlanView: View {
         var updatedPlan = plan
         updatedPlan.notes = notes
         updatedPlan.interests = selectedInterests
-        updatedPlan.hobbies = selectedHobbies
+        // Note: Hobbies are now included in interests
         updatedPlan.lastUpdated = Date()
         
         _ = try await TMIPlanService().updatePlan(updatedPlan)
@@ -1592,38 +1592,5 @@ struct InterestToggleCard: View {
   }
 }
 
-struct HobbyToggleCard: View {
-  let hobby: Hobby
-  let isSelected: Bool
-  let onToggle: () -> Void
-  
-  var body: some View {
-    Button(action: onToggle) {
-      HStack(spacing: 8) {
-        Image(systemName: hobby.iconName)
-          .font(.system(size: 14))
-          .foregroundColor(hobby.color)
-        
-        Text(hobby.name)
-          .font(.system(size: 13, weight: .medium))
-          .foregroundColor(.white)
-          .lineLimit(1)
-      }
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
-      .background(
-        RoundedRectangle(cornerRadius: 8)
-          .fill(isSelected ? hobby.color.opacity(0.2) : Color.white.opacity(0.05))
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(
-            isSelected ? hobby.color.opacity(0.5) : Color.white.opacity(0.2),
-            lineWidth: 1
-          )
-      )
-    }
-    .buttonStyle(.plain)
-  }
-}
+// Note: HobbyToggleCard removed - hobbies now handled through InterestToggleCard
 

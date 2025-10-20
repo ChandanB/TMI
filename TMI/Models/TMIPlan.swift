@@ -36,8 +36,7 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     var description: String?
     var students: [Student]
     var model: TMIPlanModel
-    var interests: [Interest]
-    var hobbies: [Hobby]
+    var interests: [Interest] // Now includes both interests and hobbies
     var startDate: Date
     var endDate: Date?
     var creationDate: Date
@@ -50,14 +49,13 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     var createdBy: String
 
 
-    init(id: String? = nil, title: String, description: String? = nil, students: [Student], model: TMIPlanModel, interests: [Interest], hobbies: [Hobby], startDate: Date, endDate: Date?, creationDate: Date, lastUpdated: Date, goals: [Goal], progress: Double, notes: String, strategies: [String]? = nil, progressTracking: [ProgressEntry]? = nil, createdBy: String) {
+    init(id: String? = nil, title: String, description: String? = nil, students: [Student], model: TMIPlanModel, interests: [Interest], startDate: Date, endDate: Date?, creationDate: Date, lastUpdated: Date, goals: [Goal], progress: Double, notes: String, strategies: [String]? = nil, progressTracking: [ProgressEntry]? = nil, createdBy: String) {
         self.id = id
         self.title = title
         self.description = description
         self.students = students
         self.model = model
         self.interests = interests
-        self.hobbies = hobbies
         self.startDate = startDate
         self.endDate = endDate
         self.creationDate = creationDate
@@ -110,9 +108,8 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
             ]
         }
 
-        // Convert interests and hobbies to full objects for proper reconstruction
+        // Convert interests to full objects for proper reconstruction
         data["interests"] = interests.map { $0.toFirestoreData() }
-        data["hobbies"] = hobbies.map { $0.toFirestoreData() }
 
         // Convert goals
         data["goals"] = goals.map { goal in
@@ -153,7 +150,6 @@ extension TMIPlan {
             students: [Student.sampleStudents[0]],
             model: .chaseYourSpace,
             interests: [],
-            hobbies: [],
             startDate: Date(),
             endDate: nil,
             creationDate: Date(),
@@ -175,7 +171,6 @@ extension TMIPlan {
             students: [Student.sampleStudents[1]],
             model: .acknowledgeInterests,
             interests: student.interests,
-            hobbies: student.hobbies,
             startDate: Date(),
             endDate: nil,
             creationDate: Date(),
@@ -191,7 +186,6 @@ extension TMIPlan {
             students: [Student.sampleStudents[2]],
             model: .alignYourMind,
             interests: student.interests,
-            hobbies: student.hobbies,
             startDate: Date(),
             endDate: nil,
             creationDate: Date(),

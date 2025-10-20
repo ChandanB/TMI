@@ -35,6 +35,10 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
     var behavioralBenefits: String?
     var skillsDeveloped: [Skill]?
     var tierRelevance: [InterventionTier]
+
+    // MARK: - Legacy Hobby Properties (for backward compatibility)
+    var relatedInterests: [String]?
+    var relatedStudents: [String]?
     
     // MARK: - Schema Versioning
     var schemaVersion: Int = 1
@@ -49,13 +53,15 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         interventionModels: [InterventionModel] = [],
         popularityScore: Int? = nil,
         isFeatured: Bool = false,
-        createdAt: Date = Date(), // Add createdAt with default value
+        createdAt: Date = Date(),
         academicBenefits: String? = nil,
         careerPathways: [CareerPathway]? = nil,
         educationalActivities: [String]? = nil,
         behavioralBenefits: String? = nil,
         skillsDeveloped: [Skill]? = nil,
         tierRelevance: [InterventionTier] = [.tier1, .tier2],
+        relatedInterests: [String]? = nil,
+        relatedStudents: [String]? = nil,
         schemaVersion: Int = 1
     ) {
         self.id = id
@@ -73,6 +79,8 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         self.behavioralBenefits = behavioralBenefits
         self.skillsDeveloped = skillsDeveloped
         self.tierRelevance = tierRelevance
+        self.relatedInterests = relatedInterests
+        self.relatedStudents = relatedStudents
         self.schemaVersion = schemaVersion
     }
     
@@ -84,8 +92,8 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
     // MARK: - Codable Implementation
     enum CodingKeys: String, CodingKey {
         case id, firestoreID, name, category, description, academicRelevance, interventionModels
-        case popularityScore, isFeatured, createdAt, academicBenefits, careerPathways, educationalActivities // Add createdAt
-        case behavioralBenefits, skillsDeveloped, tierRelevance, schemaVersion
+        case popularityScore, isFeatured, createdAt, academicBenefits, careerPathways, educationalActivities
+        case behavioralBenefits, skillsDeveloped, tierRelevance, relatedInterests, relatedStudents, schemaVersion
     }
     
     required init(from decoder: Decoder) throws {
@@ -106,6 +114,8 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         behavioralBenefits = try container.decodeIfPresent(String.self, forKey: .behavioralBenefits)
         skillsDeveloped = try container.decodeIfPresent([Skill].self, forKey: .skillsDeveloped)
         tierRelevance = try container.decodeIfPresent([InterventionTier].self, forKey: .tierRelevance) ?? [.tier1, .tier2]
+        relatedInterests = try container.decodeIfPresent([String].self, forKey: .relatedInterests)
+        relatedStudents = try container.decodeIfPresent([String].self, forKey: .relatedStudents)
         schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
     }
     
@@ -127,6 +137,8 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         try container.encodeIfPresent(behavioralBenefits, forKey: .behavioralBenefits)
         try container.encodeIfPresent(skillsDeveloped, forKey: .skillsDeveloped)
         try container.encode(tierRelevance, forKey: .tierRelevance)
+        try container.encodeIfPresent(relatedInterests, forKey: .relatedInterests)
+        try container.encodeIfPresent(relatedStudents, forKey: .relatedStudents)
         try container.encode(schemaVersion, forKey: .schemaVersion)
     }
     
@@ -181,6 +193,8 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
             behavioralBenefits: data["behavioralBenefits"] as? String,
             skillsDeveloped: parseSkills(data["skillsDeveloped"]),
             tierRelevance: tiers,
+            relatedInterests: data["relatedInterests"] as? [String],
+            relatedStudents: data["relatedStudents"] as? [String],
             schemaVersion: data["schemaVersion"] as? Int ?? 1
         )
     }
@@ -224,12 +238,70 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         if let skillsDeveloped = skillsDeveloped {
             data["skillsDeveloped"] = skillsDeveloped.map { $0.rawValue }
         }
-        
+        if let relatedInterests = relatedInterests {
+            data["relatedInterests"] = relatedInterests
+        }
+        if let relatedStudents = relatedStudents {
+            data["relatedStudents"] = relatedStudents
+        }
+
         return data
     }
     
+    // MARK: - Factory Methods
+
+    /// Create an Interest from legacy Hobby data (for backward compatibility)
+    static func fromHobby(
+        name: String,
+        hobbyCategories: [String],
+        description: String? = nil,
+        academicRelevance: [AcademicSubject] = [],
+        popularityScore: Int? = nil,
+        isFeatured: Bool = false,
+        academicBenefits: String? = nil,
+        skillsDeveloped: [Skill]? = nil,
+        relatedInterests: [String]? = nil,
+        educationalActivities: [String]? = nil,
+        relatedStudents: [String]? = nil
+    ) -> Interest {
+
+        // Map hobby categories to interest categories
+        let interestCategories = hobbyCategories.compactMap { hobbyCategoryString -> InterestCategory? in
+            switch hobbyCategoryString.lowercased() {
+            case "sports": return .sports
+            case "arts & crafts", "arts": return .arts
+            case "music": return .music
+            case "reading": return .literature
+            case "gaming": return .gaming
+            case "cooking": return .cooking
+            case "outdoors": return .outdoors
+            case "collecting": return .collecting
+            case "technology": return .technology
+            case "learning": return .learning
+            case "social": return .social
+            case "creative": return .arts
+            default: return .other
+            }
+        }
+
+        return Interest(
+            name: name,
+            category: interestCategories.isEmpty ? [.other] : interestCategories,
+            description: description,
+            academicRelevance: academicRelevance,
+            interventionModels: [], // Hobbies don't have intervention models by default
+            popularityScore: popularityScore,
+            isFeatured: isFeatured,
+            academicBenefits: academicBenefits,
+            skillsDeveloped: skillsDeveloped,
+            tierRelevance: [.tier1, .tier2], // Default for all students
+            relatedInterests: relatedInterests,
+            relatedStudents: relatedStudents
+        )
+    }
+
     // MARK: - TMI Specific Methods
-    
+
     /// Check if interest is relevant to a specific intervention model
     func isRelevantTo(model: InterventionModel) -> Bool {
         return interventionModels.contains(model)
@@ -405,87 +477,189 @@ enum InterestCategory: String, CaseIterable, Identifiable, Codable, Comparable, 
     static func < (lhs: InterestCategory, rhs: InterestCategory) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
-    
+
+    // Core educational categories
     case academics = "Academics"
-    case arts = "Arts & Creativity"
-    case sports = "Sports & Athletics"
-    case technology = "Technology"
     case science = "Science & Discovery"
-    case literature = "Reading & Writing"
+    case technology = "Technology"
+    case mathematics = "Mathematics"
+
+    // Creative & expressive categories
+    case arts = "Arts & Creativity"
     case music = "Music"
-    case outdoors = "Outdoors & Nature"
-    case socialCauses = "Social Causes"
-    case leadership = "Leadership & Service"
-    case wellness = "Health & Wellness"
-    case entertainment = "Entertainment & Media"
+    case literature = "Reading & Writing"
     case crafts = "Making & Building"
+    case photography = "Photography"
+
+    // Physical & outdoor categories
+    case sports = "Sports & Athletics"
+    case outdoors = "Outdoors & Nature"
+    case wellness = "Health & Wellness"
+
+    // Social & life skills categories
+    case leadership = "Leadership & Service"
+    case socialCauses = "Social Causes"
+    case social = "Social Activities"
+    case communication = "Communication"
+
+    // Entertainment & leisure categories
+    case entertainment = "Entertainment & Media"
+    case gaming = "Gaming"
+    case collecting = "Collecting"
+
+    // Life skills categories
+    case cooking = "Cooking & Food"
+    case learning = "Learning & Education"
+    case languages = "Languages & Culture"
+
+    // Catch-all
+    case other = "Other"
     
     var id: String { rawValue }
     
     var iconName: String {
         switch self {
+        // Core educational
         case .academics: return "book.fill"
-        case .arts: return "paintpalette.fill"
-        case .sports: return "figure.run"
-        case .technology: return "laptopcomputer"
         case .science: return "atom"
-        case .literature: return "text.book.closed"
+        case .technology: return "laptopcomputer"
+        case .mathematics: return "function"
+
+        // Creative & expressive
+        case .arts: return "paintpalette.fill"
         case .music: return "music.note"
-        case .outdoors: return "leaf.fill"
-        case .socialCauses: return "hand.raised.fill"
-        case .leadership: return "person.3.fill"
-        case .wellness: return "heart.fill"
-        case .entertainment: return "tv.fill"
+        case .literature: return "text.book.closed"
         case .crafts: return "hammer.fill"
+        case .photography: return "camera.fill"
+
+        // Physical & outdoor
+        case .sports: return "figure.run"
+        case .outdoors: return "leaf.fill"
+        case .wellness: return "heart.fill"
+
+        // Social & life skills
+        case .leadership: return "person.3.fill"
+        case .socialCauses: return "hand.raised.fill"
+        case .social: return "person.2.fill"
+        case .communication: return "text.bubble.fill"
+
+        // Entertainment & leisure
+        case .entertainment: return "tv.fill"
+        case .gaming: return "gamecontroller.fill"
+        case .collecting: return "square.grid.2x2.fill"
+
+        // Life skills
+        case .cooking: return "fork.knife"
+        case .learning: return "brain.head.profile"
+        case .languages: return "globe"
+
+        // Catch-all
+        case .other: return "ellipsis.circle.fill"
         }
     }
     
     var color: Color {
         switch self {
+        // Core educational
         case .academics: return Color.blue
-        case .arts: return Color.purple
-        case .sports: return Color.green
-        case .technology: return Color(red: 0, green: 0.7, blue: 0.9)
         case .science: return Color(red: 0, green: 0.2, blue: 0.5)
-        case .literature: return Color(red: 0.6, green: 0.3, blue: 0)
+        case .technology: return Color(red: 0, green: 0.7, blue: 0.9)
+        case .mathematics: return Color(red: 0.2, green: 0.3, blue: 0.7)
+
+        // Creative & expressive
+        case .arts: return Color.purple
         case .music: return Color(red: 0.6, green: 0, blue: 0.9)
-        case .outdoors: return Color(red: 0.2, green: 0.6, blue: 0)
-        case .socialCauses: return Color(red: 1, green: 0.5, blue: 0.2)
-        case .leadership: return Color(red: 0, green: 0.5, blue: 0.7)
-        case .wellness: return Color(red: 1, green: 0.3, blue: 0.5)
-        case .entertainment: return Color(red: 0.8, green: 0.15, blue: 0.2)
+        case .literature: return Color(red: 0.6, green: 0.3, blue: 0)
         case .crafts: return Color(red: 0.8, green: 0.6, blue: 0.3)
+        case .photography: return Color(red: 0.4, green: 0.2, blue: 0.8)
+
+        // Physical & outdoor
+        case .sports: return Color.green
+        case .outdoors: return Color(red: 0.2, green: 0.6, blue: 0)
+        case .wellness: return Color(red: 1, green: 0.3, blue: 0.5)
+
+        // Social & life skills
+        case .leadership: return Color(red: 0, green: 0.5, blue: 0.7)
+        case .socialCauses: return Color(red: 1, green: 0.5, blue: 0.2)
+        case .social: return Color(red: 0.3, green: 0.5, blue: 0.8)
+        case .communication: return Color(red: 0.5, green: 0.7, blue: 0.9)
+
+        // Entertainment & leisure
+        case .entertainment: return Color(red: 0.8, green: 0.15, blue: 0.2)
+        case .gaming: return Color(red: 0.7, green: 0.2, blue: 0.9)
+        case .collecting: return Color(red: 0.9, green: 0.7, blue: 0.3)
+
+        // Life skills
+        case .cooking: return Color(red: 1, green: 0.5, blue: 0.2)
+        case .learning: return Color(red: 0.1, green: 0.4, blue: 0.8)
+        case .languages: return Color(red: 0.3, green: 0.6, blue: 0.4)
+
+        // Catch-all
+        case .other: return Color.gray
         }
     }
     
     var relatedSubjects: [AcademicSubject] {
         switch self {
+        // Core educational
         case .academics:
             return AcademicSubject.allCases
-        case .arts:
-            return [.art, .english]
-        case .sports:
-            return [.physicalEducation]
-        case .technology:
-            return [.computerScience, .mathematics]
         case .science:
             return [.science, .mathematics]
-        case .literature:
-            return [.english, .history]
+        case .technology:
+            return [.computerScience, .mathematics]
+        case .mathematics:
+            return [.mathematics, .science]
+
+        // Creative & expressive
+        case .arts:
+            return [.art, .english]
         case .music:
             return [.music]
-        case .outdoors:
-            return [.science, .physicalEducation]
-        case .socialCauses:
-            return [.socialStudies, .history]
-        case .leadership:
-            return [.socialStudies]
-        case .wellness:
-            return [.physicalEducation, .science]
-        case .entertainment:
-            return [.art, .english, .music]
+        case .literature:
+            return [.english, .history]
         case .crafts:
             return [.art, .mathematics]
+        case .photography:
+            return [.art, .computerScience]
+
+        // Physical & outdoor
+        case .sports:
+            return [.physicalEducation]
+        case .outdoors:
+            return [.science, .physicalEducation]
+        case .wellness:
+            return [.physicalEducation, .science]
+
+        // Social & life skills
+        case .leadership:
+            return [.socialStudies]
+        case .socialCauses:
+            return [.socialStudies, .history]
+        case .social:
+            return [.socialStudies]
+        case .communication:
+            return [.english, .foreignLanguage]
+
+        // Entertainment & leisure
+        case .entertainment:
+            return [.art, .english, .music]
+        case .gaming:
+            return [.computerScience]
+        case .collecting:
+            return [.history, .socialStudies]
+
+        // Life skills
+        case .cooking:
+            return [.science]
+        case .learning:
+            return AcademicSubject.allCases
+        case .languages:
+            return [.foreignLanguage, .socialStudies, .history]
+
+        // Catch-all
+        case .other:
+            return []
         }
     }
 }

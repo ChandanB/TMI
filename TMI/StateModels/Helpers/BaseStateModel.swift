@@ -382,3 +382,78 @@ class BaseStateModel<T, E: Error>: StateModelProtocol {
     }
 }
 
+// MARK: - Error Boundary Component
+
+/// Error boundary to catch and handle errors gracefully
+struct TMIErrorBoundary<Content: View>: View {
+    let content: Content
+    @State private var error: IdentifiableError?
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        Group {
+            if let error = error {
+                TMIGlassCard(style: .error) {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 40))
+                            .foregroundColor(.orange)
+
+                        Text("Something went wrong")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+
+                        Text(error.message)
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+
+                        TMIButton(
+                            text: "Try Again",
+                            style: .secondary,
+                            action: {
+                                withAnimation {
+                                    self.error = nil
+                                }
+                            }
+                        )
+                        .padding(.top)
+                    }
+                    .padding()
+                }
+                .transition(.opacity.combined(with: .scale))
+            } else {
+                content
+                    .onReceive(NotificationCenter.default.publisher(for: .TMIErrorOccurred)) { notification in
+                        if let error = notification.object as? IdentifiableError {
+                            withAnimation {
+                                self.error = error
+                            }
+                        }
+                    }
+            }
+        }
+    }
+}
+
+// MARK: - Error Notification Extension
+
+extension Notification.Name {
+    static let TMIErrorOccurred = Notification.Name("TMIErrorOccurred")
+}
+
+// MARK: - Extensions for View Modifiers
+
+extension View {
+    /// Wrap view in error boundary
+    func errorBoundary() -> some View {
+        TMIErrorBoundary {
+            self
+        }
+    }
+}
+

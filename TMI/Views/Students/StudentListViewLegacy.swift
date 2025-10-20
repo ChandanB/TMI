@@ -268,26 +268,31 @@ struct StudentListView: View {
     
     private var studentContent: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: 28) {
                 // Stats summary
                 statsSummary
-                
+                    .padding(.horizontal, 20)
+
                 // Grid layout
                 LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: sizeClass == .compact ? 160 : 200), spacing: 20)],
-                    spacing: 20
+                    columns: [GridItem(.adaptive(minimum: sizeClass == .compact ? 170 : 220), spacing: 16)],
+                    spacing: 18
                 ) {
                     ForEach(stateModel.filteredStudents) { student in
                         NavigationLink(destination: StudentDetailView(student: student)) {
                             StudentCard(student: student)
+                                .scaleEffect(1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: student.id)
                         }
                         .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 20)
-                
+
+                // Add some bottom padding for better scrolling
+                Spacer(minLength: 100)
             }
-            .padding(.top, 20)
+            .padding(.top, 16)
         }
         .scrollIndicators(.hidden)
     }
@@ -315,7 +320,6 @@ struct StudentListView: View {
                 color: .green
             )
         }
-        .padding(.horizontal, 20)
     }
     
     // MARK: - Quick Action Bar
@@ -397,232 +401,6 @@ struct StudentListView: View {
     StudentListView()
 }
 
-// MARK: - Bulk Actions View
-
-struct BulkActionsView: View {
-    let students: [Student]
-    let onComplete: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
-    
-    @State private var selectedStudents: Set<String> = []
-    @State private var isPerformingAction = false
-    @State private var actionCompleted = false
-    
-    var body: some View {
-        ZStack {
-            TMIBackgroundView(variant: .default)
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 12) {
-                        Image(systemName: "person.crop.rectangle.stack.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.tmiSecondary)
-                        
-                        Text("Bulk Actions")
-                            .font(.title.bold())
-                            .foregroundColor(.white)
-                        
-                        Text("Select students and choose an action to apply to all selected students.")
-                            .font(.body)
-                            .foregroundColor(.white.opacity(0.7))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
-                    }
-                    
-                    // Student selection
-                    TMIGlassCard(style: .default) {
-                        VStack(alignment: .leading, spacing: 16) {
-                            HStack {
-                                Text("Select Students")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                
-                                Spacer()
-                                
-                                Button(selectedStudents.count == students.count ? "Deselect All" : "Select All") {
-                                    if selectedStudents.count == students.count {
-                                        selectedStudents.removeAll()
-                                    } else {
-                                        selectedStudents = Set(students.compactMap { $0.id })
-                                    }
-                                }
-                                .foregroundColor(.tmiSecondary)
-                            }
-                            
-                            Divider()
-                                .background(Color.white.opacity(0.1))
-                            
-                            ScrollView {
-                                LazyVStack(spacing: 8) {
-                                    ForEach(students) { student in
-                                        HStack {
-                                            Button {
-                                                if let studentId = student.id {
-                                                    if selectedStudents.contains(studentId) {
-                                                        selectedStudents.remove(studentId)
-                                                    } else {
-                                                        selectedStudents.insert(studentId)
-                                                    }
-                                                }
-                                            } label: {
-                                                HStack {
-                                                    Image(systemName: selectedStudents.contains(student.id ?? "") ? "checkmark.circle.fill" : "circle")
-                                                        .foregroundColor(selectedStudents.contains(student.id ?? "") ? .tmiSecondary : .white.opacity(0.5))
-                                                    
-                                                    Text(student.name)
-                                                        .foregroundColor(.white)
-                                                    
-                                                    Spacer()
-                                                }
-                                                .contentShape(Rectangle())
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                        .padding(.vertical, 4)
-                                    }
-                                }
-                            }
-                            .frame(maxHeight: 200)
-                        }
-                    }
-                    
-                    // Available actions
-                    if !selectedStudents.isEmpty {
-                        TMIGlassCard(style: .default) {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("Available Actions")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                
-                                LazyVStack(spacing: 12) {
-                                    BulkActionButton(
-                                        icon: "envelope.fill",
-                                        title: "Send Notifications",
-                                        description: "Send notifications to selected students",
-                                        color: .blue
-                                    ) {
-                                        Task {
-                                            await performBulkAction("notify")
-                                        }
-                                    }
-                                    
-                                    BulkActionButton(
-                                        icon: "doc.text.fill",
-                                        title: "Generate Reports",
-                                        description: "Create progress reports for selected students",
-                                        color: .green
-                                    ) {
-                                        Task {
-                                            await performBulkAction("report")
-                                        }
-                                    }
-                                    
-                                    BulkActionButton(
-                                        icon: "person.badge.plus",
-                                        title: "Assign TMI Plans",
-                                        description: "Assign TMI plans to selected students",
-                                        color: .orange
-                                    ) {
-                                        Task {
-                                            await performBulkAction("assign_plan")
-                                        }
-                                    }
-                                    
-                                    BulkActionButton(
-                                        icon: "archivebox.fill",
-                                        title: "Archive Students",
-                                        description: "Archive selected students (can be undone)",
-                                        color: .gray
-                                    ) {
-                                        Task {
-                                            await performBulkAction("archive")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
-            }
-            .navigationTitle("Bulk Actions")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
-                }
-            }
-            .preferredColorScheme(.dark)
-    }
-    
-    @MainActor
-    private func performBulkAction(_ action: String) async {
-        isPerformingAction = true
-        
-        do {
-            let selectedStudentObjects = students.filter { student in
-                selectedStudents.contains(student.id ?? "")
-            }
-            
-            switch action {
-            case "notify":
-                await sendNotifications(to: selectedStudentObjects)
-            case "report":
-                await generateReports(for: selectedStudentObjects)
-            case "assign_plan":
-                await assignPlans(to: selectedStudentObjects)
-            case "archive":
-                await archiveStudents(selectedStudentObjects)
-            default:
-                break
-            }
-            
-            actionCompleted = true
-            
-            // Wait a moment to show success, then close
-            try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-            onComplete(action)
-            
-        } catch {
-            // Handle error - in a real app, show error alert
-            print("Bulk action failed: \(error)")
-        }
-        
-        isPerformingAction = false
-    }
-    
-    private func sendNotifications(to students: [Student]) async {
-        // Simulate sending notifications
-        print("Sending notifications to \(students.count) students")
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-    }
-    
-    private func generateReports(for students: [Student]) async {
-        // Simulate generating reports
-        print("Generating reports for \(students.count) students")
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
-    }
-    
-    private func assignPlans(to students: [Student]) async {
-        // Simulate assigning plans
-        print("Assigning plans to \(students.count) students")
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
-    }
-    
-    private func archiveStudents(_ students: [Student]) async {
-        // Simulate archiving students
-        print("Archiving \(students.count) students")
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-    }
-}
 
 
 // MARK: - Export Students View
@@ -885,7 +663,7 @@ struct ExportStudentsView: View {
             // Filter data based on privacy settings
             let studentsToExport = includePrivateData ? students : students.map { student in
                 // Create a copy without sensitive data
-                var publicStudent = student
+                let publicStudent = student
                 // Note: In a real implementation, you'd create a proper PublicStudent model
                 // For now, this is a conceptual representation
                 return publicStudent
@@ -947,75 +725,3 @@ struct ExportStudentsView: View {
     }
 }
 
-// MARK: - Bulk Action Button Component
-
-struct BulkActionButton: View {
-    let icon: String
-    let title: String
-    let description: String
-    let color: Color
-    let action: () -> Void
-    
-    @State private var isPressed = false
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 16) {
-                // Icon
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(color)
-                    .frame(width: 24)
-                
-                // Content
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                    
-                    Text(description)
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
-                        .lineLimit(2)
-                }
-                
-                Spacer()
-                
-                // Arrow
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.05))
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(.ultraThinMaterial)
-                            .opacity(0.3)
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
-            .scaleEffect(isPressed ? 0.98 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: isPressed)
-        }
-        .buttonStyle(.plain)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
-    }
-}

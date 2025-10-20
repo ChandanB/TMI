@@ -389,20 +389,32 @@ struct TMIPlanListView: View {
   // MARK: - Plan Grid View
 
   private var enhancedPlanGridView: some View {
-    LazyVStack(spacing: 20) {
+    VStack(spacing: 24) {
       // Plan Stats Summary
       planStatsSummary
         .padding(.horizontal, 20)
 
-      // Plans Grid
-      ForEach(stateModel.filteredPlans) { plan in
-        NavigationLink(destination: TMIPlanDetailView(plan: plan)) {
-          TMIPlanCard(plan: plan)
-            .padding(.horizontal, 20)
+      // Plans Grid - Improved Layout
+      LazyVGrid(
+        columns: [
+          GridItem(.flexible(minimum: 300), spacing: 16),
+          GridItem(.flexible(minimum: 300), spacing: 16)
+        ],
+        spacing: 18
+      ) {
+        ForEach(stateModel.filteredPlans) { plan in
+          NavigationLink(destination: TMIPlanDetailView(plan: plan)) {
+            TMIPlanCard(plan: plan)
+              .frame(maxWidth: .infinity)
+              .scaleEffect(1.0)
+              .animation(.spring(response: 0.3, dampingFraction: 0.8), value: plan.id)
+          }
+          .buttonStyle(PlainButtonStyle())
         }
-        .buttonStyle(PlainButtonStyle())
       }
-      .padding(.top, 10)
+      .padding(.horizontal, 20)
+
+      Spacer(minLength: 50)
     }
   }
 

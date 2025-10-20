@@ -19,11 +19,9 @@ extension Student {
                 studentID: "ST-001",
                 interests: [
                     Interest(name: "Robotics", category: [.technology, .science]),
-                    Interest(name: "Computer Programming", category: [.technology])
-                ],
-                hobbies: [
-                    Hobby(name: "Arduino Projects", category: [.technology]),
-                    Hobby(name: "Video Game Development", category: [.gaming, .technology])
+                    Interest(name: "Computer Programming", category: [.technology]),
+                    Interest(name: "Arduino Projects", category: [.technology]),
+                    Interest(name: "Video Game Development", category: [.gaming, .technology])
                 ],
                 surveyResults: [
                     SurveyResult(
@@ -82,12 +80,10 @@ extension Student {
                 interests: [
                     Interest(name: "Creative Writing", category: [.literature, .arts]),
                     Interest(name: "Drama & Theater", category: [.arts, .entertainment]),
-                    Interest(name: "Digital Art", category: [.arts, .technology])
-                ],
-                hobbies: [
-                    Hobby(name: "Poetry Writing", category: [.creative, .reading]),
-                    Hobby(name: "Digital Photography", category: [.arts, .creative, .technology]),
-                    Hobby(name: "Theater Performance", category: [.arts])
+                    Interest(name: "Digital Art", category: [.arts, .technology]),
+                    Interest(name: "Poetry Writing", category: [.arts, .literature]),
+                    Interest(name: "Digital Photography", category: [.arts, .technology]),
+                    Interest(name: "Theater Performance", category: [.arts, .entertainment])
                 ],
                 surveyResults: [
                     SurveyResult(
@@ -146,12 +142,9 @@ extension Student {
                 interests: [
                     Interest(name: "Basketball", category: [.sports]),
                     Interest(name: "Sports Medicine", category: [.science, .wellness]),
-                    Interest(name: "Team Leadership", category: [.leadership])
-                ],
-                hobbies: [
-                    Hobby(name: "Basketball", category: [.sports]),
-                    Hobby(name: "Fitness Training", category: [.sports]),
-                    Hobby(name: "Sports Statistics Analysis", category: [.learning, .sports])
+                    Interest(name: "Team Leadership", category: [.leadership]),
+                    Interest(name: "Fitness Training", category: [.sports, .wellness]),
+                    Interest(name: "Sports Statistics Analysis", category: [.mathematics, .sports])
                 ],
                 surveyResults: [
                     SurveyResult(
@@ -209,12 +202,10 @@ extension Student {
                 studentID: "ST-004",
                 interests: [
                     Interest(name: "Music Production", category: [.music, .technology]),
-                    Interest(name: "Social Media", category: [.entertainment, .technology])
-                ],
-                hobbies: [
-                    Hobby(name: "Making Beats", category: [.music, .creative, .technology]),
-                    Hobby(name: "TikTok Creation", category: [.creative, .social]),
-                    Hobby(name: "Skateboarding", category: [.sports, .creative])
+                    Interest(name: "Social Media", category: [.entertainment, .technology]),
+                    Interest(name: "Making Beats", category: [.music, .technology]),
+                    Interest(name: "TikTok Creation", category: [.entertainment, .social]),
+                    Interest(name: "Skateboarding", category: [.sports])
                 ],
                 surveyResults: [
                     SurveyResult(
@@ -275,12 +266,10 @@ extension Student {
                 interests: [
                     Interest(name: "Environmental Science", category: [.science, .outdoors, .socialCauses]),
                     Interest(name: "Marine Biology", category: [.science, .outdoors]),
-                    Interest(name: "Climate Action", category: [.socialCauses, .science])
-                ],
-                hobbies: [
-                    Hobby(name: "Nature Photography", category: [.arts, .outdoors]),
-                    Hobby(name: "Gardening", category: [.outdoors, .learning]),
-                    Hobby(name: "Science Fair Projects", category: [.learning, .technology])
+                    Interest(name: "Climate Action", category: [.socialCauses, .science]),
+                    Interest(name: "Nature Photography", category: [.arts, .outdoors]),
+                    Interest(name: "Gardening", category: [.outdoors, .science]),
+                    Interest(name: "Science Fair Projects", category: [.science, .academics])
                 ],
                 surveyResults: [
                     SurveyResult(
@@ -339,12 +328,10 @@ extension Student {
                 interests: [
                     Interest(name: "Reading Fantasy Novels", category: [.literature]),
                     Interest(name: "Digital Art", category: [.arts, .technology]),
-                    Interest(name: "Board Games", category: [.entertainment, .socialCauses])
-                ],
-                hobbies: [
-                    Hobby(name: "Book Reading", category: [.reading]),
-                    Hobby(name: "Digital Drawing", category: [.arts, .creative, .technology]),
-                    Hobby(name: "Chess", category: [.learning, .gaming])
+                    Interest(name: "Board Games", category: [.entertainment, .socialCauses]),
+                    Interest(name: "Book Reading", category: [.literature]),
+                    Interest(name: "Digital Drawing", category: [.arts, .technology]),
+                    Interest(name: "Chess", category: [.gaming, .academics])
                 ],
                 surveyResults: [
                     SurveyResult(
@@ -403,12 +390,10 @@ extension Student {
                 interests: [
                     Interest(name: "Student Government", category: [.leadership, .socialCauses]),
                     Interest(name: "Community Service", category: [.socialCauses, .leadership]),
-                    Interest(name: "Public Speaking", category: [.leadership])
-                ],
-                hobbies: [
-                    Hobby(name: "Debate Club", category: [.learning, .social]),
-                    Hobby(name: "Volunteer Work", category: [.social]),
-                    Hobby(name: "Event Planning", category: [.social, .creative])
+                    Interest(name: "Public Speaking", category: [.leadership]),
+                    Interest(name: "Debate Club", category: [.academics, .leadership]),
+                    Interest(name: "Volunteer Work", category: [.socialCauses]),
+                    Interest(name: "Event Planning", category: [.social, .leadership])
                 ],
                 surveyResults: [
                     SurveyResult(
@@ -467,12 +452,10 @@ extension Student {
                 interests: [
                     Interest(name: "Automotive Repair", category: [.technology, .crafts]),
                     Interest(name: "Hip-Hop Music", category: [.music, .entertainment]),
-                    Interest(name: "Martial Arts", category: [.sports, .wellness])
-                ],
-                hobbies: [
-                    Hobby(name: "Car Restoration", category: [.technology, .creative]),
-                    Hobby(name: "Rap Music Writing", category: [.music, .creative]),
-                    Hobby(name: "Boxing", category: [.sports])
+                    Interest(name: "Martial Arts", category: [.sports, .wellness]),
+                    Interest(name: "Car Restoration", category: [.technology, .crafts]),
+                    Interest(name: "Rap Music Writing", category: [.music, .literature]),
+                    Interest(name: "Boxing", category: [.sports, .wellness])
                 ],
                 surveyResults: [
                     SurveyResult(

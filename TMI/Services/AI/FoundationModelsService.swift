@@ -111,12 +111,11 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
     // MARK: - Apple Intelligence Integration
     
     func isAppleIntelligenceAvailable() async -> Bool {
-        // Check if device supports Apple Intelligence and Foundation Models (iOS 26+)
-        if #available(iOS 26.0, *) {
-            #if canImport(FoundationModels)
-            // Check if Foundation Models are available and enabled
-            let model = FoundationModels.SystemLanguageModel.default
-            switch model.availability {
+        // Check if device supports Apple Intelligence and Foundation Models
+        #if canImport(FoundationModels)
+        // Check if Foundation Models are available and enabled
+        let model = FoundationModels.SystemLanguageModel.default
+        switch model.availability {
             case .available:
                 print("[FoundationModelsService] Foundation Models are available")
                 return true
@@ -124,12 +123,10 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
                 print("[FoundationModelsService] Foundation Models unavailable: \(reason)")
                 return false
             }
-            #else
-            // Fallback for development/simulator
-            return ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] == nil // Real device
-            #endif
-        }
-        return false
+        #else
+        // Fallback for development/simulator
+        return ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] == nil // Real device
+        #endif
     }
     
     private func createFoundationModelSession(for type: FoundationModelType) async throws -> FoundationModels.LanguageModelSession {

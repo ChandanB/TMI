@@ -9,7 +9,7 @@ import SwiftUI
 
 struct MainTabView: View {
   @State private var selectedTab: Tab = .dashboard
-  @Environment(\.simpleAuthStateModel) private var authStateModel
+  @Environment(\.authStateModel) private var authStateModel
   
   // Sheet state
   @State private var showingUserProfile = false
@@ -106,7 +106,7 @@ struct MainTabView: View {
         .tag(tab)
       }
     }
-    .preferredColorScheme(.dark)
+    .accentColor(.tmiSecondary)
     .sheet(isPresented: $showingUserProfile) {
       UserProfileView()
         .presentationDetents([.large])
@@ -115,9 +115,7 @@ struct MainTabView: View {
     }
     .alert("Sign Out", isPresented: $showingSignOutConfirmation) {
       Button("Sign Out", role: .destructive) {
-        Task {
-          await authStateModel.handleLogout()
-        }
+        authStateModel.signOut()
       }
       Button("Cancel", role: .cancel) { }
     } message: {
@@ -140,9 +138,9 @@ struct MainTabView: View {
     case .dashboard:
       DashboardView()
     case .students:
-      StudentListView()
+      StudentListViewRedesigned()
     case .tmiPlans:
-      TMIPlanListView()
+      TMIPlanListViewRedesigned()
     case .forms:
       FormsAndSurveysView()
     case .careerExplorer:

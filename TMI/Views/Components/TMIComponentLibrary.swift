@@ -291,8 +291,9 @@ struct TMIGlassCard<Content: View>: View {
   private func positionBasedGradient(for geometry: GeometryProxy) -> LinearGradient {
     // Simplified position-based gradient calculation
     let globalFrame = geometry.frame(in: .global)
-    let screenSize = UIScreen.main.bounds.size
-    
+    // Use a default screen size for gradient calculation
+    let screenSize = CGSize(width: 430, height: 932) // iPhone 14 Pro Max dimensions as fallback
+
     // Calculate normalized position (0.0 to 1.0)
     let xPercent = globalFrame.midX / screenSize.width
     let yPercent = globalFrame.midY / screenSize.height
@@ -458,8 +459,8 @@ struct TMIParticleEffect: View {
       particles.append(
         createParticle(
           size: CGSize(
-            width: UIScreen.main.bounds.width,
-            height: UIScreen.main.bounds.height
+            width: 430, // iPhone 14 Pro Max width
+            height: 932 // iPhone 14 Pro Max height
           )
         )
       )

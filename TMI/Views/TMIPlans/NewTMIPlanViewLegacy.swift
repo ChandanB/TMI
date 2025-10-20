@@ -14,13 +14,13 @@ struct NewTMIPlanView: View {
   @State private var selectedStudent: Student?
   @State private var selectedModel: TMIPlanModel?
   @State private var selectedInterests: [Interest] = []
-  @State private var selectedHobbies: [Hobby] = []
+  // Note: Hobbies are now included in interests
   @State private var notes: String = ""
 
   // Data state
   @State private var students: [Student] = []
   @State private var interests: [Interest] = []
-  @State private var hobbies: [Hobby] = []
+  // Note: Hobbies are now included in interests
   @State private var isLoadingData = false
 
   // UI state
@@ -244,7 +244,8 @@ struct NewTMIPlanView: View {
       case 2:
         enhancedSelectInterestsView
       case 3:
-        enhancedSelectHobbiesView
+        Text("Hobbies are now included in interests")
+          .foregroundColor(.white.opacity(0.6))
       default:
         EmptyView()
       }
@@ -340,80 +341,16 @@ struct NewTMIPlanView: View {
     }
   }
 
-  private var enhancedSelectHobbiesView: some View {
-    VStack(alignment: .leading, spacing: 20) {
-      VStack(alignment: .leading, spacing: 4) {
-        Text("Select relevant hobbies")
-          .font(.system(size: 16))
-          .foregroundColor(.white.opacity(0.7))
+  // Note: enhancedSelectHobbiesView removed - hobbies now handled through interests
+  private var placeholderHobbyView: some View {
+    Text("Hobbies are now handled through interests")
+      .foregroundColor(.white.opacity(0.5))
 
-        if let student = selectedStudent {
-          Text("Based on \(student.name)'s profile")
-            .font(.system(size: 14))
-            .foregroundColor(.white.opacity(0.5))
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      // Note: Hobby selection counter removed
 
-      // Selected counter and notes
-      Text("Selected: \(selectedHobbies.count)")
-        .font(.system(size: 14, weight: .medium))
-        .foregroundColor(selectedHobbies.isEmpty ? .white.opacity(0.5) : Color.tmiSecondary)
-        .padding(.vertical, 8)
-        .padding(.horizontal, 16)
-        .background(
-          Capsule()
-            .fill(Color.white.opacity(0.05))
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
+      // Note: Hobby grid removed
 
-      ScrollView {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-          ForEach(hobbies) { hobby in
-            HobbySelectionCard(
-              hobby: hobby,
-              isSelected: selectedHobbies.contains(hobby),
-              action: {
-                toggleSelection(of: hobby, in: &selectedHobbies)
-              }
-            )
-          }
-        }
-      }
-
-      // Notes field
-      VStack(alignment: .leading, spacing: 10) {
-        Text("Additional Notes (Optional)")
-          .font(.system(size: 16, weight: .medium))
-          .foregroundColor(.white)
-
-        TextEditor(text: $notes)
-          .frame(minHeight: 100)
-          .padding(12)
-          .background(
-            RoundedRectangle(cornerRadius: 12)
-              .fill(Color.white.opacity(0.05))
-              .background(
-                RoundedRectangle(cornerRadius: 12)
-                  .fill(.ultraThinMaterial)
-                  .opacity(0.3)
-              )
-          )
-          .overlay(
-            RoundedRectangle(cornerRadius: 12)
-              .stroke(
-                LinearGradient(
-                  colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                  startPoint: .topLeading,
-                  endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
-              )
-          )
-          .foregroundColor(.white)
-      }
-      .padding(.top, 16)
-    }
+      // Note: Notes field moved to interests section
   }
 
   // MARK: - Navigation Buttons
@@ -567,7 +504,6 @@ struct NewTMIPlanView: View {
           students: [student],
           model: model,
           interests: selectedInterests,
-          hobbies: selectedHobbies,
           startDate: planStartDate,
           endDate: planEndDate,
           creationDate: Date(),
@@ -609,12 +545,12 @@ struct NewTMIPlanView: View {
       let studentService = StudentService()
       students = try await studentService.fetchStudents()
       
-      // Fetch interests and hobbies using the existing logic
+      // Fetch interests (hobbies are now included in interests)
       guard let uid = Auth.auth().currentUser?.uid else {
         print("No authenticated user found")
         students = Student.comprehensiveSampleStudents
         interests = Interest.expandedSampleInterests
-        hobbies = Hobby.expandedSampleHobbies
+        // Note: Hobbies now included in interests
         isLoadingData = false
         return
       }
@@ -622,18 +558,18 @@ struct NewTMIPlanView: View {
       let db = FirebaseManager.shared.firestore
       
       async let interestsTask = fetchInterestsFromFirestore(db: db, uid: uid)
-      async let hobbiesTask = fetchHobbiesFromFirestore(db: db, uid: uid)
+      // Note: Hobbies task removed - now handled through interests
       
       interests = try await interestsTask
-      hobbies = try await hobbiesTask
+      // Note: Hobbies assignment removed - now handled through interests
       
-      print("Fetched \(students.count) students, \(interests.count) interests, \(hobbies.count) hobbies")
+      print("Fetched \(students.count) students, \(interests.count) interests")
     } catch {
       print("Error fetching data: \(error.localizedDescription)")
       // Fall back to sample data if Firebase fails
       students = Student.comprehensiveSampleStudents
       interests = Interest.expandedSampleInterests
-      hobbies = Hobby.expandedSampleHobbies
+      // Note: Hobbies now included in interests
     }
     
     isLoadingData = false
@@ -650,16 +586,7 @@ struct NewTMIPlanView: View {
     return firestoreInterests.isEmpty ? Interest.expandedSampleInterests : firestoreInterests
   }
 
-  private func fetchHobbiesFromFirestore(db: Firestore, uid: String) async throws -> [Hobby] {
-    let collection = db.collection("users").document(uid).collection("hobbies")
-    let querySnapshot = try await collection.getDocuments()
-    let firestoreHobbies = querySnapshot.documents.compactMap { document -> Hobby? in
-      Hobby.fromFirestore(id: document.documentID, data: document.data())
-    }
-    
-    // If no hobbies found in Firestore, return expanded sample data
-    return firestoreHobbies.isEmpty ? Hobby.expandedSampleHobbies : firestoreHobbies
-  }
+  // Note: fetchHobbiesFromFirestore removed - hobbies are now handled through interests
 
 
   private func toggleSelection<T: Identifiable & Equatable>(of item: T, in array: inout [T]) {
@@ -992,77 +919,7 @@ struct InterestSelectionCard: View {
   }
 }
 
-struct HobbySelectionCard: View {
-  let hobby: Hobby
-  let isSelected: Bool
-  let action: () -> Void
-
-  @State private var isHovered = false
-
-  var body: some View {
-    Button(action: action) {
-      VStack(spacing: 12) {
-        ZStack {
-          Circle()
-            .fill(hobby.color.opacity(0.15))
-            .frame(width: 40, height: 40)
-
-          Image(systemName: hobby.iconName)
-            .font(.system(size: 18))
-            .foregroundColor(hobby.color)
-        }
-
-        Text(hobby.name)
-          .font(.system(size: 15, weight: .medium))
-          .foregroundColor(.white)
-          .multilineTextAlignment(.center)
-          .lineLimit(1)
-
-        Text(hobby.category.map { $0.rawValue }.joined(separator: ", "))
-          .font(.system(size: 12))
-          .foregroundColor(.white.opacity(0.7))
-          .multilineTextAlignment(.center)
-          .lineLimit(1)
-      }
-      .padding(.vertical, 16)
-      .padding(.horizontal, 10)
-      .frame(maxWidth: .infinity)
-      .background(
-        RoundedRectangle(cornerRadius: 16)
-          .fill(isSelected ? hobby.color.opacity(0.15) : Color.white.opacity(0.05))
-          .background(
-            RoundedRectangle(cornerRadius: 16)
-              .fill(.ultraThinMaterial)
-              .opacity(0.3)
-          )
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: 16)
-          .stroke(
-            isSelected
-              ? LinearGradient(
-                colors: [hobby.color.opacity(0.5)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              )
-              : LinearGradient(
-                colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              ),
-            lineWidth: 1
-          )
-      )
-      .scaleEffect(isHovered ? 1.05 : 1.0)
-      .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-      .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-    }
-    .buttonStyle(.plain)
-    .onHover { hovering in
-      isHovered = hovering
-    }
-  }
-}
+// Note: HobbySelectionCard removed - hobbies are now handled through InterestSelectionCard
 
 #Preview {
   NewTMIPlanView()

@@ -29,7 +29,7 @@ final class ResourceService: @unchecked Sendable {
       .document(currentUser.uid)
       .collection(FirestoreCollection.resources.rawValue)
     
-    let docRef = try await collection.addDocument(from: resourceToSave)
+    let docRef = try collection.addDocument(from: resourceToSave)
     return docRef.documentID
   }
   
@@ -320,7 +320,7 @@ final class ResourceService: @unchecked Sendable {
       let resourceToSave = resource
       
       do {
-        let docRef = try await collection.addDocument(from: resourceToSave)
+        let docRef = try collection.addDocument(from: resourceToSave)
         resourceIDs.append(docRef.documentID)
       } catch {
         throw ResourceServiceError.saveFailed("Failed to save resource: \(error.localizedDescription)")

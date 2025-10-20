@@ -58,7 +58,9 @@ final class ProductionTMIManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            self?.handleErrorRetry(notification)
+            Task { @MainActor in
+                self?.handleErrorRetry(notification)
+            }
         }
         
         logger.debug("Error handling system configured")
@@ -123,19 +125,29 @@ final class ProductionTMIManager: ObservableObject {
 // MARK: - Production Environment Values
 
 private struct ProductionTMIManagerKey: EnvironmentKey {
-    static let defaultValue: ProductionTMIManager = ProductionTMIManager.shared
+    static var defaultValue: ProductionTMIManager {
+        // Use shared instance since class is MainActor-isolated
+        ProductionTMIManager.shared
+    }
 }
 
 private struct ErrorHandlerKey: EnvironmentKey {
-    static let defaultValue: ErrorHandler = ErrorHandler.shared
+    static var defaultValue: ErrorHandler {
+        // Use shared instance since initializer is private
+        ErrorHandler.shared
+    }
 }
 
 private struct PerformanceMonitorKey: EnvironmentKey {
-    static let defaultValue: PerformanceMonitor = PerformanceMonitor.shared
+    static var defaultValue: PerformanceMonitor {
+        PerformanceMonitor.shared
+    }
 }
 
 private struct SecureStorageKey: EnvironmentKey {
-    static let defaultValue: SecureStorage = SecureStorage.shared
+    static var defaultValue: SecureStorage {
+        SecureStorage.shared
+    }
 }
 
 extension EnvironmentValues {

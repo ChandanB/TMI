@@ -8,6 +8,18 @@
 import Firebase
 import FirebaseAuth
 
+// MARK: - Optional Protocol Helper
+
+protocol OptionalProtocol {
+    var isNil: Bool { get }
+}
+
+extension Optional: OptionalProtocol {
+    var isNil: Bool {
+        return self == nil
+    }
+}
+
 extension FirebaseManager {
     // MARK: - Form Template Management
     
@@ -93,12 +105,32 @@ extension FirebaseManager {
         return snapshot.documents.compactMap { try? $0.data(as: FormSubmission.self) }
     }
     
-    // MARK: - Validation Helper
+    // MARK: - Validation Helpers
+
+    private func isValueEmpty(_ value: Any) -> Bool {
+        if let optionalValue = value as? (any OptionalProtocol) {
+            return optionalValue.isNil
+        }
+
+        if let string = value as? String {
+            return string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+
+        if let array = value as? [Any] {
+            return array.isEmpty
+        }
+
+        if let dict = value as? [String: Any] {
+            return dict.isEmpty
+        }
+
+        return false
+    }
     
     private func validateFieldRule(value: AnyCodable, rule: ValidationRule, fieldId: String) throws {
         switch rule.ruleType {
         case .required:
-            if value.value == nil {
+            if isValueEmpty(value.value) {
                 throw ValidationError.validationFailed(field: fieldId, message: rule.message)
             }
         case .email:

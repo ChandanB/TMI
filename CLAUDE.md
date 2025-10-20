@@ -4,6 +4,8 @@
 
 Write idiomatic SwiftUI code following Apple's latest architectural recommendations and best practices.
 
+> **⚠️ REQUIRED READING**: Before writing any code, review [SWIFT_CODING_STANDARDS.md](./SWIFT_CODING_STANDARDS.md) for error prevention patterns and project-specific guidelines.
+
 ## Core Philosophy
 
 - SwiftUI is the default UI paradigm for Apple platforms - embrace its declarative nature

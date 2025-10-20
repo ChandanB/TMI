@@ -79,7 +79,6 @@ final class AIPromptBuilder: Sendable {
             - Name: \(student.name)
             - Grade: \(student.grade)
             - Interests: \(student.interests.map { $0.name }.joined(separator: ", "))
-            - Hobbies: \(student.hobbies.map { $0.name }.joined(separator: ", "))
             - Academic Performance (GPA): \(student.academicPerformance?.gpa ?? 0.0)
             
             **PERSONALIZATION INSTRUCTIONS:**
@@ -137,7 +136,6 @@ final class AIPromptBuilder: Sendable {
             - Name: \(student.name)
             - Grade: \(student.grade)
             - Interests: \(student.interests.map { $0.name }.joined(separator: ", "))
-            - Hobbies: \(student.hobbies.map { $0.name }.joined(separator: ", "))
             - Academic Performance (GPA): \(student.academicPerformance?.gpa ?? 0.0)
             - Academic Subjects: \(student.academicPerformance?.subjects.map { "\($0.name) (\($0.grade))" }.joined(separator: ", ") ?? "N/A")
             
@@ -222,7 +220,6 @@ final class AIPromptBuilder: Sendable {
         - Name: \(student.name)
         - Grade: \(student.grade)
         - Interests: \(student.interests.map { $0.name }.joined(separator: ", "))
-        - Hobbies: \(student.hobbies.map { $0.name }.joined(separator: ", "))
         - Academic Performance (GPA): \(student.academicPerformance?.gpa ?? 0.0)
         
         **TASK:**
@@ -242,7 +239,6 @@ final class AIPromptBuilder: Sendable {
         - Name: \(student.name)
         - Grade: \(student.grade)
         - Interests: \(student.interests.map { $0.name }.joined(separator: ", "))
-        - Hobbies: \(student.hobbies.map { $0.name }.joined(separator: ", "))
         - Academic Performance (GPA): \(student.academicPerformance?.gpa ?? 0.0)
         
         **TASK:**

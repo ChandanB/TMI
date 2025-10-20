@@ -10,7 +10,7 @@ import Observation
 
 struct AddStudentView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.simpleAuthStateModel) private var authStateModel
+    @Environment(\.authStateModel) private var authStateModel
     @State private var stateModel: AddStudentStateModel?
     
     let student: Student?
@@ -31,7 +31,7 @@ struct AddStudentView: View {
                     
                     // Content
                     ScrollView {
-                        VStack(spacing: 24) {
+                        VStack(spacing: 28) {
                             // Enhanced Header
                             VStack(spacing: 16) {
                                 ZStack {
@@ -83,22 +83,34 @@ struct AddStudentView: View {
                                             text: Binding(get: { currentStateModel.studentID }, set: { currentStateModel.studentID = $0 })
                                         )
                                         
-                                        VStack(alignment: .leading, spacing: 8) {
+                                        VStack(alignment: .leading, spacing: 12) {
                                             Label("Date of Birth", systemImage: "calendar")
                                                 .font(.system(size: 16, weight: .medium))
                                                 .foregroundColor(.white.opacity(0.9))
-                                            
-                                            DatePicker(
-                                                "Date of Birth",
-                                                selection: Binding(get: { currentStateModel.dateOfBirth }, set: { currentStateModel.dateOfBirth = $0 }),
-                                                in: Calendar.current.date(byAdding: .year, value: -25, to: Date())!...Calendar.current.date(byAdding: .year, value: -3, to: Date())!,
-                                                displayedComponents: .date
+
+                                            HStack {
+                                                DatePicker(
+                                                    "Date of Birth",
+                                                    selection: Binding(get: { currentStateModel.dateOfBirth }, set: { currentStateModel.dateOfBirth = $0 }),
+                                                    in: Calendar.current.date(byAdding: .year, value: -25, to: Date())!...Calendar.current.date(byAdding: .year, value: -3, to: Date())!,
+                                                    displayedComponents: .date
+                                                )
+                                                .datePickerStyle(.compact)
+                                                .accentColor(.tmiSecondary)
+                                                .labelsHidden()
+
+                                                Spacer()
+                                            }
+                                            .padding()
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(Color.white.opacity(0.05))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 12)
+                                                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                                    )
                                             )
-                                            .datePickerStyle(.compact)
-                                            .accentColor(.tmiSecondary)
-                                            .labelsHidden()
                                         }
-                                        .padding(.vertical, 4)
                                     }
                                 }
                             }
@@ -117,14 +129,7 @@ struct AddStudentView: View {
                                         onTap: { currentStateModel.showingInterestPicker = true }
                                     )
                                     
-                                    TMISelectionSection(
-                                        title: "Hobbies",
-                                        icon: "gamecontroller.fill",
-                                        count: currentStateModel.hobbies.count,
-                                        selectedItems: currentStateModel.hobbies.map { $0.name },
-                                        placeholder: "Add hobbies to connect learning to their passions",
-                                        onTap: { currentStateModel.showingHobbyPicker = true }
-                                    )
+                                    // Note: Hobbies are now included in interests above
                                 }
                             }
                             
@@ -191,16 +196,7 @@ struct AddStudentView: View {
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
                 }
-                .sheet(isPresented: Binding(get: { currentStateModel.showingHobbyPicker }, set: { currentStateModel.showingHobbyPicker = $0 })) {
-                    HobbySelectionView(
-                        selectedHobbies: Binding(get: { currentStateModel.hobbies }, set: { currentStateModel.hobbies = $0 }),
-                        onDismiss: {
-                            currentStateModel.showingHobbyPicker = false
-                        }
-                    )
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-                }
+                // Note: Hobby selection is now handled through interest selection
             } else {
                 ProgressView()
                     .onAppear {
@@ -332,126 +328,7 @@ struct InterestSelectionView: View {
     }
 }
 
-// MARK: - Hobby Selection View
-struct HobbySelectionView: View {
-    @Binding var selectedHobbies: [Hobby]
-    let onDismiss: () -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var searchText = ""
-    
-    private var filteredHobbies: [Hobby] {
-        if searchText.isEmpty {
-            return Hobby.expandedSampleHobbies
-        } else {
-            return Hobby.expandedSampleHobbies.filter { 
-                $0.name.localizedCaseInsensitiveContains(searchText) 
-            }
-        }
-    }
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                TMIBackgroundView(variant: .default)
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 20) {
-                    // Header with selection count
-                    TMIGlassCard(style: .form) {
-                        VStack(spacing: 12) {
-                            HStack {
-                                Image(systemName: "gamecontroller.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.tmiSecondary)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Select Hobbies")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.white)
-                                    
-                                    Text("\(selectedHobbies.count) selected")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                                
-                                Spacer()
-                            }
-                            
-                            // Search bar
-                            TMITextField(
-                                icon: "magnifyingglass",
-                                placeholder: "Search hobbies...",
-                                text: $searchText
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
-                    
-                    // Selected hobbies summary
-                    if !selectedHobbies.isEmpty {
-                        TMIGlassCard(style: .form) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Selected Hobbies")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.9))
-                                
-                                TMISelectedItemsView(items: selectedHobbies.map { $0.name })
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                    
-                    // Hobbies grid
-                    ScrollView {
-                        LazyVGrid(columns: [
-                            GridItem(.adaptive(minimum: 140, maximum: 180))
-                        ], spacing: 16) {
-                            ForEach(filteredHobbies) { hobby in
-                                HobbyPickerCard(
-                                    hobby: hobby,
-                                    isSelected: selectedHobbies.contains(hobby),
-                                    onTap: { toggleHobby(hobby) }
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 100)
-                    }
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        onDismiss()
-                        dismiss()
-                    }
-                    .foregroundColor(.tmiSecondary)
-                    .fontWeight(.semibold)
-                }
-            }
-            .preferredColorScheme(.dark)
-        }
-    }
-    
-    private func toggleHobby(_ hobby: Hobby) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            if selectedHobbies.contains(hobby) {
-                selectedHobbies.removeAll { $0.id == hobby.id }
-            } else {
-                selectedHobbies.append(hobby)
-            }
-        }
-    }
-}
+// Note: HobbySelectionView has been removed - hobbies are now handled through interests
 
 // MARK: - Enhanced Components
 
@@ -662,19 +539,5 @@ struct InterestPickerCard: View {
     }
 }
 
-struct HobbyPickerCard: View {
-    let hobby: Hobby
-    let isSelected: Bool
-    let onTap: () -> Void
-    
-    var body: some View {
-        TMIPickerCard(
-            item: hobby,
-            isSelected: isSelected,
-            onTap: onTap,
-            iconName: hobby.iconName,
-            displayName: hobby.name
-        )
-    }
-}
+// Note: HobbyPickerCard has been removed - hobbies are now handled through InterestPickerCard
 

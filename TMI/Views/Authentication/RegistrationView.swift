@@ -11,6 +11,7 @@ struct RegistrationView: View {
   @State private var errorMessage: String?
 
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.authStateModel) private var authStateModel
   @FocusState private var focusedField: Field?
 
   // Animation states
@@ -266,9 +267,15 @@ struct RegistrationView: View {
 
     Task {
       do {
-        // Use proper auth service instead of direct Firebase manager
+        // Use the AuthStateModel for registration
+        // First update the auth model's email/password
+        authStateModel.updateEmail(email)
+        authStateModel.updatePassword(password)
+
+        // Start registration flow - this will need to be enhanced with proper AuthStateModel integration
         let authService = FirebaseTMIAuthService()
         let _ = try await authService.signUp(email: email, password: password)
+
         isRegistering = false
         dismiss()
       } catch {

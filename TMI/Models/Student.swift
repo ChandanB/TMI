@@ -20,8 +20,7 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
     
     // MARK: - TMI Related Properties
     let tmiPlans: [TMIPlan]?
-    var interests: [Interest]
-    var hobbies: [Hobby]
+    var interests: [Interest] // Now includes both interests and hobbies
     var surveyResults: [SurveyResult]?
     
     // MARK: - Academic & Performance Tracking
@@ -135,7 +134,6 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
          tmiPlans: [TMIPlan]? = nil,
          studentID: String? = nil,
          interests: [Interest] = [],
-         hobbies: [Hobby] = [],
          photoURL: URL? = nil,
          surveyResults: [SurveyResult]? = nil,
          academicPerformance: AcademicPerformance? = nil,
@@ -151,7 +149,6 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
         self.tmiPlans = tmiPlans
         self.studentID = studentID
         self.interests = interests
-        self.hobbies = hobbies
         self.photoURL = photoURL
         self.surveyResults = surveyResults
         self.academicPerformance = academicPerformance
@@ -170,6 +167,82 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
         hasher.combine(id)
     }
     
+    // MARK: - Validation
+
+    /// Validates the student data and throws validation errors if any issues are found
+    func validate() throws {
+        // Validate name
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw StudentValidationError.invalidName("Student name cannot be empty")
+        }
+
+        guard name.count <= 100 else {
+            throw StudentValidationError.invalidName("Student name cannot exceed 100 characters")
+        }
+
+        // Validate grade
+        guard !grade.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw StudentValidationError.invalidGrade("Grade cannot be empty")
+        }
+
+        // Validate school
+        guard !school.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw StudentValidationError.invalidSchool("School name cannot be empty")
+        }
+
+        guard school.count <= 200 else {
+            throw StudentValidationError.invalidSchool("School name cannot exceed 200 characters")
+        }
+
+        // Validate age (derived from date of birth)
+        let currentAge = age
+        guard currentAge >= 3 && currentAge <= 120 else {
+            throw StudentValidationError.invalidAge("Student age must be between 3 and 120")
+        }
+
+        // Validate date of birth is not in the future
+        guard dateOfBirth <= Date() else {
+            throw StudentValidationError.invalidDateOfBirth("Date of birth cannot be in the future")
+        }
+
+        // Validate student ID if provided
+        if let studentID = studentID, !studentID.isEmpty {
+            guard studentID.count <= 50 else {
+                throw StudentValidationError.invalidStudentID("Student ID cannot exceed 50 characters")
+            }
+        }
+
+        // Validate interests (now includes former hobbies)
+        if interests.count > 40 {
+            throw StudentValidationError.tooManyInterests("Cannot have more than 40 interests")
+        }
+    }
+
+    /// Quick validation for UI feedback (non-throwing)
+    var isValid: Bool {
+        do {
+            try validate()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Get validation errors as an array for UI display
+    var validationErrors: [StudentValidationError] {
+        var errors: [StudentValidationError] = []
+
+        do {
+            try validate()
+        } catch let error as StudentValidationError {
+            errors.append(error)
+        } catch {
+            errors.append(.unknown(error.localizedDescription))
+        }
+
+        return errors
+    }
+
     // MARK: - Firestore Conversion
     
     func toFirestoreData() -> [String: Any] {
@@ -201,13 +274,7 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
             ]
         }
         
-        // Convert hobbies to basic data
-        data["hobbies"] = hobbies.map { hobby in
-            [
-                "id": hobby.id.uuidString,
-                "name": hobby.name
-            ]
-        }
+        // Note: Hobbies are now included in interests array
         
         // Convert survey results
         if let surveyResults = surveyResults {
@@ -413,7 +480,6 @@ extension Student {
             school: "Sample High School",
             dateOfBirth: Date(),
             interests: [],
-            hobbies: [],
             surveyResults: surveyResults,
             academicPerformance: academicPerformance,
             engagementHistory: engagementHistory,
@@ -425,6 +491,58 @@ extension Student {
     
     static var sampleStudents: [Student] {
         return comprehensiveSampleStudents
+    }
+}
+
+// MARK: - Student Validation Errors
+
+enum StudentValidationError: LocalizedError, Equatable {
+    case invalidName(String)
+    case invalidGrade(String)
+    case invalidSchool(String)
+    case invalidAge(String)
+    case invalidDateOfBirth(String)
+    case invalidStudentID(String)
+    case tooManyInterests(String)
+    case tooManyHobbies(String)
+    case unknown(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidName(let message),
+             .invalidGrade(let message),
+             .invalidSchool(let message),
+             .invalidAge(let message),
+             .invalidDateOfBirth(let message),
+             .invalidStudentID(let message),
+             .tooManyInterests(let message),
+             .tooManyHobbies(let message),
+             .unknown(let message):
+            return message
+        }
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .invalidName:
+            return "Please enter a valid student name (1-100 characters)."
+        case .invalidGrade:
+            return "Please select or enter a valid grade level."
+        case .invalidSchool:
+            return "Please enter a valid school name (1-200 characters)."
+        case .invalidAge:
+            return "Please enter a valid date of birth for a student aged 3-120."
+        case .invalidDateOfBirth:
+            return "Please select a date of birth that is not in the future."
+        case .invalidStudentID:
+            return "Student ID should be 50 characters or less."
+        case .tooManyInterests:
+            return "Please limit interests to 20 or fewer."
+        case .tooManyHobbies:
+            return "Please limit hobbies to 20 or fewer."
+        case .unknown:
+            return "Please check your input and try again."
+        }
     }
 }
 

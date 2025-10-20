@@ -231,7 +231,7 @@ struct StudentDetailView: View {
 
     @ViewBuilder
     private var interestsTab: some View {
-        if student.interests.isEmpty && student.hobbies.isEmpty {
+        if student.interests.isEmpty {
             emptyStateView(
                 icon: "heart.fill",
                 title: "No Interests Recorded",
@@ -387,15 +387,8 @@ struct StudentInterestsAndHobbiesView: View {
                 )
             }
             
-            // Hobbies Section
-            if !student.hobbies.isEmpty {
-                InterestHobbySection(
-                    title: "Hobbies",
-                    icon: "gamecontroller.fill",
-                    color: .green,
-                    items: student.hobbies.map { InterestHobbyItem(name: $0.name, category: $0.category.first?.rawValue ?? "General") }
-                )
-            }
+            // Note: Hobbies are now included in interests above
+            // Removed separate hobbies section as hobbies are now part of interests
             
             // Edit button
             TMIButton(
@@ -518,7 +511,7 @@ struct EditStudentInterestsView: View {
     let student: Student
     @Environment(\.dismiss) private var dismiss
     @State private var selectedInterests: [Interest] = []
-    @State private var selectedHobbies: [Hobby] = []
+    // Note: Hobbies are now included in interests
     
     var body: some View {
         ZStack {
@@ -533,7 +526,7 @@ struct EditStudentInterestsView: View {
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundColor(.white)
                             
-                            Text("Interests & Hobbies")
+                            Text("Interests")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundColor(.tmiSecondary)
                         }
@@ -561,27 +554,7 @@ struct EditStudentInterestsView: View {
                             }
                         }
                         
-                        // Hobbies Section
-                        VStack(alignment: .leading, spacing: 16) {
-                            HStack {
-                                Image(systemName: "gamecontroller.fill")
-                                    .foregroundColor(.green)
-                                Text("Hobbies")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.white)
-                                Spacer()
-                            }
-                            
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: 12) {
-                                ForEach(Hobby.expandedSampleHobbies) { hobby in
-                                    HobbyPickerCard(
-                                        hobby: hobby,
-                                        isSelected: selectedHobbies.contains(hobby),
-                                        onTap: { toggleHobby(hobby) }
-                                    )
-                                }
-                            }
-                        }
+                        // Note: Hobbies section removed - now handled through interests above
                     }
                     .padding(20)
                 }
@@ -601,7 +574,7 @@ struct EditStudentInterestsView: View {
                         // Update the student with selected interests and hobbies
                         var updatedStudent = student
                         updatedStudent.interests = selectedInterests
-                        updatedStudent.hobbies = selectedHobbies
+                        // Note: Hobbies are now included in interests
                         
                         // Save the updated student (this would typically use StudentService)
                         Task {
@@ -619,7 +592,7 @@ struct EditStudentInterestsView: View {
             .preferredColorScheme(.dark)
             .onAppear {
                 selectedInterests = student.interests
-                selectedHobbies = student.hobbies
+                // Note: Hobbies are now included in interests
             }
     }
     
@@ -631,13 +604,7 @@ struct EditStudentInterestsView: View {
         }
     }
     
-    private func toggleHobby(_ hobby: Hobby) {
-        if selectedHobbies.contains(hobby) {
-            selectedHobbies.removeAll { $0.id == hobby.id }
-        } else {
-            selectedHobbies.append(hobby)
-        }
-    }
+    // Note: toggleHobby function removed - hobbies now handled through interests
 }
 
 #Preview {

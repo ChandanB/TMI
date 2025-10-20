@@ -179,12 +179,7 @@ class StudentService {
             return Interest(id: id, name: name, category: [.academics])
         }
         
-        // Parse hobbies
-        let hobbies = (data["hobbies"] as? [[String: Any]] ?? []).compactMap { hobbyData -> Hobby? in
-            guard let name = hobbyData["name"] as? String else { return nil }
-            let id = hobbyData["id"] as? String
-            return Hobby(id: UUID(uuidString: id ?? UUID().uuidString) ?? UUID(), name: name, category: [.other])
-        }
+        // Note: Hobbies are now included in interests above
         
         // Parse survey results
         let surveyResults = (data["surveyResults"] as? [[String: Any]])?.compactMap { surveyData -> SurveyResult? in
@@ -258,7 +253,6 @@ class StudentService {
             dateOfBirth: dateOfBirth,
             studentID: studentID,
             interests: interests,
-            hobbies: hobbies,
             photoURL: photoURL,
             surveyResults: surveyResults,
             academicPerformance: academicPerformance,
@@ -294,12 +288,7 @@ class StudentService {
             return Interest(id: id, name: name, category: [.academics])
         }
         
-        // Parse hobbies
-        let hobbies = (data["hobbies"] as? [[String: Any]] ?? []).compactMap { hobbyData -> Hobby? in
-            guard let name = hobbyData["name"] as? String else { return nil }
-            let id = hobbyData["id"] as? String
-            return Hobby(id: UUID(uuidString: id ?? UUID().uuidString) ?? UUID(), name: name, category: [.other])
-        }
+        // Note: Hobbies are now included in interests above
         
         // Parse survey results
         let surveyResults = (data["surveyResults"] as? [[String: Any]])?.compactMap { surveyData -> SurveyResult? in
@@ -373,7 +362,6 @@ class StudentService {
             dateOfBirth: dateOfBirth,
             studentID: studentID,
             interests: interests,
-            hobbies: hobbies,
             photoURL: photoURL,
             surveyResults: surveyResults,
             academicPerformance: academicPerformance,
@@ -428,7 +416,6 @@ class MockStudentService: StudentService {
             dateOfBirth: $0.dateOfBirth,
             studentID: $0.studentID,
             interests: $0.interests,
-            hobbies: $0.hobbies,
             photoURL: $0.photoURL,
             surveyResults: $0.surveyResults,
             academicPerformance: $0.academicPerformance,
@@ -454,7 +441,6 @@ class MockStudentService: StudentService {
             dateOfBirth: student.dateOfBirth,
             studentID: student.studentID,
             interests: student.interests,
-            hobbies: student.hobbies,
             photoURL: student.photoURL,
             surveyResults: student.surveyResults,
             academicPerformance: student.academicPerformance,
@@ -477,8 +463,7 @@ class MockStudentService: StudentService {
                 dateOfBirth: student.dateOfBirth,
                 studentID: student.studentID,
                 interests: student.interests,
-                hobbies: student.hobbies,
-                photoURL: student.photoURL,
+                    photoURL: student.photoURL,
                 surveyResults: student.surveyResults,
                 academicPerformance: student.academicPerformance,
                 engagementHistory: student.engagementHistory,

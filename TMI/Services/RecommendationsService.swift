@@ -72,11 +72,7 @@ final class RecommendationsService: @unchecked Sendable {
             recommendations.append(contentsOf: interestResources.prefix(2))
         }
         
-        // Get resources based on hobbies
-        for hobby in student.hobbies {
-            let hobbyResources = try await resourceService.searchResources(query: hobby.name)
-            recommendations.append(contentsOf: hobbyResources.prefix(1))
-        }
+        // Note: Hobbies are now included in interests array above
         
         // Remove duplicates and return top 8
         let uniqueRecommendations = Array(Set(recommendations.map { $0.id ?? "" }))

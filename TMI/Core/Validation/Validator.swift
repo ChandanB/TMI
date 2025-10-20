@@ -167,7 +167,7 @@ struct ValidationRule: Codable, Hashable, Identifiable, Sendable {
     /// Create a custom validation rule
     static func custom(
         message: String,
-        validator: @escaping (Any?) -> Bool
+        validator: @escaping @Sendable (Any?) -> Bool
     ) -> ValidationRule {
         let parameters = ValidationParameters.custom(validator: validator)
         return ValidationRule(ruleType: .custom, message: message, parameters: parameters)
@@ -180,7 +180,7 @@ enum ValidationParameters: Codable, Hashable, Sendable {
     case numericRange(min: Int, max: Int, fieldName: String)
     case collectionSize(min: Int, max: Int, fieldName: String)
     case date(after: Date?, before: Date?, fieldName: String)
-    case custom(validator: (Any?) -> Bool)
+    case custom(validator: @Sendable (Any?) -> Bool)
     
     // Custom coding for the validator case
     enum CodingKeys: String, CodingKey {
@@ -764,22 +764,6 @@ enum ValidationError: Error, LocalizedError, Sendable {
     /// Create an invalid data type error
     static func invalidType(_ field: String) -> ValidationError {
         return .invalidDataType(field)
-    }
-}
-
-// MARK: - ValidationError Extensions
-extension ValidationError: Equatable {
-    static func == (lhs: ValidationError, rhs: ValidationError) -> Bool {
-        switch (lhs, rhs) {
-        case (.missingRequiredField(let lField), .missingRequiredField(let rField)):
-            return lField == rField
-        case (.invalidDataType(let lField), .invalidDataType(let rField)):
-            return lField == rField
-        case (.validationFailed(let lField, let lMessage), .validationFailed(let rField, let rMessage)):
-            return lField == rField && lMessage == rMessage
-        default:
-            return false
-        }
     }
 }
 

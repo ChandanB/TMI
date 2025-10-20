@@ -30,7 +30,7 @@ final class SurveyService: @unchecked Sendable {
       .document(currentUser.uid)
       .collection(FirestoreCollection.surveys.rawValue)
     
-    let docRef = try await collection.addDocument(from: surveyToSave)
+    let docRef = try collection.addDocument(from: surveyToSave)
     return docRef.documentID
   }
   
@@ -49,7 +49,7 @@ final class SurveyService: @unchecked Sendable {
       .document(currentUser.uid)
       .collection(FirestoreCollection.surveys.rawValue)
     
-    let docRef = try await collection.addDocument(from: surveyToSave)
+    let docRef = try collection.addDocument(from: surveyToSave)
     return docRef.documentID
   }
   
@@ -289,6 +289,161 @@ final class SurveyService: @unchecked Sendable {
       }
   }
   
+  // MARK: - Student Interest Survey (New Flow)
+
+  /// Save student interest survey response
+  func saveStudentSurveyResponse(
+    _ responses: [String: SurveyResponse.SurveyAnswerValue],
+    for studentId: String,
+    duration: TimeInterval
+  ) async throws -> SurveyResponse {
+    guard let currentUser = Auth.auth().currentUser else {
+      throw SurveyServiceError.userNotAuthenticated
+    }
+
+    // Analyze responses to create interest clusters
+    let clusters = analyzeInterests(from: responses)
+    let topInterests = extractTopInterests(from: clusters)
+
+    // Create survey response
+    let surveyResponse = SurveyResponse(
+      id: UUID(),
+      studentId: studentId,
+      responses: responses,
+      interestClusters: clusters,
+      topInterests: topInterests,
+      completedAt: Date(),
+      completionTime: duration
+    )
+
+    // Save to Firestore
+    let docRef = firestore
+      .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
+      .collection(FirestoreCollection.students.rawValue).document(studentId)
+      .collection("interestSurveys").document(surveyResponse.id.uuidString)
+
+    try await docRef.setData(surveyResponse.toFirestoreData())
+
+    // Update student document with latest survey reference
+    let studentRef = firestore
+      .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
+      .collection(FirestoreCollection.students.rawValue).document(studentId)
+
+    try await studentRef.updateData([
+      "latestSurveyId": surveyResponse.id.uuidString,
+      "lastSurveyDate": Timestamp(date: surveyResponse.completedAt),
+      "interestClusters": clusters.map { $0.toFirestoreData() },
+      "topInterests": topInterests
+    ])
+
+    print("[Data] Interest survey saved for student: \(studentId)")
+
+    return surveyResponse
+  }
+
+  /// Fetch latest interest survey for student
+  func fetchLatestStudentSurvey(for studentId: String) async throws -> SurveyResponse? {
+    guard let currentUser = Auth.auth().currentUser else {
+      throw SurveyServiceError.userNotAuthenticated
+    }
+
+    let querySnapshot = try await firestore
+      .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
+      .collection(FirestoreCollection.students.rawValue).document(studentId)
+      .collection("interestSurveys")
+      .order(by: "completedAt", descending: true)
+      .limit(to: 1)
+      .getDocuments()
+
+    guard let document = querySnapshot.documents.first else {
+      return nil
+    }
+
+    return try document.data(as: SurveyResponse.self)
+  }
+
+  /// Get career matches for student based on latest survey
+  func getCareerMatches(for studentId: String) async throws -> [CareerMatchResult] {
+    guard let survey = try await fetchLatestStudentSurvey(for: studentId) else {
+      throw SurveyServiceError.surveyNotFound
+    }
+
+    // Extract dream job if exists
+    var dreamJob: String?
+    if case .text(let text) = survey.responses["dream_job"] {
+      dreamJob = text
+    }
+
+    // Use CareerMatchingService
+    let matches = CareerMatchingService.shared.matchCareers(
+      from: survey.interestClusters,
+      dreamJob: dreamJob
+    )
+
+    return matches
+  }
+
+  // MARK: - Analysis Helpers
+
+  private func analyzeInterests(from responses: [String: SurveyResponse.SurveyAnswerValue]) -> [InterestCluster] {
+    // Extract selected interests
+    var selectedInterestIds: [String] = []
+    if case .options(let options) = responses["interests"] {
+      selectedInterestIds = options
+    }
+
+    // Extract passion scale
+    var passionScale: Int?
+    if case .scale(let value) = responses["career_passion"] {
+      passionScale = value
+    }
+
+    // Calculate weights
+    var clusterWeights: [String: Double] = [:]
+    for interestId in selectedInterestIds {
+      clusterWeights[interestId] = 1.0
+    }
+
+    // Boost if high passion
+    if let passion = passionScale, passion >= 4 {
+      for key in clusterWeights.keys {
+        clusterWeights[key]? *= 1.2
+      }
+    }
+
+    // Normalize
+    let maxWeight = clusterWeights.values.max() ?? 1.0
+    for key in clusterWeights.keys {
+      clusterWeights[key]? /= maxWeight
+    }
+
+    // Create clusters
+    let allClusters = InterestCluster.allCategories
+    var results: [InterestCluster] = []
+
+    for clusterId in selectedInterestIds {
+      if let baseCluster = allClusters.first(where: { $0.name == clusterId }) {
+        let weight = clusterWeights[clusterId] ?? 0.5
+        let weightedCluster = InterestCluster(
+          id: baseCluster.id,
+          name: baseCluster.name,
+          displayName: baseCluster.displayName,
+          weight: weight,
+          relatedCareers: baseCluster.relatedCareers,
+          icon: baseCluster.icon,
+          color: baseCluster.color
+        )
+        results.append(weightedCluster)
+      }
+    }
+
+    return results.sorted { $0.weight > $1.weight }
+  }
+
+  private func extractTopInterests(from clusters: [InterestCluster]) -> [String] {
+    return clusters.prefix(3).map { $0.displayName }
+  }
+
   // MARK: - Completion-based methods for backward compatibility
   func submitSurvey(_ survey: Survey, completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
     Task {
@@ -300,7 +455,7 @@ final class SurveyService: @unchecked Sendable {
       }
     }
   }
-  
+
   func fetchSurvey(id: String, completion: @escaping @Sendable (Result<Survey, Error>) -> Void) {
     Task {
       do {
@@ -333,7 +488,7 @@ extension SurveyService {
     case fetchFailed(String)
     case updateFailed(String)
     case deleteFailed(String)
-    
+
     var errorDescription: String? {
       switch self {
       case .userNotAuthenticated:
@@ -356,3 +511,49 @@ extension SurveyService {
     }
   }
 }
+
+// MARK: - Firestore Conversion Extensions
+
+extension SurveyResponse {
+  func toFirestoreData() -> [String: Any] {
+    var data: [String: Any] = [
+      "id": id.uuidString,
+      "studentId": studentId,
+      "interestClusters": interestClusters.map { $0.toFirestoreData() },
+      "topInterests": topInterests,
+      "completedAt": Timestamp(date: completedAt),
+      "completionTime": completionTime
+    ]
+
+    // Convert responses dictionary
+    var responsesData: [String: Any] = [:]
+    for (key, value) in responses {
+      switch value {
+      case .text(let text):
+        responsesData[key] = ["type": "text", "value": text]
+      case .options(let options):
+        responsesData[key] = ["type": "options", "value": options]
+      case .scale(let scale):
+        responsesData[key] = ["type": "scale", "value": scale]
+      }
+    }
+    data["responses"] = responsesData
+
+    return data
+  }
+}
+
+extension InterestCluster {
+  func toFirestoreData() -> [String: Any] {
+    return [
+      "id": id.uuidString,
+      "name": name,
+      "displayName": displayName,
+      "weight": weight,
+      "relatedCareers": relatedCareers,
+      "icon": icon,
+      "color": color
+    ]
+  }
+}
+

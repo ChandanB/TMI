@@ -161,10 +161,7 @@ extension TMIPlan: Validatable {
         }
         
         // Run all validations
-        let errors: () = try validator.validate()
-//        if !errors.isEmpty {
-//            throw TMIPlanServiceError.saveFailed("Validation failed: \(errors)")
-//        }
+        try validator.validate()
         
         // Additional business logic validations
         try await validateBusinessRules()
@@ -348,7 +345,7 @@ extension TMIPlan {
         // Sanitize progress tracking notes
         if let progress = progressTracking {
             progressTracking = progress.map { entry in
-                var sanitizedEntry = entry
+                let sanitizedEntry = entry
                 /*
                 if let notes = entry.notes {
                     sanitizedEntry.notes = Sanitizer.sanitizeText(notes)

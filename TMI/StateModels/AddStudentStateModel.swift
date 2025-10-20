@@ -18,7 +18,7 @@ final class AddStudentStateModel {
     var school = ""
     var dateOfBirth = Date()
     var interests: [Interest] = []
-    var hobbies: [Hobby] = []
+    // Note: Hobbies are now included in interests
     
     // UI state
     var isLoading = false
@@ -26,7 +26,7 @@ final class AddStudentStateModel {
     var alertMessage = ""
     var errorMessage: String?
     var showingInterestPicker = false
-    var showingHobbyPicker = false
+    // Note: Hobby picker removed - now using unified interest picker
     
     // Edit state
     private var student: Student?
@@ -50,7 +50,7 @@ final class AddStudentStateModel {
             self.school = student.school
             self.dateOfBirth = student.dateOfBirth
             self.interests = student.interests
-            self.hobbies = student.hobbies
+            // Note: Hobbies are now included in interests
         } else if let currentSchool = currentSchool {
             self.school = currentSchool
         }
@@ -102,7 +102,7 @@ final class AddStudentStateModel {
             dateOfBirth: dateOfBirth,
             studentID: studentID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : studentID.trimmingCharacters(in: .whitespacesAndNewlines),
             interests: interests,
-            hobbies: hobbies
+            // Note: Hobbies are now included in interests
         )
         
         do {
@@ -140,13 +140,9 @@ final class AddStudentStateModel {
         showingInterestPicker = false
     }
     
-    func showHobbyPicker() {
-        showingHobbyPicker = true
-    }
+    // Note: showHobbyPicker removed - now using showInterestPicker
     
-    func hideHobbyPicker() {
-        showingHobbyPicker = false
-    }
+    // Note: hideHobbyPicker removed - now using hideInterestPicker
     
     func addInterest(_ interest: Interest) {
         if !interests.contains(interest) {
@@ -158,15 +154,7 @@ final class AddStudentStateModel {
         interests.removeAll { $0.id == interest.id }
     }
     
-    func addHobby(_ hobby: Hobby) {
-        if !hobbies.contains(hobby) {
-            hobbies.append(hobby)
-        }
-    }
-    
-    func removeHobby(_ hobby: Hobby) {
-        hobbies.removeAll { $0.id == hobby.id }
-    }
+    // Note: Hobby functionality has been merged into interests
     
     // MARK: - Computed Properties
     
@@ -179,7 +167,5 @@ final class AddStudentStateModel {
         interests.count
     }
     
-    var selectedHobbyCount: Int {
-        hobbies.count
-    }
+    // Note: Hobby count is now included in selectedInterestCount
 }

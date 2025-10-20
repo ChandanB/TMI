@@ -211,8 +211,88 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     )
   }
   
+  // MARK: - Validation
+
+  /// Validates the TMI user data and throws validation errors if any issues are found
+  func validate() throws {
+    // Validate display name
+    guard !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw TMIUserValidationError.invalidDisplayName("Display name cannot be empty")
+    }
+
+    guard displayName.count <= 100 else {
+      throw TMIUserValidationError.invalidDisplayName("Display name cannot exceed 100 characters")
+    }
+
+    // Validate email format
+    guard isValidEmail(email) else {
+      throw TMIUserValidationError.invalidEmail("Please enter a valid email address")
+    }
+
+    // Validate age if date of birth is provided
+    if let dateOfBirth = dateOfBirth {
+      guard dateOfBirth <= Date() else {
+        throw TMIUserValidationError.invalidDateOfBirth("Date of birth cannot be in the future")
+      }
+
+      let currentAge = Calendar.current.dateComponents([.year], from: dateOfBirth, to: Date()).year ?? 0
+      guard currentAge >= 13 && currentAge <= 120 else {
+        throw TMIUserValidationError.invalidAge("User age must be between 13 and 120")
+      }
+    }
+
+    // Validate institution information for roles that require it
+    if role.requiresInstitutionalAffiliation {
+      guard let institutionName = institutionName, !institutionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        throw TMIUserValidationError.missingInstitutionalAffiliation("Institution name is required for \(role.displayName) role")
+      }
+    }
+
+    // Validate emergency contacts
+    if emergencyContacts.count > 5 {
+      throw TMIUserValidationError.tooManyEmergencyContacts("Cannot have more than 5 emergency contacts")
+    }
+
+    // Validate consent for minors
+    if isMinor && !hasValidConsent {
+      throw TMIUserValidationError.missingParentalConsent("Parental consent is required for users under 18")
+    }
+  }
+
+  /// Quick validation for UI feedback (non-throwing)
+  var isValid: Bool {
+    do {
+      try validate()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /// Get validation errors as an array for UI display
+  var validationErrors: [TMIUserValidationError] {
+    var errors: [TMIUserValidationError] = []
+
+    do {
+      try validate()
+    } catch let error as TMIUserValidationError {
+      errors.append(error)
+    } catch {
+      errors.append(.unknown(error.localizedDescription))
+    }
+
+    return errors
+  }
+
+  /// Helper method to validate email format
+  private func isValidEmail(_ email: String) -> Bool {
+    let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+    let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+    return emailPredicate.evaluate(with: email)
+  }
+
   // MARK: - Equatable
-  
+
   static func == (lhs: TMIUser, rhs: TMIUser) -> Bool {
     return lhs.id == rhs.id && lhs.userID == rhs.userID
   }
@@ -748,5 +828,53 @@ struct UserProfileData: Codable, Sendable {
     self.role = role
     self.newEmail = newEmail
     self.currentPassword = currentPassword
+  }
+}
+
+// MARK: - TMI User Validation Errors
+
+enum TMIUserValidationError: LocalizedError, Equatable {
+  case invalidDisplayName(String)
+  case invalidEmail(String)
+  case invalidAge(String)
+  case invalidDateOfBirth(String)
+  case missingInstitutionalAffiliation(String)
+  case tooManyEmergencyContacts(String)
+  case missingParentalConsent(String)
+  case unknown(String)
+
+  var errorDescription: String? {
+    switch self {
+    case .invalidDisplayName(let message),
+         .invalidEmail(let message),
+         .invalidAge(let message),
+         .invalidDateOfBirth(let message),
+         .missingInstitutionalAffiliation(let message),
+         .tooManyEmergencyContacts(let message),
+         .missingParentalConsent(let message),
+         .unknown(let message):
+      return message
+    }
+  }
+
+  var recoverySuggestion: String? {
+    switch self {
+    case .invalidDisplayName:
+      return "Please enter a valid display name (1-100 characters)."
+    case .invalidEmail:
+      return "Please enter a valid email address (e.g., user@example.com)."
+    case .invalidAge:
+      return "Please enter a valid date of birth for someone aged 13-120."
+    case .invalidDateOfBirth:
+      return "Please select a date of birth that is not in the future."
+    case .missingInstitutionalAffiliation:
+      return "Please provide your institution name for verification."
+    case .tooManyEmergencyContacts:
+      return "Please limit emergency contacts to 5 or fewer."
+    case .missingParentalConsent:
+      return "Parental consent is required for users under 18. Please have a parent or guardian complete the consent process."
+    case .unknown:
+      return "Please check your input and try again."
+    }
   }
 }

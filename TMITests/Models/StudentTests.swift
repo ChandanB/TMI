@@ -64,8 +64,8 @@ final class StudentTests: XCTestCase {
         
         // Act & Assert
         await XCTAssertThrowsAsyncError(try await student.validate()) { error in
-            XCTAssertTrue(error is ValidationError)
-            let validationError = error as! ValidationError
+            XCTAssertTrue(error is StudentValidationError)
+            let validationError = error as! StudentValidationError
             XCTAssertEqual(validationError.field, "name")
             XCTAssertTrue(validationError.message.contains("required"))
         }
@@ -82,8 +82,8 @@ final class StudentTests: XCTestCase {
         
         // Act & Assert
         await XCTAssertThrowsAsyncError(try await student.validate()) { error in
-            XCTAssertTrue(error is ValidationError)
-            let validationError = error as! ValidationError
+            XCTAssertTrue(error is StudentValidationError)
+            let validationError = error as! StudentValidationError
             XCTAssertEqual(validationError.field, "name")
             XCTAssertTrue(validationError.message.contains("2 characters"))
         }
@@ -101,8 +101,8 @@ final class StudentTests: XCTestCase {
         
         // Act & Assert
         await XCTAssertThrowsAsyncError(try await student.validate()) { error in
-            XCTAssertTrue(error is ValidationError)
-            let validationError = error as! ValidationError
+            XCTAssertTrue(error is StudentValidationError)
+            let validationError = error as! StudentValidationError
             XCTAssertEqual(validationError.field, "name")
             XCTAssertTrue(validationError.message.contains("50 characters"))
         }
@@ -119,8 +119,8 @@ final class StudentTests: XCTestCase {
         
         // Act & Assert
         await XCTAssertThrowsAsyncError(try await student.validate()) { error in
-            XCTAssertTrue(error is ValidationError)
-            let validationError = error as! ValidationError
+            XCTAssertTrue(error is StudentValidationError)
+            let validationError = error as! StudentValidationError
             XCTAssertEqual(validationError.field, "grade")
         }
     }
@@ -136,8 +136,8 @@ final class StudentTests: XCTestCase {
         
         // Act & Assert
         await XCTAssertThrowsAsyncError(try await student.validate()) { error in
-            XCTAssertTrue(error is ValidationError)
-            let validationError = error as! ValidationError
+            XCTAssertTrue(error is StudentValidationError)
+            let validationError = error as! StudentValidationError
             XCTAssertEqual(validationError.field, "dateOfBirth")
         }
     }
@@ -168,8 +168,8 @@ final class StudentTests: XCTestCase {
         
         // Act & Assert
         await XCTAssertThrowsAsyncError(try await student.validate()) { error in
-            XCTAssertTrue(error is ValidationError)
-            let validationError = error as! ValidationError
+            XCTAssertTrue(error is StudentValidationError)
+            let validationError = error as! StudentValidationError
             XCTAssertEqual(validationError.field, "school")
         }
     }

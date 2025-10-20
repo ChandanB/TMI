@@ -81,16 +81,7 @@ class TMIPlanService {
                         interests = []
                     }
                     
-                    // Reconstruct hobbies from full objects
-                    let hobbies: [Hobby]
-                    if let hobbiesData = data["hobbies"] as? [[String: Any]] {
-                        hobbies = hobbiesData.compactMap { hobbyData in
-                            guard let idString = hobbyData["id"] as? String else { return nil }
-                            return Hobby.fromFirestore(id: idString, data: hobbyData)
-                        }
-                    } else {
-                        hobbies = []
-                    }
+                    // Note: Hobbies are now included in interests
                     
                     // Reconstruct goals from array data
                     let goals: [Goal]
@@ -136,8 +127,7 @@ class TMIPlanService {
                         students: students,
                         model: model,
                         interests: interests,
-                        hobbies: hobbies,
-                        startDate: startDate,
+                                startDate: startDate,
                         endDate: endDate,
                         creationDate: creationDate,
                         lastUpdated: lastUpdated,
@@ -221,15 +211,7 @@ class TMIPlanService {
                 interests = []
             }
             
-            let hobbies: [Hobby]
-            if let hobbiesData = docData["hobbies"] as? [[String: Any]] {
-                hobbies = hobbiesData.compactMap { hobbyData in
-                    guard let idString = hobbyData["id"] as? String else { return nil }
-                    return Hobby.fromFirestore(id: idString, data: hobbyData)
-                }
-            } else {
-                hobbies = []
-            }
+            // Note: Hobbies are now included in interests
             
             let goals: [Goal]
             if let goalsData = docData["goals"] as? [[String: Any]] {
@@ -276,7 +258,6 @@ class TMIPlanService {
                 students: students,
                 model: model,
                 interests: interests,
-                hobbies: hobbies,
                 startDate: startDate,
                 endDate: endDate,
                 creationDate: creationDate,
@@ -402,15 +383,7 @@ class TMIPlanService {
                     interests = []
                 }
                 
-                let hobbies: [Hobby]
-                if let hobbiesData = data["hobbies"] as? [[String: Any]] {
-                    hobbies = hobbiesData.compactMap { hobbyData in
-                        guard let idString = hobbyData["id"] as? String else { return nil }
-                        return Hobby.fromFirestore(id: idString, data: hobbyData)
-                    }
-                } else {
-                    hobbies = []
-                }
+                // Note: Hobbies are now included in interests
                 
                 let goals: [Goal]
                 if let goalsData = data["goals"] as? [[String: Any]] {
@@ -455,8 +428,7 @@ class TMIPlanService {
                     students: students,
                     model: model,
                     interests: interests,
-                    hobbies: hobbies,
-                    startDate: startDate,
+                        startDate: startDate,
                     endDate: endDate,
                     creationDate: creationDate,
                     lastUpdated: lastUpdated,
@@ -533,16 +505,7 @@ class TMIPlanService {
                         interests = []
                     }
                     
-                    // Reconstruct hobbies from full objects
-                    let hobbies: [Hobby]
-                    if let hobbiesData = data["hobbies"] as? [[String: Any]] {
-                        hobbies = hobbiesData.compactMap { hobbyData in
-                            guard let idString = hobbyData["id"] as? String else { return nil }
-                            return Hobby.fromFirestore(id: idString, data: hobbyData)
-                        }
-                    } else {
-                        hobbies = []
-                    }
+                    // Note: Hobbies are now included in interests
                     
                     // Reconstruct goals from array data
                     let goals: [Goal]
@@ -588,8 +551,7 @@ class TMIPlanService {
                         students: students,
                         model: model,
                         interests: interests,
-                        hobbies: hobbies,
-                        startDate: startDate,
+                                startDate: startDate,
                         endDate: endDate,
                         creationDate: creationDate,
                         lastUpdated: lastUpdated,
