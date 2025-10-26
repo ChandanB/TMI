@@ -38,21 +38,31 @@ struct ContentView: View {
     @Environment(\.authStateModel) var authStateModel
 
     var body: some View {
-        Group {
-            if authStateModel.isLoggedIn {
-                // Route based on user role
-                if authStateModel.currentUser?.role == .student {
-                    StudentMainView()
-                } else {
-                    // Staff/parent view
-                    MainTabView()
-                }
-            } else {
-                AuthenticationView()
+        if authStateModel.isLoading {
+            VStack {
+                Spacer()
+                ProgressView("Loading...")
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                Spacer()
             }
+            .background(Color.black.ignoresSafeArea())
+        } else {
+            Group {
+                if authStateModel.isLoggedIn {
+                    // Route based on user role
+                    if authStateModel.currentUser?.role == .student {
+                        StudentMainView()
+                    } else {
+                        // Staff/parent view
+                        MainTabView()
+                    }
+                } else {
+                    AuthenticationView()
+                }
+            }
+            .foregroundColor(.white)
+            .foregroundStyle(.white)
         }
-        .foregroundColor(.white)
-        .foregroundStyle(.white)
     }
 }
 

@@ -304,20 +304,20 @@ struct TMIPlanListView: View {
 
     private func modelIcon(for model: TMIPlanModel) -> String {
         switch model {
-        case .chaseYourSpace: return "arrow.up.right"
+        case .chaseYourSpace: return "airplane.departure"
         case .acknowledgeInterests: return "heart.fill"
         case .alignYourMind: return "brain.head.profile"
-        case .directAndCorrect: return "arrow.triangle.2.circlepath"
+        case .directAndCorrect: return "arrow.up.forward.circle.fill"
         case .bullyToBoss: return "person.fill.badge.plus"
-        case .meekToProtector: return "shield.fill"
+        case .meekToProtector: return "shield.lefthalf.filled"
         }
     }
 
     private func modelColor(for model: TMIPlanModel) -> Color {
         switch model {
         case .chaseYourSpace: return .blue
-        case .acknowledgeInterests: return .purple
-        case .alignYourMind: return .teal
+        case .acknowledgeInterests: return .pink
+        case .alignYourMind: return .purple
         case .directAndCorrect: return .orange
         case .bullyToBoss: return .red
         case .meekToProtector: return .green
