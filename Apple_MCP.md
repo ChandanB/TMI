@@ -1,3 +1,230 @@
+# Apple Docs MCP - Apple Developer Documentation Model Context Protocol Server
+
+Apple Developer Documentation MCP Server - Access Apple's official developer docs, frameworks, APIs, SwiftUI, UIKit, and WWDC videos through Model Context Protocol. Search iOS, macOS, watchOS, tvOS, and visionOS documentation with AI-powered natural language queries. Get instant access to Swift/Objective-C code examples, API references, and technical guides directly in Claude, Cursor, or any MCP-compatible AI assistant.
+
+## ✨ Features
+
+- 🔍 **Smart Search**: Intelligent search across Apple Developer Documentation for SwiftUI, UIKit, Foundation, CoreData, ARKit, and more
+- 📚 **Complete Documentation Access**: Full access to Apple's JSON API for Swift, Objective-C, and framework documentation
+- 🔧 **Framework Index**: Browse hierarchical API structures for iOS, macOS, watchOS, tvOS, visionOS frameworks
+- 📋 **Technology Catalog**: Explore Apple technologies including SwiftUI, UIKit, Metal, Core ML, Vision, and ARKit
+- 📰 **Documentation Updates**: Track WWDC 2024/2025 announcements, iOS 26, macOS 26, and latest SDK releases
+- 🎯 **Technology Overviews**: Comprehensive guides for Swift, SwiftUI, UIKit, and all Apple development platforms
+- 💻 **Sample Code Library**: Swift and Objective-C code examples for iOS, macOS, and cross-platform development
+- 🎥 **WWDC Video Library**: Search WWDC 2014-2025 sessions with transcripts, Swift/SwiftUI code examples, and resources
+- 🔗 **Related APIs Discovery**: Find SwiftUI views, UIKit controllers, and framework-specific API relationships
+- 📊 **Platform Compatibility**: iOS 13+, macOS 10.15+, watchOS 6+, tvOS 13+, visionOS compatibility analysis
+- ⚡ **High Performance**: Optimized for Xcode, Swift Playgrounds, and AI-powered development environments
+- 🔄 **Smart UserAgent Pool**: Intelligent UserAgent rotation system with automatic failure recovery and performance monitoring
+- 🌐 **Multi-Platform**: Complete iOS, iPadOS, macOS, watchOS, tvOS, and visionOS documentation support
+- 🏷️ **Beta & Status Tracking**: iOS 26 beta APIs, deprecated UIKit methods, new SwiftUI features tracking
+
+## 💬 Usage Examples
+
+### 🔍 Smart Search
+```
+"Search for SwiftUI animations"
+"Find withAnimation API documentation"
+"Look up async/await patterns in Swift"
+"Show me UITableView delegate methods"
+"Search Core Data NSPersistentContainer examples"
+"Find AVFoundation video playback APIs"
+```
+
+### 📚 Documentation Access
+```
+"Get detailed information about the SwiftUI framework"
+"Show me withAnimation API with related APIs"
+"Get platform compatibility for SwiftData"
+"Access UIViewController documentation with similar APIs"
+"Show me NSManagedObjectContext documentation"
+"Get URLSession async/await methods"
+```
+
+### 🔧 Framework Exploration
+```
+"Show me SwiftUI framework API index"
+"List all UIKit classes and methods"
+"Browse ARKit framework structure"
+"Get WeatherKit API hierarchy"
+"Explore Core ML model loading APIs"
+"Show Vision framework image analysis APIs"
+```
+
+### 🔗 API Discovery
+```
+"Find APIs related to UIViewController"
+"Show me similar APIs to withAnimation"
+"Get all references from SwiftData documentation"
+"Discover alternatives to Core Data NSManagedObject"
+```
+
+### 📋 Technology & Platform Analysis
+```
+"List all Beta frameworks in iOS 26"
+"Show me Graphics & Games technologies"
+"What machine learning frameworks are available?"
+"Analyze platform compatibility for Vision framework"
+```
+
+### 📰 Documentation Updates
+```
+"Show me the latest WWDC updates"
+"What's new in SwiftUI?"
+"Get technology updates for iOS"
+"Show me release notes for Xcode"
+"Find beta features in the latest updates"
+```
+
+### 🎯 Technology Overviews
+```
+"Show me technology overviews for app design and UI"
+"Get comprehensive guides for games development"
+"Explore AI and machine learning overviews"
+"Show me iOS-specific technology guides"
+"Get data management technology overviews"
+```
+
+### 💻 Sample Code Library
+```
+"Show SwiftUI sample code projects"
+"Find sample code for machine learning"
+"Get UIKit example projects"
+"Show featured WWDC sample code"
+"Find Core Data sample implementations"
+"Show only beta sample code projects"
+```
+
+### 🎥 WWDC Video Search
+```
+"Search WWDC videos about SwiftUI"
+"Find WWDC sessions on machine learning"
+"Show me WWDC 2024 videos"
+"Search for async/await WWDC talks"
+"Find WWDC videos about Swift concurrency"
+"Show accessibility-focused WWDC sessions"
+```
+
+### 📺 WWDC Video Details
+```
+"Get details for WWDC session 10176"
+"Show me the transcript for WWDC23 session on SwiftData"
+"Get code examples from WWDC video 10019"
+"Show resources from Vision Pro WWDC session"
+"Get transcript for 'Meet async/await in Swift' session"
+```
+
+### 📋 WWDC Topics & Years
+```
+"List all WWDC topics"
+"Show me Swift topic WWDC videos"
+"Get WWDC videos about developer tools"
+"List WWDC videos from 2023"
+"Show all SwiftUI and UI frameworks sessions"
+"Get machine learning WWDC content"
+```
+
+### 🛠️ Advanced Usage
+```
+"Find related APIs for @State with platform analysis"
+"Resolve all references from SwiftUI documentation"
+"Get platform compatibility analysis for Vision framework"
+"Find similar APIs to UIViewController with deep search"
+```
+
+## 🛠️ Available Tools
+
+| Tool | Description | Key Features |
+|------|-------------|--------------|
+| `search_apple_docs` | Search Apple Developer Documentation | Official search API, find specific APIs, classes, methods |
+| `get_apple_doc_content` | Get detailed documentation content | JSON API access, optional enhanced analysis (related/similar APIs, platform compatibility) |
+| `list_technologies` | Browse all Apple technologies | Category filtering, language support, beta status |
+| `search_framework_symbols` | Search symbols in specific framework | Classes, structs, protocols, wildcard patterns, type filtering |
+| `get_related_apis` | Find related APIs | Inheritance, conformance, "See Also" relationships |
+| `resolve_references_batch` | Batch resolve API references | Extract and resolve all references from documentation |
+| `get_platform_compatibility` | Platform compatibility analysis | Version support, beta status, deprecation info |
+| `find_similar_apis` | Discover similar APIs | Apple's official recommendations, topic groupings |
+| `get_documentation_updates` | Track Apple documentation updates | WWDC announcements, technology updates, release notes |
+| `get_technology_overviews` | Get technology overviews and guides | Comprehensive guides, hierarchical navigation, platform filtering |
+| `get_sample_code` | Browse Apple sample code projects | Framework filtering (with limitations), keyword search, beta status |
+| `search_wwdc_videos` | Search WWDC video sessions | Keyword search, topic/year filtering, session metadata |
+| `get_wwdc_video_details` | Get WWDC video details with transcript | Full transcripts, code examples, resources, platform info |
+| `list_wwdc_topics` | List all available WWDC topics | 19 topic categories from Swift to Spatial Computing |
+| `list_wwdc_years` | List all available WWDC years | Conference years with video counts |
+
+## 🏗️ Technical Architecture for Apple Developer Documentation Access
+
+```
+apple-docs-mcp/
+├── 🔧 src/
+│   ├── index.ts                      # MCP server entry point with all tools
+│   ├── tools/                        # MCP tool implementations
+│   │   ├── search-parser.ts          # HTML search result parsing
+│   │   ├── doc-fetcher.ts            # JSON API documentation fetching
+│   │   ├── list-technologies.ts      # Technology catalog handling
+│   │   ├── get-documentation-updates.ts # Documentation updates tracking
+│   │   ├── get-technology-overviews.ts # Technology overviews and guides
+│   │   ├── get-sample-code.ts        # Sample code library browser
+│   │   ├── get-framework-index.ts    # Framework structure indexing
+│   │   ├── get-related-apis.ts       # Related API discovery
+│   │   ├── resolve-references-batch.ts # Batch reference resolution
+│   │   ├── get-platform-compatibility.ts # Platform analysis
+│   │   ├── find-similar-apis.ts      # Similar API recommendations
+│   │   └── wwdc/                     # WWDC video tools
+│   │       ├── wwdc-handlers.ts      # WWDC tool handlers
+│   │       ├── content-extractor.ts  # Video content extraction
+│   │       ├── topics-extractor.ts   # Topic listing
+│   │       └── video-list-extractor.ts # Video list parsing
+│   └── utils/                        # Utility functions and helpers
+│       ├── cache.ts                  # Memory cache with TTL support
+│       ├── constants.ts              # Application constants and URLs
+│       ├── error-handler.ts          # Error handling and validation
+│       ├── http-client.ts            # HTTP client with performance tracking
+│       ├── user-agent-pool.ts        # Smart UserAgent rotation system
+│       ├── http-headers-generator.ts # Dynamic browser headers generation
+│       └── url-converter.ts          # URL conversion utilities
+├── 📦 dist/                          # Compiled JavaScript
+├── 📄 package.json                   # Package configuration
+└── 📖 README.md                      # This file
+```
+
+### 🚀 Performance Features
+
+- **Memory-Based Caching**: Custom cache implementation with automatic cleanup and TTL support
+- **Smart UserAgent Pool**: Intelligent rotation system with automatic failure recovery and performance monitoring
+- **Dynamic Headers**: Realistic browser headers generation (Accept, Accept-Language, User-Agent)
+- **Smart Search**: Official Apple search API with enhanced result formatting
+- **Enhanced Analysis**: Optional related APIs, platform compatibility, and similarity analysis
+- **Error Resilience**: Graceful degradation with comprehensive error handling
+- **Type Safety**: Full TypeScript with Zod v4.0.5 runtime validation
+- **Latest Dependencies**: MCP SDK v1.15.1, optimized package footprint
+
+### 💾 Caching Strategy
+
+| Content Type | Cache Duration | Cache Size | Reason |
+|--------------|----------------|------------|--------|
+| API Documentation | 30 minutes | 500 entries | Frequently accessed, moderate updates |
+| Search Results | 10 minutes | 200 entries | Dynamic content, user-specific |
+| Framework Indexes | 1 hour | 100 entries | Stable structure, less frequent changes |
+| Technologies List | 2 hours | 50 entries | Rarely changes, large content |
+| Documentation Updates | 30 minutes | 100 entries | Regular updates, WWDC announcements |
+
+## 📦 WWDC Data
+
+All WWDC video data (2014-2025) is **bundled directly in the npm package**, providing:
+
+- ✅ **Zero network latency** - No API calls needed for WWDC content
+- ✅ **100% offline access** - Works without internet connection
+- ✅ **No rate limits** - Unlimited WWDC searches and browsing
+- ✅ **Instant responses** - All data is locally available
+
+The package includes:
+- 📹 **1,260+ WWDC session videos** with full transcripts
+- 🏷️ **20 topic categories** for organized browsing
+- 📅 **13 years of content** (2012-2025)
+- 💾 **35MB of optimized JSON data**
+
+
 # **Apple’s Official UI/UX Design Guidelines for iOS and macOS (2025)**
 
 ## **Human Interface Guidelines (HIG) Overview**

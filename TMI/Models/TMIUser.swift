@@ -8,7 +8,7 @@
 import FirebaseFirestore
 import Foundation
 
-// MARK: - Enhanced TMI User Model
+// MARK: - TMI User Model
 
 struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
   @DocumentID var id: String?

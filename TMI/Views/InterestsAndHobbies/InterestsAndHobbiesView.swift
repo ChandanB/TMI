@@ -317,7 +317,7 @@ struct InterestsAndHobbiesView: View {
             columns: gridColumns,
             spacing: 18
         ) {
-            ForEach(Array(displayedInterests.enumerated()), id: \.element.id) { index, interest in
+            ForEach(displayedInterests) { interest in
                 NavigationLink {
                     InterestDetailView(interest: interest)
                 } label: {
@@ -329,7 +329,6 @@ struct InterestsAndHobbiesView: View {
                     insertion: .scale(scale: 0.8).combined(with: .opacity),
                     removal: .opacity
                 ))
-                .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(Double(index) * 0.05), value: displayedInterests.count)
             }
         }
     }
@@ -501,19 +500,39 @@ struct InterestsAndHobbiesView: View {
 struct AddItemSheet: View {
     @Environment(\.interestsStateModel) var stateModel
     @Environment(\.dismiss) var dismiss
-    
+
+    @State private var showingPredefinedList = false
     @State private var itemName = ""
     @State private var selectedCategory = InterestCategory.academics
     @State private var selectedIcon = "heart.fill"
     @State private var description = ""
-    
+
     var body: some View {
-        ZStack {
+        NavigationStack {
+            ZStack {
                 TMIBackgroundView(variant: .default)
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 24) {
+                        // Browse predefined interests button
+                        browsePredefinedSection
+
+                        // Divider with "OR"
+                        HStack {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.2))
+                                .frame(height: 1)
+                            Text("OR")
+                                .font(.caption.bold())
+                                .foregroundColor(.white.opacity(0.6))
+                                .padding(.horizontal, 12)
+                            Rectangle()
+                                .fill(Color.white.opacity(0.2))
+                                .frame(height: 1)
+                        }
+                        .padding(.vertical, 8)
+
                         nameInputSection
                         categorySelectionSection
                         iconSelectionSection
@@ -522,7 +541,7 @@ struct AddItemSheet: View {
                     .padding(20)
                     .padding(.bottom, 100)
                 }
-                
+
                 saveButtonSection
             }
             .navigationTitle("Add Interest")
@@ -535,8 +554,45 @@ struct AddItemSheet: View {
                     .foregroundColor(.white)
                 }
             }
+            .sheet(isPresented: $showingPredefinedList) {
+                PredefinedInterestsListView()
+            }
         }
-    
+    }
+
+    // MARK: - Browse Predefined Section
+
+    private var browsePredefinedSection: some View {
+        TMIGlassCard(style: .elevated) {
+            VStack(spacing: 16) {
+                HStack(spacing: 12) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 24))
+                        .foregroundColor(.yellow)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Browse 200+ Interests")
+                            .font(.headline)
+                            .foregroundColor(.white)
+
+                        Text("Choose from our curated catalog")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+
+                    Spacer()
+                }
+
+                TMIButton(
+                    text: "Browse Catalog",
+                    icon: "list.bullet",
+                    style: .secondary,
+                    action: { showingPredefinedList = true }
+                )
+            }
+            .padding(20)
+        }
+    }
     // MARK: - Name Input
     
     private var nameInputSection: some View {
@@ -869,6 +925,311 @@ struct InterestCardButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Predefined Interests List View
+
+struct PredefinedInterestsListView: View {
+    @Environment(\.interestsStateModel) var stateModel
+    @Environment(\.dismiss) var dismiss
+
+    @State private var searchText = ""
+    @State private var selectedCategory: InterestCategory?
+
+    private var filteredInterests: [Interest] {
+        var interests = PredefinedInterestsData.allPredefinedInterests
+
+        // Filter by category
+        if let category = selectedCategory {
+            interests = interests.filter { $0.category.contains(category) }
+        }
+
+        // Filter by search
+        if !searchText.isEmpty {
+            interests = PredefinedInterestsData.search(searchText)
+        }
+
+        return interests.sorted { ($0.popularityScore ?? 0) > ($1.popularityScore ?? 0) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                TMIBackgroundView(variant: .default)
+                    .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    // Search bar
+                    TMITextField(
+                        icon: "magnifyingglass",
+                        placeholder: "Search interests...",
+                        text: $searchText
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 12)
+
+                    // Category filter
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            CategoryFilterChip(
+                                title: "All",
+                                isSelected: selectedCategory == nil,
+                                action: { selectedCategory = nil }
+                            )
+
+                            ForEach(InterestCategory.allCases, id: \.self) { category in
+                                CategoryFilterChip(
+                                    title: category.rawValue,
+                                    icon: category.iconName,
+                                    isSelected: selectedCategory == category,
+                                    action: { selectedCategory = category }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                    }
+
+                    // Results count
+                    HStack {
+                        Text("\(filteredInterests.count) interests")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+
+                    // Interests list
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(filteredInterests) { interest in
+                                PredefinedInterestRow(interest: interest) {
+                                    Task {
+                                        await stateModel.addInterest(interest)
+                                        dismiss()
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 100)
+                    }
+                }
+            }
+            .navigationTitle("Browse Interests")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Category Filter Chip
+
+struct CategoryFilterChip: View {
+    let title: String
+    var icon: String?
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 12))
+                }
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .foregroundColor(isSelected ? .white : .white.opacity(0.7))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(isSelected ? Color.pink.opacity(0.3) : Color.white.opacity(0.1))
+                    .overlay(
+                        Capsule()
+                            .stroke(isSelected ? Color.pink : Color.white.opacity(0.2), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Predefined Interest Row
+
+struct PredefinedInterestRow: View {
+    let interest: Interest
+    let onAdd: () -> Void
+
+    @State private var isExpanded = false
+
+    var body: some View {
+        TMIGlassCard(style: .default) {
+            VStack(alignment: .leading, spacing: 0) {
+                // Main content
+                HStack(spacing: 16) {
+                    // Icon
+                    ZStack {
+                        Circle()
+                            .fill(interest.color.opacity(0.2))
+                            .frame(width: 50, height: 50)
+
+                        Image(systemName: interest.iconName)
+                            .font(.system(size: 22))
+                            .foregroundColor(interest.color)
+                    }
+
+                    // Name and category
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(interest.name)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            if interest.isFeatured {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.yellow)
+                            }
+                        }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "tag.fill")
+                                .font(.system(size: 9))
+                            Text(interest.category.first?.rawValue ?? "General")
+                                .font(.system(size: 13))
+                        }
+                        .foregroundColor(.white.opacity(0.6))
+
+                        if let score = interest.popularityScore {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chart.bar.fill")
+                                    .font(.system(size: 9))
+                                Text("\(score)% popular")
+                                    .font(.system(size: 11))
+                            }
+                            .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+
+                    Spacer()
+
+                    // Add button
+                    Button(action: onAdd) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(.green)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(16)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.3)) {
+                        isExpanded.toggle()
+                    }
+                }
+
+                // Expanded details
+                if isExpanded {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if let description = interest.description {
+                            Text(description)
+                                .font(.system(size: 14))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+
+                        if !interest.academicRelevance.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Academic Relevance")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.7))
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(interest.academicRelevance, id: \.self) { subject in
+                                            Text(subject.rawValue)
+                                                .font(.system(size: 11))
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(
+                                                    Capsule()
+                                                        .fill(Color.blue.opacity(0.2))
+                                                )
+                                                .foregroundColor(.blue)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if let skills = interest.skillsDeveloped, !skills.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Skills Developed")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.7))
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(skills, id: \.self) { skill in
+                                            Text(skill.rawValue)
+                                                .font(.system(size: 11))
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(
+                                                    Capsule()
+                                                        .fill(Color.purple.opacity(0.2))
+                                                )
+                                                .foregroundColor(.purple)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if let pathways = interest.careerPathways, !pathways.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Career Pathways")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.7))
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(pathways, id: \.self) { pathway in
+                                            Text(pathway.rawValue)
+                                                .font(.system(size: 11))
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(
+                                                    Capsule()
+                                                        .fill(Color.orange.opacity(0.2))
+                                                )
+                                                .foregroundColor(.orange)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+        }
     }
 }
 

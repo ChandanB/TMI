@@ -150,7 +150,129 @@ class TMIPlanService {
             throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
         }
     }
-    
+
+    /// Fetch a single TMI plan by ID
+    func fetchPlan(byId planId: String) async throws -> TMIPlan? {
+        guard let collection = userPlansCollection else {
+            print("[TMIPlanService] Error: No user logged in, cannot fetch plan")
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+
+        do {
+            print("[TMIPlanService] Fetching TMI plan with ID: \(planId)")
+            let document = try await collection.document(planId).getDocument()
+
+            guard document.exists, let data = document.data() else {
+                print("[TMIPlanService] Plan not found with ID: \(planId)")
+                return nil
+            }
+
+            // Use same reconstruction logic as fetchPlans
+            guard let modelRaw = data["model"] as? String,
+                  let model = TMIPlanModel(rawValue: modelRaw),
+                  let progress = data["progress"] as? Double,
+                  let notes = data["notes"] as? String,
+                  let creationTimestamp = data["creationDate"] as? Double,
+                  let lastUpdatedTimestamp = data["lastUpdated"] as? Double else {
+                print("[TMIPlanService] Missing required fields in plan document")
+                return nil
+            }
+
+            let creationDate = Date(timeIntervalSince1970: creationTimestamp)
+            let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
+
+            // Reconstruct students
+            let students: [Student]
+            if let studentsData = data["students"] as? [[String: Any]] {
+                students = studentsData.map { studentInfo in
+                    Student(
+                        id: studentInfo["id"] as? String,
+                        name: studentInfo["name"] as? String ?? "Unknown",
+                        grade: studentInfo["grade"] as? String ?? "",
+                        school: "",
+                        dateOfBirth: Date()
+                    )
+                }
+            } else {
+                students = []
+            }
+
+            // Reconstruct interests
+            let interests: [Interest]
+            if let interestsData = data["interests"] as? [[String: Any]] {
+                interests = interestsData.compactMap { interestData in
+                    Interest.fromFirestore(id: interestData["id"] as? String ?? "", data: interestData)
+                }
+            } else {
+                interests = []
+            }
+
+            // Reconstruct goals
+            let goals: [Goal]
+            if let goalsData = data["goals"] as? [[String: Any]] {
+                goals = goalsData.compactMap { goalData in
+                    guard let idString = goalData["id"] as? String,
+                          let id = UUID(uuidString: idString),
+                          let description = goalData["description"] as? String,
+                          let statusString = goalData["status"] as? String,
+                          let status = GoalStatus(rawValue: statusString),
+                          let goalProgress = goalData["progress"] as? Double else {
+                        return nil
+                    }
+
+                    let goalNotes = goalData["notes"] as? String
+                    let dueDate: Date?
+                    if let dueDateTimestamp = goalData["dueDate"] as? Double {
+                        dueDate = Date(timeIntervalSince1970: dueDateTimestamp)
+                    } else {
+                        dueDate = nil
+                    }
+
+                    return Goal(
+                        id: id,
+                        description: description,
+                        dueDate: dueDate,
+                        status: status,
+                        progress: goalProgress,
+                        notes: goalNotes
+                    )
+                }
+            } else {
+                goals = []
+            }
+
+            let title = data["title"] as? String ?? ""
+            let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
+            let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
+            let createdBy = data["createdBy"] as? String ?? ""
+
+            let plan = TMIPlan(
+                id: planId,
+                title: title,
+                description: data["description"] as? String,
+                students: students,
+                model: model,
+                interests: interests,
+                startDate: startDate,
+                endDate: endDate,
+                creationDate: creationDate,
+                lastUpdated: lastUpdated,
+                goals: goals,
+                progress: progress,
+                notes: notes,
+                strategies: data["strategies"] as? [String],
+                progressTracking: nil,
+                createdBy: createdBy
+            )
+
+            print("[TMIPlanService] Successfully fetched plan: \(plan.model.rawValue)")
+            return plan
+        } catch {
+            print("[TMIPlanService] Error fetching plan: \(error)")
+            throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
+        }
+    }
+
     /// Add a new TMI plan to Firestore
     func addPlan(_ plan: TMIPlan) async throws -> TMIPlan {
         guard let collection = userPlansCollection else {

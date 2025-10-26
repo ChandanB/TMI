@@ -123,7 +123,7 @@ struct TMIStatChip: View {
 
 // MARK: - Empty State (Wrapper around existing)
 
-struct TMIEmptyStateRedesigned: View {
+struct TMIEmptyState: View {
     let icon: String
     let title: String
     let message: String
@@ -162,7 +162,7 @@ struct TMIEmptyStateRedesigned: View {
 
 // MARK: - Search Bar (Simplified wrapper)
 
-struct TMISearchBarRedesigned: View {
+struct TMISearchBar: View {
     @Binding var text: String
     var placeholder: String
 

@@ -1,5 +1,5 @@
 //
-//  DashboardViewRedesigned.swift
+//  DashboardView.swift
 //  TMI
 //
 //  Simplified, purposeful dashboard with unified insight panel
@@ -342,6 +342,147 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   }
 }
 
+// MARK: - Priority Action Button Component
+
+struct PriorityActionButton: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let count: Int
+    let action: () -> Void
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: {
+            TMIHaptics.lightImpact()
+            action()
+        }) {
+            HStack(spacing: TMISpacing.md) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(iconColor.opacity(0.15))
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(iconColor)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.tmiTextPrimary)
+
+                    Text("\(count) student\(count == 1 ? "" : "s") waiting")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.tmiTextSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(iconColor)
+            }
+            .padding(TMISpacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: TMIRadius.md)
+                    .fill(Color.tmiBackground)
+                    .shadow(color: .black.opacity(isPressed ? 0.05 : 0.1), radius: isPressed ? 4 : 8, x: 0, y: isPressed ? 2 : 4)
+            )
+            .scaleEffect(isPressed ? 0.98 : 1.0)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        isPressed = true
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        isPressed = false
+                    }
+                }
+        )
+    }
+}
+
+// MARK: - Metric Pill Component
+
+struct MetricPill: View {
+    let icon: String
+    let tint: Color
+    let value: String
+    let label: String
+    let subtitle: String
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: {
+            TMIHaptics.lightImpact()
+            action()
+        }) {
+            HStack(spacing: TMISpacing.md) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(tint.opacity(0.15))
+                        .frame(width: 48, height: 48)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(tint)
+                        .symbolRenderingMode(.hierarchical)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(value)
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.tmiTextPrimary)
+
+                        Text(label)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.tmiTextSecondary)
+                    }
+
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.tmiTextTertiary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(tint.opacity(isHovered ? 1.0 : 0.5))
+                    .offset(x: isHovered ? 2 : 0)
+            }
+            .padding(TMISpacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: TMIRadius.md)
+                    .fill(isHovered ? tint.opacity(0.05) : Color.tmiBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: TMIRadius.md)
+                    .strokeBorder(tint.opacity(isHovered ? 0.3 : 0.15), lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
 // MARK: -  Activity Row
 
 struct DashboardActivityRow: View {
@@ -408,10 +549,13 @@ struct DashboardView: View {
     @State private var selectedTimeFrame: TimeFrame = .week
     @State private var showingAllActivities = false
     @State private var showingAddStudent = false
+    @State private var navigateToStudents = false
+    @State private var navigateToPlans = false
+    @State private var navigateToSurveys = false
 
     var body: some View {
         ZStack {
-            Color.tmiBackground
+            TMIBackgroundView(variant: .dashboard)
                 .ignoresSafeArea()
 
             Group {
@@ -424,6 +568,17 @@ struct DashboardView: View {
                     errorView(error)
                 }
             }
+
+            // Hidden NavigationLinks for programmatic navigation
+            NavigationLink(destination: StudentListView(), isActive: $navigateToStudents) {
+                EmptyView()
+            }
+            .hidden()
+
+            NavigationLink(destination: TMIPlanListView(), isActive: $navigateToPlans) {
+                EmptyView()
+            }
+            .hidden()
         }
         .task {
             await stateModel.fetch()
@@ -435,7 +590,7 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $showingAddStudent) {
             NavigationStack {
-                AddStudentViewRedesigned(onComplete: {
+                AddStudentView(onComplete: {
                     showingAddStudent = false
                     // Refresh dashboard and student data
                     Task {
@@ -463,7 +618,7 @@ struct DashboardView: View {
     // MARK: - Error State
 
     private func errorView(_ error: IdentifiableError) -> some View {
-        TMIEmptyStateRedesigned(
+        TMIEmptyState(
             icon: "exclamationmark.triangle",
             title: "Unable to Load",
             message: error.message,
@@ -494,9 +649,9 @@ struct DashboardView: View {
                 quickStatsRow(data)
 
                 // Engagement Chart (Simplified)
-                if !data.engagementData.isEmpty {
-                    engagementChart(data)
-                }
+//                if !data.engagementData.isEmpty {
+//                    engagementChart(data)
+//                }
 
                 // Recent Activity Preview
                 recentActivitySection(data)
@@ -529,124 +684,194 @@ struct DashboardView: View {
         let attentionCount = studentsNeedingAttention(data) ?? 0
         let status = computeDashboardStatus(data: data, attentionCount: attentionCount, surveysPending: surveysPending, plansPending: plansPending)
 
-        return VStack(alignment: .leading, spacing: TMISpacing.md) {
-            // Header: Status + Totals
+        return VStack(alignment: .leading, spacing: TMISpacing.lg) {
+            // Header: Status + Totals with enhanced visual hierarchy
             HStack(alignment: .center, spacing: TMISpacing.md) {
                 ZStack {
                     Circle()
                         .fill(status.color.opacity(0.15))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: status.icon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(status.color)
-                }
+                        .frame(width: 52, height: 52)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    // "6 Students  •  4 Ready to Grow"
-                    HStack(spacing: 8) {
-                        Text("\(data.totalStudents) Students")
-                            .font(.system(size: 20, weight: .bold))
+                    Circle()
+                        .stroke(status.color.opacity(0.3), lineWidth: 2)
+                        .frame(width: 52, height: 52)
+
+                    Image(systemName: status.icon)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(status.color)
+                        .symbolEffect(.pulse, options: .repeating, value: status.status == .needsSupport || status.status == .actionNeeded)
+                }
+                .shadow(color: status.color.opacity(0.2), radius: 8, x: 0, y: 4)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    // Enhanced student count display
+                    HStack(spacing: 10) {
+                        Text("\(data.totalStudents)")
+                            .font(.system(size: 32, weight: .bold))
                             .foregroundColor(.tmiTextPrimary)
-                        Text("•")
-                            .foregroundColor(.tmiTextTertiary)
-                        Text("\(max(attentionCount, surveysPending + plansPending)) Ready to Grow")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.tmiWarning)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Students")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.tmiTextSecondary)
+
+                            if max(attentionCount, surveysPending + plansPending) > 0 {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "leaf.fill")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(.tmiWarning)
+                                    Text("\(max(attentionCount, surveysPending + plansPending)) Ready to Grow")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.tmiWarning)
+                                }
+                            }
+                        }
                     }
 
-                    // Contextual status microcopy
+                    // Enhanced status message with emoji
                     Text(status.title)
-                        .font(.tmiFootnote)
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.tmiTextSecondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer()
             }
+            .padding(.bottom, 4)
 
             TMIDivider()
 
-            // Priority Actions
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.tmiWarning)
-                    Text("Priority Actions")
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextSecondary)
+            // Priority Actions with enhanced interactivity
+            if surveysPending > 0 || plansPending > 0 {
+                VStack(alignment: .leading, spacing: TMISpacing.md) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.tmiWarning)
+                        Text("Priority Actions")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.tmiTextSecondary)
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+                    }
+
+                    VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                        if surveysPending > 0 {
+                            PriorityActionButton(
+                                icon: "chart.bar.doc.horizontal",
+                                iconColor: .tmiPrimary,
+                                title: "Complete Interest Surveys",
+                                count: surveysPending,
+                                action: { onTapStartSurveys() }
+                            )
+                        }
+
+                        if plansPending > 0 {
+                            PriorityActionButton(
+                                icon: "target",
+                                iconColor: .tmiSecondary,
+                                title: "Assign TMI Plans",
+                                count: plansPending,
+                                action: { onTapAssignPlans() }
+                            )
+                        }
+                    }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    if surveysPending > 0 {
-                        Button(action: { onTapStartSurveys() }) {
-                            HStack(alignment: .center, spacing: 8) {
-                                Image(systemName: "chart.bar")
-                                    .foregroundColor(.tmiPrimary)
-                                Text("\(surveysPending) students need survey completion")
-                                    .font(.tmiBody)
-                                    .foregroundColor(.tmiTextPrimary)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.tmiPrimary)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
+                TMIDivider()
+            } else {
+                // Success state with celebration
+                HStack(spacing: TMISpacing.md) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.tmiSuccess.opacity(0.15))
+                            .frame(width: 48, height: 48)
 
-                    if plansPending > 0 {
-                        Button(action: { onTapAssignPlans() }) {
-                            HStack(alignment: .center, spacing: 8) {
-                                Image(systemName: "target")
-                                    .foregroundColor(.tmiSecondary)
-                                Text("\(plansPending) students waiting for plan assignment")
-                                    .font(.tmiBody)
-                                    .foregroundColor(.tmiTextPrimary)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.tmiSecondary)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if surveysPending == 0 && plansPending == 0 {
-                        Text("Great work—everyone has a personalized pathway!")
-                            .font(.tmiCaption)
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(.tmiSuccess)
+                            .symbolEffect(.bounce, options: .repeating.speed(0.5))
                     }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Excellent Progress!")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.tmiSuccess)
+
+                        Text("All students have personalized pathways and surveys completed")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.tmiTextSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
                 }
+                .padding(TMISpacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: TMIRadius.md)
+                        .fill(Color.tmiSuccess.opacity(0.08))
+                )
+
+                TMIDivider()
             }
 
-            TMIDivider()
+            // Supporting Metrics with enhanced design
+            VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                Text("Key Metrics")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.tmiTextSecondary)
+                    .textCase(.uppercase)
+                    .tracking(0.5)
 
-            // Supporting Metrics (clickable + clarified)
-            HStack(spacing: TMISpacing.lg) {
-                metricPill(
-                    icon: "doc.badge.checkmark",
-                    tint: .tmiSuccess,
-                    value: "\(data.activeTMIPlans)",
-                    label: "Personalized Pathways"
-                ) { onTapPlans() }
+                VStack(spacing: TMISpacing.sm) {
+                    MetricPill(
+                        icon: "doc.text.fill",
+                        tint: .tmiSuccess,
+                        value: "\(data.activeTMIPlans)",
+                        label: "Active TMI Plans",
+                        subtitle: data.totalStudents > 0 ? "\(Int(Double(data.activeTMIPlans) / Double(data.totalStudents) * 100))% coverage" : "No students yet",
+                        action: { onTapPlans() }
+                    )
 
-                metricPill(
-                    icon: "chart.bar.fill",
-                    tint: .tmiPrimary,
-                    value: "\(data.surveysCompleted)/\(data.totalStudents)",
-                    label: surveysPending > 0 ? "Let's discover their interests!" : "All surveys complete"
-                ) { onTapStartSurveys() }
+                    MetricPill(
+                        icon: "chart.bar.fill",
+                        tint: .tmiPrimary,
+                        value: "\(data.surveysCompleted)/\(data.totalStudents)",
+                        label: "Surveys Completed",
+                        subtitle: surveysPending > 0 ? "\(surveysPending) remaining" : "All complete!",
+                        action: { navigateToStudents = true }
+                    )
 
-                metricPill(
-                    icon: "checkmark.seal.fill",
-                    tint: .tmiSecondary,
-                    value: "\(data.plansAligned)",
-                    label: "Aligned with goals"
-                ) { onTapAssignPlans() }
+                    MetricPill(
+                        icon: "checkmark.seal.fill",
+                        tint: .tmiSecondary,
+                        value: "\(data.plansAligned)",
+                        label: "Plans Aligned with Goals",
+                        subtitle: data.totalStudents > 0 ? "\(Int(Double(data.plansAligned) / Double(data.totalStudents) * 100))% aligned" : "Ready to start",
+                        action: { navigateToPlans = true }
+                    )
+                }
             }
         }
-        .tmiCard(style: .elevated)
+        .padding(TMISpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(Color.tmiSurface)
+                .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 8)
+                .shadow(color: status.color.opacity(0.1), radius: 24, x: 0, y: 12)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [status.color.opacity(0.2), status.color.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 
     // Helper function to calculate students needing attention
@@ -701,7 +926,7 @@ struct DashboardView: View {
     }
 
     private func computeDashboardStatus(data: DashboardData, attentionCount: Int, surveysPending: Int, plansPending: Int) -> (status: DashboardStatus, title: String, icon: String, color: Color) {
-        // Determine status based on urgency signals
+        // Determine status based on urgency signals with improved logic
         if attentionCount >= 2 {
             return (.needsSupport, DashboardStatus.needsSupport.title, DashboardStatus.needsSupport.icon, DashboardStatus.needsSupport.color)
         }
@@ -715,49 +940,17 @@ struct DashboardView: View {
         return (.onTrack, DashboardStatus.onTrack.title, DashboardStatus.onTrack.icon, DashboardStatus.onTrack.color)
     }
 
-    @ViewBuilder
-    private func metricPill(icon: String, tint: Color, value: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(alignment: .center, spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(tint.opacity(0.15))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(tint)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(value)
-                        .font(.tmiTitle3)
-                        .foregroundColor(.tmiTextPrimary)
-                    Text(label)
-                        .font(.tmiFootnote)
-                        .foregroundColor(.tmiTextSecondary)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 6)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    // Placeholder actions to make the card actionable.
-    // In a future iteration, wire these to navigation or filters in your app.
+    // Navigation actions for dashboard buttons
     private func onTapStartSurveys() {
-        // For now, show all activities as a proxy action.
-        showingAllActivities = true
+        navigateToStudents = true
     }
 
     private func onTapAssignPlans() {
-        // For now, show the add student flow as a proxy to plan assignment.
-        showingAddStudent = true
+        navigateToStudents = true
     }
 
     private func onTapPlans() {
-        // Navigate to plans list when available; using activities for now.
-        showingAllActivities = true
+        navigateToPlans = true
     }
 
     // MARK: - Quick Stats Row

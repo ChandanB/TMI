@@ -1,5 +1,5 @@
 //
-//  AddStudentViewRedesigned.swift
+//  AddStudentView.swift
 //  TMI
 //
 //  Simplified 3-field student creation flow
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct AddStudentViewRedesigned: View {
+struct AddStudentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.authStateModel) private var authStateModel
     let onComplete: () -> Void
@@ -35,12 +35,14 @@ struct AddStudentViewRedesigned: View {
     @State private var emergencyPhone = ""
 
     // Workflow options
-    @State private var sendSurveyImmediately = true
+    @State private var launchSurveyImmediately = true
 
     // State
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var currentStep = 1
+    @State private var showingSurvey = false
+    @State private var createdStudentId: String?
 
     private let studentService = StudentService()
 
@@ -60,7 +62,7 @@ struct AddStudentViewRedesigned: View {
 
     var body: some View {
         ZStack {
-            Color.tmiBackground
+            TMIBackgroundView(variant: .default)
                 .ignoresSafeArea()
 
             ScrollView {
@@ -96,6 +98,10 @@ struct AddStudentViewRedesigned: View {
                                         .padding(TMISpacing.md)
                                         .background(Color.tmiSurface)
                                         .cornerRadius(TMIRadius.sm)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                                .stroke(Color.tmiTextSecondary.opacity(0.3), lineWidth: 1)
+                                        )
                                         .textInputAutocapitalization(.words)
                                 }
 
@@ -110,6 +116,10 @@ struct AddStudentViewRedesigned: View {
                                         .padding(TMISpacing.md)
                                         .background(Color.tmiSurface)
                                         .cornerRadius(TMIRadius.sm)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                                .stroke(Color.tmiTextSecondary.opacity(0.3), lineWidth: 1)
+                                        )
                                         .textInputAutocapitalization(.words)
                                 }
                             }
@@ -126,6 +136,10 @@ struct AddStudentViewRedesigned: View {
                                     .padding(TMISpacing.md)
                                     .background(Color.tmiSurface)
                                     .cornerRadius(TMIRadius.sm)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                            .stroke(Color.tmiTextSecondary.opacity(0.3), lineWidth: 1)
+                                    )
                             }
 
                             // Date of Birth
@@ -200,6 +214,10 @@ struct AddStudentViewRedesigned: View {
                                         .padding(TMISpacing.md)
                                         .background(Color.tmiSurface)
                                         .cornerRadius(TMIRadius.sm)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                                .stroke(Color.tmiTextSecondary.opacity(0.3), lineWidth: 1)
+                                        )
                                         .textInputAutocapitalization(.words)
                                 } else {
                                     HStack {
@@ -246,6 +264,10 @@ struct AddStudentViewRedesigned: View {
                                     .padding(TMISpacing.md)
                                     .background(Color.tmiSurface)
                                     .cornerRadius(TMIRadius.sm)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                            .stroke(Color.tmiTextSecondary.opacity(0.3), lineWidth: 1)
+                                    )
                                     .textInputAutocapitalization(.words)
                             }
 
@@ -280,6 +302,10 @@ struct AddStudentViewRedesigned: View {
                                         .padding(TMISpacing.md)
                                         .background(Color.tmiSurface)
                                         .cornerRadius(TMIRadius.sm)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                                .stroke(Color.tmiTextSecondary.opacity(0.3), lineWidth: 1)
+                                        )
                                         .keyboardType(.phonePad)
                                 }
 
@@ -294,6 +320,10 @@ struct AddStudentViewRedesigned: View {
                                         .padding(TMISpacing.md)
                                         .background(Color.tmiSurface)
                                         .cornerRadius(TMIRadius.sm)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                                .stroke(Color.tmiTextSecondary.opacity(0.3), lineWidth: 1)
+                                        )
                                         .keyboardType(.emailAddress)
                                         .textInputAutocapitalization(.never)
                                 }
@@ -311,6 +341,10 @@ struct AddStudentViewRedesigned: View {
                                     .padding(TMISpacing.md)
                                     .background(Color.tmiSurface)
                                     .cornerRadius(TMIRadius.sm)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                            .stroke(Color.tmiTextSecondary.opacity(0.3), lineWidth: 1)
+                                    )
                                     .textInputAutocapitalization(.words)
                             }
 
@@ -326,6 +360,10 @@ struct AddStudentViewRedesigned: View {
                                         .padding(TMISpacing.md)
                                         .background(Color.tmiSurface)
                                         .cornerRadius(TMIRadius.sm)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                                .stroke(Color.tmiTextSecondary.opacity(0.3), lineWidth: 1)
+                                        )
                                         .keyboardType(.phonePad)
                                 }
                             }
@@ -352,16 +390,20 @@ struct AddStudentViewRedesigned: View {
                                     .padding(TMISpacing.sm)
                                     .background(Color.tmiSurface)
                                     .cornerRadius(TMIRadius.sm)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                            .stroke(Color.tmiTextSecondary.opacity(0.3), lineWidth: 1)
+                                    )
                             }
 
                             // Workflow option
-                            Toggle(isOn: $sendSurveyImmediately) {
+                            Toggle(isOn: $launchSurveyImmediately) {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("Send Interest Survey Immediately")
+                                    Text("Complete Interest Survey Now")
                                         .font(.tmiBody)
                                         .foregroundColor(.tmiTextPrimary)
 
-                                    Text("Student will receive survey to identify interests and hobbies")
+                                    Text("Launch in-app survey to identify student interests and hobbies")
                                         .font(.tmiFootnote)
                                         .foregroundColor(.tmiTextSecondary)
                                 }
@@ -402,7 +444,7 @@ struct AddStudentViewRedesigned: View {
                     )
 
                     TMIButton(
-                        text: sendSurveyImmediately ? "Save & Send Survey" : "Save Student",
+                        text: launchSurveyImmediately ? "Save & Launch Survey" : "Save Student",
                         style: .primary,
                         isLoading: isSaving,
                         isDisabled: !isValid,
@@ -417,6 +459,36 @@ struct AddStudentViewRedesigned: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .foregroundColor(.tmiPrimary)
+            }
+        }
+        .sheet(isPresented: $showingSurvey) {
+            if let studentId = createdStudentId {
+                NavigationStack {
+                    StudentSurveyFlow(studentId: studentId)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Skip") {
+                                    showingSurvey = false
+                                    onComplete()
+                                }
+                                .foregroundColor(.tmiPrimary)
+                            }
+                        }
+                }
+                .onDisappear {
+                    // When survey is dismissed (completed or skipped), call onComplete
+                    if !showingSurvey {
+                        onComplete()
+                    }
+                }
+            }
+        }
         .onAppear {
             // Auto-populate school from current user's institution
             if school.isEmpty, let institutionName = authStateModel.currentUser?.institutionName {
@@ -463,16 +535,17 @@ struct AddStudentViewRedesigned: View {
                     studentID: studentID.isEmpty ? nil : studentID
                 )
 
-                _ = try await studentService.addStudent(student)
-
-                // TODO: If sendSurveyImmediately is true, trigger survey sending here
-                if sendSurveyImmediately {
-                    // Send survey logic will go here when implemented
-                    print("[AddStudent] Survey will be sent to \(fullName)")
-                }
+                let savedStudent = try await studentService.addStudent(student)
 
                 await MainActor.run {
-                    onComplete()
+                    if launchSurveyImmediately, let studentId = savedStudent.id {
+                        // Store student ID and show survey
+                        createdStudentId = studentId
+                        showingSurvey = true
+                    } else {
+                        // Complete without survey
+                        onComplete()
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -486,6 +559,6 @@ struct AddStudentViewRedesigned: View {
 
 #Preview {
     NavigationStack {
-        AddStudentViewRedesigned(onComplete: {})
+        AddStudentView(onComplete: {})
     }
 }

@@ -788,7 +788,7 @@ enum PerformanceCategory: String, CaseIterable, Sendable {
     case fileIO = "FileIO"
 }
 
-// MARK: - Enhanced Supporting Types
+// MARK: - Supporting Types
 
 struct NetworkMetric: Sendable, Identifiable {
     let id: UUID

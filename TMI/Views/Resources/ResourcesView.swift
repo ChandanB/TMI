@@ -567,7 +567,11 @@ struct ResourcesView: View {
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 16) {
           ForEach(stateModel.featuredResources) { resource in
-            NavigationLink(destination: ResourceDetailView(resource: resource)) {
+            NavigationLink(destination: ResourceDetailView(resource: resource, onDelete: {
+              Task {
+                await stateModel.deleteResource(resource)
+              }
+            })) {
               FeaturedResourceCard(resource: resource)
                 .frame(width: 300, height: 180)
             }
@@ -587,7 +591,11 @@ struct ResourcesView: View {
       spacing: 16
     ) {
       ForEach(filteredResources) { resource in
-        NavigationLink(destination: ResourceDetailView(resource: resource)) {
+        NavigationLink(destination: ResourceDetailView(resource: resource, onDelete: {
+          Task {
+            await stateModel.deleteResource(resource)
+          }
+        })) {
           ResourceCard(resource: resource)
             .opacity(isLoaded ? 1 : 0)
             .offset(y: isLoaded ? 0 : 30)
@@ -600,6 +608,15 @@ struct ResourcesView: View {
             )
         }
         .buttonStyle(ScaleButtonStyle())
+        .contextMenu {
+          Button(role: .destructive) {
+            Task {
+              await stateModel.deleteResource(resource)
+            }
+          } label: {
+            Label("Delete", systemImage: "trash")
+          }
+        }
       }
     }
     .padding(.horizontal, 20)
@@ -717,7 +734,11 @@ struct ResourcesView: View {
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 16) {
           ForEach(studentRecommendations.prefix(5), id: \.id) { resource in
-            NavigationLink(destination: EnhancedResourceDetailView(resource: resource)) {
+            NavigationLink(destination: ResourceDetailView(resource: resource, onDelete: {
+              Task {
+                await stateModel.deleteResource(resource)
+              }
+            })) {
               PersonalizedResourceCard(resource: resource)
                 .frame(width: 280, height: 160)
             }

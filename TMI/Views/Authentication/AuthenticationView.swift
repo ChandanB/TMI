@@ -9,7 +9,6 @@ struct AuthenticationView: View {
   @Environment(\.authStateModel) var stateModel
   @State private var showingRegistration = false
   @State private var showingForgotPassword = false
-  @State private var showingRoleSelection = false
   @State private var showingSupportResources = false
   @Environment(\.dismiss) private var dismiss
   @FocusState private var focusedField: Field?
@@ -159,7 +158,7 @@ struct AuthenticationView: View {
                 // Enhanced Sign Up Section
                 VStack(spacing: 12) {
                   Button(action: {
-                    showingRoleSelection = true
+                    showingRegistration = true
                   }) {
                     HStack(spacing: 0) {
                       Text("Don't have an account? ")
@@ -214,11 +213,7 @@ struct AuthenticationView: View {
       }
       .navigationBarTitleDisplayMode(.inline)
       .sheet(isPresented: $showingRegistration) {
-        RegistrationView()
-          .preferredColorScheme(.dark)
-      }
-      .sheet(isPresented: $showingRoleSelection) {
-        RoleSelectionView()
+        SimplifiedRegistrationView()
           .preferredColorScheme(.dark)
       }
       .sheet(isPresented: $showingSupportResources) {

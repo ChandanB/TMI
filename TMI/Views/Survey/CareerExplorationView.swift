@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import FirebaseFirestore
+import FirebaseAuth
 
 struct CareerExplorationView: View {
     let studentId: String
@@ -270,6 +272,10 @@ struct CareerPathDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedLevel: SkillLevel = .beginner
+    @State private var isCreatingPlan = false
+    @State private var showingPlanCreated = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
 
     var body: some View {
         ZStack {
@@ -437,13 +443,19 @@ struct CareerPathDetailView: View {
 
     private var actionButton: some View {
         Button(action: {
-            // TODO: Create CEP from this career
-            dismiss()
+            Task {
+                await createPlanFromCareer()
+            }
         }) {
             HStack {
-                Image(systemName: "sparkles")
-                Text("Create My Plan")
-                    .fontWeight(.semibold)
+                if isCreatingPlan {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Image(systemName: "sparkles")
+                    Text("Create My Plan")
+                        .fontWeight(.semibold)
+                }
             }
             .font(.tmiBody)
             .foregroundColor(.white)
@@ -455,6 +467,130 @@ struct CareerPathDetailView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(isCreatingPlan)
+        .alert("Plan Created!", isPresented: $showingPlanCreated) {
+            Button("Done", role: .cancel) {
+                dismiss()
+            }
+        } message: {
+            Text("Your TMI Plan for \(career.title) has been created successfully! Go to the TMI Plans tab to view and edit your new plan.")
+        }
+        .alert("Error Creating Plan", isPresented: $showingError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
+    }
+
+    // MARK: - Plan Creation
+
+    @MainActor
+    private func createPlanFromCareer() async {
+        isCreatingPlan = true
+        defer { isCreatingPlan = false }
+
+        do {
+            // Get Firestore and Auth
+            guard let userId = Auth.auth().currentUser?.uid else {
+                errorMessage = "You must be signed in to create a plan"
+                showingError = true
+                print("[CareerPlan] No authenticated user")
+                return
+            }
+
+            let db = Firestore.firestore()
+
+            // Try to fetch the student, but don't fail if not found
+            print("[CareerPlan] Attempting to fetch student with ID: \(studentId)")
+            var students: [Student] = []
+
+            let studentDoc = try await db.collection("users")
+                .document(userId)
+                .collection("students")
+                .document(studentId)
+                .getDocument()
+
+            if let student = try? studentDoc.data(as: Student.self) {
+                students = [student]
+                print("[CareerPlan] Found student: \(student.name)")
+            } else {
+                print("[CareerPlan] ⚠️ Student not found, creating plan without student")
+            }
+
+            // Create TMI Plan from career
+            let now = Date()
+            let newPlan = TMIPlan(
+                title: "\(career.title) Career Plan",
+                description: "Career exploration plan for \(career.title)",
+                students: students,
+                model: career.pathway.tmiModules.first ?? .chaseYourSpace,
+                interests: [], // Will be populated from survey if available
+                startDate: now,
+                endDate: nil,
+                creationDate: now,
+                lastUpdated: now,
+                goals: createGoalsFromCareer(),
+                progress: 0.0,
+                notes: "",
+                strategies: createStrategiesFromCareer(),
+                createdBy: userId
+            )
+
+            // Save to Firestore
+            print("[CareerPlan] Saving plan to Firestore...")
+            let planRef = db.collection("users")
+                .document(userId)
+                .collection("tmiPlans")
+                .document()
+
+            print("[CareerPlan] Firestore path: users/\(userId)/tmiPlans/\(planRef.documentID)")
+            print("[CareerPlan] Plan data: title=\(newPlan.title), model=\(newPlan.model.rawValue), students=\(newPlan.students.count), goals=\(newPlan.goals.count)")
+
+            try planRef.setData(from: newPlan)
+
+            print("[CareerPlan] ✅ Successfully saved to Firestore with ID: \(planRef.documentID)")
+            print("[CareerPlan] Navigate to TMI Plans tab to view your new plan!")
+
+            // Notify other views that a new plan was created
+            NotificationCenter.default.post(name: NSNotification.Name("TMIPlanCreated"), object: nil)
+
+            // Success feedback
+            showingPlanCreated = true
+
+        } catch {
+            errorMessage = "Failed to create plan: \(error.localizedDescription)"
+            showingError = true
+            print("[CareerPlan] ❌ Error creating plan: \(error)")
+        }
+    }
+
+    private func createGoalsFromCareer() -> [Goal] {
+        // Convert career pathway goals to TMI goals
+        var goals: [Goal] = []
+
+        // Add beginner goals
+        for cepGoal in career.pathway.beginnerGoals.prefix(3) {
+            goals.append(Goal(
+                description: cepGoal.title,
+                dueDate: Calendar.current.date(byAdding: .month, value: 1, to: Date()),
+                status: .notStarted,
+                progress: 0.0,
+                notes: cepGoal.strategies.first
+            ))
+        }
+
+        return goals
+    }
+
+    private func createStrategiesFromCareer() -> [String] {
+        // Extract strategies from all levels
+        var strategies: [String] = []
+
+        for goal in career.pathway.beginnerGoals.prefix(2) {
+            strategies.append(contentsOf: goal.strategies.prefix(2))
+        }
+
+        return Array(strategies.prefix(5))
     }
 
     // MARK: - Helpers

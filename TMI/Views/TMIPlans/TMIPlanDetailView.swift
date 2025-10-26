@@ -1,1596 +1,2472 @@
-// TMIPlanDetailView.swift
+//
+//  TMIPlanDetailView.swift
+//  TMI
+//
+//  Redesigned to focus on delivering actual intervention content,
+//  not just tracking metadata. Shows what students care about,
+//  what resources they're receiving, and concrete next steps.
+//
 
 import Charts
 import SwiftUI
 
 struct TMIPlanDetailView: View {
-  let plan: TMIPlan
-  @Environment(\.dismiss) private var dismiss
+    let initialPlan: TMIPlan
+    @Environment(\.dismiss) private var dismiss
 
-  // Animation states
-  @State private var headerAppeared = false
-  @State private var chartAppeared = false
-  @State private var contentAppeared = false
-  @State private var isChartExpanded = false
+    // Reactive plan state
+    @State private var plan: TMIPlan
 
-  // UI States
-  @State private var selectedChartTimeFrame: ChartTimeFrame = .monthly
-  @State private var showingEditSheet = false
-  @State private var showingDeleteAlert = false
+    // UI States
+    @State private var showingEditSheet = false
+    @State private var showingDeleteAlert = false
+    @State private var selectedStudent: Student?
+    @State private var showingAddInterest = false
+    @State private var showingAddGoal = false
+    @State private var showingCompleteSurvey = false
+    @State private var selectedGoal: Goal?
+    @State private var interestsStateModel = InterestsAndHobbiesStateModel()
 
-  enum ChartTimeFrame: String, CaseIterable, Identifiable {
-    case weekly = "Weekly"
-    case monthly = "Monthly"
-    case yearly = "Yearly"
+    // Generated Resources
+    @State private var generatedResources: [Interest: [Resource]] = [:]
+    @State private var isGeneratingResources = false
+    @State private var showingAllResources = false
+    @State private var showingAddResource = false
 
-    var id: String { self.rawValue }
-  }
-
-  var body: some View {
-    ZStack {
-      // Background
-      planDetailBackgroundView
-
-      ScrollView {
-        VStack(spacing: 24) {
-          // Header View
-          enhancedHeaderView
-            .padding(.top, 16)
-            .padding(.horizontal, 20)
-            .offset(y: headerAppeared ? 0 : -20)
-            .opacity(headerAppeared ? 1 : 0)
-
-          // Quick Stats
-          enhancedQuickStatsView
-            .padding(.horizontal, 20)
-            .offset(y: headerAppeared ? 0 : -10)
-            .opacity(headerAppeared ? 1 : 0)
-
-          // Progress Chart
-          enhancedProgressChartView
-            .padding(.horizontal, 20)
-            .offset(y: chartAppeared ? 0 : 30)
-            .opacity(chartAppeared ? 1 : 0)
-
-          // Content sections
-          Group {
-            enhancedInsightsSection
-            enhancedStudentsSection
-            enhancedInterestsAndHobbiesSection
-            enhancedGoalsSection
-            enhancedNotesSection
-          }
-          .padding(.horizontal, 20)
-          .offset(y: contentAppeared ? 0 : 40)
-          .opacity(contentAppeared ? 1 : 0)
-        }
-        .padding(.bottom, 40)
-      }
-    }
-    .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-      ToolbarItem(placement: .principal) {
-        Text("TMI Plan Details")
-          .font(.system(size: 18, weight: .bold, design: .rounded))
-          .foregroundColor(.white)
-      }
-
-      ToolbarItem(placement: .navigationBarTrailing) {
-        Menu {
-          Button(action: {
-            showingEditSheet = true
-          }) {
-            Label("Edit Plan", systemImage: "pencil")
-          }
-
-          Button(action: {
-            // Export action
-          }) {
-            Label("Export Plan", systemImage: "square.and.arrow.up")
-          }
-
-          Divider()
-
-          Button(
-            role: .destructive,
-            action: {
-              showingDeleteAlert = true
-            }
-          ) {
-            Label("Delete Plan", systemImage: "trash")
-          }
-        } label: {
-          Image(systemName: "ellipsis.circle")
-            .font(.system(size: 22))
-            .foregroundColor(.white)
-        }
-      }
-    }
-    .sheet(isPresented: $showingEditSheet) {
-      EditTMIPlanView(plan: plan) { updatedPlan in
-        // Handle the updated plan
-        // In a real implementation, you would update the plan data
-        // For now, we'll just dismiss
-      }
-      .presentationDetents([.large])
-      .presentationDragIndicator(.visible)
-    }
-    .alert("Delete TMI Plan", isPresented: $showingDeleteAlert) {
-      Button("Cancel", role: .cancel) {}
-      Button("Delete", role: .destructive) {
-        deletePlan()
-      }
-    } message: {
-      Text("Are you sure you want to delete this TMI plan? This action cannot be undone.")
-    }
-    .onAppear {
-      animateViews()
-    }
-    .preferredColorScheme(.dark)
-  }
-
-  private func animateViews() {
-    withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
-      headerAppeared = true
+    init(plan: TMIPlan) {
+        self.initialPlan = plan
+        _plan = State(initialValue: plan)
     }
 
-    withAnimation(.easeOut(duration: 0.5).delay(0.3)) {
-      chartAppeared = true
-    }
-
-    withAnimation(.easeOut(duration: 0.5).delay(0.5)) {
-      contentAppeared = true
-    }
-  }
-  
-  private func deletePlan() {
-    Task {
-      do {
-        try await TMIPlanService().deletePlan(plan)
-        await MainActor.run {
-          dismiss()
-        }
-      } catch {
-        print("Error deleting TMI plan: \(error)")
-      }
-    }
-  }
-
-  // MARK: - Background
-
-  private var planDetailBackgroundView: some View {
-    // Using unified TMIBackgroundView with plan variant
-    TMIBackgroundView(variant: .plans)
-      .ignoresSafeArea()
-  }
-
-  // MARK: - Header View
-
-  private var enhancedHeaderView: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      HStack(alignment: .top) {
-        // Model badge
-        VStack(alignment: .leading, spacing: 8) {
-          ZStack {
-            // Icon badge
-            Circle()
-              .fill(modelColor.opacity(0.15))
-              .frame(width: 60, height: 60)
-
-            Image(systemName: modelIcon)
-              .font(.system(size: 24, weight: .semibold))
-              .foregroundColor(modelColor)
-          }
-
-          // Model name and creation date
-          VStack(alignment: .leading, spacing: 4) {
-            Text(plan.model.rawValue)
-              .font(.system(size: 24, weight: .bold))
-              .foregroundColor(.white)
-
-            Text("Created on \(formattedDate(plan.creationDate))")
-              .font(.system(size: 14))
-              .foregroundColor(.white.opacity(0.6))
-          }
-        }
-
-        Spacer()
-
-        // Progress circle
+    var body: some View {
         ZStack {
-          Circle()
-            .stroke(
-              Color.white.opacity(0.1),
-              lineWidth: 8
-            )
-            .frame(width: 80, height: 80)
+            TMIBackgroundView(variant: .plans)
+                .ignoresSafeArea()
 
-          Circle()
-            .trim(from: 0, to: CGFloat(min(plan.progress, 1.0)))
-            .stroke(
-              LinearGradient(
-                colors: [modelColor, modelColor.opacity(0.7)],
-                startPoint: .leading,
-                endPoint: .trailing
-              ),
-              style: StrokeStyle(lineWidth: 8, lineCap: .round)
-            )
-            .frame(width: 80, height: 80)
-            .rotationEffect(.degrees(-90))
+            ScrollView {
+                VStack(spacing: TMISpacing.xl) {
+                    // 1. Plan Overview - What is this plan about?
+                    planOverviewSection
 
-          VStack(spacing: 2) {
-            Text("\(Int(plan.progress * 100))%")
-              .font(.system(size: 20, weight: .bold, design: .rounded))
-              .foregroundColor(.white)
+                    // 2. Student Interests - What do they care about?
+                    studentInterestsSection
 
-            Text(progressStatus)
-              .font(.system(size: 10, weight: .medium))
-              .foregroundColor(.white.opacity(0.7))
-          }
+                    // 3. Personalized Resources - What are they getting?
+                    personalizedResourcesSection
+
+                    // 4. Intervention Strategies - How do teachers help?
+                    interventionStrategiesSection
+
+                    // 5. Goals & Progress - What are we achieving?
+                    goalsAndProgressSection
+
+                    // 6. Collaboration Notes - Teacher/counselor communication
+                    collaborationNotesSection
+
+                    Spacer(minLength: TMISpacing.xxl)
+                }
+                .padding(.horizontal, TMISpacing.screenPadding)
+                .padding(.top, TMISpacing.lg)
+            }
         }
-      }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text(plan.model.shortDisplayName)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
 
-      // Description
-      Text(plan.model.description)
-        .font(.system(size: 15))
-        .foregroundColor(.white.opacity(0.8))
-        .padding(.top, 8)
-    }
-  }
+                    Text("\(plan.students.count) student\(plan.students.count == 1 ? "" : "s")")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
 
-  // MARK: - Quick Stats View
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(action: { showingEditSheet = true }) {
+                        Label("Edit Plan", systemImage: "pencil")
+                    }
 
-  private var enhancedQuickStatsView: some View {
-    HStack(spacing: 15) {
-      // Last updated
-      DetailStat(
-        title: "Last Updated",
-        value: timeAgo(from: plan.lastUpdated),
-        icon: "calendar",
-        color: .blue
-      )
+                    Button(action: { /* Export action */ }) {
+                        Label("Export Plan", systemImage: "square.and.arrow.up")
+                    }
 
-      // Student count
-      DetailStat(
-        title: "Students",
-        value: "\(plan.students.count)",
-        icon: "person.3",
-        color: .green
-      )
+                    Divider()
 
-      // Interest count
-      DetailStat(
-        title: "Interests",
-        value: "\(plan.interests.count)",
-        icon: "heart",
-        color: .pink
-      )
-    }
-  }
-
-  // MARK: - Progress Chart View
-
-  private var enhancedProgressChartView: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      // Header with time frame selector
-      HStack {
-        Text("Progress Tracking")
-          .font(.system(size: 18, weight: .semibold))
-          .foregroundColor(.white)
-
-        Spacer()
-
-        // Time frame selector
-        HStack(spacing: 0) {
-          ForEach(ChartTimeFrame.allCases) { timeFrame in
-            Button {
-              withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                selectedChartTimeFrame = timeFrame
-              }
-            } label: {
-              Text(timeFrame.rawValue)
-                .font(
-                  .system(
-                    size: 12, weight: selectedChartTimeFrame == timeFrame ? .semibold : .regular)
+                    Button(role: .destructive, action: { showingDeleteAlert = true }) {
+                        Label("Delete Plan", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white)
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditSheet) {
+            NavigationStack {
+                EditTMIPlanView(plan: plan) { updatedPlan in
+                    plan = updatedPlan
+                }
+            }
+        }
+        .alert("Delete TMI Plan", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) { deletePlan() }
+        } message: {
+            Text("Are you sure you want to delete this TMI plan? This action cannot be undone.")
+        }
+        .sheet(item: $selectedStudent) { student in
+            NavigationStack {
+                StudentDetailView(student: student)
+            }
+        }
+        .sheet(isPresented: $showingAddInterest) {
+            NavigationStack {
+                AddInterestToPlanView(plan: plan) { updatedPlan in
+                    plan = updatedPlan
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            showingAddInterest = false
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddGoal) {
+            NavigationStack {
+                AddGoalView(plan: plan) { newGoal in
+                    Task {
+                        await addGoalToPlan(newGoal)
+                    }
+                }
+            }
+        }
+        .sheet(item: $selectedGoal) { goal in
+            NavigationStack {
+                EditGoalView(plan: plan, goal: goal) { updatedGoal in
+                    Task {
+                        await updateGoal(updatedGoal)
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingCompleteSurvey) {
+            NavigationStack {
+                InterestSurveyView(plan: plan, onComplete: { interests in
+                    Task {
+                        await addInterestsFromSurvey(interests)
+                    }
+                })
+            }
+        }
+        .sheet(isPresented: $showingAllResources) {
+            NavigationStack {
+                AllResourcesView(
+                    interests: plan.interests,
+                    generatedResources: generatedResources,
+                    modelColor: modelColor
                 )
-                .padding(.horizontal, 10)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") {
+                            showingAllResources = false
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddResource) {
+            NavigationStack {
+                Text("Add Custom Resource")
+                    .font(.tmiTitle2)
+                    .foregroundColor(.tmiTextPrimary)
+                    .padding()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.tmiBackground)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") {
+                                showingAddResource = false
+                            }
+                        }
+                    }
+            }
+        }
+        .refreshable {
+            await refreshPlan()
+        }
+        .task {
+            await generateResourcesForInterests()
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    // MARK: - Plan Overview Section
+
+    private var planOverviewSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.lg) {
+            // Model badge and status
+            HStack(alignment: .center, spacing: TMISpacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(modelColor.opacity(0.2))
+                        .frame(width: 64, height: 64)
+
+                    Circle()
+                        .stroke(modelColor.opacity(0.4), lineWidth: 2)
+                        .frame(width: 64, height: 64)
+
+                    Image(systemName: modelIcon)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(modelColor)
+                }
+                .shadow(color: modelColor.opacity(0.3), radius: 12, x: 0, y: 6)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(plan.model.rawValue)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.white)
+
+                    Text(plan.model.description)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+
+            TMIDivider()
+
+            // Next Action - Make it prominent
+            VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                HStack(spacing: 6) {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.tmiWarning)
+                    Text("Next Action")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.9))
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                }
+
+                Text(nextActionText)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(TMISpacing.md)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: TMIRadius.md)
+                            .fill(modelColor.opacity(0.15))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: TMIRadius.md)
+                            .strokeBorder(modelColor.opacity(0.3), lineWidth: 1)
+                    )
+            }
+
+            // Associated students
+            VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                Text("Students in this plan")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.7))
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: TMISpacing.sm) {
+                        ForEach(plan.students) { student in
+                            Button(action: { selectedStudent = student }) {
+                                StudentMiniCard(student: student, modelColor: modelColor)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(TMISpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(Color.white.opacity(0.05))
+                .background(.ultraThinMaterial.opacity(0.3))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [modelColor.opacity(0.3), .clear, modelColor.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+    }
+
+    // MARK: - Student Interests Section
+
+    private var studentInterestsSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(spacing: 8) {
+                Image(systemName: "heart.circle.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.tmiPrimary)
+
+                Text("What They Care About")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                if !plan.interests.isEmpty {
+                    Text("\(plan.interests.count) interest\(plan.interests.count == 1 ? "" : "s")")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.tmiPrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.tmiPrimary.opacity(0.2))
+                        )
+                }
+
+                Button(action: { showingAddInterest = true }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16))
+                        Text("Add")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(.tmiPrimary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if plan.interests.isEmpty {
+                VStack(spacing: TMISpacing.md) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 32))
+                        .foregroundColor(.tmiWarning)
+
+                    Text("No Interests Identified")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+
+                    Text("This plan needs student interests to be effective. Complete the interest survey with \(plan.primaryStudent?.name ?? "the student") to personalize their pathway.")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Button(action: { showingCompleteSurvey = true }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.text.fill")
+                            Text("Complete Interest Survey")
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, TMISpacing.lg)
+                        .padding(.vertical, TMISpacing.md)
+                        .background(
+                            Capsule()
+                                .fill(Color.tmiPrimary)
+                        )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+                .frame(maxWidth: .infinity)
+                .padding(TMISpacing.xl)
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: TMISpacing.sm) {
+                    ForEach(plan.interests) { interest in
+                        InterestCard(interest: interest)
+                    }
+                }
+            }
+        }
+        .padding(TMISpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(Color.white.opacity(0.05))
+                .background(.ultraThinMaterial.opacity(0.3))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Personalized Resources Section
+
+    private var personalizedResourcesSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(spacing: 8) {
+                Image(systemName: "link.circle.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.tmiSuccess)
+
+                Text("Personalized Resources")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Button(action: { showingAddResource = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.tmiSuccess)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if plan.interests.isEmpty {
+                Text("Add student interests to generate personalized resources")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(TMISpacing.lg)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else if isGeneratingResources {
+                VStack(spacing: TMISpacing.md) {
+                    ProgressView()
+                        .tint(.tmiSuccess)
+                    Text("Generating personalized resources...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .padding(TMISpacing.lg)
+                .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                VStack(spacing: TMISpacing.md) {
+                    ForEach(plan.interests.prefix(3)) { interest in
+                        AIGeneratedResourceCard(
+                            interest: interest,
+                            resources: generatedResources[interest] ?? [],
+                            modelColor: modelColor
+                        )
+                    }
+
+                    if plan.interests.count > 3 {
+                        Button(action: { showingAllResources = true }) {
+                            HStack {
+                                Text("View all \(plan.interests.count) interest resources")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundColor(.tmiSuccess)
+                            .padding(TMISpacing.md)
+                            .background(
+                                RoundedRectangle(cornerRadius: TMIRadius.md)
+                                    .fill(Color.tmiSuccess.opacity(0.1))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(TMISpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(Color.white.opacity(0.05))
+                .background(.ultraThinMaterial.opacity(0.3))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Intervention Strategies Section
+
+    private var interventionStrategiesSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(spacing: 8) {
+                Image(systemName: "lightbulb.circle.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.tmiSecondary)
+
+                Text("Intervention Strategies")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+            }
+
+            Text("For Educators")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white.opacity(0.7))
+                .textCase(.uppercase)
+                .tracking(0.5)
+
+            VStack(spacing: TMISpacing.sm) {
+                ForEach(modelStrategies, id: \.self) { strategy in
+                    StrategyRow(strategy: strategy, modelColor: modelColor)
+                }
+            }
+        }
+        .padding(TMISpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(Color.white.opacity(0.05))
+                .background(.ultraThinMaterial.opacity(0.3))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Goals & Progress Section
+
+    private var goalsAndProgressSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(spacing: 8) {
+                Image(systemName: "target")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(modelColor)
+
+                Text("Goals & Milestones")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                // Progress indicator
+                HStack(spacing: 6) {
+                    Text("\(plan.progressPercentage)%")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(modelColor)
+
+                    Text("Complete")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .foregroundColor(selectedChartTimeFrame == timeFrame ? .white : .white.opacity(0.6))
                 .background(
-                  selectedChartTimeFrame == timeFrame
-                    ? Capsule().fill(modelColor.opacity(0.3)) : nil
+                    Capsule()
+                        .fill(modelColor.opacity(0.2))
                 )
-                .contentShape(Rectangle())
+            }
+
+            // What we're measuring
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Measuring: Behavioral Engagement & Academic Progress")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
+
+                Text("Tracking on-task behavior, assignment completion, and positive peer interactions")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .padding(TMISpacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: TMIRadius.sm)
+                    .fill(Color.white.opacity(0.05))
+            )
+
+            // Goals list
+            if plan.goals.isEmpty {
+                VStack(spacing: TMISpacing.sm) {
+                    Text("No goals set for this plan")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+
+                    Button(action: { showingAddGoal = true }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.circle")
+                            Text("Add First Goal")
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(modelColor)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(TMISpacing.lg)
+            } else {
+                VStack(spacing: TMISpacing.sm) {
+                    ForEach(plan.goals) { goal in
+                        Button(action: {
+                            selectedGoal = goal
+                        }) {
+                            GoalCard(goal: goal, modelColor: modelColor)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Button(action: { showingAddGoal = true }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.circle")
+                            Text("Add Another Goal")
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(modelColor)
+                        .padding(TMISpacing.md)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: TMIRadius.md)
+                                .fill(modelColor.opacity(0.1))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: TMIRadius.md)
+                                .strokeBorder(modelColor.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(TMISpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(Color.white.opacity(0.05))
+                .background(.ultraThinMaterial.opacity(0.3))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Collaboration Notes Section
+
+    private var collaborationNotesSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(spacing: 8) {
+                Image(systemName: "person.2.circle.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.blue)
+
+                Text("Team Collaboration")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+            }
+
+            if plan.notes.isEmpty {
+                Text("No collaboration notes yet")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(TMISpacing.lg)
+            } else {
+                Text(plan.notes)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineSpacing(4)
+                    .padding(TMISpacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: TMIRadius.md)
+                            .fill(Color.white.opacity(0.05))
+                    )
+            }
+
+            Button(action: { showingEditSheet = true }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle")
+                    Text("Add Note")
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.blue)
             }
             .buttonStyle(.plain)
-          }
         }
+        .padding(TMISpacing.lg)
         .background(
-          Capsule()
-            .fill(Color.white.opacity(0.05))
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(Color.white.opacity(0.05))
+                .background(.ultraThinMaterial.opacity(0.3))
         )
-      }
-
-      // Chart
-      VStack {
-        enhancedProgressChart
-          .frame(height: isChartExpanded ? 300 : 200)
-          .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isChartExpanded)
-          .gesture(
-            TapGesture()
-              .onEnded { _ in
-                withAnimation {
-                  isChartExpanded.toggle()
-                }
-              }
-          )
-
-        // Chart legend
-        HStack(spacing: 20) {
-          // Current period text
-          Text(chartPeriodText)
-            .font(.system(size: 13))
-            .foregroundColor(.white.opacity(0.7))
-
-          Spacer()
-
-          // Legend items
-          HStack(spacing: 16) {
-            legendItem(color: modelColor, label: "Progress")
-            legendItem(color: .gray.opacity(0.5), label: "Target")
-          }
-        }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-      }
-      .padding(.top, 8)
-      .padding(16)
-      .background(
-        RoundedRectangle(cornerRadius: 16)
-          .fill(Color.white.opacity(0.03))
-          .background(
-            RoundedRectangle(cornerRadius: 16)
-              .fill(.ultraThinMaterial)
-              .opacity(0.3)
-          )
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: 16)
-          .stroke(
-            LinearGradient(
-              colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-              startPoint: .topLeading,
-              endPoint: .bottomTrailing
-            ),
-            lineWidth: 1
-          )
-      )
-    }
-  }
-
-  private var enhancedProgressChart: some View {
-    Chart(progressData) { dataPoint in
-      // Area fill
-      AreaMark(
-        x: .value("Period", dataPoint.date),
-        y: .value("Progress", dataPoint.progress)
-      )
-      .foregroundStyle(areaGradient)
-      .interpolationMethod(.catmullRom)
-      
-      // Target line
-      LineMark(
-        x: .value("Period", dataPoint.date),
-        y: .value("Target", dataPoint.target)
-      )
-      .foregroundStyle(targetLineStyle)
-      .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
-      
-      // Progress line
-      LineMark(
-        x: .value("Period", dataPoint.date),
-        y: .value("Progress", dataPoint.progress)
-      )
-      .foregroundStyle(progressLineGradient)
-      .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-      .interpolationMethod(.catmullRom)
-      
-      // Progress points
-      PointMark(
-        x: .value("Period", dataPoint.date),
-        y: .value("Progress", dataPoint.progress)
-      )
-      .foregroundStyle(modelColor)
-      .symbolSize(64)
-    }
-    .chartYScale(domain: 0...1)
-    .chartYAxis {
-      AxisMarks(position: .leading, values: .stride(by: 0.25)) { value in
-        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 4]))
-          .foregroundStyle(Color.white.opacity(0.2))
-        
-        AxisValueLabel {
-          if let doubleValue = value.as(Double.self) {
-            Text("\(Int(doubleValue * 100))%")
-              .font(.caption2)
-              .foregroundColor(.white.opacity(0.7))
-          }
-        }
-      }
-    }
-    .chartXAxis {
-      AxisMarks(values: .automatic(desiredCount: 6)) { value in
-        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 4]))
-          .foregroundStyle(Color.white.opacity(0.1))
-        
-        AxisValueLabel {
-          if let stringValue = value.as(String.self) {
-            Text(stringValue)
-              .font(.caption2)
-              .foregroundColor(.white.opacity(0.7))
-              .lineLimit(1)
-          }
-        }
-      }
-    }
-    .accessibilityLabel("TMI Plan Progress Chart")
-    .accessibilityValue("Shows progress over time compared to target")
-  }
-  
-  private var areaGradient: LinearGradient {
-    LinearGradient(
-      colors: [modelColor.opacity(0.3), modelColor.opacity(0.05)],
-      startPoint: .top,
-      endPoint: .bottom
-    )
-  }
-  
-  private var progressLineGradient: LinearGradient {
-    LinearGradient(
-      colors: [modelColor, modelColor.opacity(0.8)],
-      startPoint: .leading,
-      endPoint: .trailing
-    )
-  }
-  
-  private var targetLineStyle: Color {
-    Color.gray.opacity(0.6)
-  }
-
-  private func legendItem(color: Color, label: String) -> some View {
-    HStack(spacing: 6) {
-      Circle()
-        .fill(color)
-        .frame(width: 8, height: 8)
-
-      Text(label)
-        .font(.system(size: 12))
-        .foregroundColor(.white.opacity(0.7))
-    }
-  }
-
-  // MARK: - Insights Section
-
-  private var enhancedInsightsSection: some View {
-    DetailSection(title: "Insights") {
-      VStack(spacing: 16) {
-        // Engagement trend
-        DetailRow(
-          icon: trendIcon,
-          title: "Engagement Trend",
-          value: engagementTrend(),
-          valueColor: trendColor
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
         )
-
-        // Last milestone
-        DetailRow(
-          icon: "flag.fill",
-          title: "Last Milestone",
-          value: "Week 4 Review"
-        )
-
-        // Next action
-        DetailRow(
-          icon: "arrow.right.circle.fill",
-          title: "Next Action",
-          value: "Schedule Progress Review"
-        )
-      }
-      .padding(.vertical, 8)
     }
-  }
 
-  // MARK: - Students Section
+    // MARK: - Helper Properties
 
-  private var enhancedStudentsSection: some View {
-    DetailSection(title: "Associated Students") {
-      VStack(alignment: .leading, spacing: 16) {
-        ScrollView(.horizontal, showsIndicators: false) {
-          HStack(spacing: 12) {
-            ForEach(plan.students) { student in
-              NavigationLink(destination: StudentDetailViewRedesigned(student: student)) {
-                StudentDetailCard(student: student)
-              }
-              .buttonStyle(.plain)
-            }
-          }
-          .padding(.horizontal, 4)
-          .padding(.vertical, 8)
+    private var modelIcon: String {
+        switch plan.model {
+        case .chaseYourSpace: return "airplane.departure"
+        case .acknowledgeInterests: return "heart.fill"
+        case .alignYourMind: return "brain.head.profile"
+        case .directAndCorrect: return "arrow.up.forward.circle.fill"
+        case .bullyToBoss: return "person.fill.badge.plus"
+        case .meekToProtector: return "shield.lefthalf.filled"
         }
-
-        // Quick action hint
-        HStack(spacing: 4) {
-          Image(systemName: "hand.tap")
-            .font(.system(size: 12))
-            .foregroundColor(.white.opacity(0.5))
-          Text("Tap student to view full profile")
-            .font(.system(size: 12))
-            .foregroundColor(.white.opacity(0.5))
-        }
-        .padding(.top, 4)
-      }
     }
-  }
 
-  // MARK: - Interests and Hobbies Section
-
-  private var enhancedInterestsAndHobbiesSection: some View {
-    DetailSection(title: "Interests & Hobbies") {
-      VStack(alignment: .leading, spacing: 20) {
-        if !plan.interests.isEmpty {
-          VStack(alignment: .leading, spacing: 12) {
-            Text("Interests")
-              .font(.system(size: 16, weight: .semibold))
-              .foregroundColor(.white)
-
-            WrapView(items: plan.interests) { interest in
-              InterestTag(interest: interest)
-            }
-          }
+    private var modelColor: Color {
+        switch plan.model {
+        case .chaseYourSpace: return .blue
+        case .acknowledgeInterests: return .pink
+        case .alignYourMind: return .purple
+        case .directAndCorrect: return .orange
+        case .bullyToBoss: return .red
+        case .meekToProtector: return .green
         }
+    }
 
-        // Note: Hobbies section removed - now included in interests above
-
+    private var nextActionText: String {
         if plan.interests.isEmpty {
-          Text("No interests associated with this plan.")
-            .font(.system(size: 15))
-            .foregroundColor(.white.opacity(0.6))
-            .padding(.vertical, 8)
-        }
-      }
-    }
-  }
-
-  // MARK: - Goals Section
-
-  private var enhancedGoalsSection: some View {
-    DetailSection(title: "Goals & Objectives") {
-      VStack(alignment: .leading, spacing: 16) {
-        if plan.goals.isEmpty {
-          Text("No goals defined for this plan.")
-            .font(.system(size: 15))
-            .foregroundColor(.white.opacity(0.6))
-            .padding(.vertical, 8)
+            return "Complete interest survey with \(plan.primaryStudent?.name ?? "student") to personalize this plan"
+        } else if plan.goals.isEmpty {
+            return "Set specific, measurable goals for this intervention"
+        } else if plan.calculatedProgress < 0.3 {
+            return "Schedule check-in to review initial progress and adjust strategies"
+        } else if plan.calculatedProgress < 0.7 {
+            return "Continue current strategies and document student improvements"
         } else {
-          ForEach(plan.goals) { goal in
-            GoalCard(goal: goal)
-          }
+            return "Prepare for transition planning and celebrate achievements"
         }
-
-        Button {
-          // Add goal action
-        } label: {
-          HStack {
-            Image(systemName: "plus.circle")
-              .font(.system(size: 14))
-
-            Text("Add New Goal")
-              .font(.system(size: 14, weight: .medium))
-          }
-          .foregroundColor(.white)
-          .padding(.vertical, 8)
-          .padding(.horizontal, 14)
-          .background(
-            Capsule()
-              .fill(Color.white.opacity(0.1))
-          )
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .padding(.top, 4)
-      }
     }
-  }
 
-  // MARK: - Notes Section
+    private var modelStrategies: [String] {
+        switch plan.model {
+        case .chaseYourSpace:
+            return [
+                "Connect classroom lessons to their chosen career pathway",
+                "Invite guest speakers from their field of interest",
+                "Assign projects that build skills for their career goal",
+                "Celebrate progress toward their dream career"
+            ]
+        case .acknowledgeInterests:
+            return [
+                "Reference their interests when giving examples in class",
+                "Create assignments that incorporate their hobbies",
+                "Display their interests in their workspace",
+                "Connect with them through their passions"
+            ]
+        case .alignYourMind:
+            return [
+                "Use their interests as focus tools during independent work",
+                "Create organization systems themed around their hobbies",
+                "Provide breaks that involve their interests",
+                "Check in using interest-based conversation starters"
+            ]
+        case .directAndCorrect:
+            return [
+                "Relate behavioral scenarios to their interests",
+                "Use interest-based rewards for positive behavior",
+                "Partner with social worker to develop coping skills",
+                "Frame redirections using examples from their hobbies"
+            ]
+        case .bullyToBoss:
+            return [
+                "Channel leadership energy into positive roles",
+                "Assign peer mentoring opportunities",
+                "Connect their interests to leadership examples",
+                "Teach conflict resolution through interest-based scenarios"
+            ]
+        case .meekToProtector:
+            return [
+                "Build confidence through interest-based presentations",
+                "Create safe spaces to share their passions",
+                "Use their hobbies to practice assertiveness",
+                "Celebrate small wins related to their interests"
+            ]
+        }
+    }
 
-  private var enhancedNotesSection: some View {
-    DetailSection(title: "Notes") {
-      VStack(alignment: .leading, spacing: 16) {
-        if plan.notes.isEmpty {
-          Text("No notes added to this plan.")
-            .font(.system(size: 15))
-            .foregroundColor(.white.opacity(0.6))
-            .padding(.vertical, 8)
+    // MARK: - Actions
+
+    private func deletePlan() {
+        Task {
+            do {
+                try await TMIPlanService().deletePlan(plan)
+                await MainActor.run {
+                    dismiss()
+                }
+            } catch {
+                print("[TMIPlanDetail] Error deleting plan: \(error)")
+            }
+        }
+    }
+
+    @MainActor
+    private func addGoalToPlan(_ newGoal: Goal) async {
+        do {
+            var goals = plan.goals
+            goals.append(newGoal)
+
+            let service = TMIPlanService()
+            let planWithNewGoals = TMIPlan(
+                id: plan.id,
+                title: plan.title,
+                description: plan.description,
+                students: plan.students,
+                model: plan.model,
+                interests: plan.interests,
+                startDate: plan.startDate,
+                endDate: plan.endDate,
+                creationDate: plan.creationDate,
+                lastUpdated: Date(),
+                goals: goals,
+                progress: plan.progress,
+                notes: plan.notes,
+                strategies: plan.strategies,
+                progressTracking: plan.progressTracking,
+                createdBy: plan.createdBy
+            )
+
+            let savedPlan = try await service.updatePlan(planWithNewGoals)
+            plan = savedPlan // Update local state immediately
+            showingAddGoal = false
+        } catch {
+            print("[TMIPlanDetail] Error adding goal: \(error)")
+        }
+    }
+
+    @MainActor
+    private func updateGoal(_ updatedGoal: Goal) async {
+        do {
+            var goals = plan.goals
+
+            if let index = goals.firstIndex(where: { $0.id == updatedGoal.id }) {
+                goals[index] = updatedGoal
+            }
+
+            let service = TMIPlanService()
+            let planWithUpdatedGoals = TMIPlan(
+                id: plan.id,
+                title: plan.title,
+                description: plan.description,
+                students: plan.students,
+                model: plan.model,
+                interests: plan.interests,
+                startDate: plan.startDate,
+                endDate: plan.endDate,
+                creationDate: plan.creationDate,
+                lastUpdated: Date(),
+                goals: goals,
+                progress: plan.progress,
+                notes: plan.notes,
+                strategies: plan.strategies,
+                progressTracking: plan.progressTracking,
+                createdBy: plan.createdBy
+            )
+
+            let savedPlan = try await service.updatePlan(planWithUpdatedGoals)
+            plan = savedPlan // Update local state immediately
+            selectedGoal = nil
+        } catch {
+            print("[TMIPlanDetail] Error updating goal: \(error)")
+        }
+    }
+
+    @MainActor
+    private func addInterestsFromSurvey(_ interests: [Interest]) async {
+        do {
+            let newInterests = interests.filter { newInterest in
+                !plan.interests.contains(where: { $0.id == newInterest.id })
+            }
+
+            let service = TMIPlanService()
+            let planWithNewInterests = TMIPlan(
+                id: plan.id,
+                title: plan.title,
+                description: plan.description,
+                students: plan.students,
+                model: plan.model,
+                interests: plan.interests + newInterests,
+                startDate: plan.startDate,
+                endDate: plan.endDate,
+                creationDate: plan.creationDate,
+                lastUpdated: Date(),
+                goals: plan.goals,
+                progress: plan.progress,
+                notes: plan.notes,
+                strategies: plan.strategies,
+                progressTracking: plan.progressTracking,
+                createdBy: plan.createdBy
+            )
+
+            let savedPlan = try await service.updatePlan(planWithNewInterests)
+            plan = savedPlan // Update local state immediately
+            showingCompleteSurvey = false
+        } catch {
+            print("[TMIPlanDetail] Error adding interests from survey: \(error)")
+        }
+    }
+
+    @MainActor
+    private func refreshPlan() async {
+        guard let planId = plan.id else { return }
+
+        do {
+            let service = TMIPlanService()
+            if let refreshedPlan = try await service.fetchPlan(byId: planId) {
+                plan = refreshedPlan
+            }
+        } catch {
+            print("[TMIPlanDetail] Error refreshing plan: \(error)")
+        }
+    }
+
+    // MARK: - AI Resource Generation
+
+    @MainActor
+    private func generateResourcesForInterests() async {
+        guard !plan.interests.isEmpty else { return }
+
+        isGeneratingResources = true
+        defer { isGeneratingResources = false }
+
+        if #available(iOS 26.0, *) {
+            let service = ResourceGenerationService.shared
+
+            // Check availability first
+            guard await service.checkAvailability() else {
+                print("[TMIPlanDetail] Foundation Models not available, using fallback")
+                generateFallbackResources()
+                return
+            }
+
+            // Generate resources for each interest
+            for interest in plan.interests {
+                // Skip if already generated
+                if generatedResources[interest] != nil {
+                    continue
+                }
+
+                do {
+                    let resources = try await service.generateResources(for: interest, plan: plan)
+                    generatedResources[interest] = resources
+                    print("[TMIPlanDetail] Generated \(resources.count) resources for \(interest.name)")
+                } catch {
+                    print("[TMIPlanDetail] Error generating resources for \(interest.name): \(error)")
+                    // Use fallback for this interest
+                    generatedResources[interest] = createFallbackResources(for: interest)
+                }
+            }
         } else {
-          Text(plan.notes)
-            .font(.system(size: 15))
-            .foregroundColor(.white.opacity(0.9))
-            .lineSpacing(4)
-            .padding(.vertical, 8)
+            // iOS < 26: Use fallback resources
+            generateFallbackResources()
         }
+    }
 
-        Button {
-          // Add notes action
-        } label: {
-          HStack {
-            Image(systemName: "plus.circle")
-              .font(.system(size: 14))
-
-            Text("Add Notes")
-              .font(.system(size: 14, weight: .medium))
-          }
-          .foregroundColor(.white)
-          .padding(.vertical, 8)
-          .padding(.horizontal, 14)
-          .background(
-            Capsule()
-              .fill(Color.white.opacity(0.1))
-          )
+    private func generateFallbackResources() {
+        for interest in plan.interests {
+            generatedResources[interest] = createFallbackResources(for: interest)
         }
-        .buttonStyle(ScaleButtonStyle())
-        .padding(.top, 4)
-      }
     }
-  }
 
-  // MARK: - Helper Properties
-
-  private var modelIcon: String {
-    switch plan.model {
-    case .chaseYourSpace:
-      return "rocket.fill"
-    case .acknowledgeInterests:
-      return "heart.fill"
-    case .alignYourMind:
-      return "brain.head.profile.fill"
-    case .directAndCorrect:
-      return "arrow.up.forward.circle.fill"
-    case .bullyToBoss:
-      return "person.fill.badge.plus"
-    case .meekToProtector:
-      return "person.fill.turn.up"
+    private func createFallbackResources(for interest: Interest) -> [Resource] {
+        return [
+            Resource(
+                title: "Exploring \(interest.name): Beginner's Guide",
+                description: "A comprehensive introduction to \(interest.name) designed for students.",
+                category: .article,
+                url: "https://www.khanacademy.org",
+                createdAt: Date(),
+                updatedAt: Date(),
+                tags: [interest.name, "beginner", "guide"],
+                recommendedFor: ["Students"],
+                isFeatured: false
+            ),
+            Resource(
+                title: "Career Paths in \(interest.name)",
+                description: "Explore career opportunities related to \(interest.name).",
+                category: .video,
+                url: "https://www.pbs.org/education",
+                createdAt: Date(),
+                updatedAt: Date(),
+                tags: [interest.name, "career", "exploration"],
+                recommendedFor: ["Students", "Counselors"],
+                isFeatured: false
+            ),
+            Resource(
+                title: "\(interest.name) Interactive Activities",
+                description: "Hands-on activities and projects to deepen understanding of \(interest.name).",
+                category: .interactiveContent,
+                url: "https://www.nationalgeographic.org/education",
+                createdAt: Date(),
+                updatedAt: Date(),
+                tags: [interest.name, "interactive", "activities"],
+                recommendedFor: ["Students", "Teachers"],
+                isFeatured: false
+            )
+        ]
     }
-  }
+}
 
-  private var modelColor: Color {
-    switch plan.model {
-    case .chaseYourSpace:
-      return .blue
-    case .acknowledgeInterests:
-      return .pink
-    case .alignYourMind:
-      return .purple
-    case .directAndCorrect:
-      return .orange
-    case .bullyToBoss:
-      return .red
-    case .meekToProtector:
-      return .green
-    }
-  }
+// MARK: - Supporting Components
 
-  private var progressStatus: String {
-    if plan.progress >= 1.0 {
-      return "Completed"
-    } else if plan.progress >= 0.75 {
-      return "Final Stage"
-    } else if plan.progress >= 0.5 {
-      return "Halfway"
-    } else if plan.progress >= 0.25 {
-      return "Initial Stage"
-    } else {
-      return "Just Started"
-    }
-  }
+struct StudentMiniCard: View {
+    let student: Student
+    let modelColor: Color
 
-  private var trendIcon: String {
-    let trend = engagementTrend()
-    if trend == "Improving" {
-      return "arrow.up.right.circle.fill"
-    } else if trend == "Declining" {
-      return "arrow.down.right.circle.fill"
-    } else {
-      return "arrow.right.circle.fill"
-    }
-  }
+    var body: some View {
+        HStack(spacing: 10) {
+            TMIAvatar(
+                initials: student.initials,
+                color: modelColor,
+                size: 40
+            )
 
-  private var trendColor: Color {
-    let trend = engagementTrend()
-    if trend == "Improving" {
-      return .green
-    } else if trend == "Declining" {
-      return .red
-    } else {
-      return .orange
-    }
-  }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(student.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
 
-  private var chartPeriodText: String {
-    switch selectedChartTimeFrame {
-    case .weekly:
-      return "Past 8 weeks"
-    case .monthly:
-      return "Past 6 months"
-    case .yearly:
-      return "Past 12 months"
+                Text("Grade \(student.grade)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .fill(Color.white.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .strokeBorder(modelColor.opacity(0.3), lineWidth: 1)
+        )
     }
-  }
+}
 
-  // MARK: - Helper Methods
+struct InterestCard: View {
+    let interest: Interest
 
-  private func formattedDate(_ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .medium
-    return formatter.string(from: date)
-  }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: interest.iconName)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(interest.color)
 
-  private func timeAgo(from date: Date) -> String {
-    let calendar = Calendar.current
-    let now = Date()
-    let components = calendar.dateComponents([.day, .hour, .minute], from: date, to: now)
+                Spacer()
 
-    if let day = components.day, day > 0 {
-      return day == 1 ? "Yesterday" : "\(day) days ago"
-    } else if let hour = components.hour, hour > 0 {
-      return "\(hour) hour\(hour == 1 ? "" : "s") ago"
-    } else if let minute = components.minute, minute > 0 {
-      return "\(minute) minute\(minute == 1 ? "" : "s") ago"
-    } else {
-      return "Just now"
-    }
-  }
+                if let firstCategory = interest.category.first {
+                    Text(firstCategory.rawValue.uppercased())
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(interest.color.opacity(0.8))
+                        .tracking(0.5)
+                }
+            }
 
-  private func engagementTrend() -> String {
-    let values = progressData.map { $0.progress }
-    if values.first! < values.last! {
-      return "Improving"
-    } else if values.first! > values.last! {
-      return "Declining"
-    } else {
-      return "Stable"
+            Text(interest.name)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(TMISpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .fill(interest.color.opacity(0.15))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .strokeBorder(interest.color.opacity(0.3), lineWidth: 1)
+        )
     }
-  }
+}
 
-  private var progressData: [ProgressData] {
-    switch selectedChartTimeFrame {
-    case .weekly:
-      return generateWeeklyProgressData()
-    case .monthly:
-      return generateMonthlyProgressData()
-    case .yearly:
-      return generateYearlyProgressData()
+struct TMIPlanResourceCard: View {
+    let interest: Interest
+    let modelColor: Color
+
+    // Mock resources - in production, these would come from a resource service
+    private var mockResources: [(title: String, type: String)] {
+        [
+            ("Exploring \(interest.name): Beginner's Guide", "Article"),
+            ("Career Paths in \(interest.name)", "Video"),
+            ("\(interest.name) Workshop Opportunities", "Activity")
+        ]
     }
-  }
-  
-  // MARK: - Progress Data Generation
-  
-  private func generateWeeklyProgressData() -> [ProgressData] {
-    let startDate = plan.creationDate
-    let weeksElapsed = weeksFromDate(startDate)
-    let currentProgress = plan.progress
-    
-    var data: [ProgressData] = []
-    let maxWeeks = max(8, weeksElapsed + 1)
-    
-    for week in 1...maxWeeks {
-      let _ = Calendar.current.date(byAdding: .weekOfYear, value: week - 1, to: startDate) ?? startDate
-      let _ = week == weeksElapsed + 1
-      let isFuture = week > weeksElapsed + 1
-      
-      let progress = calculateProgressForPeriod(
-        current: currentProgress,
-        totalPeriods: maxWeeks,
-        currentPeriod: week,
-        planStartDate: startDate
-      )
-      
-      let target = Double(week) / Double(maxWeeks)
-      
-      data.append(ProgressData(
-        date: "Week \(week)",
-        progress: isFuture ? target * 0.9 : progress, // Future weeks show projected progress
-        target: target
-      ))
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            // Interest header
+            HStack(spacing: 8) {
+                Image(systemName: interest.iconName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(interest.color)
+
+                Text(interest.name)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Text("\(mockResources.count)")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(interest.color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(interest.color.opacity(0.2))
+                    )
+            }
+
+            // Resources list
+            VStack(spacing: 6) {
+                ForEach(mockResources.indices, id: \.self) { index in
+                    HStack(spacing: 8) {
+                        Image(systemName: resourceIcon(for: mockResources[index].type))
+                            .font(.system(size: 12))
+                            .foregroundColor(modelColor.opacity(0.7))
+                            .frame(width: 20)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(mockResources[index].title)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+
+                            Text(mockResources[index].type)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                }
+            }
+        }
+        .padding(TMISpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+        )
     }
-    
-    return data
-  }
-  
-  private func generateMonthlyProgressData() -> [ProgressData] {
-    let startDate = plan.creationDate
-    let monthsElapsed = monthsFromDate(startDate)
-    let currentProgress = plan.progress
-    
-    let calendar = Calendar.current
-    var data: [ProgressData] = []
-    let maxMonths = max(6, monthsElapsed + 1)
-    
-    for month in 1...maxMonths {
-      let monthDate = calendar.date(byAdding: .month, value: month - 1, to: startDate) ?? startDate
-      let monthName = DateFormatter().shortMonthSymbols[calendar.component(.month, from: monthDate) - 1]
-      let isFuture = month > monthsElapsed + 1
-      
-      let progress = calculateProgressForPeriod(
-        current: currentProgress,
-        totalPeriods: maxMonths,
-        currentPeriod: month,
-        planStartDate: startDate
-      )
-      
-      let target = Double(month) / Double(maxMonths)
-      
-      data.append(ProgressData(
-        date: monthName,
-        progress: isFuture ? target * 0.85 : progress,
-        target: target
-      ))
+
+    private func resourceIcon(for type: String) -> String {
+        switch type {
+        case "Article": return "doc.text"
+        case "Video": return "play.rectangle"
+        case "Activity": return "figure.walk"
+        default: return "link"
+        }
     }
-    
-    return data
-  }
-  
-  private func generateYearlyProgressData() -> [ProgressData] {
-    let startDate = plan.creationDate
-    let quarterStart = Calendar.current.dateInterval(of: .quarter, for: startDate)?.start ?? startDate
-    let quartersElapsed = quartersFromDate(quarterStart)
-    let currentProgress = plan.progress
-    
-    var data: [ProgressData] = []
-    let maxQuarters = 4
-    
-    for quarter in 1...maxQuarters {
-      let isFuture = quarter > quartersElapsed + 1
-      
-      let progress = calculateProgressForPeriod(
-        current: currentProgress,
-        totalPeriods: maxQuarters,
-        currentPeriod: quarter,
-        planStartDate: startDate
-      )
-      
-      let target = Double(quarter) / Double(maxQuarters)
-      
-      data.append(ProgressData(
-        date: "Q\(quarter)",
-        progress: isFuture ? target * 0.8 : progress,
-        target: target
-      ))
+}
+
+// MARK: - AI Generated Resource Card
+
+struct AIGeneratedResourceCard: View {
+    let interest: Interest
+    let resources: [Resource]
+    let modelColor: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            // Interest header
+            HStack(spacing: 8) {
+                Image(systemName: interest.iconName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(interest.color)
+
+                Text(interest.name)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                // AI badge
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 10))
+                    Text("AI")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .foregroundColor(.tmiPrimary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(Color.tmiPrimary.opacity(0.2))
+                )
+
+                Text("\(resources.count)")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(interest.color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(interest.color.opacity(0.2))
+                    )
+            }
+
+            if resources.isEmpty {
+                Text("No resources available")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.5))
+                    .padding(.vertical, 8)
+            } else {
+                // Resources list
+                VStack(spacing: 6) {
+                    ForEach(resources) { resource in
+                        HStack(spacing: 8) {
+                            Image(systemName: resource.category.icon)
+                                .font(.system(size: 12))
+                                .foregroundColor(resource.category.color.opacity(0.8))
+                                .frame(width: 20)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(resource.title)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+
+                                Text(resource.category.rawValue.capitalized)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+
+                            Spacer()
+
+                            // Link indicator
+                            Image(systemName: "arrow.up.forward.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(modelColor.opacity(0.6))
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if let url = URL(string: resource.url) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(TMISpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            interest.color.opacity(0.3),
+                            Color.tmiPrimary.opacity(0.2)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
-    
-    return data
-  }
-  
-  // MARK: - Helper Methods
-  
-  private func calculateProgressForPeriod(current: Double, totalPeriods: Int, currentPeriod: Int, planStartDate: Date) -> Double {
-    let timeBasedProgress = Double(currentPeriod - 1) / Double(totalPeriods - 1)
-    
-    // Factor in engagement score and goal completion
-    let engagementFactor = plan.primaryStudent?.engagementScore ?? 0.5
-    let goalCompletionFactor = calculateGoalCompletionRate()
-    let interestAlignmentFactor = calculateInterestAlignment()
-    
-    // Weighted combination of factors
-    let calculatedProgress = (
-      timeBasedProgress * 0.4 +
-      current * 0.3 +
-      engagementFactor * 0.15 +
-      goalCompletionFactor * 0.1 +
-      interestAlignmentFactor * 0.05
-    )
-    
-    return min(1.0, max(0.0, calculatedProgress))
-  }
-  
-  private func calculateGoalCompletionRate() -> Double {
-    guard !plan.goals.isEmpty else { return 0.5 }
-    let completedGoals = plan.goals.filter { $0.status == .completed }
-    return Double(completedGoals.count) / Double(plan.goals.count)
-  }
-  
-  private func calculateInterestAlignment() -> Double {
-    // Higher alignment score if student has more interests that match the plan
-    let alignmentScore = min(Double(plan.interests.count) / 3.0, 1.0)
-    return alignmentScore
-  }
-  
-  private func weeksFromDate(_ date: Date) -> Int {
-    let calendar = Calendar.current
-    let components = calendar.dateComponents([.weekOfYear], from: date, to: Date())
-    return max(0, components.weekOfYear ?? 0)
-  }
-  
-  private func monthsFromDate(_ date: Date) -> Int {
-    let calendar = Calendar.current
-    let components = calendar.dateComponents([.month], from: date, to: Date())
-    return max(0, components.month ?? 0)
-  }
-  
-  private func quartersFromDate(_ date: Date) -> Int {
-    let monthsElapsed = monthsFromDate(date)
-    return monthsElapsed / 3
-  }
+}
+
+struct StrategyRow: View {
+    let strategy: String
+    let modelColor: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 16))
+                .foregroundColor(modelColor)
+
+            Text(strategy)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer()
+        }
+        .padding(TMISpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.sm)
+                .fill(Color.white.opacity(0.03))
+        )
+    }
+}
+
+struct GoalCard: View {
+    let goal: Goal
+    let modelColor: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(goal.description)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let dueDate = goal.dueDate {
+                        Text("Due: \(formattedDate(dueDate))")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+
+                Spacer()
+
+                StatusBadge(status: goal.status)
+            }
+
+            // Progress bar
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Progress")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+
+                    Spacer()
+
+                    Text("\(Int(goal.progress * 100))%")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(modelColor)
+                }
+
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.1))
+                            .frame(height: 6)
+
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(modelColor)
+                            .frame(width: geometry.size.width * goal.progress, height: 6)
+                    }
+                }
+                .frame(height: 6)
+            }
+        }
+        .padding(TMISpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .strokeBorder(modelColor.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
+}
+
+struct StatusBadge: View {
+    let status: GoalStatus
+
+    private var statusColor: Color {
+        switch status {
+        case .completed: return .tmiSuccess
+        case .inProgress: return .tmiWarning
+        case .notStarted: return .tmiTextSecondary
+        }
+    }
+
+    var body: some View {
+        Text(status.rawValue)
+            .font(.system(size: 11, weight: .bold))
+            .foregroundColor(statusColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(statusColor.opacity(0.2))
+            )
+    }
+}
+
+// MARK: - TMIPlanModel Extension
+
+extension TMIPlanModel {
+    var shortDisplayName: String {
+        switch self {
+        case .chaseYourSpace: return "Chase Your Space"
+        case .acknowledgeInterests: return "Acknowledge Interests"
+        case .alignYourMind: return "Align Your Mind"
+        case .directAndCorrect: return "Direct & Correct"
+        case .bullyToBoss: return "Bully to Boss"
+        case .meekToProtector: return "Meek to Protector"
+        }
+    }
+}
+
+// MARK: - Add Goal View
+
+struct AddGoalView: View {
+    let plan: TMIPlan
+    let onSave: (Goal) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var goalDescription = ""
+    @State private var selectedStatus: GoalStatus = .notStarted
+    @State private var goalProgress: Double = 0.0
+    @State private var hasDueDate = false
+    @State private var dueDate = Date()
+    @State private var notes = ""
+
+    var body: some View {
+        ZStack {
+            TMIBackgroundView(variant: .default)
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 12) {
+                        Image(systemName: "target")
+                            .font(.system(size: 50))
+                            .foregroundColor(modelColor)
+
+                        Text("Add Goal")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+
+                        Text("Set a specific, measurable goal for this TMI plan")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 20)
+
+                    // Goal Description
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Goal Description *")
+                                .font(.headline)
+                                .foregroundColor(.white)
+
+                            TextEditor(text: $goalDescription)
+                                .frame(minHeight: 100)
+                                .scrollContentBackground(.hidden)
+                                .background(Color.white.opacity(0.05))
+                                .foregroundColor(.white)
+                                .font(.system(size: 16))
+                                .cornerRadius(8)
+                                .overlay(
+                                    goalDescription.isEmpty ?
+                                    VStack {
+                                        HStack {
+                                            Text("e.g., Increase on-task behavior to 80% during independent work")
+                                                .foregroundColor(.white.opacity(0.5))
+                                                .font(.system(size: 16))
+                                                .allowsHitTesting(false)
+                                            Spacer()
+                                        }
+                                        Spacer()
+                                    }
+                                    .padding(.top, 8)
+                                    .padding(.leading, 5)
+                                    : nil
+                                )
+                        }
+                    }
+
+                    // Status
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Status")
+                                .font(.headline)
+                                .foregroundColor(.white)
+
+                            HStack(spacing: 12) {
+                                ForEach(GoalStatus.allCases, id: \.self) { status in
+                                    Button(action: {
+                                        selectedStatus = status
+                                    }) {
+                                        Text(status.rawValue)
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(selectedStatus == status ? .white : .white.opacity(0.7))
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 10)
+                                            .background(
+                                                Capsule()
+                                                    .fill(selectedStatus == status ? modelColor.opacity(0.3) : Color.white.opacity(0.1))
+                                            )
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(selectedStatus == status ? modelColor : Color.white.opacity(0.2), lineWidth: 1)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+
+                    // Due Date
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Toggle(isOn: $hasDueDate) {
+                                Text("Set Due Date")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                            }
+                            .tint(modelColor)
+
+                            if hasDueDate {
+                                DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
+                                    .foregroundColor(.white)
+                                    .tint(modelColor)
+                            }
+                        }
+                    }
+
+                    // Notes
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Notes (Optional)")
+                                .font(.headline)
+                                .foregroundColor(.white)
+
+                            TextEditor(text: $notes)
+                                .frame(minHeight: 80)
+                                .scrollContentBackground(.hidden)
+                                .background(Color.white.opacity(0.05))
+                                .foregroundColor(.white)
+                                .font(.system(size: 15))
+                                .cornerRadius(8)
+                        }
+                    }
+                }
+                .padding(20)
+                .padding(.bottom, 100)
+            }
+
+            // Save button
+            VStack {
+                Spacer()
+
+                TMIButton(
+                    text: "Save Goal",
+                    style: .primary,
+                    action: saveGoal
+                )
+                .disabled(goalDescription.isEmpty)
+                .padding(20)
+                .background(
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.5)
+                        .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: -5)
+                )
+            }
+        }
+        .navigationTitle("Add Goal")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .foregroundColor(.white)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var modelColor: Color {
+        switch plan.model {
+        case .chaseYourSpace: return .blue
+        case .acknowledgeInterests: return .pink
+        case .alignYourMind: return .purple
+        case .directAndCorrect: return .orange
+        case .bullyToBoss: return .red
+        case .meekToProtector: return .green
+        }
+    }
+
+    private func saveGoal() {
+        let newGoal = Goal(
+            description: goalDescription,
+            dueDate: hasDueDate ? dueDate : nil,
+            status: selectedStatus,
+            progress: goalProgress,
+            notes: notes.isEmpty ? nil : notes
+        )
+
+        onSave(newGoal)
+        // Parent view will dismiss after async save completes
+    }
+}
+
+// MARK: - Edit Goal View
+
+struct EditGoalView: View {
+    let plan: TMIPlan
+    let goal: Goal
+    let onSave: (Goal) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var goalDescription: String
+    @State private var selectedStatus: GoalStatus
+    @State private var goalProgress: Double
+    @State private var hasDueDate: Bool
+    @State private var dueDate: Date
+    @State private var notes: String
+
+    init(plan: TMIPlan, goal: Goal, onSave: @escaping (Goal) -> Void) {
+        self.plan = plan
+        self.goal = goal
+        self.onSave = onSave
+        _goalDescription = State(initialValue: goal.description)
+        _selectedStatus = State(initialValue: goal.status)
+        _goalProgress = State(initialValue: goal.progress)
+        _hasDueDate = State(initialValue: goal.dueDate != nil)
+        _dueDate = State(initialValue: goal.dueDate ?? Date())
+        _notes = State(initialValue: goal.notes ?? "")
+    }
+
+    var body: some View {
+        ZStack {
+            TMIBackgroundView(variant: .default)
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 12) {
+                        Image(systemName: "pencil.circle.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(modelColor)
+
+                        Text("Edit Goal")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+
+                        Text("Update goal details and track progress")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 20)
+
+                    // Goal Description
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Goal Description *")
+                                .font(.headline)
+                                .foregroundColor(.white)
+
+                            TextEditor(text: $goalDescription)
+                                .frame(minHeight: 100)
+                                .scrollContentBackground(.hidden)
+                                .background(Color.white.opacity(0.05))
+                                .foregroundColor(.white)
+                                .font(.system(size: 16))
+                                .cornerRadius(8)
+                        }
+                    }
+
+                    // Status
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Status")
+                                .font(.headline)
+                                .foregroundColor(.white)
+
+                            HStack(spacing: 12) {
+                                ForEach(GoalStatus.allCases, id: \.self) { status in
+                                    Button(action: {
+                                        selectedStatus = status
+                                        // Auto-update progress based on status
+                                        if status == .notStarted {
+                                            goalProgress = 0.0
+                                        } else if status == .completed {
+                                            goalProgress = 1.0
+                                        }
+                                    }) {
+                                        Text(status.rawValue)
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(selectedStatus == status ? .white : .white.opacity(0.7))
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 10)
+                                            .background(
+                                                Capsule()
+                                                    .fill(selectedStatus == status ? modelColor.opacity(0.3) : Color.white.opacity(0.1))
+                                            )
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(selectedStatus == status ? modelColor : Color.white.opacity(0.2), lineWidth: 1)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+
+                    // Progress
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Text("Progress")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+
+                                Spacer()
+
+                                Text("\(Int(goalProgress * 100))%")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(modelColor)
+                            }
+
+                            Slider(value: $goalProgress, in: 0...1)
+                                .tint(modelColor)
+                        }
+                    }
+
+                    // Due Date
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Toggle(isOn: $hasDueDate) {
+                                Text("Set Due Date")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                            }
+                            .tint(modelColor)
+
+                            if hasDueDate {
+                                DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
+                                    .foregroundColor(.white)
+                                    .tint(modelColor)
+                            }
+                        }
+                    }
+
+                    // Notes
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Notes (Optional)")
+                                .font(.headline)
+                                .foregroundColor(.white)
+
+                            TextEditor(text: $notes)
+                                .frame(minHeight: 80)
+                                .scrollContentBackground(.hidden)
+                                .background(Color.white.opacity(0.05))
+                                .foregroundColor(.white)
+                                .font(.system(size: 15))
+                                .cornerRadius(8)
+                        }
+                    }
+                }
+                .padding(20)
+                .padding(.bottom, 100)
+            }
+
+            // Save button
+            VStack {
+                Spacer()
+
+                HStack(spacing: 16) {
+                    TMIButton(
+                        text: "Delete Goal",
+                        style: .destructive,
+                        action: {
+                            // TODO: Implement delete functionality
+                            dismiss()
+                        }
+                    )
+
+                    TMIButton(
+                        text: "Save Changes",
+                        style: .primary,
+                        action: saveGoal
+                    )
+                    .disabled(goalDescription.isEmpty)
+                }
+                .padding(20)
+                .background(
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.5)
+                        .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: -5)
+                )
+            }
+        }
+        .navigationTitle("Edit Goal")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .foregroundColor(.white)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var modelColor: Color {
+        switch plan.model {
+        case .chaseYourSpace: return .blue
+        case .acknowledgeInterests: return .pink
+        case .alignYourMind: return .purple
+        case .directAndCorrect: return .orange
+        case .bullyToBoss: return .red
+        case .meekToProtector: return .green
+        }
+    }
+
+    private func saveGoal() {
+        let updatedGoal = Goal(
+            id: goal.id,
+            description: goalDescription,
+            dueDate: hasDueDate ? dueDate : nil,
+            status: selectedStatus,
+            progress: goalProgress,
+            notes: notes.isEmpty ? nil : notes
+        )
+
+        onSave(updatedGoal)
+        // Parent view will dismiss after async save completes
+    }
+}
+
+// MARK: - Interest Survey View
+
+struct InterestSurveyView: View {
+    let plan: TMIPlan
+    let onComplete: ([Interest]) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var currentPage = 0
+    @State private var selectedInterests: Set<Interest> = []
+    @State private var careerGoal = ""
+    @State private var favoriteSubjects: Set<String> = []
+    @State private var activities: Set<String> = []
+
+    // Survey pages
+    private let totalPages = 4
+
+    var body: some View {
+        ZStack {
+            TMIBackgroundView(variant: .default)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // Progress bar
+                progressBar
+
+                // Content
+                TabView(selection: $currentPage) {
+                    welcomePage.tag(0)
+                    interestsPage.tag(1)
+                    careerPage.tag(2)
+                    reviewPage.tag(3)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .animation(.easeInOut, value: currentPage)
+
+                // Navigation buttons
+                navigationButtons
+            }
+        }
+        .navigationTitle("Interest Survey")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .foregroundColor(.white)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    // MARK: - Progress Bar
+
+    private var progressBar: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 4) {
+                ForEach(0..<totalPages, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(index <= currentPage ? Color.tmiPrimary : Color.white.opacity(0.3))
+                        .frame(height: 4)
+                }
+            }
+            .padding(.horizontal, 20)
+
+            Text("Step \(currentPage + 1) of \(totalPages)")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
+
+    // MARK: - Welcome Page
+
+    private var welcomePage: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                VStack(spacing: 16) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 60))
+                        .foregroundColor(.tmiPrimary)
+
+                    Text("Let's Discover Your Interests!")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+
+                    Text("This survey helps us understand what you love and create a personalized plan for \(plan.primaryStudent?.name ?? "you").")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                }
+                .padding(.top, 40)
+
+                TMIGlassCard(style: .default) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("What to Expect")
+                            .font(.headline)
+                            .foregroundColor(.white)
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            InfoRow(icon: "clock", text: "Takes 10-15 minutes", color: .tmiPrimary)
+                            InfoRow(icon: "list.bullet", text: "4 simple sections", color: .tmiPrimary)
+                            InfoRow(icon: "hand.raised", text: "No wrong answers!", color: .tmiPrimary)
+                            InfoRow(icon: "lock.shield", text: "Your info stays private", color: .tmiPrimary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+            .padding(.bottom, 100)
+        }
+    }
+
+    // MARK: - Interests Page
+
+    private var interestsPage: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                VStack(spacing: 12) {
+                    Text("What Do You Love?")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+
+                    Text("Select all the interests and hobbies that excite you")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 20)
+
+                // Group interests by category
+                ForEach(InterestCategory.allCases.filter { $0 != .other }, id: \.self) { category in
+                    interestCategorySection(category)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 100)
+        }
+    }
+
+    private func interestCategorySection(_ category: InterestCategory) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: category.iconName)
+                    .foregroundColor(category.color)
+                Text(category.rawValue)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: 12) {
+                ForEach(PredefinedInterestsData.allPredefinedInterests.filter { $0.category.contains(category) }.prefix(6)) { interest in
+                    Button(action: {
+                        if selectedInterests.contains(interest) {
+                            selectedInterests.remove(interest)
+                        } else {
+                            selectedInterests.insert(interest)
+                        }
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: interest.iconName)
+                                .font(.system(size: 14))
+                                .foregroundColor(interest.color)
+
+                            Text(interest.name)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+
+                            Spacer()
+
+                            if selectedInterests.contains(interest) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.tmiSuccess)
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(selectedInterests.contains(interest) ? interest.color.opacity(0.2) : Color.white.opacity(0.05))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(selectedInterests.contains(interest) ? interest.color.opacity(0.5) : Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Career Page
+
+    private var careerPage: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                VStack(spacing: 12) {
+                    Text("What's Your Dream?")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+
+                    Text("Tell us about what you want to be when you grow up")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 20)
+
+                TMIGlassCard(style: .default) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Career Goal")
+                            .font(.headline)
+                            .foregroundColor(.white)
+
+                        TextEditor(text: $careerGoal)
+                            .frame(minHeight: 100)
+                            .scrollContentBackground(.hidden)
+                            .background(Color.white.opacity(0.05))
+                            .foregroundColor(.white)
+                            .font(.system(size: 16))
+                            .cornerRadius(8)
+                            .overlay(
+                                careerGoal.isEmpty ?
+                                VStack {
+                                    HStack {
+                                        Text("e.g., Doctor, Artist, Engineer, Teacher...")
+                                            .foregroundColor(.white.opacity(0.5))
+                                            .font(.system(size: 16))
+                                            .allowsHitTesting(false)
+                                        Spacer()
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                : nil
+                            )
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+            .padding(.bottom, 100)
+        }
+    }
+
+    // MARK: - Review Page
+
+    private var reviewPage: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                VStack(spacing: 12) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.tmiSuccess)
+
+                    Text("Review Your Answers")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+
+                    Text("Everything look good? You can always update later!")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 20)
+
+                TMIGlassCard(style: .default) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Selected Interests")
+                            .font(.headline)
+                            .foregroundColor(.white)
+
+                        if selectedInterests.isEmpty {
+                            Text("No interests selected yet")
+                                .foregroundColor(.white.opacity(0.6))
+                        } else {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 8) {
+                                ForEach(Array(selectedInterests), id: \.id) { interest in
+                                    HStack(spacing: 6) {
+                                        Image(systemName: interest.iconName)
+                                            .font(.system(size: 12))
+                                        Text(interest.name)
+                                            .font(.system(size: 13))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule()
+                                            .fill(interest.color.opacity(0.2))
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+
+                if !careerGoal.isEmpty {
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Career Goal")
+                                .font(.headline)
+                                .foregroundColor(.white)
+
+                            Text(careerGoal)
+                                .foregroundColor(.white.opacity(0.9))
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+            .padding(.bottom, 100)
+        }
+    }
+
+    // MARK: - Navigation Buttons
+
+    private var navigationButtons: some View {
+        HStack(spacing: 16) {
+            if currentPage > 0 {
+                TMIButton(
+                    text: "Back",
+                    icon: "chevron.left",
+                    style: .secondary,
+                    action: { currentPage -= 1 }
+                )
+            }
+
+            Spacer()
+
+            if currentPage < totalPages - 1 {
+                TMIButton(
+                    text: "Next",
+                    icon: "chevron.right",
+                    style: .primary,
+                    action: { currentPage += 1 }
+                )
+            } else {
+                TMIButton(
+                    text: "Complete Survey",
+                    icon: "checkmark",
+                    style: .primary,
+                    action: completeSurvey
+                )
+                .disabled(selectedInterests.isEmpty)
+            }
+        }
+        .padding(20)
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .opacity(0.5)
+                .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: -5)
+        )
+    }
+
+    private func completeSurvey() {
+        onComplete(Array(selectedInterests))
+        dismiss()
+    }
 }
 
 // MARK: - Supporting Views
 
-struct DetailSection<Content: View>: View {
-  var title: String
-  @ViewBuilder var content: () -> Content
+struct InfoRow: View {
+    let icon: String
+    let text: String
+    let color: Color
 
-  var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      Text(title)
-        .font(.system(size: 18, weight: .semibold))
-        .foregroundColor(.white)
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundColor(color)
+                .frame(width: 24)
 
-      content()
-        .padding(16)
-        .background(
-          RoundedRectangle(cornerRadius: 16)
-            .fill(Color.white.opacity(0.03))
-            .background(
-              RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .opacity(0.3)
-            )
-        )
-        .overlay(
-          RoundedRectangle(cornerRadius: 16)
-            .stroke(
-              LinearGradient(
-                colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              ),
-              lineWidth: 1
-            )
-        )
-    }
-  }
-}
-
-struct DetailStat: View {
-  var title: String
-  var value: String
-  var icon: String
-  var color: Color
-
-  @State private var isHovered = false
-  @State private var hasAppeared = false
-
-  var body: some View {
-    VStack(spacing: 12) {
-      ZStack {
-        Circle()
-          .fill(color.opacity(0.2))
-          .frame(width: 48, height: 48)
-          .scaleEffect(isHovered ? 1.15 : 1.0)
-          .blur(radius: isHovered ? 4 : 0)
-
-        Image(systemName: icon)
-          .font(.system(size: 20, weight: .medium))
-          .foregroundColor(color)
-          .symbolEffect(.bounce, options: .speed(0.5), value: isHovered)
-      }
-
-      Text(value)
-        .font(.system(size: 16, weight: .bold, design: .rounded))
-        .foregroundColor(.white)
-        .multilineTextAlignment(.center)
-        .lineLimit(1)
-        .minimumScaleFactor(0.8)
-
-      Text(title)
-        .font(.system(size: 12, weight: .medium))
-        .foregroundColor(.white.opacity(0.7))
-        .multilineTextAlignment(.center)
-        .lineLimit(1)
-        .minimumScaleFactor(0.8)
-    }
-    .frame(maxWidth: .infinity)
-    .padding(.vertical, 16)
-    .background(
-      RoundedRectangle(cornerRadius: 16)
-        .fill(Color.white.opacity(0.05))
-        .background(
-          RoundedRectangle(cornerRadius: 16)
-            .fill(.ultraThinMaterial)
-            .opacity(0.3)
-        )
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 16)
-        .stroke(
-          isHovered
-            ? LinearGradient(
-                colors: [color.opacity(0.4), color.opacity(0.2)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              )
-            : LinearGradient(
-                colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              ),
-          lineWidth: isHovered ? 1.5 : 1
-        )
-    )
-    .scaleEffect(isHovered ? 1.05 : 1.0)
-    .shadow(
-      color: isHovered ? color.opacity(0.3) : Color.clear,
-      radius: isHovered ? 12 : 0,
-      y: isHovered ? 4 : 0
-    )
-    .scaleEffect(hasAppeared ? 1.0 : 0.8)
-    .opacity(hasAppeared ? 1.0 : 0)
-    .onAppear {
-      withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
-        hasAppeared = true
-      }
-    }
-    .onHover { hovering in
-      withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-        isHovered = hovering
-      }
-    }
-  }
-}
-
-struct DetailRow: View {
-  var icon: String
-  var title: String
-  var value: String
-  var valueColor: Color = .white
-
-  var body: some View {
-    HStack(spacing: 12) {
-      Image(systemName: icon)
-        .font(.system(size: 16))
-        .foregroundColor(valueColor)
-        .frame(width: 24)
-
-      Text(title)
-        .font(.system(size: 15))
-        .foregroundColor(.white.opacity(0.8))
-
-      Spacer()
-
-      Text(value)
-        .font(.system(size: 15, weight: .medium))
-        .foregroundColor(valueColor)
-    }
-  }
-}
-
-struct StudentDetailCard: View {
-  var student: Student
-
-  @State private var isHovered = false
-
-  var body: some View {
-    VStack(spacing: 12) {
-      // Avatar
-      ZStack {
-        Circle()
-          .fill(
-            LinearGradient(
-              colors: [
-                student.avatarColor == .blue
-                  ? Color.blue
-                  : student.avatarColor == .green
-                    ? Color.green
-                    : student.avatarColor == .orange
-                      ? Color.orange
-                      : student.avatarColor == .purple
-                        ? Color.purple
-                        : student.avatarColor == .teal
-                          ? Color.teal : student.avatarColor == .pink ? Color.pink : Color.indigo,
-                Color.black.opacity(0.2),
-              ],
-              startPoint: .top,
-              endPoint: .bottom
-            )
-          )
-          .frame(width: 60, height: 60)
-
-        Text(student.initials)
-          .font(.system(size: 24, weight: .bold))
-          .foregroundColor(.white)
-      }
-
-      // Name & details
-      VStack(spacing: 4) {
-        Text(student.name)
-          .font(.system(size: 15, weight: .semibold))
-          .foregroundColor(.white)
-
-        Text("Grade \(student.grade)")
-          .font(.system(size: 12))
-          .foregroundColor(.white.opacity(0.7))
-      }
-
-      // Engagement badge
-      HStack(spacing: 4) {
-        Circle()
-          .fill(engagementColor)
-          .frame(width: 8, height: 8)
-
-        Text("\(Int(student.engagementScore * 100))% Engaged")
-          .font(.system(size: 12))
-          .foregroundColor(.white.opacity(0.9))
-      }
-    }
-    .padding(.vertical, 16)
-    .padding(.horizontal, 14)
-    .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(Color.white.opacity(0.05))
-        .background(
-          RoundedRectangle(cornerRadius: 12)
-            .fill(.ultraThinMaterial)
-            .opacity(0.3)
-        )
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 12)
-        .stroke(
-          LinearGradient(
-            colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          ),
-          lineWidth: 1
-        )
-    )
-    .scaleEffect(isHovered ? 1.03 : 1.0)
-    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-    .onHover { hovering in
-      isHovered = hovering
-    }
-  }
-
-  private var engagementColor: Color {
-    if student.engagementScore >= 0.7 {
-      return .green
-    } else if student.engagementScore >= 0.4 {
-      return .orange
-    } else {
-      return .red
-    }
-  }
-}
-
-struct InterestTag: View {
-  var interest: Interest
-
-  var body: some View {
-    HStack(spacing: 6) {
-      Image(systemName: interest.iconName)
-        .font(.system(size: 12))
-        .foregroundColor(interest.color)
-
-      Text(interest.name)
-        .font(.system(size: 13))
-        .foregroundColor(.white)
-    }
-    .padding(.horizontal, 10)
-    .padding(.vertical, 6)
-    .background(
-      Capsule()
-        .fill(interest.color.opacity(0.15))
-    )
-    .overlay(
-      Capsule()
-        .stroke(interest.color.opacity(0.3), lineWidth: 1)
-    )
-  }
-}
-
-// Note: HobbyTag removed - hobbies are now handled through InterestTag
-
-struct WrapView<T: Identifiable, Content: View>: View {
-  let items: [T]
-  let content: (T) -> Content
-
-  @State private var totalHeight: CGFloat = .zero
-
-  var body: some View {
-    GeometryReader { geometry in
-      generateContent(in: geometry)
-    }
-    .frame(height: totalHeight)
-  }
-
-  private func generateContent(in geometry: GeometryProxy) -> some View {
-    var width = CGFloat.zero
-    var height = CGFloat.zero
-
-    return ZStack(alignment: .topLeading) {
-      ForEach(items) { item in
-        content(item)
-          .padding(.trailing, 8)
-          .padding(.bottom, 8)
-          .alignmentGuide(.leading) { dimension in
-            if abs(width - dimension.width) > geometry.size.width {
-              width = 0
-              height -= dimension.height
-            }
-            let result = width
-            if item.id == items.last?.id {
-              width = 0
-            } else {
-              width -= dimension.width
-            }
-            return result
-          }
-          .alignmentGuide(.top) { _ in
-            let result = height
-            if item.id == items.last?.id {
-              height = 0
-            }
-            return result
-          }
-      }
-    }
-    .background(
-      GeometryReader { geometry in
-        Color.clear.onAppear {
-          totalHeight = geometry.size.height
+            Text(text)
+                .font(.system(size: 15))
+                .foregroundColor(.white.opacity(0.9))
         }
-      }
-    )
-  }
-}
-
-struct GoalCard: View {
-  var goal: Goal
-
-  @State private var isHovered = false
-
-  // Helper computed property to check completion status
-  private var isCompleted: Bool {
-    return goal.status == .completed
-  }
-
-  private var accentColor: Color {
-    isCompleted ? .green : .orange
-  }
-
-  var body: some View {
-    let cardContent = VStack(alignment: .leading, spacing: 12) {
-      goalHeaderView
-
-      // Description
-      if !goal.description.isEmpty {
-        Text(goal.description)
-          .font(.system(size: 14))
-          .foregroundColor(.white.opacity(0.8))
-          .lineLimit(3)
-      }
     }
-    .padding(16)
-
-    let backgroundShape = RoundedRectangle(cornerRadius: 14)
-      .fill(
-        isHovered
-          ? accentColor.opacity(0.08)
-          : Color.white.opacity(0.05)
-      )
-      .background(
-        RoundedRectangle(cornerRadius: 14)
-          .fill(.ultraThinMaterial)
-          .opacity(0.3)
-      )
-
-    let overlayGradient =
-      isHovered
-      ? LinearGradient(
-          colors: [accentColor.opacity(0.5), accentColor.opacity(0.2)],
-          startPoint: .topLeading,
-          endPoint: .bottomTrailing
-        )
-      : LinearGradient(
-          colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-          startPoint: .topLeading,
-          endPoint: .bottomTrailing
-        )
-
-    return
-      cardContent
-      .background(backgroundShape)
-      .overlay(
-        RoundedRectangle(cornerRadius: 14)
-          .stroke(overlayGradient, lineWidth: isHovered ? 1.5 : 1)
-      )
-      .scaleEffect(isHovered ? 1.02 : 1.0)
-      .shadow(
-        color: isHovered ? accentColor.opacity(0.2) : Color.clear,
-        radius: isHovered ? 10 : 0,
-        y: isHovered ? 4 : 0
-      )
-      .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-      .onHover { hovering in
-        isHovered = hovering
-      }
-  }
-
-  private var goalHeaderView: some View {
-    HStack {
-      VStack(alignment: .leading, spacing: 4) {
-        Text(goal.description)
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundColor(.white)
-
-        if let dueDate = goal.dueDate {
-          Text(formattedDate(dueDate))
-            .font(.system(size: 12))
-            .foregroundColor(.white.opacity(0.6))
-        }
-      }
-
-      Spacer()
-
-      completionBadge
-    }
-  }
-
-  private var completionBadge: some View {
-    Text(goal.status.rawValue)
-      .font(.system(size: 12, weight: .medium))
-      .foregroundColor(isCompleted ? .green : .orange)
-      .padding(.horizontal, 10)
-      .padding(.vertical, 4)
-      .background(
-        Capsule()
-          .fill(isCompleted ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
-      )
-  }
-
-  private func formattedDate(_ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .medium
-    return "Due: \(formatter.string(from: date))"
-  }
-}
-
-struct TMIGoal: Identifiable {
-  let id = UUID()
-  let title: String
-  let description: String
-  let dueDate: Date
-  let isCompleted: Bool
 }
 
 // MARK: - Preview
 
 #Preview {
-  TMIPlanDetailView(plan: TMIPlan.samplePlan)
+    NavigationStack {
+        TMIPlanDetailView(plan: TMIPlan.samplePlan)
+    }
 }
 
 // MARK: - Edit TMI Plan View
 
 struct EditTMIPlanView: View {
-  let plan: TMIPlan
-  let onPlanUpdated: (TMIPlan) -> Void
-  @Environment(\.dismiss) private var dismiss
-  
-  @State private var notes: String
-  @State private var selectedInterests: [Interest]
-  // Note: Hobbies are now included in interests
-  @State private var isUpdating = false
-  
-  init(plan: TMIPlan, onPlanUpdated: @escaping (TMIPlan) -> Void) {
-    self.plan = plan
-    self.onPlanUpdated = onPlanUpdated
-    _notes = State(initialValue: plan.notes)
-    _selectedInterests = State(initialValue: plan.interests)
-    // Note: Hobbies initialization removed - now handled through interests
-  }
-  
-  var body: some View {
-    ZStack {
-        TMIBackgroundView(variant: .default)
-          .ignoresSafeArea()
-        
-        ScrollView {
-          VStack(spacing: 24) {
-            // Header
-            VStack(spacing: 8) {
-              Image(systemName: "pencil.circle.fill")
-                .font(.system(size: 50))
-                .foregroundColor(.tmiSecondary)
-              
-              Text("Edit TMI Plan")
-                .font(.system(size: 24, weight: .bold))
+    let plan: TMIPlan
+    let onPlanUpdated: (TMIPlan) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var notes: String
+    @State private var selectedInterests: [Interest]
+    @State private var isUpdating = false
+
+    init(plan: TMIPlan, onPlanUpdated: @escaping (TMIPlan) -> Void) {
+        self.plan = plan
+        self.onPlanUpdated = onPlanUpdated
+        _notes = State(initialValue: plan.notes)
+        _selectedInterests = State(initialValue: plan.interests)
+    }
+
+    var body: some View {
+        ZStack {
+            TMIBackgroundView(variant: .default)
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Image(systemName: "pencil.circle.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.tmiSecondary)
+
+                        Text("Edit TMI Plan")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+
+                        Text("Update the plan details")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    .padding(.top, 20)
+
+                    // Plan Info (Read-only)
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Plan Information")
+                                .font(.title3.weight(.semibold))
+                                .foregroundColor(.white)
+
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("Model:")
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Text(plan.model.rawValue)
+                                        .foregroundColor(.white)
+                                        .fontWeight(.medium)
+                                }
+
+                                HStack {
+                                    Text("Primary Student:")
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Text(plan.primaryStudent?.name ?? "No student assigned")
+                                        .foregroundColor(.white)
+                                        .fontWeight(.medium)
+                                }
+
+                                HStack {
+                                    Text("Progress:")
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Text("\(plan.progressPercentage)%")
+                                        .foregroundColor(.tmiSecondary)
+                                        .fontWeight(.medium)
+                                }
+                            }
+                        }
+                    }
+
+                    // Notes Section
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Notes")
+                                .font(.title3.weight(.semibold))
+                                .foregroundColor(.white)
+
+                            TextEditor(text: $notes)
+                                .frame(minHeight: 100)
+                                .scrollContentBackground(.hidden)
+                                .background(Color.clear)
+                                .foregroundColor(.white)
+                                .font(.system(size: 16))
+                        }
+                    }
+
+                    // Interests Section
+                    TMIGlassCard(style: .default) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Associated Interests")
+                                .font(.title3.weight(.semibold))
+                                .foregroundColor(.white)
+
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 12) {
+                                ForEach(Interest.expandedSampleInterests) { interest in
+                                    InterestToggleCard(
+                                        interest: interest,
+                                        isSelected: selectedInterests.contains(interest),
+                                        onToggle: { toggleInterest(interest) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(20)
+            }
+        }
+        .navigationTitle("Edit Plan")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    dismiss()
+                }
                 .foregroundColor(.white)
-              
-              Text("Update the plan details")
-                .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.7))
             }
-            .padding(.top, 20)
-            
-            // Plan Info (Read-only)
-            TMIGlassCard(style: .default) {
-              VStack(alignment: .leading, spacing: 16) {
-                Text("Plan Information")
-                  .font(.title3.weight(.semibold))
-                  .foregroundColor(.white)
-                
-                VStack(alignment: .leading, spacing: 12) {
-                  HStack {
-                    Text("Model:")
-                      .foregroundColor(.white.opacity(0.7))
-                    Text(plan.model.rawValue)
-                      .foregroundColor(.white)
-                      .fontWeight(.medium)
-                  }
-                  
-                  HStack {
-                    Text("Primary Student:")
-                      .foregroundColor(.white.opacity(0.7))
-                    Text(plan.primaryStudent?.name ?? "No student assigned")
-                      .foregroundColor(.white)
-                      .fontWeight(.medium)
-                  }
-                  
-                  HStack {
-                    Text("Progress:")
-                      .foregroundColor(.white.opacity(0.7))
-                    Text("\(Int(plan.progress * 100))%")
-                      .foregroundColor(.tmiSecondary)
-                      .fontWeight(.medium)
-                  }
+
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Save") {
+                    updatePlan()
                 }
-              }
+                .foregroundColor(.tmiSecondary)
+                .disabled(isUpdating)
             }
-            
-            // Notes Section
-            TMIGlassCard(style: .default) {
-              VStack(alignment: .leading, spacing: 16) {
-                Text("Notes")
-                  .font(.title3.weight(.semibold))
-                  .foregroundColor(.white)
-                
-                TextEditor(text: $notes)
-                  .frame(minHeight: 100)
-                  .scrollContentBackground(.hidden)
-                  .background(Color.clear)
-                  .foregroundColor(.white)
-                  .font(.system(size: 16))
-              }
-            }
-            
-            // Interests Section
-            TMIGlassCard(style: .default) {
-              VStack(alignment: .leading, spacing: 16) {
-                Text("Associated Interests")
-                  .font(.title3.weight(.semibold))
-                  .foregroundColor(.white)
-                
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 12) {
-                  ForEach(Interest.expandedSampleInterests) { interest in
-                    InterestToggleCard(
-                      interest: interest,
-                      isSelected: selectedInterests.contains(interest),
-                      onToggle: { toggleInterest(interest) }
-                    )
-                  }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func toggleInterest(_ interest: Interest) {
+        if selectedInterests.contains(interest) {
+            selectedInterests.removeAll { $0.id == interest.id }
+        } else {
+            selectedInterests.append(interest)
+        }
+    }
+
+    private func updatePlan() {
+        isUpdating = true
+
+        Task {
+            do {
+                var updatedPlan = plan
+                updatedPlan.notes = notes
+                updatedPlan.interests = selectedInterests
+                updatedPlan.lastUpdated = Date()
+
+                let savedPlan = try await TMIPlanService().updatePlan(updatedPlan)
+
+                await MainActor.run {
+                    onPlanUpdated(savedPlan) // Pass the saved plan from Firestore
+                    dismiss()
                 }
-              }
+            } catch {
+                print("Error updating TMI plan: \(error)")
             }
-            
-            // Note: Hobbies section removed - now handled through interests above
-          }
-          .padding(20)
+
+            await MainActor.run {
+                isUpdating = false
+            }
         }
-      }
-      .navigationTitle("Edit Plan")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .navigationBarLeading) {
-          Button("Cancel") {
-            dismiss()
-          }
-          .foregroundColor(.white)
-        }
-        
-        ToolbarItem(placement: .navigationBarTrailing) {
-          Button("Save") {
-            updatePlan()
-          }
-          .foregroundColor(.tmiSecondary)
-          .disabled(isUpdating)
-        }
-      }
-      .preferredColorScheme(.dark)
     }
-  
-  private func toggleInterest(_ interest: Interest) {
-    if selectedInterests.contains(interest) {
-      selectedInterests.removeAll { $0.id == interest.id }
-    } else {
-      selectedInterests.append(interest)
-    }
-  }
-  
-  // Note: toggleHobby function removed - hobbies now handled through interests
-  
-  private func updatePlan() {
-    isUpdating = true
-    
-    Task {
-      do {
-        var updatedPlan = plan
-        updatedPlan.notes = notes
-        updatedPlan.interests = selectedInterests
-        // Note: Hobbies are now included in interests
-        updatedPlan.lastUpdated = Date()
-        
-        _ = try await TMIPlanService().updatePlan(updatedPlan)
-        
-        await MainActor.run {
-          onPlanUpdated(updatedPlan)
-          dismiss()
-        }
-      } catch {
-        print("Error updating TMI plan: \(error)")
-      }
-      
-      await MainActor.run {
-        isUpdating = false
-      }
-    }
-  }
 }
 
 // MARK: - Supporting Views for Edit
 
 struct InterestToggleCard: View {
-  let interest: Interest
-  let isSelected: Bool
-  let onToggle: () -> Void
-  
-  var body: some View {
-    Button(action: onToggle) {
-      HStack(spacing: 8) {
-        Image(systemName: interest.iconName)
-          .font(.system(size: 14))
-          .foregroundColor(interest.color)
-        
-        Text(interest.name)
-          .font(.system(size: 13, weight: .medium))
-          .foregroundColor(.white)
-          .lineLimit(1)
-      }
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
-      .background(
-        RoundedRectangle(cornerRadius: 8)
-          .fill(isSelected ? interest.color.opacity(0.2) : Color.white.opacity(0.05))
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(
-            isSelected ? interest.color.opacity(0.5) : Color.white.opacity(0.2),
-            lineWidth: 1
-          )
-      )
+    let interest: Interest
+    let isSelected: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 8) {
+                Image(systemName: interest.iconName)
+                    .font(.system(size: 14))
+                    .foregroundColor(interest.color)
+
+                Text(interest.name)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? interest.color.opacity(0.2) : Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        isSelected ? interest.color.opacity(0.5) : Color.white.opacity(0.2),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
     }
-    .buttonStyle(.plain)
-  }
 }
 
-// Note: HobbyToggleCard removed - hobbies now handled through InterestToggleCard
+// MARK: - All Resources View
 
+struct AllResourcesView: View {
+    let interests: [Interest]
+    let generatedResources: [Interest: [Resource]]
+    let modelColor: Color
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: TMISpacing.lg) {
+                ForEach(interests) { interest in
+                    AIGeneratedResourceCard(
+                        interest: interest,
+                        resources: generatedResources[interest] ?? [],
+                        modelColor: modelColor
+                    )
+                }
+            }
+            .padding(TMISpacing.screenPadding)
+        }
+        .background(Color.tmiBackground)
+        .navigationTitle("All Resources")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}

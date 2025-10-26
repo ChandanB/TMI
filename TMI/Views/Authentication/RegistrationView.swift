@@ -7,6 +7,8 @@ struct RegistrationView: View {
   @State private var email = ""
   @State private var password = ""
   @State private var confirmPassword = ""
+  @State private var displayName = ""
+  @State private var selectedRole: UserRole = .teacher
   @State private var isRegistering = false
   @State private var errorMessage: String?
 
@@ -20,6 +22,7 @@ struct RegistrationView: View {
   @State private var animateButton = false
 
   enum Field: Hashable {
+    case displayName
     case email
     case password
     case confirmPassword
@@ -76,6 +79,24 @@ struct RegistrationView: View {
           // Registration Form - Using unified TMIGlassCard
           TMIGlassCard(style: .auth) {
             VStack(spacing: 24) {
+              // Display Name field
+              TMITextField(
+                icon: "person.fill",
+                placeholder: "Display Name",
+                text: $displayName,
+                onSubmit: {
+                  focusedField = .email
+                }
+              )
+              .focused($focusedField, equals: .displayName)
+              .offset(x: animateFields ? 0 : -30)
+              .opacity(animateFields ? 1.0 : 0)
+              .animation(
+                Animation.spring(response: 0.6, dampingFraction: 0.8)
+                  .delay(0.3),
+                value: animateFields
+              )
+
               // Email field - Using unified TMITextField
               TMITextField(
                 icon: "envelope.fill",
@@ -91,7 +112,7 @@ struct RegistrationView: View {
               .opacity(animateFields ? 1.0 : 0)
               .animation(
                 Animation.spring(response: 0.6, dampingFraction: 0.8)
-                  .delay(0.3),
+                  .delay(0.35),
                 value: animateFields
               )
 
@@ -125,6 +146,28 @@ struct RegistrationView: View {
                 }
               )
               .focused($focusedField, equals: .confirmPassword)
+              .offset(x: animateFields ? 0 : -30)
+              .opacity(animateFields ? 1.0 : 0)
+              .animation(
+                Animation.spring(response: 0.6, dampingFraction: 0.8)
+                  .delay(0.45),
+                value: animateFields
+              )
+
+              // Role Selection
+              VStack(alignment: .leading, spacing: 12) {
+                Text("I am a...")
+                  .font(.system(size: 14, weight: .medium))
+                  .foregroundColor(.white.opacity(0.7))
+
+                Picker("Role", selection: $selectedRole) {
+                  ForEach(UserRole.allCases) { role in
+                    Text(role.displayName).tag(role)
+                  }
+                }
+                .pickerStyle(.segmented)
+                .tint(.tmiPrimary)
+              }
               .offset(x: animateFields ? 0 : -30)
               .opacity(animateFields ? 1.0 : 0)
               .animation(
@@ -214,9 +257,9 @@ struct RegistrationView: View {
       }
       .preferredColorScheme(.dark)
       .onAppear {
-        // Set initial focus to email field after a slight delay
+        // Set initial focus to displayName field after a slight delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-          focusedField = .email
+          focusedField = .displayName
         }
 
         // Trigger animations
@@ -237,6 +280,11 @@ struct RegistrationView: View {
 
   private func register() {
     // Validate input
+    guard !displayName.isEmpty else {
+      errorMessage = "Please enter your name"
+      return
+    }
+
     guard !email.isEmpty else {
       errorMessage = "Please enter an email address"
       return
@@ -268,21 +316,47 @@ struct RegistrationView: View {
     Task {
       do {
         // Use the AuthStateModel for registration
-        // First update the auth model's email/password
         authStateModel.updateEmail(email)
         authStateModel.updatePassword(password)
 
-        // Start registration flow - this will need to be enhanced with proper AuthStateModel integration
+        // Create Firebase Auth account
         let authService = FirebaseTMIAuthService()
-        let _ = try await authService.signUp(email: email, password: password)
+        let firebaseUser = try await authService.signUp(email: email, password: password)
 
-        isRegistering = false
-        dismiss()
+        // Create TMIUser document in Firestore with selected role
+        let tmiUser = TMIUser(
+          userID: firebaseUser.uid,
+          displayName: displayName,
+          email: email,
+          isEmailVerified: firebaseUser.isEmailVerified,
+          role: selectedRole,
+          createdAt: Date(),
+          lastLoginAt: Date(),
+          isActive: true
+        )
+
+        // Save to Firestore
+        try await createTMIUserDocument(tmiUser)
+
+        // The AuthStateModel will automatically load the user after auth
+        // Just dismiss and let the natural flow happen
+        await MainActor.run {
+          isRegistering = false
+          dismiss()
+        }
       } catch {
-        isRegistering = false
-        errorMessage = error.localizedDescription
+        await MainActor.run {
+          isRegistering = false
+          errorMessage = error.localizedDescription
+        }
       }
     }
+  }
+
+  private func createTMIUserDocument(_ user: TMIUser) async throws {
+    let firestore = FirebaseManager.shared.firestore
+    let userRef = firestore.collection("users").document(user.userID)
+    try userRef.setData(from: user)
   }
 
   private func isValidEmail(_ email: String) -> Bool {

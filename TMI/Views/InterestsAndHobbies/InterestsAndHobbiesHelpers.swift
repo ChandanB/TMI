@@ -81,7 +81,7 @@ extension TMIBackgroundView {
 // MARK: - Missing TMI Components
 // These should be added to the main TMIComponentLibrary
 
-struct TMISearchBar: View {
+struct InterestsSearchBar: View {
     @Binding var text: String
     let placeholder: String
     let style: TMIComponentStyle
@@ -174,14 +174,14 @@ struct TMICard<Content: View>: View {
     }
 }
 
-struct TMIEmptyState: View {
+struct InterestsEmptyState: View {
     let icon: String
     let title: String
     let message: String
     let actionTitle: String?
     let action: (() -> Void)?
     let style: TMIComponentStyle
-    
+
     init(icon: String, title: String, message: String, actionTitle: String? = nil, action: (() -> Void)? = nil, style: TMIComponentStyle) {
         self.icon = icon
         self.title = title

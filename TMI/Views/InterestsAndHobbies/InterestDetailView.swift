@@ -11,14 +11,16 @@ import SwiftUI
 
 struct InterestDetailView: View {
     let interest: Interest
-    
+
     @Environment(\.interestsStateModel) var stateModel
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var associatedData: InterestAssociatedData?
     @State private var isLoadingData = false
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
-    
+    @State private var showingConnectStudent = false
+
     // Animation states
     @State private var headerAppeared = false
     @State private var statsAppeared = false
@@ -45,8 +47,19 @@ struct InterestDetailView: View {
         .onAppear {
             animateViewEntrance()
         }
-        .sheet(isPresented: $showingEditSheet) {
+        .sheet(isPresented: $showingEditSheet, onDismiss: {
+            Task {
+                await loadAssociatedData()
+            }
+        }) {
             EditInterestSheet(interest: interest)
+        }
+        .sheet(isPresented: $showingConnectStudent) {
+            ConnectStudentSheet(interest: interest, onConnect: { student in
+                Task {
+                    await connectStudentToInterest(student)
+                }
+            })
         }
         .alert("Delete Interest", isPresented: $showingDeleteAlert) {
             deleteAlertButtons
@@ -503,7 +516,7 @@ struct InterestDetailView: View {
                 }
                 
                 Button {
-                    // Connect student functionality
+                    showingConnectStudent = true
                 } label: {
                     Label("Connect Student", systemImage: "person.badge.plus")
                 }
@@ -527,11 +540,14 @@ struct InterestDetailView: View {
     @ViewBuilder
     private var deleteAlertButtons: some View {
         Button("Cancel", role: .cancel) { }
-        
+
         Button("Delete", role: .destructive) {
             Task {
                 await stateModel.deleteInterest(interest)
                 // Navigate back after deletion
+                await MainActor.run {
+                    dismiss()
+                }
             }
         }
     }
@@ -557,16 +573,68 @@ struct InterestDetailView: View {
     
     private var popularityTrend: String {
         guard let data = associatedData else { return "—" }
-        return data.associatedStudents.count > 5 ? "↗ Trending" : "→ Stable"
+
+        let studentCount = data.associatedStudents.count
+
+        // Determine trend based on student count thresholds
+        switch studentCount {
+        case 0...2:
+            return "→ Emerging"
+        case 3...5:
+            return "→ Stable"
+        case 6...10:
+            return "↗ Growing"
+        default:
+            return "↗↗ Trending"
+        }
     }
-    
+
     private var successRate: String {
-        // This would be calculated from actual plan completion data
-        "\(Int.random(in: 75...95))%"
+        guard let data = associatedData else { return "—" }
+
+        // Calculate success rate based on TMI plan completion
+        let completedPlans = data.connectedTMIPlans.filter { $0.calculatedProgress >= 0.8 }.count
+        let totalPlans = data.connectedTMIPlans.count
+
+        guard totalPlans > 0 else { return "No data" }
+
+        let successPercentage = (Double(completedPlans) / Double(totalPlans)) * 100
+        return "\(Int(successPercentage))%"
     }
-    
+
     private var bestSeason: String {
-        ["Fall", "Spring", "Winter", "Summer"].randomElement() ?? "Year-round"
+        guard let data = associatedData else { return "—" }
+
+        // Analyze when this interest was most popular based on creation dates
+        let calendar = Calendar.current
+        let seasonCounts = data.associatedStudents.reduce(into: [String: Int]()) { counts, student in
+            // Use the student's last interaction date or current date as proxy
+            let date = student.lastInteractionDate ?? Date()
+            let month = calendar.component(.month, from: date)
+
+            let season: String
+            switch month {
+            case 12, 1, 2:
+                season = "Winter"
+            case 3, 4, 5:
+                season = "Spring"
+            case 6, 7, 8:
+                season = "Summer"
+            case 9, 10, 11:
+                season = "Fall"
+            default:
+                season = "Year-round"
+            }
+
+            counts[season, default: 0] += 1
+        }
+
+        // Find the season with the most students
+        if let mostPopularSeason = seasonCounts.max(by: { $0.value < $1.value })?.key {
+            return mostPopularSeason
+        }
+
+        return "Year-round"
     }
     
     // MARK: - Data Loading
@@ -584,18 +652,56 @@ struct InterestDetailView: View {
     }
     
     // MARK: - Animation
-    
+
     private func animateViewEntrance() {
         withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
             headerAppeared = true
         }
-        
+
         withAnimation(.easeOut(duration: 0.5).delay(0.3)) {
             statsAppeared = true
         }
-        
+
         withAnimation(.easeOut(duration: 0.5).delay(0.5)) {
             contentAppeared = true
+        }
+    }
+
+    // MARK: - Student Connection
+
+    @MainActor
+    private func connectStudentToInterest(_ student: Student) async {
+        // Create a mutable copy of the student with the new interest
+        var updatedStudent = student
+
+        // Check if the interest is already in the student's interests
+        if !updatedStudent.interests.contains(where: { $0.id == interest.id }) {
+            updatedStudent = Student(
+                id: student.id,
+                name: student.name,
+                grade: student.grade,
+                school: student.school,
+                dateOfBirth: student.dateOfBirth,
+                tmiPlans: student.tmiPlans,
+                studentID: student.studentID,
+                interests: student.interests + [interest],
+                photoURL: student.photoURL,
+                surveyResults: student.surveyResults,
+                academicPerformance: student.academicPerformance,
+                engagementHistory: student.engagementHistory,
+                notes: student.notes,
+                lastInteractionDate: student.lastInteractionDate
+            )
+
+            // Update student in Firestore
+            let studentService = StudentService()
+            do {
+                _ = try await studentService.updateStudent(updatedStudent)
+                // Refresh the associated data to show the newly connected student
+                await loadAssociatedData()
+            } catch {
+                print("Failed to connect student to interest: \(error)")
+            }
         }
     }
 }
@@ -607,25 +713,293 @@ struct InterestDetailView: View {
 struct EditInterestSheet: View {
     let interest: Interest
     @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.interestsStateModel) var stateModel
+
+    @State private var name: String
+    @State private var selectedCategories: Set<InterestCategory>
+    @State private var description: String
+    @State private var selectedAcademicSubjects: Set<AcademicSubject>
+    @State private var selectedInterventionModels: Set<InterventionModel>
+    @State private var academicBenefits: String
+    @State private var behavioralBenefits: String
+    @State private var isFeatured: Bool
+    @State private var isSaving = false
+
+    init(interest: Interest) {
+        self.interest = interest
+        _name = State(initialValue: interest.name)
+        _selectedCategories = State(initialValue: Set(interest.category))
+        _description = State(initialValue: interest.description ?? "")
+        _selectedAcademicSubjects = State(initialValue: Set(interest.academicRelevance))
+        _selectedInterventionModels = State(initialValue: Set(interest.interventionModels))
+        _academicBenefits = State(initialValue: interest.academicBenefits ?? "")
+        _behavioralBenefits = State(initialValue: interest.behavioralBenefits ?? "")
+        _isFeatured = State(initialValue: interest.isFeatured)
+    }
+
     var body: some View {
         NavigationStack {
-            Text("Edit Interest: \(interest.name)")
-                .navigationTitle("Edit Interest")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") { dismiss() }
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Save") { dismiss() }
+            Form {
+                Section("Basic Information") {
+                    TextField("Interest Name", text: $name)
+
+                    TextField("Description", text: $description, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+
+                Section("Categories") {
+                    ForEach(InterestCategory.allCases.filter { $0 != .other }, id: \.self) { category in
+                        Toggle(isOn: Binding(
+                            get: { selectedCategories.contains(category) },
+                            set: { isSelected in
+                                if isSelected {
+                                    selectedCategories.insert(category)
+                                } else {
+                                    selectedCategories.remove(category)
+                                }
+                            }
+                        )) {
+                            HStack {
+                                Image(systemName: category.iconName)
+                                    .foregroundColor(category.color)
+                                Text(category.rawValue)
+                            }
+                        }
                     }
                 }
+
+                Section("Academic Relevance") {
+                    ForEach(AcademicSubject.allCases, id: \.self) { subject in
+                        Toggle(isOn: Binding(
+                            get: { selectedAcademicSubjects.contains(subject) },
+                            set: { isSelected in
+                                if isSelected {
+                                    selectedAcademicSubjects.insert(subject)
+                                } else {
+                                    selectedAcademicSubjects.remove(subject)
+                                }
+                            }
+                        )) {
+                            HStack {
+                                Image(systemName: subject.iconName)
+                                Text(subject.rawValue)
+                            }
+                        }
+                    }
+                }
+
+                Section("TMI Intervention Models") {
+                    ForEach(InterventionModel.allCases, id: \.self) { model in
+                        Toggle(isOn: Binding(
+                            get: { selectedInterventionModels.contains(model) },
+                            set: { isSelected in
+                                if isSelected {
+                                    selectedInterventionModels.insert(model)
+                                } else {
+                                    selectedInterventionModels.remove(model)
+                                }
+                            }
+                        )) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(model.rawValue)
+                                    .font(.body)
+                                Text(model.description)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                Section("Benefits") {
+                    TextField("Academic Benefits", text: $academicBenefits, axis: .vertical)
+                        .lineLimit(2...4)
+
+                    TextField("Behavioral Benefits", text: $behavioralBenefits, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+
+                Section {
+                    Toggle("Featured Interest", isOn: $isFeatured)
+                }
+            }
+            .navigationTitle("Edit Interest")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        Task {
+                            await saveInterest()
+                        }
+                    }
+                    .disabled(name.isEmpty || selectedCategories.isEmpty || isSaving)
+                }
+            }
+            .disabled(isSaving)
         }
+    }
+
+    private func saveInterest() async {
+        isSaving = true
+        defer { isSaving = false }
+
+        let updatedInterest = Interest(
+            id: interest.id,
+            name: name,
+            category: Array(selectedCategories),
+            description: description.isEmpty ? nil : description,
+            academicRelevance: Array(selectedAcademicSubjects),
+            interventionModels: Array(selectedInterventionModels),
+            popularityScore: interest.popularityScore,
+            isFeatured: isFeatured,
+            createdAt: interest.createdAt,
+            academicBenefits: academicBenefits.isEmpty ? nil : academicBenefits,
+            careerPathways: interest.careerPathways,
+            educationalActivities: interest.educationalActivities,
+            behavioralBenefits: behavioralBenefits.isEmpty ? nil : behavioralBenefits,
+            skillsDeveloped: interest.skillsDeveloped,
+            tierRelevance: interest.tierRelevance,
+            relatedInterests: interest.relatedInterests,
+            relatedStudents: interest.relatedStudents,
+            schemaVersion: interest.schemaVersion
+        )
+
+        await stateModel.updateInterest(updatedInterest)
+        dismiss()
     }
 }
 
 // Note: EditHobbySheet removed - now using unified EditInterestSheet
+
+// MARK: - Connect Student Sheet
+
+struct ConnectStudentSheet: View {
+    let interest: Interest
+    let onConnect: (Student) -> Void
+
+    @Environment(\.dismiss) var dismiss
+    @State private var studentService = StudentService()
+    @State private var students: [Student] = []
+    @State private var isLoading = false
+    @State private var searchText = ""
+
+    var filteredStudents: [Student] {
+        if searchText.isEmpty {
+            return students.filter { student in
+                !student.interests.contains(where: { $0.id == interest.id })
+            }
+        } else {
+            return students.filter { student in
+                student.name.localizedCaseInsensitiveContains(searchText) &&
+                !student.interests.contains(where: { $0.id == interest.id })
+            }
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView("Loading students...")
+                } else if filteredStudents.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "person.2.slash")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+
+                        Text(searchText.isEmpty ? "No students available" : "No students found")
+                            .font(.headline)
+
+                        Text(searchText.isEmpty ?
+                            "All students already have this interest" :
+                            "Try a different search term")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                } else {
+                    List(filteredStudents) { student in
+                        Button(action: {
+                            onConnect(student)
+                            dismiss()
+                        }) {
+                            HStack {
+                                // Avatar
+                                ZStack {
+                                    Circle()
+                                        .fill(student.avatarColor.color)
+                                        .frame(width: 40, height: 40)
+
+                                    Text(student.initials)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(student.name)
+                                        .font(.body)
+                                        .foregroundColor(.primary)
+
+                                    Text("Grade \(student.grade)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.tmiPrimary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .searchable(text: $searchText, prompt: "Search students")
+                }
+            }
+            .navigationTitle("Connect Student")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                await loadStudents()
+            }
+        }
+    }
+
+    private func loadStudents() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            students = try await studentService.fetchStudents()
+        } catch {
+            print("Failed to load students: \(error)")
+            students = []
+        }
+    }
+}
+
+extension AvatarColor {
+    var color: Color {
+        switch self {
+        case .blue: return .blue
+        case .green: return .green
+        case .orange: return .orange
+        case .purple: return .purple
+        case .teal: return .teal
+        case .pink: return .pink
+        case .indigo: return .indigo
+        }
+    }
+}
 
 // MARK: - Supporting Views
 
@@ -839,10 +1213,10 @@ struct PlanRowView: View {
 
                         RoundedRectangle(cornerRadius: 4)
                             .fill(color)
-                            .frame(width: 80 * plan.progress, height: 6)
+                            .frame(width: 80 * plan.calculatedProgress, height: 6)
                     }
 
-                    Text("\(Int(plan.progress * 100))%")
+                    Text("\(plan.progressPercentage)%")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(color)
                 }

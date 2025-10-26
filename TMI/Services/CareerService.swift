@@ -200,7 +200,7 @@ final class CareerService: @unchecked Sendable {
     for career in allCareers {
       var score = 0.0
       
-      // Enhanced interest-based scoring with weighted categories
+      // Interest-based scoring with weighted categories
       for interest in student.interests {
         let interestWeight = Double(interest.popularityScore ?? 1)
         let categoryWeight = getInterestCategoryWeight(interest.category.first?.rawValue ?? "")
@@ -221,7 +221,7 @@ final class CareerService: @unchecked Sendable {
         }
       }
       
-      // Enhanced hobby-based scoring with skill alignment
+      // Hobby-based scoring with skill alignment
       // Note: Hobbies are now part of interests array
       // Additional interest-based scoring is handled above
       

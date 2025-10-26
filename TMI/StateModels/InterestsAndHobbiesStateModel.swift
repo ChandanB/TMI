@@ -13,14 +13,17 @@ import SwiftUI
 
 // MARK: - Environment Key (defined in InterestsAndHobbiesHelpers.swift)
 
-// MARK: - Enhanced State Model
+// MARK: - State Model
 @Observable
 final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesData, IdentifiableError> {
     // MARK: - Dependencies
     private let interestService = InterestService()
     private let studentService = StudentService()
     private let tmiPlanService = TMIPlanService()
-    
+
+    // MARK: - Fetch Guard
+    private var isFetching = false
+
     // MARK: - Initialization
     override init() {
         super.init()
@@ -34,12 +37,12 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
     }
     
     enum ViewSegment: String, CaseIterable, Identifiable {
-        case all = "All Interests"
-        case academic = "Academic"
-        case creative = "Creative"
-        case physical = "Physical"
-        case social = "Social"
-        case entertainment = "Entertainment"
+        case all = "Interests"
+        case academic = "Academic Interests"
+        case creative = "Creative Interests"
+        case physical = "Physical Interests"
+        case social = "Social Interests"
+        case entertainment = "Entertainment Interests"
 
         var id: String { self.rawValue }
 
@@ -157,6 +160,15 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
     
     @MainActor
     override func fetch() async {
+        // Prevent duplicate fetches
+        guard !isFetching else {
+            print("[InterestsAndHobbiesStateModel] Fetch already in progress, skipping")
+            return
+        }
+
+        isFetching = true
+        defer { isFetching = false }
+
         updateState(.loading)
 
         do {
@@ -217,24 +229,49 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
     
     
     @MainActor
+    func updateInterest(_ interest: Interest) async {
+        guard let interestId = interest.id else {
+            handleError(InterestError.invalidData, userFriendlyMessage: "Cannot update interest: missing ID")
+            return
+        }
+
+        do {
+            let updatedInterest = try await interestService.updateInterest(interest)
+
+            guard case .loaded(var data) = state else { return }
+            if let index = data.interests.firstIndex(where: { $0.id == interestId }) {
+                data.interests[index] = updatedInterest
+                updateState(.loaded(data))
+            }
+        } catch {
+            handleError(error, userFriendlyMessage: "Failed to update interest")
+        }
+    }
+
+    @MainActor
     func deleteInterest(_ interest: Interest) async {
         guard let interestId = interest.id else {
             handleError(InterestError.invalidData, userFriendlyMessage: "Cannot delete interest: missing ID")
             return
         }
-        
+
         do {
+            // First, update UI immediately for better UX
+            if case .loaded(var data) = state {
+                data.interests.removeAll { $0.id == interestId }
+                updateState(.loaded(data))
+            }
+
+            // Then delete from Firestore
             try await interestService.deleteInterest(interestId)
-            
-            guard case .loaded(var data) = state else { return }
-            data.interests.removeAll { $0.id == interestId }
-            updateState(.loaded(data))
         } catch {
+            // If deletion fails, refresh to restore the correct state
+            await refresh()
             handleError(error, userFriendlyMessage: "Failed to delete interest")
         }
     }
-    
-    
+
+
     @MainActor
     override func refresh() async {
         await fetch()
@@ -388,9 +425,15 @@ class InterestService {
                     return nil
                 }
             }
-            
+
+            // Deduplicate interests by ID and name
+            let uniqueInterests = Array(Dictionary(grouping: interests) { $0.id ?? $0.name }
+                .compactMap { $0.value.first })
+
+            print("[InterestService] Fetched \(interests.count) documents, \(uniqueInterests.count) unique interests")
+
             // Return sample data if no user data exists
-            return interests.isEmpty ? Interest.expandedSampleInterests : interests
+            return uniqueInterests.isEmpty ? Interest.expandedSampleInterests : uniqueInterests
         } catch {
             print("[InterestService] Firestore error: \(error)")
             // Return sample data as fallback, but still throw the error for proper error handling
@@ -402,20 +445,43 @@ class InterestService {
         guard let uid = Auth.auth().currentUser?.uid else {
             throw InterestError.userNotAuthenticated
         }
-        
+
         let collection = db.collection("users").document(uid).collection("interests")
         let docRef = try await collection.addDocument(data: interest.toFirestoreData())
-        
+
         // Re-fetch the document to get the auto-populated @DocumentID
         let savedInterest = try await docRef.getDocument(as: Interest.self)
         return savedInterest
     }
-    
+
+    func updateInterest(_ interest: Interest) async throws -> Interest {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw InterestError.userNotAuthenticated
+        }
+
+        guard let interestId = interest.id else {
+            throw InterestError.invalidData
+        }
+
+        let collection = db.collection("users").document(uid).collection("interests")
+
+        // Use updateData instead of setData to avoid creating duplicates
+        // But first convert to Firestore data
+        let data = interest.toFirestoreData()
+
+        // Use setData with merge: false to completely replace the document
+        try await collection.document(interestId).setData(data, merge: false)
+
+        // Re-fetch the document to ensure consistency
+        let updatedInterest = try await collection.document(interestId).getDocument(as: Interest.self)
+        return updatedInterest
+    }
+
     func deleteInterest(_ interestId: String) async throws {
         guard let uid = Auth.auth().currentUser?.uid else {
             throw InterestError.userNotAuthenticated
         }
-        
+
         let collection = db.collection("users").document(uid).collection("interests")
         try await collection.document(interestId).delete()
     }

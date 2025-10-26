@@ -9,18 +9,33 @@ service cloud.firestore {
       match /students/{studentId} {
         allow read, write: if request.auth.uid == userId;
       }
-      
+
       match /tmiPlans/{planId} {
         allow read, write: if request.auth.uid == userId;
       }
-      
+
       // Sample data collections (needed for MVP functionality)
       match /interests/{interestId} {
         allow read, write: if request.auth.uid == userId;
       }
-      
+
       match /hobbies/{hobbyId} {
         allow read, write: if request.auth.uid == userId;
+      }
+    }
+
+    // Global AI-generated resources (shared across all users)
+    match /generatedResources/{interestId} {
+      // Anyone authenticated can read
+      allow read: if request.auth != null;
+
+      // Only authenticated users can write (to generate resources)
+      allow write: if request.auth != null;
+
+      // Resources sub-collection
+      match /resources/{resourceId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
       }
     }
   }

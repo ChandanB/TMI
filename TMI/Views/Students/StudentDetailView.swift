@@ -1,5 +1,5 @@
 //
-//  StudentDetailViewRedesigned.swift
+//  StudentDetailView.swift
 //  TMI
 //
 //  Simplified single-scroll student profile with pinned actions
@@ -8,16 +8,29 @@
 import SwiftUI
 import Charts
 
-struct StudentDetailViewRedesigned: View {
-    let student: Student
+struct StudentDetailView: View {
+    let initialStudent: Student
+    @State private var student: Student
+    @State private var refreshID = UUID()
     @State private var showingCreatePlan = false
     @State private var showingEditStudent = false
+    @State private var showingAddInterest = false
+    @State private var showingAllPlans = false
+    @State private var showingProgress = false
+    @State private var showingSurvey = false
     @State private var expandedSections: Set<String> = []
     @State private var planStateModel = TMIPlanListStateModel()
+    @State private var interestsStateModel = InterestsAndHobbiesStateModel()
+    @State private var studentService = StudentService()
+
+    init(student: Student) {
+        self.initialStudent = student
+        _student = State(initialValue: student)
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color.tmiBackground
+            TMIBackgroundView(variant: .default)
                 .ignoresSafeArea()
 
             ScrollView {
@@ -38,9 +51,9 @@ struct StudentDetailViewRedesigned: View {
                     tmiPlansSection
 
                     // Engagement Chart
-                    if let engagementHistory = student.engagementHistory, !engagementHistory.isEmpty {
-                        engagementChartSection(engagementHistory)
-                    }
+//                    if let engagementHistory = student.engagementHistory, !engagementHistory.isEmpty {
+//                        engagementChartSection(engagementHistory)
+//                    }
 
                     // Academic Performance
                     if let academic = student.academicPerformance {
@@ -57,6 +70,7 @@ struct StudentDetailViewRedesigned: View {
                 .padding(.horizontal, TMISpacing.screenPadding)
                 .padding(.top, TMISpacing.md)
             }
+            .id(refreshID)
 
             // Bottom Action Bar (Optional - can remove if using quick actions)
             // primaryActionBar
@@ -71,15 +85,53 @@ struct StudentDetailViewRedesigned: View {
                 }
             }
         }
+        .task {
+            await refreshStudent()
+            await planStateModel.fetch()
+        }
+        .refreshable {
+            await refreshStudent()
+            await planStateModel.fetch()
+        }
         .sheet(isPresented: $showingCreatePlan) {
             NavigationStack {
-                NewTMIPlanViewRedesigned(student: student)
+                NewTMIPlanView(student: student) {
+                    Task {
+                        await planStateModel.refresh()
+                    }
+                }
             }
         }
         .sheet(isPresented: $showingEditStudent) {
             NavigationStack {
-                // TODO: Create EditStudentViewRedesigned or use existing edit view
-                AddStudentViewRedesigned(onComplete: { showingEditStudent = false })
+                EditStudentView(student: student) { updatedStudent in
+                    student = updatedStudent
+                    refreshID = UUID()
+                }
+            }
+        }
+        .sheet(isPresented: $showingAllPlans) {
+            NavigationStack {
+                StudentPlansListView(student: student, plans: studentPlans)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") {
+                                showingAllPlans = false
+                            }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showingProgress) {
+            NavigationStack {
+                StudentProgressView(student: student, plans: studentPlans)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") {
+                                showingProgress = false
+                            }
+                        }
+                    }
             }
         }
     }
@@ -123,13 +175,13 @@ struct StudentDetailViewRedesigned: View {
             quickActionButton(
                 icon: "list.clipboard",
                 label: "View Plans",
-                action: { /* Navigate to plans */ }
+                action: { showingAllPlans = true }
             )
 
             quickActionButton(
                 icon: "chart.bar",
                 label: "Progress",
-                action: { /* Show progress */ }
+                action: { showingProgress = true }
             )
         }
     }
@@ -193,48 +245,115 @@ struct StudentDetailViewRedesigned: View {
 
     private var interestsSection: some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
-            Button(action: {
-                withAnimation {
-                    toggleSection("interests")
-                }
-            }) {
-                HStack {
-                    Text("Interests")
-                        .font(.tmiTitle3)
-                        .foregroundColor(.tmiTextPrimary)
+            HStack {
+                Text("Interests")
+                    .font(.tmiTitle3)
+                    .foregroundColor(.tmiTextPrimary)
 
-                    Spacer()
+                Spacer()
 
-                    Image(systemName: expandedSections.contains("interests") ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.tmiTextSecondary)
+                Button(action: {
+                    showingAddInterest = true
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16))
+                        Text("Add")
+                            .font(.tmiCaption)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.tmiPrimary)
                 }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
-            if expandedSections.contains("interests") {
-                if student.interests.isEmpty {
+            if student.interests.isEmpty {
+                VStack(spacing: TMISpacing.md) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 32))
+                        .foregroundColor(.tmiTextTertiary)
+
                     Text("No interests recorded yet")
                         .font(.tmiBody)
+                        .foregroundColor(.tmiTextSecondary)
+
+                    Text("Add interests to personalize \(student.name)'s learning experience")
+                        .font(.tmiCaption)
                         .foregroundColor(.tmiTextTertiary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, TMISpacing.lg)
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: TMISpacing.sm) {
-                            ForEach(student.interests, id: \.id) { interest in
-                                TMIBadge(
-                                    text: interest.name,
-                                    color: .tmiPrimary,
-                                    style: .solid
-                                )
-                            }
+                        .multilineTextAlignment(.center)
+
+                    HStack(spacing: TMISpacing.md) {
+                        TMIButton(
+                            text: "Add Interest",
+                            icon: "plus",
+                            style: .secondary,
+                            action: { showingAddInterest = true }
+                        )
+
+                        TMIButton(
+                            text: "Take Survey",
+                            icon: "list.clipboard",
+                            style: .primary,
+                            action: { showingSurvey = true }
+                        )
+                    }
+                    .padding(.top, TMISpacing.sm)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, TMISpacing.lg)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: TMISpacing.sm) {
+                        ForEach(student.interests, id: \.id) { interest in
+                            TMIBadge(
+                                text: interest.name,
+                                color: interest.primaryCategory?.color ?? .tmiPrimary,
+                                style: .solid
+                            )
                         }
                     }
                 }
             }
         }
         .tmiCard()
+        .sheet(isPresented: $showingAddInterest) {
+            NavigationStack {
+                AddInterestToStudentView(student: student) { updatedStudent in
+                    student = updatedStudent
+                    refreshID = UUID()
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            showingAddInterest = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingSurvey) {
+            if let studentId = student.id {
+                NavigationStack {
+                    StudentSurveyFlow(studentId: studentId)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") {
+                                    showingSurvey = false
+                                }
+                                .foregroundColor(.tmiPrimary)
+                            }
+                        }
+                }
+                .onDisappear {
+                    // Refresh student data after survey completion
+                    Task {
+                        await refreshStudent()
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - TMI Plans Section
@@ -590,10 +709,22 @@ struct StudentDetailViewRedesigned: View {
             expandedSections.insert(section)
         }
     }
+
+    @MainActor
+    private func refreshStudent() async {
+        do {
+            if let updatedStudent = try await studentService.getStudent(by: student.id ?? "") {
+                student = updatedStudent
+            }
+        } catch {
+            // If fetch fails, keep using the existing student
+            print("Failed to refresh student: \(error)")
+        }
+    }
 }
 
 #Preview {
     NavigationStack {
-        StudentDetailViewRedesigned(student: Student.sampleStudent)
+        StudentDetailView(student: Student.sampleStudent)
     }
 }

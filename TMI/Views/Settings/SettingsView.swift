@@ -48,22 +48,22 @@ struct SettingsView: View {
               .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: isLoaded)
 
             // TMI Settings Section
-            tmiSettingsSection
-              .opacity(isLoaded ? 1 : 0)
-              .offset(y: isLoaded ? 0 : 20)
-              .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.3), value: isLoaded)
+//            tmiSettingsSection
+//              .opacity(isLoaded ? 1 : 0)
+//              .offset(y: isLoaded ? 0 : 20)
+//              .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.3), value: isLoaded)
 
             // App Preferences Section
-            appPreferencesSection
-              .opacity(isLoaded ? 1 : 0)
-              .offset(y: isLoaded ? 0 : 20)
-              .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.4), value: isLoaded)
+//            appPreferencesSection
+//              .opacity(isLoaded ? 1 : 0)
+//              .offset(y: isLoaded ? 0 : 20)
+//              .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.4), value: isLoaded)
 
             // Data Management Section
-            dataManagementSection
-              .opacity(isLoaded ? 1 : 0)
-              .offset(y: isLoaded ? 0 : 20)
-              .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.5), value: isLoaded)
+//            dataManagementSection
+//              .opacity(isLoaded ? 1 : 0)
+//              .offset(y: isLoaded ? 0 : 20)
+//              .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.5), value: isLoaded)
 
             // Support & Legal Section
             supportLegalSection
@@ -188,14 +188,14 @@ struct SettingsView: View {
         }
       )
       
-      SettingsRow(
-        title: "Notification Preferences", 
-        subtitle: "Manage your notification settings",
-        icon: "bell.badge",
-        action: {
-          // Navigate to notification settings
-        }
-      )
+//      SettingsRow(
+//        title: "Notification Preferences", 
+//        subtitle: "Manage your notification settings",
+//        icon: "bell.badge",
+//        action: {
+//          // Navigate to notification settings
+//        }
+//      )
     }
   }
 

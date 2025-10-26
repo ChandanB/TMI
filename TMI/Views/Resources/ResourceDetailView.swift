@@ -2,24 +2,31 @@
 //  ResourceDetailView.swift
 //  TMI
 //
-//  Created by Chandan Brown on 8/11/25.
+//  Created by Chandan Brown on 8/12/25.
 //
 
 import SwiftUI
+import SafariServices
 
+// Resource detail view with career connections and improved metadata
 struct ResourceDetailView: View {
     let resource: Resource
+    var onDelete: (() -> Void)? = nil
+
     @State private var animateContent = false
     @State private var showShareSheet = false
     @State private var isBookmarked = false
     @State private var isLoading = false
     @State private var relatedResources: [Resource] = []
+    @State private var careerRecommendations: [Career] = []
     @State private var showWebView = false
     @State private var showBookmarkConfirmation = false
-    @Environment(\.presentationMode) var presentationMode
-    
+    @State private var showDeleteConfirmation = false
+    @Environment(\.dismiss) private var dismiss
+
     private let resourceService = ResourceService.shared
-    
+    private let careerService = CareerService.shared
+
     var body: some View {
         ZStack {
             // Background
@@ -46,14 +53,19 @@ struct ResourceDetailView: View {
                             // Resource description
                             descriptionSection
                             
+                            // Enhanced metadata section
+                            enhancedMetadataSection
+                            
                             // Tags section
                             tagsSection
                             
-                            // Recommended for section
-                            recommendedForSection
-                            
                             // Action buttons
                             actionButtonsSection
+                            
+                            // Career connections section
+                            if !careerRecommendations.isEmpty {
+                                careerConnectionsSection
+                            }
                             
                             // Related resources
                             if !relatedResources.isEmpty {
@@ -82,12 +94,25 @@ struct ResourceDetailView: View {
                         Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
                             .foregroundColor(.white)
                     }
-                    
+
                     Button(action: {
                         showShareSheet = true
                     }) {
                         Image(systemName: "square.and.arrow.up")
                             .foregroundColor(.white)
+                    }
+
+                    if onDelete != nil {
+                        Menu {
+                            Button(role: .destructive) {
+                                showDeleteConfirmation = true
+                            } label: {
+                                Label("Delete Resource", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundColor(.white)
+                        }
                     }
                 }
             }
@@ -98,18 +123,27 @@ struct ResourceDetailView: View {
         .sheet(isPresented: $showWebView) {
             SafariWebView(url: URL(string: resource.url) ?? URL(string: "https://example.com")!)
         }
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(url: resource.url)
+        }
         .alert("Resource Bookmarked", isPresented: $showBookmarkConfirmation) {
             Button("OK") { }
         } message: {
             Text("\(resource.title) has been added to your bookmarks.")
         }
+        .alert("Delete Resource", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                onDelete?()
+                dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to delete '\(resource.title)'? This action cannot be undone.")
+        }
         .onAppear {
             withAnimation(.easeOut(duration: 0.6)) {
                 animateContent = true
             }
-        }
-        .sheet(isPresented: $showShareSheet) {
-            ShareSheet(url: resource.url)
         }
         .preferredColorScheme(.dark)
     }
@@ -117,460 +151,453 @@ struct ResourceDetailView: View {
     // MARK: - Hero Section
     
     private var heroSection: some View {
-        ZStack(alignment: .bottom) {
-            // Background gradient
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            resource.category.color.opacity(0.8),
-                            resource.category.color,
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(height: 280)
+        ZStack(alignment: .bottomLeading) {
+            // Background with category color
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    resource.category.color.opacity(0.8),
+                    resource.category.color
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(height: 200)
+            
+            // Category icon (watermarked)
+            Image(systemName: resource.category.icon)
+                .font(.system(size: 120))
+                .foregroundColor(.white.opacity(0.1))
+                .offset(x: 50, y: -30)
+                .rotationEffect(.degrees(-15))
             
             // Content overlay
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 8) {
-                        // Category badge
-                        HStack(spacing: 8) {
-                            Image(systemName: resource.category.icon)
-                                .font(.system(size: 14))
-                            
-                            Text(resource.category.rawValue.capitalized)
-                                .font(.system(size: 14, weight: .medium))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.2))
-                        )
-                        .foregroundColor(.white)
-                        .opacity(animateContent ? 1 : 0)
-                        .offset(y: animateContent ? 0 : 20)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: animateContent)
-                        
-                        // Title
-                        Text(resource.title)
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.leading)
-                            .opacity(animateContent ? 1 : 0)
-                            .offset(y: animateContent ? 0 : 20)
-                            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1), value: animateContent)
-                    }
-                    
-                    Spacer()
-                }
+            VStack(alignment: .leading, spacing: 12) {
+                // Category badge
+                Text(resource.category.rawValue.capitalized)
+                    .font(.system(size: 12, weight: .semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.2))
+                    )
+                    .foregroundColor(.white)
                 
-                // Resource metadata
-                HStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Created")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
-                        
-                        Text(formatDate(resource.createdAt))
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                    }
+                // Title
+                Text(resource.title)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(3)
+                
+                // Quick metadata
+                HStack(spacing: 16) {
+                    Label(formatDate(resource.createdAt), systemImage: "calendar")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.8))
                     
                     if resource.isFeatured {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Status")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                            
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.yellow)
-                                
-                                Text("Featured")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.white)
-                            }
-                        }
+                        Label("Featured", systemImage: "star.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.yellow)
                     }
-                    
-                    Spacer()
                 }
-                .opacity(animateContent ? 1 : 0)
-                .offset(y: animateContent ? 0 : 30)
-                .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: animateContent)
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 40)
+            .padding(.bottom, 20)
         }
+        .opacity(animateContent ? 1 : 0)
+        .offset(y: animateContent ? 0 : -20)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: animateContent)
     }
     
     // MARK: - Description Section
     
     private var descriptionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("About")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
-            
-            Text(resource.description)
-                .font(.body)
-                .foregroundColor(.white.opacity(0.8))
-                .lineSpacing(4)
+        TMIGlassCard(style: .elevated) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("About This Resource")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                
+                Text(resource.description)
+                    .font(.system(size: 16))
+                    .foregroundColor(.white.opacity(0.8))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(4)
+            }
+            .padding(20)
         }
+        .padding(.horizontal)
         .opacity(animateContent ? 1 : 0)
         .offset(y: animateContent ? 0 : 20)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3), value: animateContent)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1), value: animateContent)
+    }
+    
+    // MARK: - Enhanced Metadata Section
+    
+    private var enhancedMetadataSection: some View {
+        TMIGlassCard(style: .elevated) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Resource Details")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    MetadataRow(icon: "calendar", label: "Published", value: formatDate(resource.createdAt))
+                    MetadataRow(icon: "arrow.up.right.square", label: "Source", value: extractDomain(from: resource.url))
+                    
+                    if !resource.recommendedFor.isEmpty {
+                        MetadataRow(icon: "person.2", label: "Recommended for", value: resource.recommendedFor.joined(separator: ", "))
+                    }
+                    
+                    if resource.isFeatured {
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.yellow)
+                            Text("Featured Resource")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+            }
+            .padding(20)
+        }
+        .padding(.horizontal)
+        .opacity(animateContent ? 1 : 0)
+        .offset(y: animateContent ? 0 : 20)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.15), value: animateContent)
     }
     
     // MARK: - Tags Section
     
     private var tagsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if !resource.tags.isEmpty {
+        TMIGlassCard(style: .elevated) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text("Tags")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                
-                FlowLayout(spacing: 8) {
-                    ForEach(resource.tags, id: \.self) { tag in
-                        TagView(title: tag)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(resource.tags, id: \.self) { tag in
+                            Text(tag)
+                                .font(.system(size: 14))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(resource.category.color.opacity(0.2))
+                                )
+                                .foregroundColor(resource.category.color)
+                        }
                     }
                 }
             }
+            .padding(20)
         }
+        .padding(.horizontal)
         .opacity(animateContent ? 1 : 0)
         .offset(y: animateContent ? 0 : 20)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: animateContent)
-    }
-    
-    // MARK: - Recommended For Section
-    
-    private var recommendedForSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if !resource.recommendedFor.isEmpty {
-                Text("Recommended For")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
-                
-                FlowLayout(spacing: 8) {
-                    ForEach(resource.recommendedFor, id: \.self) { role in
-                        RoleView(role: role)
-                    }
-                }
-            }
-        }
-        .opacity(animateContent ? 1 : 0)
-        .offset(y: animateContent ? 0 : 20)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.5), value: animateContent)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: animateContent)
     }
     
     // MARK: - Action Buttons Section
     
     private var actionButtonsSection: some View {
-        VStack(spacing: 16) {
-            // Open Resource button
-            Button(action: {
-                if let url = URL(string: resource.url) {
-                    UIApplication.shared.open(url)
+        VStack(spacing: 12) {
+            TMIButton(
+                text: "Open Resource",
+                icon: "arrow.up.right.square",
+                style: .primary,
+                action: {
+                    showWebView = true
                 }
-            }) {
-                HStack(spacing: 12) {
-                    Image(systemName: "arrow.up.right.square.fill")
-                        .font(.system(size: 20))
-                    
-                    Text("Open Resource")
-                        .font(.system(size: 16, weight: .semibold))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: [resource.category.color, resource.category.color.opacity(0.8)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .foregroundColor(.white)
-                .cornerRadius(16)
-                .shadow(color: resource.category.color.opacity(0.4), radius: 8, x: 0, y: 4)
-            }
-            .buttonStyle(ScaleButtonStyle())
+            )
             
-            // Secondary actions
             HStack(spacing: 12) {
-                Button(action: {
-                    // Copy URL action
-                    UIPasteboard.general.string = resource.url
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "doc.on.doc")
-                        Text("Copy URL")
-                            .font(.system(size: 14, weight: .medium))
+                TMIButton(
+                    text: isBookmarked ? "Bookmarked" : "Bookmark",
+                    icon: isBookmarked ? "bookmark.fill" : "bookmark",
+                    style: .secondary,
+                    action: {
+                        Task {
+                            await toggleBookmark()
+                        }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                            .background(Color.white.opacity(0.05))
-                    )
-                    .foregroundColor(.white.opacity(0.8))
-                }
-                .buttonStyle(ScaleButtonStyle())
+                )
                 
-                Button(action: {
-                    showShareSheet = true
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.and.arrow.up")
-                        Text("Share")
-                            .font(.system(size: 14, weight: .medium))
+                TMIButton(
+                    text: "Share",
+                    icon: "square.and.arrow.up",
+                    style: .secondary,
+                    action: {
+                        showShareSheet = true
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                            .background(Color.white.opacity(0.05))
-                    )
-                    .foregroundColor(.white.opacity(0.8))
-                }
-                .buttonStyle(ScaleButtonStyle())
+                )
             }
         }
+        .padding(.horizontal)
         .opacity(animateContent ? 1 : 0)
-        .offset(y: animateContent ? 0 : 30)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.6), value: animateContent)
+        .offset(y: animateContent ? 0 : 20)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.25), value: animateContent)
+    }
+    
+    // MARK: - Career Connections Section
+    
+    private var careerConnectionsSection: some View {
+        TMIGlassCard(style: .elevated) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("Related Careers")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    Button("View All") {
+                        // Navigate to career explorer filtered by this resource's tags
+                    }
+                    .font(.system(size: 14))
+                    .foregroundColor(.tmiSecondary)
+                }
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(careerRecommendations.prefix(3), id: \.id) { career in
+                            NavigationLink(destination: CareerDetailView(career: career)) {
+                                CompactCareerCard(career: career)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+            }
+            .padding(20)
+        }
+        .padding(.horizontal)
+        .opacity(animateContent ? 1 : 0)
+        .offset(y: animateContent ? 0 : 20)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3), value: animateContent)
     }
     
     // MARK: - Related Resources Section
     
     private var relatedResourcesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Related Resources")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(relatedResources.prefix(5), id: \.id) { relatedResource in
+        TMIGlassCard(style: .elevated) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Related Resources")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                
+                VStack(spacing: 12) {
+                    ForEach(relatedResources.prefix(3), id: \.id) { relatedResource in
                         NavigationLink(destination: ResourceDetailView(resource: relatedResource)) {
-                            RelatedResourceCard(resource: relatedResource)
+                            CompactResourceRow(resource: relatedResource)
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                 }
-                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, -20)
+            .padding(20)
         }
+        .padding(.horizontal)
         .opacity(animateContent ? 1 : 0)
-        .offset(y: animateContent ? 0 : 30)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.7), value: animateContent)
+        .offset(y: animateContent ? 0 : 20)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.35), value: animateContent)
     }
     
     // MARK: - Data Loading
     
-    @MainActor
     private func loadResourceData() async {
         isLoading = true
         
         do {
-            // Load related resources based on tags and category
+            // Load related resources
             relatedResources = try await resourceService.fetchResources(withTags: resource.tags)
-                .filter { $0.id != resource.id }
             
-            // If not enough related by tags, add some by category
-            if relatedResources.count < 3 {
-                let categoryResources = try await resourceService.fetchResources(category: resource.category)
-                    .filter { categoryResource in
-                        categoryResource.id != resource.id && !relatedResources.contains(where: { $0.id == categoryResource.id })
-                    }
-                
-                relatedResources.append(contentsOf: Array(categoryResources.prefix(3 - relatedResources.count)))
-            }
+            // Load career recommendations based on resource content
+            let allCareers = try await careerService.fetchAllCareers()
+            careerRecommendations = findRelatedCareers(from: allCareers)
             
         } catch {
-            // Fallback to sample data
-            relatedResources = Resource.sampleResources.filter {
-                $0.category == resource.category && $0.id != resource.id
-            }.prefix(3).map { $0 }
+            print("Failed to load resource data: \(error)")
         }
         
         isLoading = false
     }
     
-    @MainActor
-    private func toggleBookmark() async {
-        // This would integrate with a bookmark service
-        isBookmarked.toggle()
+    private func findRelatedCareers(from careers: [Career]) -> [Career] {
+        let resourceKeywords = Set(resource.tags.map { $0.lowercased() } + 
+                                 [resource.title.lowercased(), resource.category.rawValue.lowercased()])
+        
+        return careers.filter { career in
+            let careerKeywords = Set([career.field.lowercased(), career.title.lowercased()] + 
+                                   career.skills.map { $0.lowercased() })
+            return !careerKeywords.intersection(resourceKeywords).isEmpty
+        }.prefix(5).map { $0 }
     }
     
-    // MARK: - Helper Functions
+    // MARK: - Helper Methods
+    
+    private func toggleBookmark() async {
+        // Implement bookmark functionality
+        isBookmarked.toggle()
+        if isBookmarked {
+            showBookmarkConfirmation = true
+        }
+    }
     
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
-        formatter.timeStyle = .none
         return formatter.string(from: date)
+    }
+    
+    private func extractDomain(from urlString: String) -> String {
+        guard let url = URL(string: urlString) else { return "Unknown" }
+        return url.host ?? "Unknown"
     }
 }
 
 // MARK: - Supporting Views
 
-struct TagView: View {
-    let title: String
+struct MetadataRow: View {
+    let icon: String
+    let label: String
+    let value: String
     
     var body: some View {
-        Text(title)
-            .font(.system(size: 12, weight: .medium))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.blue.opacity(0.2))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.blue.opacity(0.5), lineWidth: 1)
-            )
-            .foregroundColor(.blue)
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(.white.opacity(0.7))
+                .frame(width: 20)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.6))
+                
+                Text(value)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+            }
+            
+            Spacer()
+        }
     }
 }
 
-struct RoleView: View {
-    let role: String
+struct CompactCareerCard: View {
+    let career: Career
     
     var body: some View {
-        Text(role)
-            .font(.system(size: 12, weight: .medium))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.tmiSecondary.opacity(0.2))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.tmiSecondary.opacity(0.5), lineWidth: 1)
-            )
-            .foregroundColor(.tmiSecondary)
-    }
-}
-
-struct RelatedResourceCard: View {
-    let resource: Resource
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: resource.category.icon)
+                Image(systemName: getCareerIcon(field: career.field))
                     .font(.system(size: 16))
-                    .foregroundColor(resource.category.color)
+                    .foregroundColor(.tmiSecondary)
                 
                 Spacer()
                 
-                if resource.isFeatured {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.yellow)
-                }
+                Text(career.field)
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.6))
             }
             
-            Text(resource.title)
+            Text(career.title)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
             
-            Text(resource.category.rawValue.capitalized)
-                .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.7))
-            
-            Spacer()
+            Text("$\(Int(career.salaryRange.lowerBound/1000))k+")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.tmiSecondary)
         }
-        .padding(16)
-        .frame(width: 160, height: 120)
+        .padding(12)
+        .frame(width: 140, height: 100)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white.opacity(0.05))
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(.ultraThinMaterial)
-                        .opacity(0.3)
+                        .opacity(0.8)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
                 )
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
-        )
+    }
+    
+    private func getCareerIcon(field: String) -> String {
+        switch field {
+        case "Technology": return "desktopcomputer"
+        case "Healthcare": return "heart.text.square"
+        case "Education": return "book"
+        case "Business": return "briefcase"
+        case "Engineering": return "gearshape.2"
+        case "Arts": return "paintpalette"
+        case "Science": return "atom"
+        default: return "star"
+        }
     }
 }
 
-// MARK: - Flow Layout
+struct CompactResourceRow: View {
+    let resource: Resource
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Category icon
+            ZStack {
+                Circle()
+                    .fill(resource.category.color.opacity(0.2))
+                    .frame(width: 40, height: 40)
+                
+                Image(systemName: resource.category.icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(resource.category.color)
+            }
+            
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                Text(resource.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                
+                Text(resource.description)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.5))
+        }
+        .padding(.vertical, 8)
+    }
+}
 
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-    
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        return layout(width: width, subviews: subviews)
+
+// MARK: - Safari Web View
+
+struct SafariWebView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        return SFSafariViewController(url: url)
     }
-    
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let width = proposal.width ?? bounds.width
-        
-        var origin = bounds.origin
-        var maxHeight: CGFloat = 0
-        
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            
-            if origin.x + size.width > width {
-                // Move to next row
-                origin.x = bounds.origin.x
-                origin.y += maxHeight + spacing
-                maxHeight = 0
-            }
-            
-            subview.place(at: origin, proposal: ProposedViewSize(size))
-            
-            maxHeight = max(maxHeight, size.height)
-            origin.x += size.width + spacing
-        }
-    }
-    
-    private func layout(width: CGFloat, subviews: Subviews) -> CGSize {
-        var origin = CGPoint.zero
-        var maxHeight: CGFloat = 0
-        var totalHeight: CGFloat = 0
-        
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            
-            if origin.x + size.width > width {
-                // Move to next row
-                origin.x = 0
-                origin.y += maxHeight + spacing
-                totalHeight += maxHeight + spacing
-                maxHeight = 0
-            }
-            
-            maxHeight = max(maxHeight, size.height)
-            origin.x += size.width + spacing
-        }
-        
-        totalHeight += maxHeight
-        
-        return CGSize(width: width, height: totalHeight)
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {
+        // No updates needed
     }
 }
 
@@ -578,17 +605,18 @@ struct FlowLayout: Layout {
 
 struct ShareSheet: UIViewControllerRepresentable {
     let url: String
-    
+
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        let activityVC = UIActivityViewController(
-            activityItems: [URL(string: url) ?? url],
-            applicationActivities: nil
-        )
+        let items: [Any] = [url]
+        let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
         return activityVC
     }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No updates needed
+    }
 }
+
 
 // MARK: - Preview
 
@@ -597,4 +625,3 @@ struct ShareSheet: UIViewControllerRepresentable {
         ResourceDetailView(resource: Resource.sampleResources.first!)
     }
 }
-

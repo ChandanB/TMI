@@ -1,5 +1,5 @@
 //
-//  TMIPlanListViewRedesigned.swift
+//  TMIPlanListView.swift
 //  TMI
 //
 //  Unified TMI plans list with contextual information
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct TMIPlanListViewRedesigned: View {
+struct TMIPlanListView: View {
     @State private var stateModel = TMIPlanListStateModel()
     @State private var selectedTab: PlanTab = .active
     @State private var searchText = ""
@@ -44,7 +44,7 @@ struct TMIPlanListViewRedesigned: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            Color.tmiBackground
+            TMIBackgroundView(variant: .plans)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -54,7 +54,7 @@ struct TMIPlanListViewRedesigned: View {
                     .padding(.top, TMISpacing.sm)
 
                 // Search Bar
-                TMISearchBarRedesigned(text: $searchText, placeholder: "Search plans...")
+                TMISearchBar(text: $searchText, placeholder: "Search plans...")
                     .padding(.horizontal, TMISpacing.screenPadding)
                     .padding(.top, TMISpacing.md)
 
@@ -95,6 +95,12 @@ struct TMIPlanListViewRedesigned: View {
         }
         .refreshable {
             await stateModel.fetch()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TMIPlanCreated"))) { _ in
+            print("[TMIPlanList] Received TMIPlanCreated notification, refreshing plans...")
+            Task {
+                await stateModel.fetch()
+            }
         }
     }
 
@@ -249,7 +255,7 @@ struct TMIPlanListViewRedesigned: View {
     }
 
     private var emptyStateView: some View {
-        TMIEmptyStateRedesigned(
+        TMIEmptyState(
             icon: selectedTab == .active ? "doc.badge.plus" : "archivebox",
             title: selectedTab == .active ? "No Active Plans" : "No Completed Plans",
             message: selectedTab == .active ?
@@ -261,7 +267,7 @@ struct TMIPlanListViewRedesigned: View {
     }
 
     private func errorView(_ error: IdentifiableError) -> some View {
-        TMIEmptyStateRedesigned(
+        TMIEmptyState(
             icon: "exclamationmark.triangle",
             title: "Unable to Load",
             message: error.message,
@@ -275,9 +281,16 @@ struct TMIPlanListViewRedesigned: View {
     // MARK: - New Plan Selector
 
     private var newPlanSelector: some View {
-        StudentSelectorForPlanView(onStudentSelected: { _ in
-            showingNewPlan = false
-        })
+        StudentSelectorForPlanView(
+            onStudentSelected: { _ in
+                showingNewPlan = false
+            },
+            onPlanCreated: {
+                Task {
+                    await stateModel.refresh()
+                }
+            }
+        )
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
@@ -324,6 +337,6 @@ struct TMIPlanListViewRedesigned: View {
 
 #Preview {
     NavigationStack {
-        TMIPlanListViewRedesigned()
+        TMIPlanListView()
     }
 }

@@ -1602,7 +1602,7 @@ struct SalaryRangeSection: View {
             upperBound: salaryFilter.upperBound
           )
 
-          EnhancedRangeSlider(range: $salaryFilter, bounds: 20000...200000)
+          RangeSlider(range: $salaryFilter, bounds: 20000...200000)
             .frame(height: 40)
         }
       }
@@ -1641,7 +1641,7 @@ struct FilterBackground: View {
   }
 }
 
-struct EnhancedFilterSheet: View {
+struct FilterSheet: View {
   @Binding var salaryFilter: ClosedRange<Double>
   @Binding var selectedSkills: Set<String>
   var allSkills: [String]
@@ -1870,9 +1870,9 @@ struct SalaryAndGrowthRow: View {
   }
 }
 
-// MARK: - Enhanced Range Slider
+// MARK: - Range Slider
 
-struct EnhancedRangeSlider: View {
+struct RangeSlider: View {
   @Binding var range: ClosedRange<Double>
   let bounds: ClosedRange<Double>
 

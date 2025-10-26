@@ -12,8 +12,9 @@ import SwiftUI
 // Note: These are programmatic definitions. In a real app, you'd define these in the asset catalog.
 
 extension Color {
-    static let tmiPrimary = Color(light: #colorLiteral(red: 0.0653751418, green: 0.004413233139, blue: 0.238399297, alpha: 1), dark: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1))
-    static let tmiPrimaryDark = Color(light: #colorLiteral(red: 0.01977282949, green: 0.001201396808, blue: 0.0739999935, alpha: 1), dark: #colorLiteral(red: 0.5325596929, green: 0.5392637253, blue: 0.5391458273, alpha: 1))
+    // Gentle blue that works well in both light and dark modes
+    static let tmiPrimary = Color(light: #colorLiteral(red: 0.2901960784, green: 0.5647058824, blue: 0.8862745098, alpha: 1), dark: #colorLiteral(red: 0.3764705882, green: 0.6431372549, blue: 0.9490196078, alpha: 1))
+    static let tmiPrimaryDark = Color(light: #colorLiteral(red: 0.2196078431, green: 0.4431372549, blue: 0.7058823529, alpha: 1), dark: #colorLiteral(red: 0.2901960784, green: 0.5647058824, blue: 0.8862745098, alpha: 1))
     static let tmiSecondary = Color(light: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1), dark: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1))
     static let tmiBackground = Color(light: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1), dark: #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1))
     static let tmiText = Color(light: #colorLiteral(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006, alpha: 1), dark: #colorLiteral(red: 0.8498495817, green: 0.9484829307, blue: 0.9581733346, alpha: 1))

@@ -36,11 +36,17 @@ struct TMIApp: App {
 
 struct ContentView: View {
     @Environment(\.authStateModel) var authStateModel
-    
+
     var body: some View {
         Group {
             if authStateModel.isLoggedIn {
-                MainTabView()
+                // Route based on user role
+                if authStateModel.currentUser?.role == .student {
+                    StudentMainView()
+                } else {
+                    // Staff/parent view
+                    MainTabView()
+                }
             } else {
                 AuthenticationView()
             }

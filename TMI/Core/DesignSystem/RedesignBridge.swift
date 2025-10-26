@@ -93,9 +93,8 @@ extension TMIAnimation {
 // Note: TMISizing and TMIElevation are defined in TMIDesignTokens.swift already
 
 // MARK: - Component Notes
-// TMIEmptyState and TMISearchBar already exist in the codebase
-// Redesigned views should use TMIEmptyStateRedesigned and TMISearchBarRedesigned
-// or be updated to use the existing components
+// TMIEmptyState and TMISearchBar components are now unified
+// All views should use TMIEmptyState and TMISearchBar (no "Redesigned" suffix)
 
 // MARK: - View Extension for Card Modifier
 

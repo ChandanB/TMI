@@ -1,5 +1,5 @@
 //
-//  NewTMIPlanViewRedesigned.swift
+//  NewTMIPlanView.swift
 //  TMI
 //
 //  Streamlined TMI plan creation with smart suggestions
@@ -7,9 +7,10 @@
 
 import SwiftUI
 
-struct NewTMIPlanViewRedesigned: View {
+struct NewTMIPlanView: View {
     @Environment(\.dismiss) private var dismiss
     let student: Student
+    let onPlanCreated: (() -> Void)?
 
     @State private var selectedModel: TMIPlanModel?
     @State private var planTitle = ""
@@ -20,6 +21,11 @@ struct NewTMIPlanViewRedesigned: View {
     @State private var errorMessage: String?
 
     private let tmiPlanService = TMIPlanService()
+
+    init(student: Student, onPlanCreated: (() -> Void)? = nil) {
+        self.student = student
+        self.onPlanCreated = onPlanCreated
+    }
 
     var suggestedModel: TMIPlanModel {
         // Smart suggestion based on student data
@@ -39,7 +45,7 @@ struct NewTMIPlanViewRedesigned: View {
 
     var body: some View {
         ZStack {
-            Color.tmiBackground
+            TMIBackgroundView(variant: .plans)
                 .ignoresSafeArea()
 
             ScrollView {
@@ -141,22 +147,35 @@ struct NewTMIPlanViewRedesigned: View {
     // MARK: - Suggested Model
 
     private var suggestedModelCard: some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
+        let suggestedColor = colorForModel(suggestedModel)
+        let suggestedIcon = iconForModel(suggestedModel)
+
+        return VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
-                Image(systemName: "sparkles")
-                    .foregroundColor(.tmiSecondary)
+                ZStack {
+                    Circle()
+                        .fill(suggestedColor.opacity(0.2))
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: suggestedIcon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(suggestedColor)
+                }
 
                 Text("Suggested Model")
                     .font(.tmiTitle3)
                     .foregroundColor(.tmiTextPrimary)
 
                 Spacer()
+
+                Image(systemName: "sparkles")
+                    .foregroundColor(suggestedColor)
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(suggestedModel.rawValue)
                     .font(.tmiLabelLarge)
-                    .foregroundColor(.tmiSecondary)
+                    .foregroundColor(suggestedColor)
 
                 Text(suggestedModel.description)
                     .font(.tmiCaption)
@@ -177,8 +196,12 @@ struct NewTMIPlanViewRedesigned: View {
             }
         }
         .padding(TMISpacing.md)
-        .background(Color.tmiSecondary.opacity(0.1))
+        .background(suggestedColor.opacity(0.1))
         .cornerRadius(TMIRadius.md)
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .stroke(suggestedColor.opacity(0.3), lineWidth: 1)
+        )
     }
 
     // MARK: - Model Selection
@@ -198,14 +221,25 @@ struct NewTMIPlanViewRedesigned: View {
     }
 
     private func modelOption(_ model: TMIPlanModel) -> some View {
-        Button(action: {
+        let modelColor = colorForModel(model)
+        let modelIcon = iconForModel(model)
+        let isSelected = selectedModel == model
+
+        return Button(action: {
             selectedModel = model
             planTitle = "\(model.rawValue) - \(student.name)"
         }) {
             HStack(spacing: TMISpacing.md) {
-                Image(systemName: selectedModel == model ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20))
-                    .foregroundColor(selectedModel == model ? .tmiPrimary : .tmiTextTertiary)
+                // Model Icon with color
+                ZStack {
+                    Circle()
+                        .fill(modelColor.opacity(isSelected ? 0.2 : 0.1))
+                        .frame(width: 40, height: 40)
+
+                    Image(systemName: modelIcon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(modelColor)
+                }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.rawValue)
@@ -219,14 +253,19 @@ struct NewTMIPlanViewRedesigned: View {
                 }
 
                 Spacer()
+
+                // Selection indicator
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundColor(isSelected ? modelColor : .tmiTextTertiary)
             }
             .padding(TMISpacing.md)
-            .background(selectedModel == model ? Color.tmiPrimary.opacity(0.1) : Color.tmiSurface)
+            .background(isSelected ? modelColor.opacity(0.1) : Color.tmiSurface)
             .cornerRadius(TMIRadius.sm)
             .overlay(
                 RoundedRectangle(cornerRadius: TMIRadius.sm)
                     .stroke(
-                        selectedModel == model ? Color.tmiPrimary : Color.clear,
+                        isSelected ? modelColor : Color.clear,
                         lineWidth: 2
                     )
             )
@@ -357,6 +396,30 @@ struct NewTMIPlanViewRedesigned: View {
         }
     }
 
+    // MARK: - Helper Methods
+
+    private func colorForModel(_ model: TMIPlanModel) -> Color {
+        switch model {
+        case .chaseYourSpace: return .blue
+        case .acknowledgeInterests: return .pink
+        case .alignYourMind: return .purple
+        case .directAndCorrect: return .orange
+        case .bullyToBoss: return .red
+        case .meekToProtector: return .green
+        }
+    }
+
+    private func iconForModel(_ model: TMIPlanModel) -> String {
+        switch model {
+        case .chaseYourSpace: return "airplane.departure"
+        case .acknowledgeInterests: return "heart.fill"
+        case .alignYourMind: return "brain.head.profile"
+        case .directAndCorrect: return "arrow.up.forward.circle.fill"
+        case .bullyToBoss: return "person.fill.badge.plus"
+        case .meekToProtector: return "shield.lefthalf.filled"
+        }
+    }
+
     // MARK: - Create Plan
 
     private func createPlan() {
@@ -386,6 +449,7 @@ struct NewTMIPlanViewRedesigned: View {
                 try await tmiPlanService.addPlan(plan)
 
                 await MainActor.run {
+                    onPlanCreated?()
                     dismiss()
                 }
             } catch {
@@ -400,6 +464,6 @@ struct NewTMIPlanViewRedesigned: View {
 
 #Preview {
     NavigationStack {
-        NewTMIPlanViewRedesigned(student: Student.sampleStudent)
+        NewTMIPlanView(student: Student.sampleStudent)
     }
 }

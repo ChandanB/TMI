@@ -349,26 +349,26 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                             .foregroundColor(.white.opacity(0.7))
                     }
                     
-                    HStack {
-                        Text("Email Status")
-                            .foregroundColor(.white)
-                        Spacer()
-                        if profileData.isEmailVerified {
-                            Label("Verified", systemImage: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                        } else {
-                            TMIButton(
-                                text: "Verify Now",
-                                style: .tertiary,
-                                action: {
-                                    Task {
-                                        await stateModel.sendVerificationEmail()
-                                    }
-                                }
-                            )
-                        }
-                    }
-                    
+//                    HStack {
+//                        Text("Email Status")
+//                            .foregroundColor(.white)
+//                        Spacer()
+//                        if profileData.isEmailVerified {
+//                            Label("Verified", systemImage: "checkmark.circle.fill")
+//                                .foregroundColor(.green)
+//                        } else {
+//                            TMIButton(
+//                                text: "Verify Now",
+//                                style: .tertiary,
+//                                action: {
+//                                    Task {
+//                                        await stateModel.sendVerificationEmail()
+//                                    }
+//                                }
+//                            )
+//                        }
+//                    }
+//                    
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Display Name")
                             .foregroundColor(.white)

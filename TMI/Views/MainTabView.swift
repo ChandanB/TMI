@@ -36,9 +36,9 @@ struct MainTabView: View {
       case .careerExplorer:
         return [] // Temporarily disabled for MVP
       case .interests:
-        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .student]
+        return [] // Temporarily disabled for MVP - [.teacher, .counselor, .administrator, .admin, .socialWorker, .student]
       case .resources:
-        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian]
+        return [] // Temporarily disabled for MVP - [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian]
       case .settings:
         return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .student]
       }
@@ -138,9 +138,9 @@ struct MainTabView: View {
     case .dashboard:
       DashboardView()
     case .students:
-      StudentListViewRedesigned()
+      StudentListView()
     case .tmiPlans:
-      TMIPlanListViewRedesigned()
+      TMIPlanListView()
     case .forms:
       FormsAndSurveysView()
     case .careerExplorer:

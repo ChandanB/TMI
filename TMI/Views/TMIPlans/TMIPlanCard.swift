@@ -53,7 +53,7 @@ struct TMIPlanCard: View {
               .frame(width: 40, height: 40)
 
             Circle()
-              .trim(from: 0, to: CGFloat(min(plan.progress, 1.0)))
+              .trim(from: 0, to: CGFloat(min(plan.calculatedProgress, 1.0)))
               .stroke(
                 progressGradient,
                 style: StrokeStyle(lineWidth: 4, lineCap: .round)
@@ -61,16 +61,16 @@ struct TMIPlanCard: View {
               .frame(width: 40, height: 40)
               .rotationEffect(.degrees(-90))
 
-            Text("\(Int(plan.progress * 100))%")
+            Text("\(plan.progressPercentage)%")
               .font(.system(size: 12, weight: .bold))
               .foregroundColor(.white)
           }
         }
 
         // Progress bar
-        ProgressView(value: plan.progress)
+        ProgressView(value: plan.calculatedProgress)
           .tmiProgressStyle(color: modelColor)
-          .animation(.spring(response: 0.3, dampingFraction: 0.7), value: plan.progress)
+          .animation(.spring(response: 0.3, dampingFraction: 0.7), value: plan.calculatedProgress)
       }
       .padding(.horizontal, 20)
       .padding(.top, 20)
@@ -174,17 +174,17 @@ struct TMIPlanCard: View {
   private var modelIcon: String {
     switch plan.model {
     case .chaseYourSpace:
-      return "rocket.fill"
+      return "airplane.departure"
     case .acknowledgeInterests:
       return "heart.fill"
     case .alignYourMind:
-      return "brain.head.profile.fill"
+      return "brain.head.profile"
     case .directAndCorrect:
       return "arrow.up.forward.circle.fill"
     case .bullyToBoss:
       return "person.fill.badge.plus"
     case .meekToProtector:
-      return "person.fill.turn.up"
+      return "shield.lefthalf.filled"
     }
   }
 

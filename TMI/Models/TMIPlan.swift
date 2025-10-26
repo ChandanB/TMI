@@ -41,7 +41,7 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     var endDate: Date?
     var creationDate: Date
     var lastUpdated: Date
-    let goals: [Goal]
+    var goals: [Goal]
     var progress: Double
     var notes: String
     var strategies: [String]?
@@ -77,10 +77,29 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     }
 
     // MARK: - Computed Properties
-    
+
     /// Primary student (first student in the list for backward compatibility)
     var primaryStudent: Student? {
         return students.first
+    }
+
+    /// Calculated progress based on goals
+    var calculatedProgress: Double {
+        guard !goals.isEmpty else { return 0.0 }
+
+        // Calculate average progress of all goals
+        let totalProgress = goals.reduce(0.0) { $0 + $1.progress }
+        return totalProgress / Double(goals.count)
+    }
+
+    /// Number of completed goals
+    var completedGoalsCount: Int {
+        goals.filter { $0.status == .completed }.count
+    }
+
+    /// Progress percentage as integer (0-100)
+    var progressPercentage: Int {
+        Int(calculatedProgress * 100)
     }
 
     // MARK: - Firestore Conversion
@@ -205,14 +224,14 @@ enum GoalStatus: String, Codable, CaseIterable, Sendable {
     case completed = "Completed"
 }
 
-struct Goal: Identifiable, Codable, Sendable {
+struct Goal: Identifiable, Codable, Sendable, Hashable {
     let id: UUID
     var description: String
     var dueDate: Date?
     var status: GoalStatus
     var progress: Double // Range from 0.0 to 1.0
     var notes: String?
-    
+
     // Initializer
     init(id: UUID = UUID(),
          description: String,
@@ -226,5 +245,13 @@ struct Goal: Identifiable, Codable, Sendable {
         self.status = status
         self.progress = progress
         self.notes = notes
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    static func == (lhs: Goal, rhs: Goal) -> Bool {
+        lhs.id == rhs.id
     }
 }

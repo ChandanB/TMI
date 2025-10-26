@@ -17,9 +17,9 @@ enum Field: Hashable {
   case password
 }
 
-// MARK: - Enhanced Authentication State
+// MARK: - Authentication State
 
-enum EnhancedAuthenticationState: Equatable {
+enum AuthenticationState: Equatable {
   case unauthenticated
   case registering(RegistrationStep)
   case authenticating
@@ -29,7 +29,7 @@ enum EnhancedAuthenticationState: Equatable {
   case error(AuthenticationError)
   case suspended(SuspensionReason)
 
-  static func == (lhs: EnhancedAuthenticationState, rhs: EnhancedAuthenticationState) -> Bool {
+  static func == (lhs: AuthenticationState, rhs: AuthenticationState) -> Bool {
     switch (lhs, rhs) {
     case (.unauthenticated, .unauthenticated):
       return true
@@ -382,7 +382,7 @@ extension EnvironmentValues {
 // MARK: - Auth State Model
 
 @Observable
-final class AuthStateModel: BaseStateModel<EnhancedAuthenticationState, IdentifiableError> {
+final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableError> {
 
   // MARK: - Dependencies
   private let firebaseManager: FirebaseManager
@@ -501,7 +501,7 @@ final class AuthStateModel: BaseStateModel<EnhancedAuthenticationState, Identifi
     return nil
   }
 
-  var currentAuthState: EnhancedAuthenticationState? {
+  var currentAuthState: AuthenticationState? {
     if case .loaded(let authState) = state {
       return authState
     }
@@ -670,14 +670,15 @@ final class AuthStateModel: BaseStateModel<EnhancedAuthenticationState, Identifi
                 print("[AuthStateModel] User may need additional consent for some features, userID=\(userID)")
             }
             
-            // Seed initial data for new educators (sample students, interests, hobbies)
-            // This ensures viable educator onboarding.
-            do {
-                try await firebaseManager.seedInitialEducatorDataIfNeeded()
-            } catch {
-                print("[AuthStateModel] Seeding initial educator data failed for userID=\(userID):", error)
-                // Optional: Log or handle seeding error silently
-            }
+            // DISABLED: Seed initial data for new educators (sample students, interests, hobbies)
+            // This was creating mock data on account creation which is no longer desired.
+            // Educators will start with a clean slate and add their own students.
+            // do {
+            //     try await firebaseManager.seedInitialEducatorDataIfNeeded()
+            // } catch {
+            //     print("[AuthStateModel] Seeding initial educator data failed for userID=\(userID):", error)
+            //     // Optional: Log or handle seeding error silently
+            // }
             
             // All checks passed - user is authenticated
             currentUser = user

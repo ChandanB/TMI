@@ -158,7 +158,7 @@ struct QuickActionsGrid: View {
         }
         .sheet(isPresented: $showingAddStudent) {
             NavigationStack {
-                AddStudentViewRedesigned(onComplete: {
+                AddStudentView(onComplete: {
                     showingAddStudent = false
                     // Refresh data after adding student
                     Task {
@@ -190,7 +190,7 @@ struct QuickActionsGrid: View {
         }
         .sheet(isPresented: $showingViewAllStudents) {
             NavigationStack {
-                StudentListViewRedesigned()
+                StudentListView()
             }
         }
     }
@@ -225,7 +225,7 @@ struct StudentsNeedingSupportView: View {
     var body: some View {
         Group {
             if studentsNeedingSupport.isEmpty {
-                TMIEmptyStateRedesigned(
+                TMIEmptyState(
                     icon: "checkmark.circle.fill",
                     title: "All Students Engaged",
                     message: "Great work! All your students are showing positive engagement levels.",
@@ -234,7 +234,7 @@ struct StudentsNeedingSupportView: View {
                 )
             } else {
                 List(studentsNeedingSupport) { student in
-                    NavigationLink(destination: StudentDetailViewRedesigned(student: student)) {
+                    NavigationLink(destination: StudentDetailView(student: student)) {
                         HStack(spacing: TMISpacing.md) {
                             TMIAvatar(
                                 initials: student.initials,
@@ -305,6 +305,12 @@ struct StudentSelectorForPlanView: View {
     @State private var selectedStudent: Student? = nil
     @State private var searchText = ""
     let onStudentSelected: (Student) -> Void
+    let onPlanCreated: (() -> Void)?
+
+    init(onStudentSelected: @escaping (Student) -> Void, onPlanCreated: (() -> Void)? = nil) {
+        self.onStudentSelected = onStudentSelected
+        self.onPlanCreated = onPlanCreated
+    }
 
     var filteredStudents: [Student] {
         if searchText.isEmpty {
@@ -318,13 +324,13 @@ struct StudentSelectorForPlanView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Search bar
-            TMISearchBarRedesigned(text: $searchText, placeholder: "Search students...")
+            TMISearchBar(text: $searchText, placeholder: "Search students...")
                 .padding(.horizontal, TMISpacing.screenPadding)
                 .padding(.vertical, TMISpacing.md)
 
             // Student list
             if studentStateModel.students.isEmpty {
-                TMIEmptyStateRedesigned(
+                TMIEmptyState(
                     icon: "person.crop.circle.badge.plus",
                     title: "No Students Yet",
                     message: "Add a student first before creating a TMI plan",
@@ -374,7 +380,7 @@ struct StudentSelectorForPlanView: View {
         }
         .sheet(item: $selectedStudent) { student in
             NavigationStack {
-                NewTMIPlanViewRedesigned(student: student)
+                NewTMIPlanView(student: student, onPlanCreated: onPlanCreated)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Cancel") {

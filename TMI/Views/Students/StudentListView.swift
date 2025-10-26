@@ -1,5 +1,5 @@
 //
-//  StudentListViewRedesigned.swift
+//  StudentListView.swift
 //  TMI
 //
 //  Simplified student list with integrated search and filters
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct StudentListViewRedesigned: View {
+struct StudentListView: View {
     @State private var stateModel = StudentListStateModel()
     @State private var searchText = ""
     @State private var selectedGradeFilter: String? = nil
@@ -82,12 +82,12 @@ struct StudentListViewRedesigned: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            Color.tmiBackground
+            TMIBackgroundView(variant: .default)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Search Bar
-                TMISearchBarRedesigned(text: $searchText, placeholder: "Search students...")
+                TMISearchBar(text: $searchText, placeholder: "Search students...")
                     .padding(.horizontal, TMISpacing.screenPadding)
                     .padding(.top, TMISpacing.sm)
 
@@ -126,7 +126,7 @@ struct StudentListViewRedesigned: View {
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showingAddStudent) {
             NavigationStack {
-                AddStudentViewRedesigned {
+                AddStudentView {
                     Task { await stateModel.fetch() }
                     showingAddStudent = false
                 }
@@ -176,7 +176,7 @@ struct StudentListViewRedesigned: View {
     private var studentList: some View {
         List {
             ForEach(filteredStudents) { student in
-                NavigationLink(destination: StudentDetailViewRedesigned(student: student)) {
+                NavigationLink(destination: StudentDetailView(student: student)) {
                     studentRow(student)
                 }
                 .listRowBackground(Color.clear)
@@ -225,7 +225,7 @@ struct StudentListViewRedesigned: View {
         }
         .sheet(item: $studentForNewPlan) { student in
             NavigationStack {
-                NewTMIPlanViewRedesigned(student: student)
+                NewTMIPlanView(student: student)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Cancel") {
@@ -432,7 +432,7 @@ struct StudentListViewRedesigned: View {
     }
 
     private var emptyStateView: some View {
-        TMIEmptyStateRedesigned(
+        TMIEmptyState(
             icon: searchText.isEmpty ? "heart.circle" : "magnifyingglass",
             title: searchText.isEmpty ? "Ready to Make an Impact" : "No Matches Found",
             message: searchText.isEmpty ?
@@ -444,7 +444,7 @@ struct StudentListViewRedesigned: View {
     }
 
     private func errorView(_ error: IdentifiableError) -> some View {
-        TMIEmptyStateRedesigned(
+        TMIEmptyState(
             icon: "exclamationmark.triangle",
             title: "Unable to Load",
             message: error.message,
@@ -473,12 +473,12 @@ extension TMIPlanModel {
 
 #Preview("With Students") {
     NavigationStack {
-        StudentListViewRedesigned()
+        StudentListView()
     }
 }
 
 #Preview("Empty") {
     NavigationStack {
-        StudentListViewRedesigned()
+        StudentListView()
     }
 }

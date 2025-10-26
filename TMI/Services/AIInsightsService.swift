@@ -85,7 +85,7 @@ final class AIInsightsService: Sendable  {
                 print("[AIInsightsService] Generated \(insights.count) Foundation Model insights")
                 return insights
             } else {
-                // Enhanced rule-based insights for iOS 18.0-25.x
+                // Rule-based insights for iOS 18.0-25.x
                 print("[AIInsightsService] Using enhanced rule-based insights (iOS 18-25)")
                 return generateRuleBasedInsights(from: dashboardData)
             }
