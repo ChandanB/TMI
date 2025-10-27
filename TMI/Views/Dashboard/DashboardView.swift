@@ -15,6 +15,48 @@ import SwiftUI
 import AppKit
 #endif
 
+// MARK: - Help Tooltip Button
+struct HelpTooltipButton: View {
+    let message: String
+    @State private var showTooltip = false
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Button(action: { withAnimation { showTooltip.toggle() } }) {
+                Image(systemName: "questionmark.circle.fill")
+                    .font(.system(size: 15))
+                    .foregroundColor(.tmiPrimary)
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                #if os(macOS)
+                withAnimation { showTooltip = hovering }
+                #endif
+            }
+
+            if showTooltip {
+                Text(message)
+                    .font(.system(size: 13))
+                    .foregroundColor(.white)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.85))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.tmiPrimary.opacity(0.7), lineWidth: 1)
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 220)
+                    .offset(y: 28)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .zIndex(99)
+            }
+        }
+        .padding(.leading, 2)
+    }
+}
+
 // MARK: - Dashboard Data Model
 
 struct DashboardData: Equatable, Sendable {
@@ -543,6 +585,7 @@ struct DashboardActivityRow: View {
   }
 }
 
+// TODO: Add `HelpTooltipButton` to other sections (Hero Card, Student Engagement, Insights, etc.) as needed.
 struct DashboardView: View {
     @Environment(\.dashboardStateModel) var stateModel
     @State private var studentStateModel = StudentListStateModel()
@@ -568,17 +611,6 @@ struct DashboardView: View {
                     errorView(error)
                 }
             }
-
-            // Hidden NavigationLinks for programmatic navigation
-            NavigationLink(destination: StudentListView(), isActive: $navigateToStudents) {
-                EmptyView()
-            }
-            .hidden()
-
-            NavigationLink(destination: TMIPlanListView(), isActive: $navigateToPlans) {
-                EmptyView()
-            }
-            .hidden()
         }
         .task {
             await stateModel.fetch()
@@ -599,6 +631,12 @@ struct DashboardView: View {
                     }
                 })
             }
+        }
+        .navigationDestination(isPresented: $navigateToStudents) {
+            StudentListView()
+        }
+        .navigationDestination(isPresented: $navigateToPlans) {
+            TMIPlanListView()
         }
     }
 
@@ -635,26 +673,26 @@ struct DashboardView: View {
     private func dashboardContent(_ data: DashboardData) -> some View {
         ScrollView {
             VStack(spacing: TMISpacing.lg) {
+                // Recent Activity Preview
+                recentActivitySection(data)
+                
+                // Quick Action Cards 
+                QuickActionsGrid()
+                
                 // Hero Section - Primary Insight
                 primaryInsightCard(data)
                     .padding(.top, TMISpacing.md)
 
-                // Quick Action Cards - NEW
-                QuickActionsGrid()
-
-                // Student Engagement Overview - NEW
-                StudentStatusWidget()
-
                 // Quick Stats Row
-                quickStatsRow(data)
+//                quickStatsRow(data)
 
                 // Engagement Chart (Simplified)
 //                if !data.engagementData.isEmpty {
 //                    engagementChart(data)
 //                }
-
-                // Recent Activity Preview
-                recentActivitySection(data)
+                
+                // Student Engagement Overview - NEW
+                StudentStatusWidget()
 
                 Spacer(minLength: TMISpacing.xxl)
             }
@@ -1033,7 +1071,7 @@ struct DashboardView: View {
                 Text("Recent Activity")
                     .font(.tmiTitle3)
                     .foregroundColor(.tmiTextPrimary)
-
+                HelpTooltipButton(message: "See the most recent student activity, surveys, and plan updates from the last few days.")
                 Spacer()
 
                 if !data.recentActivities.isEmpty {

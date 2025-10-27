@@ -125,32 +125,32 @@ final class ProductionTMIManager: ObservableObject {
 // MARK: - Production Environment Values
 
 private struct ProductionTMIManagerKey: EnvironmentKey {
-    static var defaultValue: ProductionTMIManager {
+    @MainActor static var defaultValue: ProductionTMIManager {
         // Use shared instance since class is MainActor-isolated
         ProductionTMIManager.shared
     }
 }
 
 private struct ErrorHandlerKey: EnvironmentKey {
-    static var defaultValue: ErrorHandler {
+    @MainActor static var defaultValue: ErrorHandler {
         // Use shared instance since initializer is private
         ErrorHandler.shared
     }
 }
 
 private struct PerformanceMonitorKey: EnvironmentKey {
-    static var defaultValue: PerformanceMonitor {
+    @MainActor static var defaultValue: PerformanceMonitor {
         PerformanceMonitor.shared
     }
 }
 
 private struct SecureStorageKey: EnvironmentKey {
-    static var defaultValue: SecureStorage {
+    @MainActor static var defaultValue: SecureStorage {
         SecureStorage.shared
     }
 }
 
-extension EnvironmentValues {
+@MainActor extension EnvironmentValues {
     var productionManager: ProductionTMIManager {
         get { self[ProductionTMIManagerKey.self] }
         set { self[ProductionTMIManagerKey.self] = newValue }

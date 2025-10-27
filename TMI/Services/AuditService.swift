@@ -198,7 +198,7 @@ final class AuditService {
 
   // MARK: - State
   private var isProcessingBatch = false
-  private nonisolated(unsafe) var batchProcessingTask: Task<Void, Never>?
+    private nonisolated(unsafe) var batchProcessingTask: Task<Void, Never>?
 
   // MARK: - Initialization
 

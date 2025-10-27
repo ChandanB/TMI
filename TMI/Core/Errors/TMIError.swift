@@ -190,7 +190,7 @@ extension TMIError {
                 return "The app is undergoing maintenance. Please try again later"
             case .securityError:
                 return "A security error occurred. Please contact support."
-            @unknown default:
+            default:
                 return "An unexpected error occurred"
             }
         }
@@ -373,3 +373,4 @@ extension TMIError {
         )
     }
 }
+

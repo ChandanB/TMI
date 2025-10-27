@@ -86,6 +86,16 @@ struct StudentListView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text("Students")
+                        .font(.largeTitle).bold()
+                        .foregroundColor(.tmiTextPrimary)
+                    HelpTooltipButton(message: "Browse, search, and filter all students. You can add new students or view details about each student’s progress and plans.")
+                    Spacer()
+                }
+                .padding(.horizontal, TMISpacing.screenPadding)
+                .padding(.top, TMISpacing.screenPadding)
+
                 // Search Bar
                 TMISearchBar(text: $searchText, placeholder: "Search students...")
                     .padding(.horizontal, TMISpacing.screenPadding)

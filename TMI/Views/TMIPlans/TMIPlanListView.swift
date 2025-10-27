@@ -7,6 +7,48 @@
 
 import SwiftUI
 
+// MARK: - Help Tooltip Button
+struct TMIHelpTooltipButton: View {
+    let message: String
+    @State private var showTooltip = false
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Button(action: { withAnimation { showTooltip.toggle() } }) {
+                Image(systemName: "questionmark.circle.fill")
+                    .font(.system(size: 15))
+                    .foregroundColor(.tmiPrimary)
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                #if os(macOS)
+                withAnimation { showTooltip = hovering }
+                #endif
+            }
+
+            if showTooltip {
+                Text(message)
+                    .font(.system(size: 13))
+                    .foregroundColor(.white)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.85))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.tmiPrimary.opacity(0.7), lineWidth: 1)
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 220)
+                    .offset(y: 28)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .zIndex(99)
+            }
+        }
+        .padding(.leading, 2)
+    }
+}
+
 struct TMIPlanListView: View {
     @State private var stateModel = TMIPlanListStateModel()
     @State private var selectedTab: PlanTab = .active
@@ -48,6 +90,16 @@ struct TMIPlanListView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text("TMI Plans")
+                        .font(.largeTitle).bold()
+                        .foregroundColor(.tmiTextPrimary)
+                    TMIHelpTooltipButton(message: "View and manage all trauma-informed intervention plans. Filter by status, search, and access detailed plans for each student or group.")
+                    Spacer()
+                }
+                .padding(.horizontal, TMISpacing.screenPadding)
+                .padding(.top, TMISpacing.screenPadding)
+
                 // Tab Selector
                 tabSelector
                     .padding(.horizontal, TMISpacing.screenPadding)
@@ -340,3 +392,4 @@ struct TMIPlanListView: View {
         TMIPlanListView()
     }
 }
+

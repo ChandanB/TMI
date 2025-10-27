@@ -98,16 +98,18 @@ struct StudentStatusWidget: View {
             .frame(height: 160)
             .chartBackground { chartProxy in
                 GeometryReader { geometry in
-                    let frame = geometry[chartProxy.plotAreaFrame]
-                    VStack(spacing: 2) {
-                        Text("\(stateModel.filteredStudents.count)")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.tmiTextPrimary)
-                        Text("Students")
-                            .font(.tmiCaption)
-                            .foregroundColor(.tmiTextSecondary)
+                    if let plotFrame = chartProxy.plotFrame {
+                        let frame = geometry[plotFrame]
+                        VStack(spacing: 2) {
+                            Text("\(stateModel.filteredStudents.count)")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundColor(.tmiTextPrimary)
+                            Text("Students")
+                                .font(.tmiCaption)
+                                .foregroundColor(.tmiTextSecondary)
+                        }
+                        .position(x: frame.midX, y: frame.midY)
                     }
-                    .position(x: frame.midX, y: frame.midY)
                 }
             }
             .onAppear {
@@ -318,3 +320,4 @@ struct StudentStatusBar: View {
     }
     .background(Color.tmiBackground)
 }
+
