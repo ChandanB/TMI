@@ -23,6 +23,8 @@ struct StudentDetailView: View {
     @State private var interestsStateModel = InterestsAndHobbiesStateModel()
     @State private var studentService = StudentService()
 
+    @Environment(\.studentModeSession) private var studentModeSession
+
     init(student: Student) {
         self.initialStudent = student
         _student = State(initialValue: student)
@@ -165,33 +167,44 @@ struct StudentDetailView: View {
     // MARK: - Quick Actions
 
     private var quickActionsRow: some View {
-        HStack(spacing: TMISpacing.md) {
-            quickActionButton(
-                icon: "doc.badge.plus",
-                label: "Create Plan",
-                action: { showingCreatePlan = true }
-            )
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: TMISpacing.md) {
+                quickActionButton(
+                    icon: "person.crop.circle.badge.checkmark",
+                    label: "Student Mode",
+                    color: .tmiSuccess,
+                    action: { enableStudentMode() }
+                )
 
-            quickActionButton(
-                icon: "list.clipboard",
-                label: "View Plans",
-                action: { showingAllPlans = true }
-            )
+                quickActionButton(
+                    icon: "doc.badge.plus",
+                    label: "Create Plan",
+                    action: { showingCreatePlan = true }
+                )
 
-            quickActionButton(
-                icon: "chart.bar",
-                label: "Progress",
-                action: { showingProgress = true }
-            )
+                quickActionButton(
+                    icon: "list.clipboard",
+                    label: "View Plans",
+                    action: { showingAllPlans = true }
+                )
+
+                quickActionButton(
+                    icon: "chart.bar",
+                    label: "Progress",
+                    action: { showingProgress = true }
+                )
+            }
+            .padding(.horizontal, TMISpacing.screenPadding)
         }
+        .padding(.horizontal, -TMISpacing.screenPadding)
     }
 
-    private func quickActionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+    private func quickActionButton(icon: String, label: String, color: Color = .tmiPrimary, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: TMISpacing.sm) {
                 Image(systemName: icon)
                     .font(.system(size: 24))
-                    .foregroundColor(.tmiPrimary)
+                    .foregroundColor(color)
 
                 Text(label)
                     .font(.tmiCaption)
@@ -720,6 +733,13 @@ struct StudentDetailView: View {
             // If fetch fails, keep using the existing student
             print("Failed to refresh student: \(error)")
         }
+    }
+
+    // MARK: - Student Mode
+
+    private func enableStudentMode() {
+        print("[StudentDetail] 🎓 Enabling student mode for: \(student.name)")
+        studentModeSession.startStudentMode(for: student)
     }
 }
 

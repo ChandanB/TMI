@@ -9,6 +9,7 @@ import SwiftUI
 
 struct StudentSurveyFlow: View {
     let studentId: String
+    var showCancelButton: Bool = true
 
     @Environment(\.dismiss) private var dismiss
     @State private var currentStepIndex = 0
@@ -61,7 +62,11 @@ struct StudentSurveyFlow: View {
                 SurveyResultsView(
                     studentId: studentId,
                     responses: responses,
-                    surveyDuration: Date().timeIntervalSince(surveyStartTime)
+                    surveyDuration: Date().timeIntervalSince(surveyStartTime),
+                    onDismiss: {
+                        // Dismiss the entire survey modal
+                        dismiss()
+                    }
                 )
             } else {
                 VStack(spacing: 0) {
@@ -86,9 +91,11 @@ struct StudentSurveyFlow: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(currentStepIndex > 0)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
-                    dismiss()
+            if showCancelButton {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
                 }
             }
         }

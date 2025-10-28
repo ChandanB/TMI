@@ -305,6 +305,9 @@ final class SurveyService: @unchecked Sendable {
     let clusters = analyzeInterests(from: responses)
     let topInterests = extractTopInterests(from: clusters)
 
+    // Convert clusters to actual Interest objects
+    let interests = convertClustersToInterests(clusters)
+
     // Create survey response
     let surveyResponse = SurveyResponse(
       id: UUID(),
@@ -324,7 +327,7 @@ final class SurveyService: @unchecked Sendable {
 
     try await docRef.setData(surveyResponse.toFirestoreData())
 
-    // Update student document with latest survey reference
+    // Update student document with latest survey reference AND interests
     let studentRef = firestore
       .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
       .collection(FirestoreCollection.students.rawValue).document(studentId)
@@ -333,10 +336,24 @@ final class SurveyService: @unchecked Sendable {
       "latestSurveyId": surveyResponse.id.uuidString,
       "lastSurveyDate": Timestamp(date: surveyResponse.completedAt),
       "interestClusters": clusters.map { $0.toFirestoreData() },
-      "topInterests": topInterests
+      "topInterests": topInterests,
+      "interests": interests.map { $0.toFirestoreData() }  // ← ADD ACTUAL INTERESTS
     ])
 
-    print("[Data] Interest survey saved for student: \(studentId)")
+    print("[SurveyService] ✅ Survey saved with \(interests.count) interests for student: \(studentId)")
+
+    // Synchronize interests to all TMI Plans for this student
+    Task {
+      do {
+        try await StudentInterestSynchronizer.shared.synchronizeInterests(
+          for: studentId,
+          newInterests: interests
+        )
+        print("[SurveyService] ✅ Synchronized interests to TMI Plans")
+      } catch {
+        print("[SurveyService] ⚠️ Failed to synchronize interests to plans: \(error.localizedDescription)")
+      }
+    }
 
     return surveyResponse
   }
@@ -438,6 +455,63 @@ final class SurveyService: @unchecked Sendable {
     }
 
     return results.sorted { $0.weight > $1.weight }
+  }
+
+  /// Convert interest clusters to actual Interest objects
+  private func convertClustersToInterests(_ clusters: [InterestCluster]) -> [Interest] {
+    print("[SurveyService] Converting \(clusters.count) interest clusters to Interest objects")
+
+    return clusters.compactMap { cluster in
+      // Try to map cluster name to InterestCategory
+      let category: InterestCategory
+      switch cluster.name.lowercased() {
+      case let name where name.contains("science") || name.contains("discovery"):
+        category = .science
+      case let name where name.contains("art") || name.contains("creative"):
+        category = .arts
+      case let name where name.contains("sport") || name.contains("athletic"):
+        category = .sports
+      case let name where name.contains("music") || name.contains("audio"):
+        category = .music
+      case let name where name.contains("tech") || name.contains("computer"):
+        category = .technology
+      case let name where name.contains("math"):
+        category = .mathematics
+      case let name where name.contains("reading") || name.contains("writing") || name.contains("literature"):
+        category = .literature
+      case let name where name.contains("social") || name.contains("community"):
+        category = .social
+      case let name where name.contains("outdoor") || name.contains("nature"):
+        category = .outdoors
+      case let name where name.contains("gaming") || name.contains("video") || name.contains("entertainment"):
+        category = .entertainment
+      case let name where name.contains("food") || name.contains("cooking") || name.contains("culinary"):
+        category = .cooking
+      case let name where name.contains("leadership") || name.contains("service") || name.contains("volunteer"):
+        category = .leadership
+      case let name where name.contains("health") || name.contains("wellness"):
+        category = .wellness
+      case let name where name.contains("craft") || name.contains("making") || name.contains("building"):
+        category = .crafts
+      case let name where name.contains("photo"):
+        category = .photography
+      case let name where name.contains("academic"):
+        category = .academics
+      default:
+        category = .other
+      }
+
+      let interest = Interest(
+        id: cluster.id.uuidString,
+        name: cluster.displayName,
+        category: [category],
+        description: "Interest selected from survey",
+        popularityScore: Int(cluster.weight * 100)
+      )
+
+      print("[SurveyService] Created interest: \(interest.name) (category: \(category.rawValue))")
+      return interest
+    }
   }
 
   private func extractTopInterests(from clusters: [InterestCluster]) -> [String] {

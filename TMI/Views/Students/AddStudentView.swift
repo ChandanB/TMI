@@ -470,23 +470,37 @@ struct AddStudentView: View {
         .sheet(isPresented: $showingSurvey) {
             if let studentId = createdStudentId {
                 NavigationStack {
-                    StudentSurveyFlow(studentId: studentId)
+                    StudentSurveyFlow(studentId: studentId, showCancelButton: false)
+                        .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
+                            ToolbarItem(placement: .topBarTrailing) {
                                 Button("Skip") {
                                     showingSurvey = false
                                     onComplete()
                                 }
+                                .font(.tmiBody)
                                 .foregroundColor(.tmiPrimary)
                             }
                         }
                 }
+                .presentationDragIndicator(.visible)
+                .interactiveDismissDisabled(false)
                 .onDisappear {
                     // When survey is dismissed (completed or skipped), call onComplete
                     if !showingSurvey {
                         onComplete()
                     }
                 }
+            } else {
+                // Fallback if studentId is nil
+                VStack(spacing: 20) {
+                    ProgressView()
+                    Text("Loading survey...")
+                        .font(.tmiBody)
+                        .foregroundColor(.tmiTextSecondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.tmiBackground)
             }
         }
         .onAppear {
@@ -538,10 +552,16 @@ struct AddStudentView: View {
                 let savedStudent = try await studentService.addStudent(student)
 
                 await MainActor.run {
+                    isSaving = false
+
                     if launchSurveyImmediately, let studentId = savedStudent.id {
-                        // Store student ID and show survey
+                        // Store student ID and show survey after a slight delay
                         createdStudentId = studentId
-                        showingSurvey = true
+
+                        // Delay to ensure state is settled before showing sheet
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showingSurvey = true
+                        }
                     } else {
                         // Complete without survey
                         onComplete()

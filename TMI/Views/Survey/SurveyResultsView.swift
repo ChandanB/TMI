@@ -11,6 +11,7 @@ struct SurveyResultsView: View {
     let studentId: String
     let responses: [String: SurveyResponse.SurveyAnswerValue]
     let surveyDuration: TimeInterval
+    var onDismiss: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @State private var showConfetti = false
@@ -254,7 +255,12 @@ struct SurveyResultsView: View {
                 }
 
                 Button(action: {
-                    dismiss()
+                    // Call dismiss callback if provided, otherwise use environment dismiss
+                    if let onDismiss = onDismiss {
+                        onDismiss()
+                    } else {
+                        dismiss()
+                    }
                 }) {
                     Text("Return to Dashboard")
                         .font(.tmiBody)

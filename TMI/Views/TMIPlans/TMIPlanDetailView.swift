@@ -33,6 +33,11 @@ struct TMIPlanDetailView: View {
     @State private var showingAllResources = false
     @State private var showingAddResource = false
 
+    // Meetings
+    @State private var showingScheduleMeeting = false
+    @State private var scheduledMeetings: [Meeting] = []
+    @State private var isLoadingMeetings = false
+
     init(plan: TMIPlan) {
         self.initialPlan = plan
         _plan = State(initialValue: plan)
@@ -60,7 +65,10 @@ struct TMIPlanDetailView: View {
                     // 5. Goals & Progress - What are we achieving?
                     goalsAndProgressSection
 
-                    // 6. Collaboration Notes - Teacher/counselor communication
+                    // 6. Scheduled Meetings - Check-ins and progress reviews
+                    scheduledMeetingsSection
+
+                    // 7. Collaboration Notes - Teacher/counselor communication
                     collaborationNotesSection
 
                     Spacer(minLength: TMISpacing.xxl)
@@ -197,11 +205,26 @@ struct TMIPlanDetailView: View {
                     }
             }
         }
+        .sheet(isPresented: $showingScheduleMeeting) {
+            NavigationStack {
+                ScheduleMeetingView(
+                    planId: plan.id ?? "",
+                    relatedStudentIds: plan.students.compactMap { $0.id },
+                    onComplete: {
+                        Task {
+                            await loadMeetings()
+                        }
+                    }
+                )
+            }
+        }
         .refreshable {
             await refreshPlan()
+            await loadMeetings()
         }
         .task {
             await generateResourcesForInterests()
+            await loadMeetings()
         }
         .preferredColorScheme(.dark)
     }
@@ -257,19 +280,42 @@ struct TMIPlanDetailView: View {
                         .tracking(0.5)
                 }
 
-                Text(nextActionText)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(TMISpacing.md)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: TMIRadius.md)
-                            .fill(modelColor.opacity(0.15))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: TMIRadius.md)
-                            .strokeBorder(modelColor.opacity(0.3), lineWidth: 1)
-                    )
+                VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                    Text(nextActionText)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // Show action button if relevant
+                    if shouldShowScheduleMeetingButton {
+                        Button(action: { showingScheduleMeeting = true }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "calendar.badge.plus")
+                                    .font(.system(size: 14))
+                                Text("Schedule Check-In")
+                                    .font(.system(size: 15, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, TMISpacing.md)
+                            .padding(.vertical, TMISpacing.sm)
+                            .background(
+                                Capsule()
+                                    .fill(modelColor)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(TMISpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: TMIRadius.md)
+                        .fill(modelColor.opacity(0.15))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: TMIRadius.md)
+                        .strokeBorder(modelColor.opacity(0.3), lineWidth: 1)
+                )
             }
 
             // Associated students
@@ -636,6 +682,109 @@ struct TMIPlanDetailView: View {
         )
     }
 
+    // MARK: - Scheduled Meetings Section
+
+    private var scheduledMeetingsSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.circle.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.tmiSecondary)
+
+                Text("Scheduled Meetings")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                if !scheduledMeetings.isEmpty {
+                    Text("\(scheduledMeetings.count)")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.tmiSecondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.tmiSecondary.opacity(0.2))
+                        )
+                }
+
+                Button(action: { showingScheduleMeeting = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.tmiSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if isLoadingMeetings {
+                HStack {
+                    ProgressView()
+                        .tint(.white)
+                    Text("Loading meetings...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .padding(TMISpacing.lg)
+                .frame(maxWidth: .infinity, alignment: .center)
+            } else if scheduledMeetings.isEmpty {
+                VStack(spacing: TMISpacing.sm) {
+                    Text("No meetings scheduled")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+
+                    Button(action: { showingScheduleMeeting = true }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "calendar.badge.plus")
+                            Text("Schedule First Meeting")
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.tmiSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(TMISpacing.lg)
+            } else {
+                VStack(spacing: TMISpacing.sm) {
+                    ForEach(scheduledMeetings.prefix(5)) { meeting in
+                        MeetingCard(meeting: meeting, modelColor: modelColor)
+                    }
+
+                    if scheduledMeetings.count > 5 {
+                        Button(action: {
+                            // TODO: Show all meetings view
+                        }) {
+                            HStack {
+                                Text("View all \(scheduledMeetings.count) meetings")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundColor(.tmiSecondary)
+                            .padding(TMISpacing.md)
+                            .background(
+                                RoundedRectangle(cornerRadius: TMIRadius.md)
+                                    .fill(Color.tmiSecondary.opacity(0.1))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(TMISpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(Color.white.opacity(0.05))
+                .background(.ultraThinMaterial.opacity(0.3))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+        )
+    }
+
     // MARK: - Collaboration Notes Section
 
     private var collaborationNotesSection: some View {
@@ -727,6 +876,10 @@ struct TMIPlanDetailView: View {
         } else {
             return "Prepare for transition planning and celebrate achievements"
         }
+    }
+
+    private var shouldShowScheduleMeetingButton: Bool {
+        !plan.interests.isEmpty && !plan.goals.isEmpty && plan.calculatedProgress < 0.3
     }
 
     private var modelStrategies: [String] {
@@ -911,6 +1064,23 @@ struct TMIPlanDetailView: View {
         }
     }
 
+    @MainActor
+    private func loadMeetings() async {
+        guard let planId = plan.id else { return }
+
+        isLoadingMeetings = true
+        defer { isLoadingMeetings = false }
+
+        do {
+            let meetings = try await MeetingService.shared.fetchMeetings(for: planId)
+            scheduledMeetings = meetings.sorted { $0.startTime < $1.startTime }
+            print("[TMIPlanDetail] Loaded \(meetings.count) meetings for plan")
+        } catch {
+            print("[TMIPlanDetail] Error loading meetings: \(error)")
+            scheduledMeetings = []
+        }
+    }
+
     // MARK: - AI Resource Generation
 
     @MainActor
@@ -999,6 +1169,139 @@ struct TMIPlanDetailView: View {
 }
 
 // MARK: - Supporting Components
+
+struct MeetingCard: View {
+    let meeting: Meeting
+    let modelColor: Color
+
+    private var statusColor: Color {
+        switch meeting.status {
+        case .scheduled, .confirmed: return .tmiPrimary
+        case .completed: return .tmiSuccess
+        case .cancelled: return .tmiTextTertiary
+        case .rescheduled: return .tmiWarning
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                // Meeting type icon
+                ZStack {
+                    Circle()
+                        .fill(Color(hex: meeting.meetingType.color).opacity(0.2))
+                        .frame(width: 40, height: 40)
+
+                    Image(systemName: meeting.meetingType.icon)
+                        .font(.system(size: 18))
+                        .foregroundColor(Color(hex: meeting.meetingType.color))
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(meeting.title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 11))
+                        Text(formattedDate(meeting.startTime))
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(.white.opacity(0.7))
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 11))
+                        Text("\(formattedTime(meeting.startTime)) - \(formattedTime(meeting.endTime))")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(.white.opacity(0.7))
+
+                    if let location = meeting.location {
+                        HStack(spacing: 4) {
+                            Image(systemName: "location")
+                                .font(.system(size: 11))
+                            Text(location)
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+
+                Spacer()
+
+                // Status badge
+                Text(meeting.status.rawValue)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(statusColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(statusColor.opacity(0.2))
+                    )
+            }
+
+            // Participants
+            if !meeting.participants.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Participants:")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+
+                    HStack(spacing: 6) {
+                        ForEach(meeting.participants.prefix(3)) { participant in
+                            HStack(spacing: 4) {
+                                Image(systemName: participant.role.icon)
+                                    .font(.system(size: 10))
+                                Text(participant.name)
+                                    .font(.system(size: 11))
+                            }
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.1))
+                            )
+                        }
+
+                        if meeting.participants.count > 3 {
+                            Text("+\(meeting.participants.count - 3)")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(TMISpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .strokeBorder(modelColor.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
+
+    private func formattedTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+}
 
 struct StudentMiniCard: View {
     let student: Student

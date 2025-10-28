@@ -10,11 +10,14 @@ import SwiftUI
 struct MainTabView: View {
   @State private var selectedTab: Tab = .dashboard
   @Environment(\.authStateModel) private var authStateModel
-  
+
+  // Student Mode
+  @State private var studentModeSession = StudentModeSession()
+
   // Sheet state
   @State private var showingUserProfile = false
   @State private var showingSignOutConfirmation = false
-  
+
   // State models
   @State private var interestsStateModel = InterestsAndHobbiesStateModel()
 
@@ -70,6 +73,22 @@ struct MainTabView: View {
   }
 
   var body: some View {
+    Group {
+      if let activeStudent = studentModeSession.activeStudent {
+        // Student Mode - Restricted Interface
+        StudentModeView(student: activeStudent)
+          .environment(studentModeSession)
+      } else {
+        // Staff Mode - Full Interface
+        staffTabView
+          .environment(studentModeSession)
+      }
+    }
+  }
+
+  // MARK: - Staff Tab View
+
+  private var staffTabView: some View {
     TabView(selection: $selectedTab) {
       ForEach(availableTabs, id: \.self) { tab in
         NavigationStack {
