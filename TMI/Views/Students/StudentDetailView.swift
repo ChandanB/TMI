@@ -209,8 +209,10 @@ struct StudentDetailView: View {
                 Text(label)
                     .font(.tmiCaption)
                     .foregroundColor(.tmiTextSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity)
+            .frame(width: 100, height: 80)
             .padding(.vertical, TMISpacing.md)
             .background(Color.tmiSurface)
             .cornerRadius(TMIRadius.md)
@@ -738,8 +740,13 @@ struct StudentDetailView: View {
     // MARK: - Student Mode
 
     private func enableStudentMode() {
-        print("[StudentDetail] 🎓 Enabling student mode for: \(student.name)")
-        studentModeSession.startStudentMode(for: student)
+        print("[StudentDetail] 🎓 Button tapped - Enabling student mode for: \(student.name)")
+
+        // Use Task to avoid "modifying state during view update" warning
+        Task { @MainActor in
+            studentModeSession.startStudentMode(for: student)
+            print("[StudentDetail] 🎓 Active student after start: \(studentModeSession.activeStudent?.name ?? "nil")")
+        }
     }
 }
 

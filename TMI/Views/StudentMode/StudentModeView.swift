@@ -16,76 +16,52 @@ struct StudentModeView: View {
     @State private var isExiting = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.tmiBackground
-                    .ignoresSafeArea()
+        ZStack {
+            Color.tmiBackground
+                .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    // Student header
-                    studentHeader
+            VStack(spacing: 0) {
+                // Custom header with exit button
+                customHeader
 
-                    // Tab view
-                    TabView(selection: $selectedTab) {
-                        // My Interests
-                        StudentInterestsTab(student: student)
-                            .tag(0)
-                            .tabItem {
-                                Label("My Interests", systemImage: "heart.fill")
-                            }
+                // Student header
+                studentHeader
 
-                        // Career Explorer
-                        StudentCareersTab(student: student)
-                            .tag(1)
-                            .tabItem {
-                                Label("Careers", systemImage: "briefcase.fill")
-                            }
-
-                        // My Progress
-                        StudentProgressTab(student: student)
-                            .tag(2)
-                            .tabItem {
-                                Label("My Progress", systemImage: "chart.line.uptrend.xyaxis")
-                            }
-                    }
-                    .tint(.tmiPrimary)
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Student Mode")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { showingExitConfirmation = true }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "lock.shield.fill")
-                            Text("Exit")
+                // Tab view
+                TabView(selection: $selectedTab) {
+                    // My Interests
+                    StudentInterestsTab(student: student)
+                        .tag(0)
+                        .tabItem {
+                            Label("My Interests", systemImage: "heart.fill")
                         }
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.tmiWarning)
-                    }
-                    .disabled(isExiting)
+
+                    // Career Explorer
+                    StudentCareersTab(student: student)
+                        .tag(1)
+                        .tabItem {
+                            Label("Careers", systemImage: "briefcase.fill")
+                        }
+
+                    // My Progress
+                    StudentProgressTab(student: student)
+                        .tag(2)
+                        .tabItem {
+                            Label("My Progress", systemImage: "chart.line.uptrend.xyaxis")
+                        }
                 }
+                .tint(.tmiPrimary)
             }
-            .alert("Exit Student Mode?", isPresented: $showingExitConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Exit", role: .destructive) {
-                    exitStudentMode()
-                }
-            } message: {
-                Text("Staff authentication required to exit student mode.")
-            }
-            .interactiveDismissDisabled(true) // Prevent swipe-to-dismiss
-            .gesture(
-                // Disable back gestures
-                DragGesture()
-                    .onChanged { _ in }
-            )
         }
+        .alert("Exit Student Mode?", isPresented: $showingExitConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Exit", role: .destructive) {
+                exitStudentMode()
+            }
+        } message: {
+            Text("Staff authentication required to exit student mode.")
+        }
+        .interactiveDismissDisabled(true)
         .preferredColorScheme(.dark)
         .onAppear {
             session.updateActivity()
@@ -93,6 +69,38 @@ struct StudentModeView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             checkSessionTimeout()
         }
+    }
+
+    // MARK: - Custom Header
+
+    private var customHeader: some View {
+        HStack {
+            Text("Student Mode")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Button(action: { showingExitConfirmation = true }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "lock.shield.fill")
+                    Text("Exit")
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.tmiWarning)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.tmiWarning.opacity(0.2))
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isExiting)
+        }
+        .padding(.horizontal, TMISpacing.screenPadding)
+        .padding(.vertical, TMISpacing.md)
+        .background(Color.tmiBackground)
     }
 
     // MARK: - Student Header
@@ -116,6 +124,7 @@ struct StudentModeView: View {
                     .foregroundColor(.white.opacity(0.7))
             }
         }
+        .frame(maxWidth: .infinity)
         .padding(.vertical, TMISpacing.lg)
         .padding(.horizontal, TMISpacing.screenPadding)
         .background(
@@ -162,25 +171,37 @@ struct StudentInterestsTab: View {
 
     @State private var interests: [Interest] = []
     @State private var isLoading = false
+    @State private var showingInterestSurvey = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: TMISpacing.xl) {
-                if isLoading {
-                    ProgressView("Loading your interests...")
-                        .tint(.tmiPrimary)
-                        .padding(TMISpacing.xl)
-                } else if interests.isEmpty {
-                    emptyState
-                } else {
-                    interestsGrid
+        NavigationStack {
+            ZStack {
+                Color.tmiBackground
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: TMISpacing.xl) {
+                        if isLoading {
+                            ProgressView("Loading your interests...")
+                                .tint(.tmiPrimary)
+                                .padding(TMISpacing.xl)
+                        } else if interests.isEmpty {
+                            emptyState
+                        } else {
+                            interestsGrid
+                        }
+                    }
+                    .padding(TMISpacing.screenPadding)
                 }
             }
-            .padding(TMISpacing.screenPadding)
-        }
-        .background(Color.tmiBackground)
-        .task {
-            await loadInterests()
+            .sheet(isPresented: $showingInterestSurvey) {
+                if let studentId = student.id {
+                    StudentSurveyFlow(studentId: studentId)
+                }
+            }
+            .task {
+                await loadInterests()
+            }
         }
     }
 
@@ -194,23 +215,63 @@ struct StudentInterestsTab: View {
                 .font(.tmiTitle2)
                 .foregroundColor(.white)
 
-            Text("Ask your teacher to help you take the interest survey!")
+            Text("Take the interest survey to discover what you love!")
                 .font(.tmiBody)
                 .foregroundColor(.tmiTextSecondary)
                 .multilineTextAlignment(.center)
+
+            Button(action: { showingInterestSurvey = true }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "heart.fill")
+                    Text("Take Survey")
+                }
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(
+                    Capsule()
+                        .fill(Color.tmiPrimary)
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.top, TMISpacing.sm)
         }
         .padding(.top, 60)
     }
 
     private var interestsGrid: some View {
         VStack(alignment: .leading, spacing: TMISpacing.lg) {
-            Text("My Interests")
-                .font(.tmiTitle2)
-                .foregroundColor(.white)
+            HStack {
+                Text("My Interests")
+                    .font(.tmiTitle2)
+                    .foregroundColor(.white)
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: TMISpacing.md) {
+                Spacer()
+
+                Button(action: { showingInterestSurvey = true }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.tmiPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.tmiPrimary.opacity(0.2))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 280))], spacing: TMISpacing.md) {
                 ForEach(interests) { interest in
-                    InterestCard(interest: interest)
+                    NavigationLink(destination: StudentInterestDetailView(interest: interest, currentStudent: student)) {
+                        InterestCardView(interest: interest)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -234,23 +295,29 @@ struct StudentCareersTab: View {
     @State private var isLoading = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: TMISpacing.xl) {
-                if isLoading {
-                    ProgressView("Finding careers for you...")
-                        .tint(.tmiPrimary)
-                        .padding(TMISpacing.xl)
-                } else if careerMatches.isEmpty {
-                    emptyState
-                } else {
-                    careersGrid
+        NavigationStack {
+            ZStack {
+                Color.tmiBackground
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: TMISpacing.xl) {
+                        if isLoading {
+                            ProgressView("Finding careers for you...")
+                                .tint(.tmiPrimary)
+                                .padding(TMISpacing.xl)
+                        } else if careerMatches.isEmpty {
+                            emptyState
+                        } else {
+                            careersGrid
+                        }
+                    }
+                    .padding(TMISpacing.screenPadding)
                 }
             }
-            .padding(TMISpacing.screenPadding)
-        }
-        .background(Color.tmiBackground)
-        .task {
-            await loadCareerMatches()
+            .task {
+                await loadCareerMatches()
+            }
         }
     }
 
@@ -280,10 +347,30 @@ struct StudentCareersTab: View {
 
             VStack(spacing: TMISpacing.md) {
                 ForEach(careerMatches.prefix(10)) { match in
-                    CareerMatchCard(match: match)
+                    NavigationLink(destination: CareerDetailView(career: convertToCareer(match.career))) {
+                        CareerMatchCard(match: match)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    private func convertToCareer(_ careerPath: CareerPath) -> Career {
+        // Convert CareerPath to Career for display in CareerDetailView
+        let salaryLower = Double(careerPath.estimatedSalary?.min ?? 30000)
+        let salaryUpper = Double(careerPath.estimatedSalary?.max ?? 100000)
+
+        return Career(
+            title: careerPath.title,
+            field: careerPath.category,
+            description: careerPath.description,
+            skills: careerPath.requiredInterests,
+            education: careerPath.educationLevel.rawValue,
+            salaryRange: salaryLower...salaryUpper,
+            jobOutlook: "Growing field with opportunities",
+            growthRate: 0.05
+        )
     }
 
     private func loadCareerMatches() async {
@@ -338,23 +425,29 @@ struct StudentProgressTab: View {
     @State private var isLoading = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: TMISpacing.xl) {
-                if isLoading {
-                    ProgressView("Loading your progress...")
-                        .tint(.tmiPrimary)
-                        .padding(TMISpacing.xl)
-                } else if plans.isEmpty {
-                    emptyState
-                } else {
-                    progressView
+        NavigationStack {
+            ZStack {
+                Color.tmiBackground
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: TMISpacing.xl) {
+                        if isLoading {
+                            ProgressView("Loading your progress...")
+                                .tint(.tmiPrimary)
+                                .padding(TMISpacing.xl)
+                        } else if plans.isEmpty {
+                            emptyState
+                        } else {
+                            progressView
+                        }
+                    }
+                    .padding(TMISpacing.screenPadding)
                 }
             }
-            .padding(TMISpacing.screenPadding)
-        }
-        .background(Color.tmiBackground)
-        .task {
-            await loadPlans()
+            .task {
+                await loadPlans()
+            }
         }
     }
 
@@ -384,7 +477,10 @@ struct StudentProgressTab: View {
 
             VStack(spacing: TMISpacing.md) {
                 ForEach(plans) { plan in
-                    StudentPlanCard(plan: plan)
+                    NavigationLink(destination: StudentTMIPlanDetailView(plan: plan)) {
+                        StudentPlanCard(plan: plan)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }

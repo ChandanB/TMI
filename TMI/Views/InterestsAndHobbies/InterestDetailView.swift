@@ -246,8 +246,7 @@ struct InterestDetailView: View {
         VStack(spacing: 10) {
             ForEach(Array(students.prefix(3))) { student in
                 NavigationLink {
-                    // Navigate to student detail
-                    Text("Student Detail: \(student.name)")
+                    StudentDetailView(student: student)
                 } label: {
                     StudentRowView(student: student, color: interest.color)
                 }

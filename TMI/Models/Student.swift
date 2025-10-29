@@ -39,7 +39,12 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
             return result + String(first)
         }
     }
-    
+
+    // First name only (for student mode privacy)
+    var firstName: String {
+        return name.components(separatedBy: " ").first ?? name
+    }
+
     // Calculates display name with appropriate formatting
     var displayName: String {
         let components = name.components(separatedBy: " ")

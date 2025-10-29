@@ -457,12 +457,30 @@ final class SurveyService: @unchecked Sendable {
     return results.sorted { $0.weight > $1.weight }
   }
 
-  /// Convert interest clusters to actual Interest objects
+  /// Convert interest clusters to actual Interest objects using predefined database
   private func convertClustersToInterests(_ clusters: [InterestCluster]) -> [Interest] {
     print("[SurveyService] Converting \(clusters.count) interest clusters to Interest objects")
 
     return clusters.compactMap { cluster in
-      // Try to map cluster name to InterestCategory
+      // FIRST: Try to find matching predefined interest
+      let predefinedInterest = PredefinedInterestsData.allPredefinedInterests.first { interest in
+        // Match by exact name
+        interest.name.lowercased() == cluster.displayName.lowercased() ||
+        // Match by category
+        interest.category.contains(where: { $0.rawValue.lowercased() == cluster.name.lowercased() }) ||
+        // Match by similar names
+        interest.name.lowercased().contains(cluster.displayName.lowercased()) ||
+        cluster.displayName.lowercased().contains(interest.name.lowercased())
+      }
+
+      if let existing = predefinedInterest {
+        print("[SurveyService] ✅ Using predefined interest: \(existing.name) with full data")
+        return existing
+      }
+
+      // FALLBACK: Create basic interest if no match found
+      print("[SurveyService] ⚠️ No predefined match for '\(cluster.displayName)', creating basic interest")
+
       let category: InterestCategory
       switch cluster.name.lowercased() {
       case let name where name.contains("science") || name.contains("discovery"):
@@ -501,16 +519,13 @@ final class SurveyService: @unchecked Sendable {
         category = .other
       }
 
-      let interest = Interest(
+      return Interest(
         id: cluster.id.uuidString,
         name: cluster.displayName,
         category: [category],
         description: "Interest selected from survey",
         popularityScore: Int(cluster.weight * 100)
       )
-
-      print("[SurveyService] Created interest: \(interest.name) (category: \(category.rawValue))")
-      return interest
     }
   }
 

@@ -77,11 +77,17 @@ struct MainTabView: View {
       if let activeStudent = studentModeSession.activeStudent {
         // Student Mode - Restricted Interface
         StudentModeView(student: activeStudent)
-          .environment(studentModeSession)
+          .environment(\.studentModeSession, studentModeSession)
+          .onAppear {
+            print("[MainTabView] 🎓 Switched to Student Mode for: \(activeStudent.name)")
+          }
       } else {
         // Staff Mode - Full Interface
         staffTabView
-          .environment(studentModeSession)
+          .environment(\.studentModeSession, studentModeSession)
+          .onAppear {
+            print("[MainTabView] 👨‍💼 In Staff Mode")
+          }
       }
     }
   }

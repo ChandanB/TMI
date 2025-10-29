@@ -88,23 +88,66 @@ class StudentService {
         guard let studentId = student.id else {
             throw StudentServiceError.invalidStudentId
         }
-        
+
         guard let collection = userStudentsCollection else {
             throw StudentServiceError.userNotAuthenticated
         }
-        
+
         do {
             print("[StudentService] Updating student: \(student.name)")
-            
+
             let data = student.toFirestoreData()
             try await collection.document(studentId).updateData(data)
-            
+
             print("[StudentService] Student updated successfully")
             return student
         } catch {
             print("[StudentService] Error updating student: \(error)")
             throw StudentServiceError.updateFailed(error.localizedDescription)
         }
+    }
+
+    /// Add interests to a student with automatic deduplication
+    func addInterests(_ newInterests: [Interest], to student: Student) async throws -> Student {
+        print("[StudentService] Adding \(newInterests.count) interests to student: \(student.name)")
+
+        // Get existing interest IDs (by matching name since Interest uses class identity)
+        let existingNames = Set(student.interests.map { $0.name.lowercased() })
+
+        // Filter out duplicates by name
+        let uniqueNewInterests = newInterests.filter { interest in
+            let isDuplicate = existingNames.contains(interest.name.lowercased())
+            if isDuplicate {
+                print("[StudentService] ⚠️ Skipping duplicate interest: \(interest.name)")
+            }
+            return !isDuplicate
+        }
+
+        print("[StudentService] ✅ Adding \(uniqueNewInterests.count) unique interests (filtered \(newInterests.count - uniqueNewInterests.count) duplicates)")
+
+        // Combine interests
+        var updatedInterests = student.interests
+        updatedInterests.append(contentsOf: uniqueNewInterests)
+
+        // Create updated student
+        let updatedStudent = Student(
+            id: student.id,
+            name: student.name,
+            grade: student.grade,
+            school: student.school,
+            dateOfBirth: student.dateOfBirth,
+            studentID: student.studentID,
+            interests: updatedInterests,
+            photoURL: student.photoURL,
+            surveyResults: student.surveyResults,
+            academicPerformance: student.academicPerformance,
+            engagementHistory: student.engagementHistory,
+            notes: student.notes,
+            lastInteractionDate: student.lastInteractionDate
+        )
+
+        // Update in Firestore
+        return try await updateStudent(updatedStudent)
     }
     
     /// Delete a student from Firestore

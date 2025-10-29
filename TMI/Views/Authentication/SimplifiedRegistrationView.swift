@@ -9,28 +9,24 @@ import FirebaseAuth
 import SwiftUI
 
 enum AccountType: String, CaseIterable, Identifiable {
-    case student = "Student"
     case staff = "Staff"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .student: return "graduationcap.fill"
         case .staff: return "person.2.fill"
         }
     }
 
     var color: Color {
         switch self {
-        case .student: return .tmiPrimary
         case .staff: return .tmiSecondary
         }
     }
 
     var userRole: UserRole {
         switch self {
-        case .student: return .student
         case .staff: return .teacher
         }
     }
@@ -41,7 +37,7 @@ struct SimplifiedRegistrationView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
-    @State private var selectedAccountType: AccountType = .student
+    @State private var selectedAccountType: AccountType = .staff
     @State private var isRegistering = false
     @State private var errorMessage: String?
 

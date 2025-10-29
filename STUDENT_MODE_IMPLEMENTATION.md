@@ -52,18 +52,21 @@ Student Mode provides a **secure, restricted interface** where educators can han
 - ✅ **Session timeout**: Auto-exit after 30 minutes of inactivity
 - ✅ **Immutable navigation**: `.interactiveDismissDisabled(true)`
 
-**Three Tabs**:
+**Three Interactive Tabs**:
 
 #### Tab 1: My Interests
-- Shows student's interests from survey
-- Displays interest cards with categories
-- Empty state if no interests yet
+- Shows student's interests from survey in wider cards (280pt minimum width)
+- Displays interest cards with categories and colors
+- **"Add" button** to launch interest survey
+- **NavigationLink** on each interest card to view InterestDetailView
+- Empty state with "Take Survey" button
 - **Data Source**: `student.interests` array
 
 #### Tab 2: Careers
 - Shows career matches based on student interests
 - Displays top 10 career recommendations
 - Match percentage for each career
+- **NavigationLink** on each career card to view CareerDetailView
 - Empty state if survey not completed
 - **Data Source**: `CareerMatchingService.matchCareers()`
 
@@ -71,8 +74,23 @@ Student Mode provides a **secure, restricted interface** where educators can han
 - Shows TMI Plans the student is part of
 - Progress bars for each plan
 - Goal counts and completion percentages
+- **NavigationLink** on each plan card to view **StudentTMIPlanDetailView** (custom student view)
 - Empty state if no plans assigned
 - **Data Source**: `TMIPlanService.fetchPlans()` filtered by student ID
+
+**StudentTMIPlanDetailView** - Custom read-only plan view for students:
+- ✅ Plan overview and description
+- ✅ Progress tracking with visual progress bar
+- ✅ My Goals list with completion status
+- ✅ Upcoming Meetings section
+- ✅ My Interests chips
+- ✅ Resources For Me section
+- ❌ Hidden: Intervention Strategies (staff-only)
+- ❌ Hidden: Team Collaboration notes (staff-only)
+- ❌ Hidden: Edit button
+- ❌ Hidden: Add Goals button
+- ❌ Hidden: Schedule Meeting button
+- ❌ Hidden: Next Action suggestions
 
 **Navigation Structure**:
 ```
