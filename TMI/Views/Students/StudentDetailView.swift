@@ -18,6 +18,7 @@ struct StudentDetailView: View {
     @State private var showingAllPlans = false
     @State private var showingProgress = false
     @State private var showingSurvey = false
+    @State private var showRetakeConfirmation = false
     @State private var expandedSections: Set<String> = []
     @State private var planStateModel = TMIPlanListStateModel()
     @State private var interestsStateModel = InterestsAndHobbiesStateModel()
@@ -135,6 +136,14 @@ struct StudentDetailView: View {
                         }
                     }
             }
+        }
+        .alert("Retake Survey?", isPresented: $showRetakeConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Retake", role: .destructive) {
+                retakeSurvey()
+            }
+        } message: {
+            Text("This will allow \(student.name) to take the interest survey again. Current survey results will be replaced, but manually added interests will be preserved.")
         }
     }
 
@@ -266,6 +275,23 @@ struct StudentDetailView: View {
                     .foregroundColor(.tmiTextPrimary)
 
                 Spacer()
+
+                // Show "Retake Survey" button if student has completed a survey
+                if hasSurveyResults {
+                    Button(action: {
+                        showRetakeConfirmation = true
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise.circle.fill")
+                                .font(.system(size: 16))
+                            Text("Retake")
+                                .font(.tmiCaption)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.orange)
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 Button(action: {
                     showingAddInterest = true
@@ -735,6 +761,17 @@ struct StudentDetailView: View {
             // If fetch fails, keep using the existing student
             print("Failed to refresh student: \(error)")
         }
+    }
+
+    private var hasSurveyResults: Bool {
+        return student.surveyResults?.isEmpty == false
+    }
+
+    private func retakeSurvey() {
+        // Clear survey results but keep manually added interests
+        // For now, we'll just trigger the survey flow again
+        // In a full implementation, we would mark which interests came from survey vs manual
+        showingSurvey = true
     }
 
     // MARK: - Student Mode

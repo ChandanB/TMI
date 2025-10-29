@@ -21,6 +21,8 @@ struct SurveyResultsView: View {
     @State private var isSaving = false
     @State private var saveError: String?
     @State private var showingCareerExploration = false
+    @State private var showingAddInterests = false
+    @State private var currentStudent: Student?
 
     var body: some View {
         ZStack {
@@ -254,6 +256,40 @@ struct SurveyResultsView: View {
                     }
                 }
 
+                // Add More Interests button
+                if let student = currentStudent {
+                    Button(action: {
+                        showingAddInterests = true
+                    }) {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Add More Interests")
+                                .fontWeight(.semibold)
+                        }
+                        .font(.tmiBody)
+                        .foregroundColor(.tmiPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, TMISpacing.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: TMIRadius.md)
+                                .fill(Color.tmiPrimary.opacity(0.1))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: TMIRadius.md)
+                                        .stroke(Color.tmiPrimary, lineWidth: 2)
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .sheet(isPresented: $showingAddInterests) {
+                        NavigationStack {
+                            AddInterestToStudentView(student: student) { updatedStudent in
+                                currentStudent = updatedStudent
+                                showingAddInterests = false
+                            }
+                        }
+                    }
+                }
+
                 Button(action: {
                     // Call dismiss callback if provided, otherwise use environment dismiss
                     if let onDismiss = onDismiss {
@@ -374,8 +410,13 @@ struct SurveyResultsView: View {
                     dreamJob: extractDreamJob()
                 )
 
+                // Fetch the updated student to enable "Add More Interests" button
+                let studentService = StudentService()
+                let student = try await studentService.getStudent(by: studentId)
+
                 await MainActor.run {
                     careerMatches = matches
+                    currentStudent = student
                     isSaving = false
                 }
 

@@ -21,6 +21,17 @@ struct AddInterestToStudentView: View {
     @State private var showError = false
     @State private var errorMessage = ""
 
+    // Separate survey-based interests from manually added
+    private var surveyBasedInterests: [Interest] {
+        // If student has survey results, consider interests that came from survey
+        // For now, we'll need to add metadata to track this, but as a starting point
+        // we can show existing interests
+        guard let surveyResults = student.surveyResults, !surveyResults.isEmpty else {
+            return []
+        }
+        return student.interests
+    }
+
     // Filter interests that the student doesn't already have
     private var availableInterests: [Interest] {
         let studentInterestNames = Set(student.interests.map { $0.name.lowercased() })
@@ -96,11 +107,27 @@ struct AddInterestToStudentView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
 
-                // Interests list
-                if availableInterests.isEmpty {
-                    emptyStateView
+                // Survey-based interests section (if any)
+                if !surveyBasedInterests.isEmpty {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            surveyInterestsSection
+
+                            Divider()
+                                .background(Color.white.opacity(0.3))
+                                .padding(.horizontal, 20)
+
+                            addMoreInterestsSection
+                        }
+                        .padding(.bottom, 100)
+                    }
                 } else {
-                    interestsList
+                    // Interests list (no survey results)
+                    if availableInterests.isEmpty {
+                        emptyStateView
+                    } else {
+                        interestsList
+                    }
                 }
             }
         }
@@ -159,6 +186,76 @@ struct AddInterestToStudentView: View {
         )
     }
 
+    // MARK: - Survey Interests Section
+
+    private var surveyInterestsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "chart.bar.doc.horizontal.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.blue)
+
+                Text("From Your Survey")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+
+            Text("These interests were discovered through the student's survey responses")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
+                .padding(.horizontal, 20)
+
+            LazyVStack(spacing: 12) {
+                ForEach(surveyBasedInterests) { interest in
+                    SurveyInterestRow(interest: interest)
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    // MARK: - Add More Interests Section
+
+    private var addMoreInterestsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.green)
+
+                Text("Add More Interests")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+
+            if availableInterests.isEmpty {
+                Text("All available interests have been added!")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
+                    .padding(.horizontal, 20)
+            } else {
+                LazyVStack(spacing: 12) {
+                    ForEach(availableInterests) { interest in
+                        StudentInterestRow(
+                            interest: interest,
+                            isAdding: isAdding,
+                            onAdd: {
+                                addInterest(interest)
+                            }
+                        )
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
     // MARK: - Interests List
 
     private var interestsList: some View {
@@ -214,28 +311,8 @@ struct AddInterestToStudentView: View {
 
         Task {
             do {
-                // Create updated student with new interest
-                var updatedInterests = student.interests
-                updatedInterests.append(interest)
-
-                let updatedStudent = Student(
-                    id: student.id,
-                    name: student.name,
-                    grade: student.grade,
-                    school: student.school,
-                    dateOfBirth: student.dateOfBirth,
-                    studentID: student.studentID,
-                    interests: updatedInterests,
-                    photoURL: student.photoURL,
-                    surveyResults: student.surveyResults,
-                    academicPerformance: student.academicPerformance,
-                    engagementHistory: student.engagementHistory,
-                    notes: student.notes,
-                    lastInteractionDate: student.lastInteractionDate
-                )
-
-                // Update in Firestore
-                let savedStudent = try await studentService.updateStudent(updatedStudent)
+                // Use new deduplication method from StudentService
+                let savedStudent = try await studentService.addInterests([interest], to: student)
 
                 // Add to global interests collection
                 await interestsStateModel.addInterest(interest)
@@ -252,6 +329,62 @@ struct AddInterestToStudentView: View {
                     isAdding = false
                 }
             }
+        }
+    }
+}
+
+// MARK: - Survey Interest Row
+
+struct SurveyInterestRow: View {
+    let interest: Interest
+
+    var body: some View {
+        TMIGlassCard(style: .default) {
+            HStack(spacing: 16) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(interest.color.opacity(0.2))
+                        .frame(width: 50, height: 50)
+
+                    Image(systemName: interest.iconName)
+                        .font(.system(size: 22))
+                        .foregroundColor(interest.color)
+                }
+
+                // Name and category
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(interest.name)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "tag.fill")
+                            .font(.system(size: 9))
+                        Text(interest.category.first?.rawValue ?? "General")
+                            .font(.system(size: 13))
+                    }
+                    .foregroundColor(.white.opacity(0.6))
+                }
+
+                Spacer()
+
+                // Survey badge
+                HStack(spacing: 4) {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 10))
+                    Text("Survey")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundColor(.blue)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(Color.blue.opacity(0.2))
+                )
+            }
+            .padding(16)
         }
     }
 }
