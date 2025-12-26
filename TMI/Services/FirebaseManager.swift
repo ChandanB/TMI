@@ -214,7 +214,7 @@ extension FirebaseManager {
     guard let userID = auth.currentUser?.uid else { return }
     let studentsCollection = firestore.collection("users").document(userID).collection("students")
     let studentSnapshot = try await studentsCollection.limit(to: 1).getDocuments()
-    
+
     // Seed only if no students found
     if studentSnapshot.isEmpty {
       // Seed sample students
@@ -223,7 +223,7 @@ extension FirebaseManager {
         // Don't manually set @DocumentID - let Firestore manage it
         let _ = try await studentsCollection.addDocument(data: student.toFirestoreData())
       }
-      
+
       // Seed interests
       let interestsCollection = firestore.collection("users").document(userID).collection("interests")
       let interests = Interest.expandedSampleInterests
@@ -234,6 +234,27 @@ extension FirebaseManager {
 
       // Note: Hobbies are now included in interests above
     }
+  }
+
+  // MARK: - User Account Management
+
+  /// Reauthenticate user with current password
+  nonisolated(nonsending) func reauthenticate(with password: String) async throws {
+    guard let user = auth.currentUser, let email = user.email else {
+      throw FirebaseManagerError.userNotLoggedIn
+    }
+
+    let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+    try await user.reauthenticate(with: credential)
+  }
+
+  /// Send email verification to current user
+  nonisolated(nonsending) func verifyEmail() async throws {
+    guard let user = auth.currentUser else {
+      throw FirebaseManagerError.userNotLoggedIn
+    }
+
+    try await user.sendEmailVerification()
   }
 }
 
