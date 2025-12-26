@@ -13,11 +13,11 @@ import SwiftUI
 
 extension Color {
     // Gentle blue that works well in both light and dark modes
-    static let tmiPrimary = Color(light: #colorLiteral(red: 0.2901960784, green: 0.5647058824, blue: 0.8862745098, alpha: 1), dark: #colorLiteral(red: 0.3764705882, green: 0.6431372549, blue: 0.9490196078, alpha: 1))
-    static let tmiPrimaryDark = Color(light: #colorLiteral(red: 0.2196078431, green: 0.4431372549, blue: 0.7058823529, alpha: 1), dark: #colorLiteral(red: 0.2901960784, green: 0.5647058824, blue: 0.8862745098, alpha: 1))
-    static let tmiSecondary = Color(light: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1), dark: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1))
-    static let tmiBackground = Color(light: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1), dark: #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1))
-    static let tmiText = Color(light: #colorLiteral(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006, alpha: 1), dark: #colorLiteral(red: 0.8498495817, green: 0.9484829307, blue: 0.9581733346, alpha: 1))
+    static let tmiPrimary = Color(red: 0.2901960784, green: 0.5647058824, blue: 0.8862745098)
+    static let tmiPrimaryDark = Color(red: 0.2196078431, green: 0.4431372549, blue: 0.7058823529)
+    static let tmiSecondary = Color(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529)
+    static let tmiBackground = Color(red: 0, green: 0, blue: 0)
+    static let tmiText = Color(red: 0.8498495817, green: 0.9484829307, blue: 0.9581733346)
     static let backgroundTop = Color(red: 0.0, green: 0.47, blue: 0.75)
     static let backgroundBottom = Color(red: 0.0, green: 0.35, blue: 0.65)
     static let cardBackground = Color.black.opacity(0.5)
@@ -25,23 +25,10 @@ extension Color {
 
 #if DEBUG
 extension Color {
-    static let debugTMIPrimary = Color(light: #colorLiteral(red: 0.0653751418, green: 0.004413233139, blue: 0.238399297, alpha: 1), dark: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1))
-    static let debugTMISecondary = Color(light: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1), dark: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1))
-    static let debugTMIBackground = Color(light: #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1), dark: #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1))
-    static let debugTMIText = Color(light: #colorLiteral(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006, alpha: 1), dark: #colorLiteral(red: 0.8498495817, green: 0.9484829307, blue: 0.9581733346, alpha: 1))
-}
- 
-extension Color {
-    init(light: UIColor, dark: UIColor) {
-        self.init(UIColor { traitCollection in
-            switch traitCollection.userInterfaceStyle {
-            case .dark:
-                return dark
-            default:
-                return light
-            }
-        })
-    }
+    static let debugTMIPrimary = Color(red: 0.0653751418, green: 0.004413233139, blue: 0.238399297)
+    static let debugTMISecondary = Color(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529)
+    static let debugTMIBackground = Color(red: 1, green: 1, blue: 1)
+    static let debugTMIText = Color(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006)
 }
 #endif
 

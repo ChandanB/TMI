@@ -32,7 +32,9 @@ class StudentService {
         
         do {
             print("[StudentService] Fetching students...")
-            let querySnapshot = try await collection.getDocuments()
+            let querySnapshot = try await withTimeout(seconds: 10) {
+                try await collection.getDocuments()
+            }
             
             let students: [Student] = try querySnapshot.documents.compactMap { document in
                 do {
@@ -69,12 +71,16 @@ class StudentService {
             let data = student.toFirestoreData()
             
             // Add the document and get the reference
-            let documentRef = try await collection.addDocument(data: data)
+            let documentRef = try await withTimeout(seconds: 10) {
+                try await collection.addDocument(data: data)
+            }
             
             print("[StudentService] Student added with ID: \(documentRef.documentID)")
             
             // Re-fetch the document using our custom parser
-            let document = try await documentRef.getDocument()
+            let document = try await withTimeout(seconds: 10) {
+                try await documentRef.getDocument()
+            }
             let savedStudent = try parseStudent(from: document)
             return savedStudent
         } catch {
@@ -97,7 +103,9 @@ class StudentService {
             print("[StudentService] Updating student: \(student.name)")
 
             let data = student.toFirestoreData()
-            try await collection.document(studentId).updateData(data)
+            try await withTimeout(seconds: 10) {
+                try await collection.document(studentId).updateData(data)
+            }
 
             print("[StudentService] Student updated successfully")
             return student
@@ -162,7 +170,9 @@ class StudentService {
         
         do {
             print("[StudentService] Deleting student: \(student.name)")
-            try await collection.document(studentId).delete()
+            try await withTimeout(seconds: 10) {
+                try await collection.document(studentId).delete()
+            }
             print("[StudentService] Student deleted successfully")
         } catch {
             print("[StudentService] Error deleting student: \(error)")
@@ -178,7 +188,9 @@ class StudentService {
         
         do {
             print("[StudentService] Fetching student with ID: \(id)")
-            let document = try await collection.document(id).getDocument()
+            let document = try await withTimeout(seconds: 10) {
+                try await collection.document(id).getDocument()
+            }
             
             guard document.exists else {
                 return nil

@@ -15,48 +15,6 @@ import SwiftUI
 import AppKit
 #endif
 
-// MARK: - Help Tooltip Button
-struct HelpTooltipButton: View {
-    let message: String
-    @State private var showTooltip = false
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            Button(action: { withAnimation { showTooltip.toggle() } }) {
-                Image(systemName: "questionmark.circle.fill")
-                    .font(.system(size: 15))
-                    .foregroundColor(.tmiPrimary)
-            }
-            .buttonStyle(.plain)
-            .onHover { hovering in
-                #if os(macOS)
-                withAnimation { showTooltip = hovering }
-                #endif
-            }
-
-            if showTooltip {
-                Text(message)
-                    .font(.system(size: 13))
-                    .foregroundColor(.white)
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.85))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.tmiPrimary.opacity(0.7), lineWidth: 1)
-                    )
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 220)
-                    .offset(y: 28)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                    .zIndex(99)
-            }
-        }
-        .padding(.leading, 2)
-    }
-}
-
 // MARK: - Dashboard Data Model
 
 struct DashboardData: Equatable, Sendable {
@@ -384,206 +342,9 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   }
 }
 
-// MARK: - Priority Action Button Component
-
-struct PriorityActionButton: View {
-    let icon: String
-    let iconColor: Color
-    let title: String
-    let count: Int
-    let action: () -> Void
-
-    @State private var isPressed = false
-
-    var body: some View {
-        Button(action: {
-            TMIHaptics.lightImpact()
-            action()
-        }) {
-            HStack(spacing: TMISpacing.md) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(iconColor.opacity(0.15))
-                        .frame(width: 44, height: 44)
-
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(iconColor)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.tmiTextPrimary)
-
-                    Text("\(count) student\(count == 1 ? "" : "s") waiting")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.tmiTextSecondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(iconColor)
-            }
-            .padding(TMISpacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: TMIRadius.md)
-                    .fill(Color.tmiBackground)
-                    .shadow(color: .black.opacity(isPressed ? 0.05 : 0.1), radius: isPressed ? 4 : 8, x: 0, y: isPressed ? 2 : 4)
-            )
-            .scaleEffect(isPressed ? 0.98 : 1.0)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    withAnimation(.easeInOut(duration: 0.1)) {
-                        isPressed = true
-                    }
-                }
-                .onEnded { _ in
-                    withAnimation(.easeInOut(duration: 0.1)) {
-                        isPressed = false
-                    }
-                }
-        )
-    }
-}
-
-// MARK: - Metric Pill Component
-
-struct MetricPill: View {
-    let icon: String
-    let tint: Color
-    let value: String
-    let label: String
-    let subtitle: String
-    let action: () -> Void
-
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: {
-            TMIHaptics.lightImpact()
-            action()
-        }) {
-            HStack(spacing: TMISpacing.md) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(tint.opacity(0.15))
-                        .frame(width: 48, height: 48)
-
-                    Image(systemName: icon)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(tint)
-                        .symbolRenderingMode(.hierarchical)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(value)
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.tmiTextPrimary)
-
-                        Text(label)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.tmiTextSecondary)
-                    }
-
-                    Text(subtitle)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.tmiTextTertiary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(tint.opacity(isHovered ? 1.0 : 0.5))
-                    .offset(x: isHovered ? 2 : 0)
-            }
-            .padding(TMISpacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: TMIRadius.md)
-                    .fill(isHovered ? tint.opacity(0.05) : Color.tmiBackground)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: TMIRadius.md)
-                    .strokeBorder(tint.opacity(isHovered ? 0.3 : 0.15), lineWidth: 1)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isHovered = hovering
-            }
-        }
-    }
-}
-
 // MARK: -  Activity Row
 
-struct DashboardActivityRow: View {
-  var activity: RecentActivity
-
-  @State private var isHovered = false
-
-  var body: some View {
-    HStack(spacing: 16) {
-      // Activity Icon
-      ZStack {
-        Circle()
-          .fill(activity.iconColor.opacity(0.15))
-          .frame(width: 40, height: 40)
-
-        Image(systemName: activity.icon)
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundStyle(activity.iconColor)
-      }
-
-      VStack(alignment: .leading, spacing: 4) {
-        Text(activity.title)
-          .font(.system(size: 15, weight: .semibold))
-          .foregroundColor(.white)
-
-        Text(activity.description)
-          .font(.system(size: 13))
-          .foregroundColor(.white.opacity(0.7))
-          .lineLimit(2)
-      }
-
-      Spacer()
-
-      VStack(alignment: .trailing, spacing: 2) {
-        Text(activity.timeAgo)
-          .font(.system(size: 12, weight: .medium))
-          .foregroundColor(.white.opacity(0.5))
-
-        if activity.showProgress {
-          ProgressView(value: activity.progressValue)
-            .tmiProgressStyle(color: activity.iconColor)
-            .frame(width: 50)
-        }
-      }
-    }
-    .padding(.vertical, 8)
-    .padding(.horizontal, 12)
-    .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(Color.white.opacity(isHovered ? 0.05 : 0))
-    )
-    .contentShape(Rectangle())
-    .onHover { hovering in
-      withAnimation(.easeInOut(duration: 0.2)) {
-        isHovered = hovering
-      }
-    }
-  }
-}
+// MARK: - DashboardActivityRow moved to Components/DashboardActivityRow.swift
 
 // TODO: Add `HelpTooltipButton` to other sections (Hero Card, Student Engagement, Insights, etc.) as needed.
 struct DashboardView: View {
@@ -680,16 +441,45 @@ struct DashboardView: View {
                 QuickActionsGrid()
                 
                 // Hero Section - Primary Insight
-                primaryInsightCard(data)
+                // Hero Section - Primary Insight
+                DashboardHeaderView(
+                    data: data,
+                    attentionCount: studentsNeedingAttention(data) ?? 0,
+                    onNavigateToStudents: { navigateToStudents = true },
+                    onNavigateToPlans: { navigateToPlans = true }
+                )
                     .padding(.top, TMISpacing.md)
 
                 // Quick Stats Row
-//                quickStatsRow(data)
+                DashboardStatsView(
+                    data: data,
+                    onNavigateToStudents: { navigateToStudents = true },
+                    onNavigateToPlans: { navigateToPlans = true }
+                )
+                
+                // Actionable Lists Section
+                if studentsNeedingAttention(data) != nil || (data.totalStudents - data.surveysCompleted) > 0 {
+                    VStack(spacing: TMISpacing.lg) {
+                        // Students Ready to Grow
+                        if let readyToGrowCount = studentsNeedingAttention(data), readyToGrowCount > 0 {
+                            StudentsReadyToGrowCard(count: readyToGrowCount) {
+                                navigateToStudents = true
+                            }
+                        }
+                        
+                        // Surveys Pending
+                        if (data.totalStudents - data.surveysCompleted) > 0 {
+                            SurveysPendingCard(count: data.totalStudents - data.surveysCompleted) {
+                                navigateToStudents = true
+                            }
+                        }
+                    }
+                }
 
                 // Engagement Chart (Simplified)
-//                if !data.engagementData.isEmpty {
-//                    engagementChart(data)
-//                }
+                if !data.engagementData.isEmpty {
+                    DashboardEngagementChart(data: data.engagementData)
+                }
                 
                 // Student Engagement Overview - NEW
                 StudentStatusWidget()
@@ -702,7 +492,7 @@ struct DashboardView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: {}) {
+                NavigationLink(destination: SettingsView()) {
                     TMIAvatar(initials: "ED", color: .tmiPrimary, size: 36)
                 }
             }
@@ -714,354 +504,17 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Primary Insight Card
-
-    private func primaryInsightCard(_ data: DashboardData) -> some View {
-        let surveysPending = max(0, data.totalStudents - data.surveysCompleted)
-        let plansPending = max(0, data.totalStudents - data.plansAligned)
-        let attentionCount = studentsNeedingAttention(data) ?? 0
-        let status = computeDashboardStatus(data: data, attentionCount: attentionCount, surveysPending: surveysPending, plansPending: plansPending)
-
-        return VStack(alignment: .leading, spacing: TMISpacing.lg) {
-            // Header: Status + Totals with enhanced visual hierarchy
-            HStack(alignment: .center, spacing: TMISpacing.md) {
-                ZStack {
-                    Circle()
-                        .fill(status.color.opacity(0.15))
-                        .frame(width: 52, height: 52)
-
-                    Circle()
-                        .stroke(status.color.opacity(0.3), lineWidth: 2)
-                        .frame(width: 52, height: 52)
-
-                    Image(systemName: status.icon)
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(status.color)
-                        .symbolEffect(.pulse, options: .repeating, value: status.status == .needsSupport || status.status == .actionNeeded)
-                }
-                .shadow(color: status.color.opacity(0.2), radius: 8, x: 0, y: 4)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    // Enhanced student count display
-                    HStack(spacing: 10) {
-                        Text("\(data.totalStudents)")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.tmiTextPrimary)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Students")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.tmiTextSecondary)
-
-                            if max(attentionCount, surveysPending + plansPending) > 0 {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "leaf.fill")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(.tmiWarning)
-                                    Text("\(max(attentionCount, surveysPending + plansPending)) Ready to Grow")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.tmiWarning)
-                                }
-                            }
-                        }
-                    }
-
-                    // Enhanced status message with emoji
-                    Text(status.title)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.tmiTextSecondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer()
-            }
-            .padding(.bottom, 4)
-
-            TMIDivider()
-
-            // Priority Actions with enhanced interactivity
-            if surveysPending > 0 || plansPending > 0 {
-                VStack(alignment: .leading, spacing: TMISpacing.md) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.tmiWarning)
-                        Text("Priority Actions")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.tmiTextSecondary)
-                            .textCase(.uppercase)
-                            .tracking(0.5)
-                    }
-
-                    VStack(alignment: .leading, spacing: TMISpacing.sm) {
-                        if surveysPending > 0 {
-                            PriorityActionButton(
-                                icon: "chart.bar.doc.horizontal",
-                                iconColor: .tmiPrimary,
-                                title: "Complete Interest Surveys",
-                                count: surveysPending,
-                                action: { onTapStartSurveys() }
-                            )
-                        }
-
-                        if plansPending > 0 {
-                            PriorityActionButton(
-                                icon: "target",
-                                iconColor: .tmiSecondary,
-                                title: "Assign TMI Plans",
-                                count: plansPending,
-                                action: { onTapAssignPlans() }
-                            )
-                        }
-                    }
-                }
-
-                TMIDivider()
-            } else {
-                // Success state with celebration
-                HStack(spacing: TMISpacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.tmiSuccess.opacity(0.15))
-                            .frame(width: 48, height: 48)
-
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.tmiSuccess)
-                            .symbolEffect(.bounce, options: .repeating.speed(0.5))
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Excellent Progress!")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.tmiSuccess)
-
-                        Text("All students have personalized pathways and surveys completed")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.tmiTextSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-                }
-                .padding(TMISpacing.md)
-                .background(
-                    RoundedRectangle(cornerRadius: TMIRadius.md)
-                        .fill(Color.tmiSuccess.opacity(0.08))
-                )
-
-                TMIDivider()
-            }
-
-            // Supporting Metrics with enhanced design
-            VStack(alignment: .leading, spacing: TMISpacing.sm) {
-                Text("Key Metrics")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.tmiTextSecondary)
-                    .textCase(.uppercase)
-                    .tracking(0.5)
-
-                VStack(spacing: TMISpacing.sm) {
-                    MetricPill(
-                        icon: "doc.text.fill",
-                        tint: .tmiSuccess,
-                        value: "\(data.activeTMIPlans)",
-                        label: "Active TMI Plans",
-                        subtitle: data.totalStudents > 0 ? "\(Int(Double(data.activeTMIPlans) / Double(data.totalStudents) * 100))% coverage" : "No students yet",
-                        action: { onTapPlans() }
-                    )
-
-                    MetricPill(
-                        icon: "chart.bar.fill",
-                        tint: .tmiPrimary,
-                        value: "\(data.surveysCompleted)/\(data.totalStudents)",
-                        label: "Surveys Completed",
-                        subtitle: surveysPending > 0 ? "\(surveysPending) remaining" : "All complete!",
-                        action: { navigateToStudents = true }
-                    )
-
-                    MetricPill(
-                        icon: "checkmark.seal.fill",
-                        tint: .tmiSecondary,
-                        value: "\(data.plansAligned)",
-                        label: "Plans Aligned with Goals",
-                        subtitle: data.totalStudents > 0 ? "\(Int(Double(data.plansAligned) / Double(data.totalStudents) * 100))% aligned" : "Ready to start",
-                        action: { navigateToPlans = true }
-                    )
-                }
-            }
-        }
-        .padding(TMISpacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .fill(Color.tmiSurface)
-                .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 8)
-                .shadow(color: status.color.opacity(0.1), radius: 24, x: 0, y: 12)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [status.color.opacity(0.2), status.color.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-    }
-
-    // Helper function to calculate students needing attention
-    private func studentsNeedingAttention(_ data: DashboardData) -> Int? {
-        // Count students with engagement < 0.4 (needs support level)
-        let needsSupport = studentStateModel.students.filter { $0.engagementScore < 0.4 }.count
-        return needsSupport > 0 ? needsSupport : nil
-    }
-
-    private func supportingStat(value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(value)
-                .font(.tmiTitle3)
-                .foregroundColor(.tmiTextPrimary)
-
-            Text(label)
-                .font(.tmiFootnote)
-                .foregroundColor(.tmiTextSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private enum DashboardStatus {
-        case onTrack, actionNeeded, growing, needsSupport
-
-        var title: String {
-            switch self {
-            case .onTrack: return "🎯 On Track — surveys complete and plans active"
-            case .actionNeeded: return "⚡ Action Needed — missing surveys or unassigned pathways"
-            case .growing: return "🌱 Growing — progress improving"
-            case .needsSupport: return "🚨 Needs Support — multiple students at risk"
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .onTrack: return "checkmark.seal.fill"
-            case .actionNeeded: return "bolt.fill"
-            case .growing: return "leaf.fill"
-            case .needsSupport: return "exclamationmark.triangle.fill"
-            }
-        }
-
-        var color: Color {
-            switch self {
-            case .onTrack: return .tmiSuccess
-            case .actionNeeded: return .tmiWarning
-            case .growing: return .tmiPrimary
-            case .needsSupport: return .tmiError
-            }
-        }
-    }
-
-    private func computeDashboardStatus(data: DashboardData, attentionCount: Int, surveysPending: Int, plansPending: Int) -> (status: DashboardStatus, title: String, icon: String, color: Color) {
-        // Determine status based on urgency signals with improved logic
-        if attentionCount >= 2 {
-            return (.needsSupport, DashboardStatus.needsSupport.title, DashboardStatus.needsSupport.icon, DashboardStatus.needsSupport.color)
-        }
-        if surveysPending > 0 || plansPending > 0 {
-            return (.actionNeeded, DashboardStatus.actionNeeded.title, DashboardStatus.actionNeeded.icon, DashboardStatus.actionNeeded.color)
-        }
-        // If engagement is trending up or plans exist but not all, call it growing
-        if data.activeTMIPlans > 0 && (data.activeTMIPlans < data.totalStudents) {
-            return (.growing, DashboardStatus.growing.title, DashboardStatus.growing.icon, DashboardStatus.growing.color)
-        }
-        return (.onTrack, DashboardStatus.onTrack.title, DashboardStatus.onTrack.icon, DashboardStatus.onTrack.color)
-    }
-
-    // Navigation actions for dashboard buttons
-    private func onTapStartSurveys() {
-        navigateToStudents = true
-    }
-
-    private func onTapAssignPlans() {
-        navigateToStudents = true
-    }
-
-    private func onTapPlans() {
-        navigateToPlans = true
-    }
-
     // MARK: - Quick Stats Row
 
-    private func quickStatsRow(_ data: DashboardData) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: TMISpacing.md) {
-                TMIStatChip(
-                    value: "\(data.surveysCompleted)",
-                    label: "Surveys Done",
-                    color: .tmiSuccess
-                )
+    // MARK: - Quick Stats Row moved to Components/DashboardStatsView.swift
 
-                TMIStatChip(
-                    value: "\(Int(planAlignmentRate(data) * 100))%",
-                    label: "Plan Alignment",
-                    trend: planAlignmentRate(data) > 0.7 ? .up : .neutral,
-                    color: .tmiPrimary
-                )
+    // MARK: - Engagement Chart moved to Components/DashboardEngagementChart.swift
 
-                TMIStatChip(
-                    value: "\(data.interestsIdentified)",
-                    label: "Interests Found",
-                    color: .tmiSecondary
-                )
-            }
-        }
-    }
+    // MARK: - Primary Insight Card
 
-    // MARK: - Engagement Chart
+    // MARK: - Primary Insight Card moved to Components/DashboardHeaderView.swift
 
-    private func engagementChart(_ data: DashboardData) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
-            Text("Weekly Engagement")
-                .font(.tmiTitle3)
-                .foregroundColor(.tmiTextPrimary)
 
-            Chart(data.engagementData) { item in
-                LineMark(
-                    x: .value("Week", item.week),
-                    y: .value("Level", item.engagementLevel)
-                )
-                .foregroundStyle(Color.tmiPrimary)
-                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-
-                AreaMark(
-                    x: .value("Week", item.week),
-                    y: .value("Level", item.engagementLevel)
-                )
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color.tmiPrimary.opacity(0.2), .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
-            .frame(height: 160)
-            .chartXAxis {
-                AxisMarks { _ in
-                    AxisValueLabel()
-                        .foregroundStyle(Color.tmiTextSecondary)
-                }
-            }
-            .chartYAxis {
-                AxisMarks { _ in
-                    AxisValueLabel()
-                        .foregroundStyle(Color.tmiTextSecondary)
-                }
-            }
-        }
-        .tmiCard()
-    }
 
     // MARK: - Recent Activity Section
 
@@ -1192,29 +645,13 @@ struct DashboardView: View {
 
     // MARK: - Helper Methods
 
-    private func surveyCompletionRate(_ data: DashboardData) -> Double {
-        guard data.totalStudents > 0 else { return 0.0 }
-        return Double(data.surveysCompleted) / Double(data.totalStudents)
-    }
 
-    private func planAlignmentRate(_ data: DashboardData) -> Double {
-        guard data.totalStudents > 0 else { return 0.0 }
-        return Double(data.plansAligned) / Double(data.totalStudents)
-    }
 
-    private func calculateTrend(_ data: DashboardData) -> (icon: String, value: String, label: String, color: Color)? {
-        guard !data.engagementData.isEmpty, data.engagementData.count >= 2 else { return nil }
-
-        let recent = data.engagementData.suffix(2)
-        let change = recent.last!.engagementLevel - recent.first!.engagementLevel
-
-        if abs(change) < 1 {
-            return ("minus", "0", "No change", .tmiTextSecondary)
-        } else if change > 0 {
-            return ("arrow.up.right", "+\(Int(change))", "vs last week", .tmiSuccess)
-        } else {
-            return ("arrow.down.right", "\(Int(change))", "vs last week", .tmiError)
-        }
+    // Helper function to calculate students needing attention
+    private func studentsNeedingAttention(_ data: DashboardData) -> Int? {
+        // Count students with engagement < 0.4 (needs support level)
+        let needsSupport = studentStateModel.students.filter { $0.engagementScore < 0.4 }.count
+        return needsSupport > 0 ? needsSupport : nil
     }
 }
 
@@ -1233,4 +670,6 @@ struct DashboardView: View {
     }
     .preferredColorScheme(.dark)
 }
+
+// MARK: - Actionable Cards moved to Components/ActionableCards.swift
 

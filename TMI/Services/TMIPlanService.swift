@@ -115,6 +115,43 @@ class TMIPlanService {
                     } else {
                         goals = []
                     }
+
+                    // Reconstruct resources
+                    let resources: [Resource]
+                    if let resourcesData = data["resources"] as? [[String: Any]] {
+                        resources = resourcesData.compactMap { resourceData in
+                            guard let title = resourceData["title"] as? String,
+                                  let description = resourceData["description"] as? String,
+                                  let categoryRaw = resourceData["category"] as? String,
+                                  let category = Resource.ResourceCategory(rawValue: categoryRaw),
+                                  let url = resourceData["url"] as? String,
+                                  let createdAtTimestamp = resourceData["createdAt"] as? Double,
+                                  let updatedAtTimestamp = resourceData["updatedAt"] as? Double else {
+                                return nil
+                            }
+                            
+                            let tags = resourceData["tags"] as? [String] ?? []
+                            let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
+                            let isFeatured = resourceData["isFeatured"] as? Bool ?? false
+                            let thumbnail = resourceData["thumbnail"] as? String
+                            
+                            return Resource(
+                                id: resourceData["id"] as? String,
+                                title: title,
+                                description: description,
+                                category: category,
+                                url: url,
+                                createdAt: Date(timeIntervalSince1970: createdAtTimestamp),
+                                updatedAt: Date(timeIntervalSince1970: updatedAtTimestamp),
+                                tags: tags,
+                                recommendedFor: recommendedFor,
+                                isFeatured: isFeatured,
+                                thumbnail: thumbnail
+                            )
+                        }
+                    } else {
+                        resources = []
+                    }
                     
                     let title = data["title"] as? String ?? ""
                     let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
@@ -136,7 +173,8 @@ class TMIPlanService {
                         notes: notes,
                         strategies: data["strategies"] as? [String],
                         progressTracking: nil,
-                        createdBy: createdBy
+                        createdBy: createdBy,
+                        resources: resources
                     )
                     
                     print("[TMIPlanService] Successfully reconstructed plan: \(plan.model.rawValue)")
@@ -241,6 +279,43 @@ class TMIPlanService {
                 goals = []
             }
 
+            // Reconstruct resources
+            let resources: [Resource]
+            if let resourcesData = data["resources"] as? [[String: Any]] {
+                resources = resourcesData.compactMap { resourceData in
+                    guard let title = resourceData["title"] as? String,
+                          let description = resourceData["description"] as? String,
+                          let categoryRaw = resourceData["category"] as? String,
+                          let category = Resource.ResourceCategory(rawValue: categoryRaw),
+                          let url = resourceData["url"] as? String,
+                          let createdAtTimestamp = resourceData["createdAt"] as? Double,
+                          let updatedAtTimestamp = resourceData["updatedAt"] as? Double else {
+                        return nil
+                    }
+                    
+                    let tags = resourceData["tags"] as? [String] ?? []
+                    let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
+                    let isFeatured = resourceData["isFeatured"] as? Bool ?? false
+                    let thumbnail = resourceData["thumbnail"] as? String
+                    
+                    return Resource(
+                        id: resourceData["id"] as? String,
+                        title: title,
+                        description: description,
+                        category: category,
+                        url: url,
+                        createdAt: Date(timeIntervalSince1970: createdAtTimestamp),
+                        updatedAt: Date(timeIntervalSince1970: updatedAtTimestamp),
+                        tags: tags,
+                        recommendedFor: recommendedFor,
+                        isFeatured: isFeatured,
+                        thumbnail: thumbnail
+                    )
+                }
+            } else {
+                resources = []
+            }
+
             let title = data["title"] as? String ?? ""
             let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
             let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
@@ -262,7 +337,8 @@ class TMIPlanService {
                 notes: notes,
                 strategies: data["strategies"] as? [String],
                 progressTracking: nil,
-                createdBy: createdBy
+                createdBy: createdBy,
+                resources: resources
             )
 
             print("[TMIPlanService] Successfully fetched plan: \(plan.model.rawValue)")
@@ -367,6 +443,43 @@ class TMIPlanService {
             } else {
                 goals = []
             }
+
+            // Reconstruct resources
+            let resources: [Resource]
+            if let resourcesData = docData["resources"] as? [[String: Any]] {
+                resources = resourcesData.compactMap { resourceData in
+                    guard let title = resourceData["title"] as? String,
+                          let description = resourceData["description"] as? String,
+                          let categoryRaw = resourceData["category"] as? String,
+                          let category = Resource.ResourceCategory(rawValue: categoryRaw),
+                          let url = resourceData["url"] as? String,
+                          let createdAtTimestamp = resourceData["createdAt"] as? Double,
+                          let updatedAtTimestamp = resourceData["updatedAt"] as? Double else {
+                        return nil
+                    }
+                    
+                    let tags = resourceData["tags"] as? [String] ?? []
+                    let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
+                    let isFeatured = resourceData["isFeatured"] as? Bool ?? false
+                    let thumbnail = resourceData["thumbnail"] as? String
+                    
+                    return Resource(
+                        id: resourceData["id"] as? String,
+                        title: title,
+                        description: description,
+                        category: category,
+                        url: url,
+                        createdAt: Date(timeIntervalSince1970: createdAtTimestamp),
+                        updatedAt: Date(timeIntervalSince1970: updatedAtTimestamp),
+                        tags: tags,
+                        recommendedFor: recommendedFor,
+                        isFeatured: isFeatured,
+                        thumbnail: thumbnail
+                    )
+                }
+            } else {
+                resources = []
+            }
             
             let title = docData["title"] as? String ?? ""
             let startDate = (docData["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
@@ -389,7 +502,8 @@ class TMIPlanService {
                 notes: notes,
                 strategies: docData["strategies"] as? [String],
                 progressTracking: nil,
-                createdBy: createdBy
+                createdBy: createdBy,
+                resources: resources
             )
             
             return savedPlan
@@ -538,6 +652,43 @@ class TMIPlanService {
                 } else {
                     goals = []
                 }
+
+                // Reconstruct resources
+                let resources: [Resource]
+                if let resourcesData = data["resources"] as? [[String: Any]] {
+                    resources = resourcesData.compactMap { resourceData in
+                        guard let title = resourceData["title"] as? String,
+                              let description = resourceData["description"] as? String,
+                              let categoryRaw = resourceData["category"] as? String,
+                              let category = Resource.ResourceCategory(rawValue: categoryRaw),
+                              let url = resourceData["url"] as? String,
+                              let createdAtTimestamp = resourceData["createdAt"] as? Double,
+                              let updatedAtTimestamp = resourceData["updatedAt"] as? Double else {
+                            return nil
+                        }
+                        
+                        let tags = resourceData["tags"] as? [String] ?? []
+                        let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
+                        let isFeatured = resourceData["isFeatured"] as? Bool ?? false
+                        let thumbnail = resourceData["thumbnail"] as? String
+                        
+                        return Resource(
+                            id: resourceData["id"] as? String,
+                            title: title,
+                            description: description,
+                            category: category,
+                            url: url,
+                            createdAt: Date(timeIntervalSince1970: createdAtTimestamp),
+                            updatedAt: Date(timeIntervalSince1970: updatedAtTimestamp),
+                            tags: tags,
+                            recommendedFor: recommendedFor,
+                            isFeatured: isFeatured,
+                            thumbnail: thumbnail
+                        )
+                    }
+                } else {
+                    resources = []
+                }
                 
                 let title = data["title"] as? String ?? ""
                 let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
@@ -559,7 +710,8 @@ class TMIPlanService {
                     notes: notes,
                     strategies: data["strategies"] as? [String],
                     progressTracking: nil,
-                    createdBy: createdBy
+                    createdBy: createdBy,
+                    resources: resources
                 )
             } else {
                 return nil
@@ -661,6 +813,43 @@ class TMIPlanService {
                     } else {
                         goals = []
                     }
+
+                    // Reconstruct resources
+                    let resources: [Resource]
+                    if let resourcesData = data["resources"] as? [[String: Any]] {
+                        resources = resourcesData.compactMap { resourceData in
+                            guard let title = resourceData["title"] as? String,
+                                  let description = resourceData["description"] as? String,
+                                  let categoryRaw = resourceData["category"] as? String,
+                                  let category = Resource.ResourceCategory(rawValue: categoryRaw),
+                                  let url = resourceData["url"] as? String,
+                                  let createdAtTimestamp = resourceData["createdAt"] as? Double,
+                                  let updatedAtTimestamp = resourceData["updatedAt"] as? Double else {
+                                return nil
+                            }
+                            
+                            let tags = resourceData["tags"] as? [String] ?? []
+                            let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
+                            let isFeatured = resourceData["isFeatured"] as? Bool ?? false
+                            let thumbnail = resourceData["thumbnail"] as? String
+                            
+                            return Resource(
+                                id: resourceData["id"] as? String,
+                                title: title,
+                                description: description,
+                                category: category,
+                                url: url,
+                                createdAt: Date(timeIntervalSince1970: createdAtTimestamp),
+                                updatedAt: Date(timeIntervalSince1970: updatedAtTimestamp),
+                                tags: tags,
+                                recommendedFor: recommendedFor,
+                                isFeatured: isFeatured,
+                                thumbnail: thumbnail
+                            )
+                        }
+                    } else {
+                        resources = []
+                    }
                     
                     let title = data["title"] as? String ?? ""
                     let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
@@ -682,7 +871,8 @@ class TMIPlanService {
                         notes: notes,
                         strategies: data["strategies"] as? [String],
                         progressTracking: nil,
-                        createdBy: createdBy
+                        createdBy: createdBy,
+                        resources: resources
                     )
                     
                     print("[TMIPlanService] Successfully reconstructed plan: \(plan.model.rawValue)")

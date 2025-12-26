@@ -370,9 +370,7 @@ struct StudentListView: View {
 
     private func quickActionsMenu(for student: Student) -> some View {
         Menu {
-            Button {
-                // View student detail
-            } label: {
+            NavigationLink(destination: StudentDetailView(student: student)) {
                 Label("View Details", systemImage: "person.circle")
             }
 
@@ -385,6 +383,9 @@ struct StudentListView: View {
 
             Button {
                 // Send interest survey
+                // In a real app, this would trigger an email or notification
+                print("Sending survey to \(student.name)")
+                TMIHaptics.lightImpact()
             } label: {
                 Label("Send Survey", systemImage: "envelope")
             }
@@ -408,9 +409,8 @@ struct StudentListView: View {
     // MARK: - Helper Methods
 
     private func activePlanForStudent(_ student: Student) -> TMIPlan? {
-        // In a real app, this would query the TMIPlanService
-        // For now, return nil or a sample plan
-        return nil
+        guard let studentId = student.id else { return nil }
+        return stateModel.activePlans[studentId]
     }
 
     private func modelColor(for model: TMIPlanModel) -> Color {
@@ -489,3 +489,4 @@ extension TMIPlanModel {
         StudentListView()
     }
 }
+

@@ -320,7 +320,7 @@ struct ScheduleMeetingView: View {
             if participants.isEmpty {
                 HStack {
                     Image(systemName: "person.2")
-                        .foregroundColor(.tmiTextTertiary)
+                    .foregroundColor(.tmiTextTertiary)
                     Text("No participants added yet")
                         .font(.tmiBody)
                         .foregroundColor(.tmiTextSecondary)
@@ -559,8 +559,8 @@ struct ScheduleMeetingView: View {
                     isSaving = false
                     saveError = error.localizedDescription
                     showingError = true
+                    print("[ERROR] Failed to schedule meeting: \(error.localizedDescription)")
                 }
-                print("[ERROR] Failed to schedule meeting: \(error.localizedDescription)")
             }
         }
     }

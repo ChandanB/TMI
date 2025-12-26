@@ -47,9 +47,10 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     var strategies: [String]?
     var progressTracking: [ProgressEntry]?
     var createdBy: String
+    var resources: [Resource]
 
 
-    init(id: String? = nil, title: String, description: String? = nil, students: [Student], model: TMIPlanModel, interests: [Interest], startDate: Date, endDate: Date?, creationDate: Date, lastUpdated: Date, goals: [Goal], progress: Double, notes: String, strategies: [String]? = nil, progressTracking: [ProgressEntry]? = nil, createdBy: String) {
+    init(id: String? = nil, title: String, description: String? = nil, students: [Student], model: TMIPlanModel, interests: [Interest], startDate: Date, endDate: Date?, creationDate: Date, lastUpdated: Date, goals: [Goal], progress: Double, notes: String, strategies: [String]? = nil, progressTracking: [ProgressEntry]? = nil, createdBy: String, resources: [Resource] = []) {
         self.id = id
         self.title = title
         self.description = description
@@ -66,6 +67,7 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
         self.strategies = strategies
         self.progressTracking = progressTracking
         self.createdBy = createdBy
+        self.resources = resources
     }
 
     public static func == (lhs: TMIPlan, rhs: TMIPlan) -> Bool {
@@ -115,7 +117,8 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
             "lastUpdated": lastUpdated.timeIntervalSince1970,
             "progress": progress,
             "notes": notes,
-            "createdBy": createdBy
+            "createdBy": createdBy,
+            "resources": resources.map { try? Firestore.Encoder().encode($0) }
         ]
 
         // Convert students array
@@ -176,7 +179,8 @@ extension TMIPlan {
             goals: [],
             progress: 0.50,
             notes: "Student is actively engaged in science club and coding workshops.",
-            createdBy: "system"
+            createdBy: "system",
+            resources: Resource.sampleResources
         )
     }
     
@@ -197,7 +201,8 @@ extension TMIPlan {
             goals: [],
             progress: 0.75,
             notes: "Student is actively engaged in science club and coding workshops.",
-            createdBy: "system")
+            createdBy: "system",
+            resources: [])
         
         let plan3 = TMIPlan(
             title: "Align Your Mind Sample Plan",

@@ -341,12 +341,30 @@ struct StudentCareersTab: View {
 
     private var careersGrid: some View {
         VStack(alignment: .leading, spacing: TMISpacing.lg) {
-            Text("Careers For You")
+            // Featured top match (if available)
+            if let topMatch = careerMatches.first {
+                VStack(alignment: .leading, spacing: TMISpacing.md) {
+                    Text("Top Match")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.tmiTextSecondary)
+                        .textCase(.uppercase)
+                        .tracking(1.2)
+                    
+                    NavigationLink(destination: CareerDetailView(career: convertToCareer(topMatch.career))) {
+                        FeaturedCareerCard(match: topMatch)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            
+            // All career matches
+            Text(careerMatches.count > 1 ? "All Matches" : "Careers For You")
                 .font(.tmiTitle2)
                 .foregroundColor(.white)
+                .padding(.top, careerMatches.count > 1 ? TMISpacing.md : 0)
 
             VStack(spacing: TMISpacing.md) {
-                ForEach(careerMatches.prefix(10)) { match in
+                ForEach(Array(careerMatches.dropFirst().prefix(9))) { match in
                     NavigationLink(destination: CareerDetailView(career: convertToCareer(match.career))) {
                         CareerMatchCard(match: match)
                     }
@@ -550,6 +568,128 @@ struct StudentPlanCard: View {
             RoundedRectangle(cornerRadius: TMIRadius.md)
                 .fill(Color.tmiSurface)
         )
+    }
+}
+
+// MARK: - Featured Career Card
+
+struct FeaturedCareerCard: View {
+    let match: CareerMatchResult
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                    // Career title
+                    Text(match.career.title)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    // Category
+                    Text(match.career.category)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.tmiTextSecondary)
+                }
+                
+                Spacer()
+                
+                // Match percentage badge
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 12))
+                    Text("\(Int(match.score * 100))%")
+                        .font(.system(size: 16, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.tmiSuccess, Color.tmiSuccess.opacity(0.8)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
+            }
+            
+            // Career stats
+            HStack(spacing: TMISpacing.lg) {
+                // Salary
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "dollarsign.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.tmiSuccess)
+                        Text("Salary")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.tmiTextSecondary)
+                    }
+                    if let salary = match.career.estimatedSalary {
+                        Text("$\(salary.min/1000)k-$\(salary.max/1000)k")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                    } else {
+                        Text("Varies")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                }
+                
+                Divider()
+                    .frame(height: 40)
+                
+                // Education
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "graduationcap.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.tmiPrimary)
+                        Text("Education")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.tmiTextSecondary)
+                    }
+                    Text(match.career.educationLevel.rawValue)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.top, TMISpacing.sm)
+        }
+        .padding(TMISpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.tmiPrimary.opacity(0.15),
+                            Color.tmiSecondary.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .background(
+                    RoundedRectangle(cornerRadius: TMIRadius.lg)
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.6)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.tmiPrimary.opacity(0.5), Color.tmiSecondary.opacity(0.3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2
+                )
+        )
+        .shadow(color: Color.tmiPrimary.opacity(0.2), radius: 12, x: 0, y: 6)
     }
 }
 

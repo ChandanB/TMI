@@ -56,6 +56,7 @@ struct TMIPlanListView: View {
     @State private var showingNewPlan = false
     @State private var planToDelete: TMIPlan? = nil
     @State private var showingDeleteConfirmation = false
+    @State private var selectedPlanForStudents: TMIPlan?
 
     enum PlanTab: String, CaseIterable {
         case active = "Active"
@@ -91,9 +92,6 @@ struct TMIPlanListView: View {
 
             VStack(spacing: 0) {
                 HStack(alignment: .center, spacing: 8) {
-                    Text("TMI Plans")
-                        .font(.largeTitle).bold()
-                        .foregroundColor(.tmiTextPrimary)
                     TMIHelpTooltipButton(message: "View and manage all trauma-informed intervention plans. Filter by status, search, and access detailed plans for each student or group.")
                     Spacer()
                 }
@@ -140,6 +138,38 @@ struct TMIPlanListView: View {
         .sheet(isPresented: $showingNewPlan) {
             NavigationStack {
                 newPlanSelector
+            }
+        }
+        .sheet(item: $selectedPlanForStudents) { plan in
+            NavigationStack {
+                if let student = plan.students.first, plan.students.count == 1 {
+                    StudentDetailView(student: student)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Close") {
+                                    selectedPlanForStudents = nil
+                                }
+                            }
+                        }
+                } else {
+                    List(plan.students) { student in
+                        NavigationLink(destination: StudentDetailView(student: student)) {
+                            HStack {
+                                TMIAvatar(initials: student.initials, color: .blue, size: 32)
+                                Text(student.name)
+                                    .font(.tmiBody)
+                            }
+                        }
+                    }
+                    .navigationTitle("Students in Plan")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close") {
+                                selectedPlanForStudents = nil
+                            }
+                        }
+                    }
+                }
             }
         }
         .task {
@@ -210,7 +240,7 @@ struct TMIPlanListView: View {
                 .swipeActions(edge: .leading, allowsFullSwipe: false) {
                     // View Students action
                     Button {
-                        // Navigate to first student in plan
+                        selectedPlanForStudents = plan
                         TMIHaptics.lightImpact()
                     } label: {
                         Label("Students", systemImage: "person.2")

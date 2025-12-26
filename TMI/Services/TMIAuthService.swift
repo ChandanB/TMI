@@ -548,16 +548,18 @@ class FirebaseTMIAuthService: TMIAuthService {
             if let tmiUser = self.currentTMIUser {
                 return tmiUser
             } else {
-                let userDoc = try await firebaseManager.firestore
-                    .collection("users")
-                    .document(userID)
-                    .getDocument()
-                
-                guard let userData = userDoc.data() else {
-                    throw FirebaseError.documentNotFound
+                let tmiUser = try await withTimeout(seconds: 10) {
+                    let userDoc = try await self.firebaseManager.firestore
+                        .collection("users")
+                        .document(userID)
+                        .getDocument()
+                    
+                    guard let userData = userDoc.data() else {
+                        throw FirebaseError.documentNotFound
+                    }
+                    
+                    return try Firestore.Decoder().decode(TMIUser.self, from: userData)
                 }
-                
-                let tmiUser = try Firestore.Decoder().decode(TMIUser.self, from: userData)
                 self.currentTMIUser = tmiUser
                 
                 return tmiUser

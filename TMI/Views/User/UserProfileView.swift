@@ -441,82 +441,84 @@ struct ChangeEmailView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        ZStack {
-            // Unified Background
-            TMIBackgroundView(variant: .default)
-                .ignoresSafeArea()
-            
-            ScrollView {
-                VStack(spacing: 20) {
-                    TMIGlassCard(style: .default) {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Change Email")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            
-                            TMITextField(
-                                icon: "envelope",
-                                placeholder: "New Email",
-                                text: Binding(
-                                    get: { profileData.newEmail },
-                                    set: { stateModel.updateNewEmail($0) }
-                                ),
-                                keyboardType: .emailAddress
-                            )
-                            
-                            TMITextField(
-                                icon: "lock",
-                                placeholder: "Current Password",
-                                text: Binding(
-                                    get: { profileData.currentPassword },
-                                    set: { stateModel.updateCurrentPassword($0) }
-                                ),
-                                isSecure: true
-                            )
-                            
-                            Text("You'll need to verify your new email after changing it.")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                                .padding(.top, 8)
+        NavigationStack {
+            ZStack {
+                // Unified Background
+                TMIBackgroundView(variant: .default)
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        TMIGlassCard(style: .default) {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Change Email")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                
+                                TMITextField(
+                                    icon: "envelope",
+                                    placeholder: "New Email",
+                                    text: Binding(
+                                        get: { profileData.newEmail },
+                                        set: { stateModel.updateNewEmail($0) }
+                                    ),
+                                    keyboardType: .emailAddress
+                                )
+                                
+                                TMITextField(
+                                    icon: "lock",
+                                    placeholder: "Current Password",
+                                    text: Binding(
+                                        get: { profileData.currentPassword },
+                                        set: { stateModel.updateCurrentPassword($0) }
+                                    ),
+                                    isSecure: true
+                                )
+                                
+                                Text("You'll need to verify your new email after changing it.")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .padding(.top, 8)
+                            }
                         }
                     }
+                    .padding(20)
                 }
-                .padding(20)
-            }
-            
-            if stateModel.isLoading {
-                ProgressView()
-                    .scaleEffect(1.5)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.4))
-            }
-        }
-        .navigationTitle("Change Email")
-        .navigationBarTitleDisplayMode(.inline)
-        .foregroundColor(.white)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cancel") {
-                    dismiss()
+                
+                if stateModel.isLoading {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black.opacity(0.4))
                 }
-                .foregroundColor(.white)
             }
-            
-            ToolbarItem(placement: .navigationBarTrailing) {
-                TMIButton(
-                    text: "Save",
-                    style: .primary,
-                    isDisabled: profileData.newEmail.isEmpty || profileData.currentPassword.isEmpty
-                    || stateModel.isLoading,
-                    action: {
-                        Task {
-                            await stateModel.updateEmail()
-                        }
+            .navigationTitle("Change Email")
+            .navigationBarTitleDisplayMode(.inline)
+            .foregroundColor(.white)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
                     }
-                )
+                    .foregroundColor(.white)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    TMIButton(
+                        text: "Save",
+                        style: .primary,
+                        isDisabled: profileData.newEmail.isEmpty || profileData.currentPassword.isEmpty
+                        || stateModel.isLoading,
+                        action: {
+                            Task {
+                                await stateModel.updateEmail()
+                            }
+                        }
+                    )
+                }
             }
+            .preferredColorScheme(.dark)
         }
-        .preferredColorScheme(.dark)
     }
 }
 

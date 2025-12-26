@@ -30,7 +30,8 @@ struct DataImportView: View {
     }
     
     var body: some View {
-        ZStack {
+        NavigationStack {
+            ZStack {
                 TMIBackgroundView(variant: .default)
                     .ignoresSafeArea()
                 
@@ -95,6 +96,7 @@ struct DataImportView: View {
                 }
             }
         }
+    }
     
     private var headerView: some View {
         TMIGlassCard(style: .default) {

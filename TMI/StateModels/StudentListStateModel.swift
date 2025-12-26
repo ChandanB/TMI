@@ -16,12 +16,15 @@ final class StudentListStateModel: BaseStateModel<[Student], IdentifiableError> 
     var selectedFilterOption: FilterOption = .all
     var showingAddStudent = false
     var selectedStudent: Student?
+    var activePlans: [String: TMIPlan] = [:]
     
     // Dependencies
     private let studentService: StudentService
+    private let tmiPlanService: TMIPlanService
     
-    init(studentService: StudentService = StudentService()) {
+    init(studentService: StudentService = StudentService(), tmiPlanService: TMIPlanService = TMIPlanService()) {
         self.studentService = studentService
+        self.tmiPlanService = tmiPlanService
         super.init()
     }
     
@@ -30,7 +33,32 @@ final class StudentListStateModel: BaseStateModel<[Student], IdentifiableError> 
         updateState(.loading)
         
         do {
-            let students = try await studentService.fetchStudents()
+            // Fetch students and plans concurrently
+            async let studentsTask = studentService.fetchStudents()
+            async let plansTask = tmiPlanService.fetchPlans()
+            
+            let (students, plans) = try await (studentsTask, plansTask)
+            
+            // Map active plans to students
+            var newActivePlans: [String: TMIPlan] = [:]
+            for plan in plans {
+                // Assuming a plan can have multiple students, map each student ID to this plan
+                // If a student has multiple plans, the last one processed will be used (or we could sort by date)
+                for student in plan.students {
+                    if let studentId = student.id {
+                        // Prefer more recently updated plans
+                        if let existingPlan = newActivePlans[studentId] {
+                            if plan.lastUpdated > existingPlan.lastUpdated {
+                                newActivePlans[studentId] = plan
+                            }
+                        } else {
+                            newActivePlans[studentId] = plan
+                        }
+                    }
+                }
+            }
+            self.activePlans = newActivePlans
+            
             updateState(.loaded(students))
         } catch {
             let identifiableError = ErrorHandlingHelper.handleRepositoryError(

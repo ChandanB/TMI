@@ -76,7 +76,6 @@ final class MeetingService {
         let snapshot = try await db.collection("users").document(userId)
             .collection("meetings")
             .whereField("relatedPlanId", isEqualTo: planId)
-            .order(by: "startTime", descending: false)
             .getDocuments()
 
         let meetings = snapshot.documents.compactMap { doc -> Meeting? in

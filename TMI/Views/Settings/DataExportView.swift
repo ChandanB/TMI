@@ -80,7 +80,8 @@ struct DataExportView: View {
     }
     
     var body: some View {
-        ZStack {
+        NavigationStack {
+            ZStack {
                 TMIBackgroundView(variant: TMIBackgroundView.BackgroundVariant.default)
                     .ignoresSafeArea()
                 
@@ -115,6 +116,7 @@ struct DataExportView: View {
             }
             .preferredColorScheme(.dark)
         }
+    }
     
     private var headerView: some View {
         TMIGlassCard(style: .default) {

@@ -624,6 +624,50 @@ struct CareerDetailView: View {
           )
           .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
       )
+      
+      // Recommended TMI Modules section
+      VStack(alignment: .leading, spacing: 16) {
+        sectionHeader(title: "Recommended TMI Modules", icon: "lightbulb.fill")
+        
+        Text("These intervention models can help students build skills for this career:")
+          .font(.system(size: 14, weight: .regular))
+          .foregroundColor(.white.opacity(0.8))
+          .fixedSize(horizontal: false, vertical: true)
+        
+        VStack(spacing: 12) {
+          ForEach(Array(getRecommendedTMIModels(for: career).enumerated()), id: \.offset) { index, model in
+            TMIModuleCard(model: model)
+              .opacity(animateContent ? 1 : 0)
+              .offset(y: animateContent ? 0 : 20)
+              .animation(
+                .spring(response: 0.6, dampingFraction: 0.8).delay(0.9 + Double(index) * 0.1),
+                value: animateContent
+              )
+          }
+        }
+      }
+      .padding(24)
+      .background(
+        RoundedRectangle(cornerRadius: 20)
+          .fill(Color.white.opacity(0.06))
+          .background(
+            RoundedRectangle(cornerRadius: 20)
+              .fill(.ultraThinMaterial)
+              .opacity(0.8)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 20)
+              .stroke(
+                LinearGradient(
+                  colors: [.white.opacity(0.25), .clear, .white.opacity(0.1)],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ),
+                lineWidth: 1.5
+              )
+          )
+          .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
+      )
     }
     .padding(.horizontal, 20)
   }
@@ -1515,6 +1559,62 @@ struct CareerDetailView: View {
     ]
   }
   
+  // MARK: - TMI Model Recommendations
+  
+  private func getRecommendedTMIModels(for career: Career) -> [(model: TMIPlanModel, reason: String)] {
+    var recommendations: [(model: TMIPlanModel, reason: String)] = []
+    
+    // Always recommend Chase Your Space for careers with clear pathways
+    recommendations.append((
+      model: .chaseYourSpace,
+      reason: "Cultivate career pathway for students who know they want to pursue \(career.field)"
+    ))
+    
+    // Recommend Acknowledge Interests for creative and specialized fields
+    if career.field.lowercased().contains("arts") ||
+       career.field.lowercased().contains("creative") ||
+       career.field.lowercased().contains("technology") {
+      recommendations.append((
+        model: .acknowledgeInterests,
+        reason: "Connect student interests in \(career.field) to classroom learning"
+      ))
+    }
+    
+    // Recommend Align Your Mind for technical/analytical careers
+    if career.field.lowercased().contains("technology") ||
+       career.field.lowercased().contains("science") ||
+       career.field.lowercased().contains("engineering") ||
+       career.field.lowercased().contains("finance") {
+      recommendations.append((
+        model: .alignYourMind,
+        reason: "Build focus and organization skills needed for \(career.field)"
+      ))
+    }
+    
+    // Recommend leadership models for business/management careers
+    if career.field.lowercased().contains("business") ||
+       career.field.lowercased().contains("management") ||
+       career.title.lowercased().contains("leader") {
+      recommendations.append((
+        model: .bullyToBoss,
+        reason: "Channel leadership energy into positive roles like \(career.title)"
+      ))
+    }
+    
+    // Recommend confidence-building for helping professions
+    if career.field.lowercased().contains("health") ||
+       career.field.lowercased().contains("education") ||
+       career.field.lowercased().contains("social") {
+      recommendations.append((
+        model: .meekToProtector,
+        reason: "Build confidence for careers in \(career.field) that require assertiveness"
+      ))
+    }
+    
+    // Limit to top 3 recommendations
+    return Array(recommendations.prefix(3))
+  }
+  
   // MARK: - Data Loading Functions
   
   @MainActor
@@ -2073,6 +2173,83 @@ struct CareerResourceCard: View {
     .onHover { hovering in
       isHovered = hovering
     }
+  }
+}
+
+// MARK: - TMI Module Card
+
+struct TMIModuleCard: View {
+  let model: (model: TMIPlanModel, reason: String)
+  
+  private var modelColor: Color {
+    switch model.model {
+    case .chaseYourSpace: return .blue
+    case .acknowledgeInterests: return .pink
+    case .alignYourMind: return .purple
+    case .directAndCorrect: return .orange
+    case .bullyToBoss: return .red
+    case .meekToProtector: return .green
+    }
+  }
+  
+  private var modelIcon: String {
+    switch model.model {
+    case .chaseYourSpace: return "airplane.departure"
+    case .acknowledgeInterests: return "heart.fill"
+    case .alignYourMind: return "brain.head.profile"
+    case .directAndCorrect: return "arrow.up.forward.circle.fill"
+    case .bullyToBoss: return "person.fill.badge.plus"
+    case .meekToProtector: return "shield.lefthalf.filled"
+    }
+  }
+  
+  var body: some View {
+    HStack(spacing: 16) {
+      // Icon
+      ZStack {
+        Circle()
+          .fill(modelColor.opacity(0.2))
+          .frame(width: 48, height: 48)
+        
+        Image(systemName: modelIcon)
+          .font(.system(size: 20, weight: .semibold))
+          .foregroundColor(modelColor)
+      }
+      
+      VStack(alignment: .leading, spacing: 6) {
+        Text(model.model.rawValue)
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundColor(.white)
+        
+        Text(model.reason)
+          .font(.system(size: 14, weight: .regular))
+          .foregroundColor(.white.opacity(0.8))
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      
+      Spacer()
+    }
+    .padding(16)
+    .background(
+      RoundedRectangle(cornerRadius: 12)
+        .fill(Color.white.opacity(0.05))
+        .background(
+          RoundedRectangle(cornerRadius: 12)
+            .fill(.ultraThinMaterial)
+            .opacity(0.5)
+        )
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 12)
+        .stroke(
+          LinearGradient(
+            colors: [modelColor.opacity(0.3), Color.clear],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          ),
+          lineWidth: 1
+        )
+    )
   }
 }
 
