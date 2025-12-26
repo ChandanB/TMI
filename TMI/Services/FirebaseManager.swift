@@ -256,6 +256,28 @@ extension FirebaseManager {
 
     try await user.sendEmailVerification()
   }
+
+  /// Update user's email address
+  nonisolated(nonsending) func updateEmail(to newEmail: String) async throws {
+    guard let user = auth.currentUser else {
+      throw FirebaseManagerError.userNotLoggedIn
+    }
+
+    do {
+      // Send verification email before updating
+      try await user.sendEmailVerification(beforeUpdatingEmail: newEmail)
+
+      // Update email in Firestore user profile
+      if let uid = auth.currentUser?.uid {
+        try await firestore.collection("users").document(uid).updateData([
+          "email": newEmail,
+          "updatedAt": FieldValue.serverTimestamp()
+        ])
+      }
+    } catch {
+      throw FirebaseManagerError.userProfileUpdateFailed("Failed to update email: \(error.localizedDescription)")
+    }
+  }
 }
 
 // MARK: - Error Handling
