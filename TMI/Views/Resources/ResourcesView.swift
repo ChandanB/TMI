@@ -82,7 +82,7 @@ struct ResourcesView: View {
   
   private var resourcesContentView: some View {
     Group {
-      if filteredResources.isEmpty {
+      if stateModel.filteredResources.isEmpty {
         emptyStateView
           .opacity(isLoaded ? 1 : 0)
           .offset(y: isLoaded ? 0 : 30)
@@ -343,24 +343,20 @@ struct ResourcesView: View {
       columns: [GridItem(.adaptive(minimum: 160), spacing: 16)],
       spacing: 16
     ) {
-      ForEach(filteredResources) { resource in
-        NavigationLink(destination: ResourceDetailView(resource: resource, onDelete: {
-          Task {
-            await stateModel.deleteResource(resource)
-          }
-        })) {
+      ForEach(stateModel.filteredResources) { resource in
+        NavigationLink(
+          destination: ResourceDetailView(resource: resource, onDelete: {
+            Task {
+              await stateModel.deleteResource(resource)
+            }
+          })
+        ) {
           ResourceCard(resource: resource)
-            .opacity(isLoaded ? 1 : 0)
-            .offset(y: isLoaded ? 0 : 30)
-            .animation(
-              .spring(response: 0.5, dampingFraction: 0.7)
-                .delay(
-                  0.3 + Double(filteredResources.firstIndex(where: { $0.id == resource.id }) ?? 0)
-                    * 0.05),
-              value: isLoaded
-            )
         }
         .buttonStyle(ScaleButtonStyle())
+        .opacity(isLoaded ? 1 : 0)
+        .offset(y: isLoaded ? 0 : 30)
+        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: isLoaded)
         .contextMenu {
           Button(role: .destructive) {
             Task {
@@ -512,13 +508,9 @@ struct ResourcesView: View {
     studentRecommendations = await careerService.getRecommendedResources(for: student)
     showStudentRecommendations = !studentRecommendations.isEmpty
   }
-
-  // MARK: - Filtered Resources
-
-  private var filteredResources: [Resource] {
-    stateModel.filteredResources
-  }
 }
+
+
 
 // MARK: - Category Button
 
@@ -922,3 +914,4 @@ struct AllStudentResourcesSheet: View {
 #Preview {
   ResourcesView()
 }
+

@@ -1580,6 +1580,30 @@ struct StatusBadge: View {
     }
 }
 
+//struct StatusBadge: View {
+//    let status: String
+//    
+//    var color: Color {
+//        switch status {
+//        case "submitted": return .green
+//        case "reviewed": return .blue
+//        case "draft": return .orange
+//        default: return .gray
+//        }
+//    }
+//    
+//    var body: some View {
+//        Text(status.capitalized)
+//            .font(.caption2)
+//            .fontWeight(.bold)
+//            .padding(.horizontal, 8)
+//            .padding(.vertical, 4)
+//            .background(color.opacity(0.1))
+//            .foregroundColor(color)
+//            .cornerRadius(4)
+//    }
+//}
+
 // MARK: - TMIPlanModel Extension
 
 extension TMIPlanModel {

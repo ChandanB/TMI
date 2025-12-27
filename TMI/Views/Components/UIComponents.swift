@@ -112,6 +112,7 @@ struct PremiumGlassTabBar: View {
     case .students: return "Students"
     case .tmiPlans: return "Plans"
     case .dashboard: return "Dashboard"
+    case .districtDashboard: return "District"
     case .forms: return "Forms"
     case .careerExplorer: return "Careers"
     case .interests: return "Interests"
@@ -125,6 +126,7 @@ struct PremiumGlassTabBar: View {
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
     case .dashboard: return "chart.bar.fill"
+    case .districtDashboard: return "building.2.fill"
     case .forms: return "list.clipboard.fill"
     case .careerExplorer: return "briefcase.fill"
     case .interests: return "heart.fill"
@@ -227,6 +229,7 @@ struct PremiumSidebarList: View {
     case .students: return "Students"
     case .tmiPlans: return "TMI Plans"
     case .dashboard: return "Dashboard"
+    case .districtDashboard: return "District"
     case .forms: return "Forms & Surveys"
     case .careerExplorer: return "Career Explorer"
     case .interests: return "Interests & Hobbies"
@@ -240,6 +243,7 @@ struct PremiumSidebarList: View {
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
     case .dashboard: return "chart.bar.fill"
+    case .districtDashboard: return "building.2.fill"
     case .forms: return "list.clipboard.fill"
     case .careerExplorer: return "briefcase.fill"
     case .interests: return "heart.fill"
@@ -879,3 +883,33 @@ struct StatCard: View {
     }
   }
 }
+
+
+//struct StatCard: View {
+//    let title: String
+//    let value: String
+//    let icon: String
+//    let color: Color
+//    
+//    var body: some View {
+//        VStack(spacing: 8) {
+//            HStack {
+//                Image(systemName: icon)
+//                    .foregroundColor(color)
+//                Spacer()
+//            }
+//            Text(value)
+//                .font(.title2)
+//                .fontWeight(.bold)
+//                .frame(maxWidth: .infinity, alignment: .leading)
+//            Text(title)
+//                .font(.caption)
+//                .foregroundColor(.secondary)
+//                .frame(maxWidth: .infinity, alignment: .leading)
+//        }
+//        .padding()
+//        .background(Color(UIColor.secondarySystemBackground))
+//        .cornerRadius(12)
+//    }
+//}
+

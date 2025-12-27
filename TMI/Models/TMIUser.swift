@@ -20,6 +20,8 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
   var dateOfBirth: Date?
   var institutionID: String?
   var institutionName: String?
+  var districtId: String?
+  var schoolId: String?
   
   // Verification and compliance
   var verificationStatus: VerificationStatus
@@ -56,6 +58,8 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     dateOfBirth: Date? = nil,
     institutionID: String? = nil,
     institutionName: String? = nil,
+    districtId: String? = nil,
+    schoolId: String? = nil,
     verificationStatus: VerificationStatus = VerificationStatus(),
     consentRecords: [ConsentRecord] = [],
     parentalConsentStatus: ParentalConsentStatus = .notRequired,
@@ -79,6 +83,8 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     self.dateOfBirth = dateOfBirth
     self.institutionID = institutionID
     self.institutionName = institutionName
+    self.districtId = districtId
+    self.schoolId = schoolId
     self.verificationStatus = verificationStatus
     self.consentRecords = consentRecords
     self.parentalConsentStatus = parentalConsentStatus
@@ -105,6 +111,8 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     case dateOfBirth
     case institutionID
     case institutionName
+    case districtId
+    case schoolId
     case verificationStatus
     case consentRecords
     case parentalConsentStatus
@@ -148,6 +156,8 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     dateOfBirth = try container.decodeIfPresent(Date.self, forKey: .dateOfBirth)
     institutionID = try container.decodeIfPresent(String.self, forKey: .institutionID)
     institutionName = try container.decodeIfPresent(String.self, forKey: .institutionName)
+    districtId = try container.decodeIfPresent(String.self, forKey: .districtId)
+    schoolId = try container.decodeIfPresent(String.self, forKey: .schoolId)
     
     // Complex fields with defaults
     verificationStatus = try container.decodeIfPresent(VerificationStatus.self, forKey: .verificationStatus) ?? VerificationStatus()
@@ -178,6 +188,8 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     try container.encodeIfPresent(dateOfBirth, forKey: .dateOfBirth)
     try container.encodeIfPresent(institutionID, forKey: .institutionID)
     try container.encodeIfPresent(institutionName, forKey: .institutionName)
+    try container.encodeIfPresent(districtId, forKey: .districtId)
+    try container.encodeIfPresent(schoolId, forKey: .schoolId)
     try container.encode(verificationStatus, forKey: .verificationStatus)
     try container.encode(consentRecords, forKey: .consentRecords)
     try container.encode(parentalConsentStatus, forKey: .parentalConsentStatus)
@@ -309,6 +321,8 @@ enum UserRole: String, CaseIterable, Codable, Identifiable, Sendable {
   case socialWorker = "social_worker"
   case parent = "parent"
   case legalGuardian = "legal_guardian"
+  case superintendent = "superintendent"
+  case districtAdmin = "district_admin"
   
   var id: String { rawValue }
   
@@ -321,12 +335,14 @@ enum UserRole: String, CaseIterable, Codable, Identifiable, Sendable {
     case .socialWorker: return "Social Worker"
     case .parent: return "Parent"
     case .legalGuardian: return "Legal Guardian"
+    case .superintendent: return "Superintendent"
+    case .districtAdmin: return "District Administrator"
     }
   }
   
   var requiresInstitutionalAffiliation: Bool {
     switch self {
-    case .teacher, .counselor, .administrator, .admin, .socialWorker:
+    case .teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin:
       return true
     case .student, .parent, .legalGuardian:
       return false
@@ -337,7 +353,7 @@ enum UserRole: String, CaseIterable, Codable, Identifiable, Sendable {
     switch self {
     case .student:
       return .ageVerification
-    case .teacher, .counselor, .administrator, .admin:
+    case .teacher, .counselor, .administrator, .admin, .superintendent, .districtAdmin:
       return .institutionalEmail
     case .socialWorker:
       return .professionalCredentials
@@ -354,7 +370,7 @@ enum UserRole: String, CaseIterable, Codable, Identifiable, Sendable {
       return Set([.viewOwnData, .viewStudentData, .createAssessments, .viewReports, .accessSupportResources])
     case .counselor:
       return Set([.viewOwnData, .viewStudentData, .viewSensitiveData, .createInterventions, .accessCrisisResources, .accessSupportResources])
-    case .administrator, .admin:
+    case .administrator, .admin, .superintendent, .districtAdmin:
       return Set(Permission.allCases.filter { !$0.isRestrictedPermission })
     case .socialWorker:
       return Set([.viewOwnData, .viewStudentData, .viewSensitiveData, .viewFamilyData, .createInterventions, .accessCrisisResources, .accessSupportResources])
@@ -371,7 +387,7 @@ enum UserRole: String, CaseIterable, Codable, Identifiable, Sendable {
       return Set([.publicData, .internalData, .personal, .educational])
     case .counselor:
       return Set([.publicData, .internalData, .personal, .educational, .sensitive])
-    case .administrator, .admin:
+    case .administrator, .admin, .superintendent, .districtAdmin:
       return Set(DataClassification.allCases)
     case .socialWorker:
       return Set([.publicData, .internalData, .personal, .educational, .sensitive, .traumaRelated])
@@ -487,7 +503,7 @@ struct VerificationStatus: Codable, Sendable {
     switch role {
     case .student:
       return true // Email verification is sufficient for students
-    case .teacher, .counselor, .administrator, .admin:
+    case .teacher, .counselor, .administrator, .admin, .superintendent, .districtAdmin:
       return isInstitutionVerified || isEmailVerified // Institution or email verification
     case .socialWorker:
       return isCredentialsVerified || isEmailVerified // Credentials or email verification
@@ -767,7 +783,7 @@ extension TMIUser {
     switch role {
     case .student, .parent, .legalGuardian:
       return verificationStatus.isEmailVerified
-    case .teacher, .counselor, .administrator, .admin:
+    case .teacher, .counselor, .administrator, .admin, .superintendent, .districtAdmin:
       return verificationStatus.isEmailVerified && verificationStatus.isInstitutionVerified
     case .socialWorker:
       return verificationStatus.isEmailVerified && verificationStatus.isCredentialsVerified
@@ -781,7 +797,7 @@ extension TMIUser {
     switch role {
     case .student, .parent, .legalGuardian:
       return false // Can only manage their own data
-    case .teacher, .counselor, .administrator, .admin, .socialWorker:
+    case .teacher, .counselor, .administrator, .admin, .superintendent, .districtAdmin, .socialWorker:
       return canAccessAdvancedFeatures()
     }
   }
@@ -878,3 +894,4 @@ enum TMIUserValidationError: LocalizedError, Equatable {
     }
   }
 }
+

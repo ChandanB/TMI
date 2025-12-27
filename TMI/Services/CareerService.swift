@@ -556,7 +556,7 @@ struct CareerStatistics: Codable, Sendable {
   let fieldDistribution: [String: Int]
 }
 
-struct CareerDiscoveryInsights: Codable, Sendable {
+struct CareerDiscoveryInsights: Codable, Sendable, Equatable {
   let totalCareersExplored: Int
   let personalizedRecommendations: Int
   let topInterestCategory: String

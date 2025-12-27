@@ -10,24 +10,31 @@ import FirebaseFirestore
 import Foundation
 import Observation
 
+// MARK: - Data Structure
+struct ResourcesData {
+    var resources: [Resource] = []
+}
+
 @Observable
-class ResourcesStateModel {
+final class ResourcesStateModel: BaseStateModel<ResourcesData, IdentifiableError> {
     private let db = Firestore.firestore()
     
-    // MARK: - Published State
-    var resources: [Resource] = []
-    var isLoading = false
-    var errorMessage: String?
-    
-    // UI State
+    // UI State (kept separate from BaseStateModel's state)
     var searchText = ""
     var selectedCategory: Resource.ResourceCategory?
     var showingAddResource = false
     var showSearchBar = false
     
     // MARK: - Computed Properties
+    
+    var resources: [Resource] {
+        guard case .loaded(let data) = state else { return [] }
+        return data.resources
+    }
+    
     var filteredResources: [Resource] {
-        var filtered = resources
+        guard case .loaded(let data) = state else { return [] }
+        var filtered = data.resources
         
         // Apply category filter
         if let category = selectedCategory {
@@ -63,45 +70,51 @@ class ResourcesStateModel {
     // MARK: - Data Operations
     
     @MainActor
-    func fetch() async {
-        isLoading = true
-        errorMessage = nil
+    override func fetch() async {
+        updateState(.loading)
         
         do {
-            resources = try await fetchResourcesFromFirestore()
+            let fetchedResources = try await fetchResourcesFromFirestore()
+            updateState(.loaded(ResourcesData(resources: fetchedResources)))
         } catch {
             print("[ResourcesStateModel] Failed to fetch from Firestore, using sample data: \(error)")
             // Fallback to sample data
-            resources = Resource.sampleResources
-            errorMessage = "Using offline data. \(error.localizedDescription)"
+            let sampleData = ResourcesData()
+            updateState(.loaded(sampleData))
+            // We can optionally set a non-blocking error message if needed, 
+            // but for now we are gracefully falling back.
         }
-        
-        isLoading = false
     }
     
     @MainActor
     func addResource(_ resource: Resource) async {
         do {
             let savedResource = try await saveResourceToFirestore(resource)
-            resources.append(savedResource)
+            if case .loaded(var currentData) = state {
+                currentData.resources.append(savedResource)
+                updateState(.loaded(currentData))
+            }
             showingAddResource = false
         } catch {
-            errorMessage = "Failed to save resource: \(error.localizedDescription)"
+            handleError(error)
         }
     }
     
     @MainActor
     func deleteResource(_ resource: Resource) async {
         guard let resourceId = resource.id else {
-            errorMessage = "Cannot delete resource: missing ID"
+            handleError(ResourceError.invalidData)
             return
         }
         
         do {
             try await deleteResourceFromFirestore(resourceId)
-            resources.removeAll { $0.id == resourceId }
+            if case .loaded(var currentData) = state {
+                currentData.resources.removeAll { $0.id == resourceId }
+                updateState(.loaded(currentData))
+            }
         } catch {
-            errorMessage = "Failed to delete resource: \(error.localizedDescription)"
+            handleError(error)
         }
     }
     
@@ -188,3 +201,4 @@ extension Resource {
         ]
     }
 }
+

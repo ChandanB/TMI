@@ -117,10 +117,16 @@ enum FirestoreCollection: String {
     // Miscellaneous feeds
     case homeFeed = "home_feed"
     
-    case interests
-    case hobbies
-    case tmiPlans
-    case resources
+    // District Pilot
+    case districts = "districts"
+    case schools = "schools"
+    
+    case interests = "interests"
+    case hobbies = "hobbies"
+    case tmiPlans = "tmi_plans"
+    case resources = "resources"
+    
+    case generatedResources = "generatedResources"
     
     nonisolated func reference() -> CollectionReference {
         FirebaseManager.shared.firestore.collection(self.rawValue)

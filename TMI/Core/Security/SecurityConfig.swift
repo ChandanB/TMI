@@ -138,13 +138,14 @@ enum DataClassification: String, CaseIterable, Codable, Identifiable, Sendable {
 extension UserRole {
     var requiresBiometricForConfidential: Bool {
         switch self {
-        case .teacher, .counselor, .administrator, .admin:
+        case .teacher, .counselor, .administrator, .admin, .socialWorker:
             return true
         case .student:
             return false
         case .parent, .legalGuardian:
             return false
-        case .socialWorker:
+        default:
+            // Secure default: require biometric for any unknown or future roles
             return true
         }
     }

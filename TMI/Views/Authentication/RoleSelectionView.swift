@@ -824,6 +824,7 @@ extension UserRole {
     case .socialWorker: return "person.2.circle"
     case .parent: return "figure.2.and.child.holdinghands"
     case .legalGuardian: return "person.crop.circle.badge.checkmark"
+    default: return "person"
     }
   }
 
@@ -836,6 +837,7 @@ extension UserRole {
     case .socialWorker: return "Providing social support"
     case .parent: return "Supporting my child"
     case .legalGuardian: return "Legal guardian"
+    default: return "User"
     }
   }
 }
@@ -846,3 +848,4 @@ extension UserRole {
   RoleSelectionView()
     .preferredColorScheme(.dark)
 }
+

@@ -8,7 +8,7 @@
 import FirebaseFirestore
 import SwiftUI
 
-struct Career: Identifiable, Codable, Sendable {
+struct Career: Identifiable, Codable, Sendable, Equatable {
     let id: UUID
     let title: String
     let field: String

@@ -1,9 +1,39 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User document: only the authenticated user can access their own document
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return getUserData().role;
+    }
+
+    function getUserDistrictId() {
+      return getUserData().get('districtId', null);
+    }
+
+    function isDistrictAdmin() {
+      return getUserRole() in ['superintendent', 'district_admin', 'administrator', 'admin'];
+    }
+
+    function isSameDistrict(districtId) {
+      return getUserDistrictId() == districtId;
+    }
+
+    // User documents
     match /users/{userId} {
-      allow read, write: if request.auth.uid == userId;
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        isDistrictAdmin()
+      );
+      allow write: if request.auth.uid == userId;
 
       // MVP Sub-collections: Students and TMI Plans
       match /students/{studentId} {
@@ -11,10 +41,46 @@ service cloud.firestore {
       }
 
       match /tmiPlans/{planId} {
+        allow read: if request.auth.uid == userId || isDistrictAdmin();
+        allow write: if request.auth.uid == userId;
+      }
+
+      // Form templates
+      match /formTemplates/{templateId} {
+        allow read: if request.auth.uid == userId ||
+                       (resource.data.get('isPublic', false) == true &&
+                        isSameDistrict(resource.data.get('districtId', '')));
+        allow write: if request.auth.uid == userId;
+      }
+
+      // Form assignments
+      match /formAssignments/{assignmentId} {
+        allow read: if request.auth.uid == userId || isDistrictAdmin();
+        allow write: if request.auth.uid == userId;
+      }
+
+      // Form submissions
+      match /formSubmissions/{submissionId} {
+        allow read: if request.auth.uid == userId ||
+                       request.auth.uid == resource.data.get('submittedBy', '') ||
+                       isDistrictAdmin();
+        allow create: if isAuthenticated();
+        allow update: if request.auth.uid == userId ||
+                         request.auth.uid == resource.data.get('submittedBy', '');
+      }
+
+      // Meetings
+      match /meetings/{meetingId} {
+        allow read: if request.auth.uid == userId;
+        allow write: if request.auth.uid == userId;
+      }
+
+      // Resources
+      match /resources/{resourceId} {
         allow read, write: if request.auth.uid == userId;
       }
 
-      // Sample data collections (needed for MVP functionality)
+      // Interests and hobbies
       match /interests/{interestId} {
         allow read, write: if request.auth.uid == userId;
       }
@@ -24,18 +90,43 @@ service cloud.firestore {
       }
     }
 
+    // Districts collection
+    match /districts/{districtId} {
+      allow read: if isAuthenticated() && (
+        isSameDistrict(districtId) || isDistrictAdmin()
+      );
+      allow write: if isDistrictAdmin() && isSameDistrict(districtId);
+
+      // Schools sub-collection
+      match /schools/{schoolId} {
+        allow read: if isAuthenticated() && (
+          isSameDistrict(districtId) || isDistrictAdmin()
+        );
+        allow write: if isDistrictAdmin() && isSameDistrict(districtId);
+      }
+
+      // Audit logs (read-only for most, write via server-side recommended)
+      match /auditLogs/{logId} {
+        allow read: if isDistrictAdmin() && isSameDistrict(districtId);
+        allow write: if isAuthenticated();
+      }
+
+      // Analytics aggregations (server-side only)
+      match /analytics/{date} {
+        allow read: if isDistrictAdmin() && isSameDistrict(districtId);
+        allow write: if false; // Server-side only (Cloud Functions)
+      }
+    }
+
     // Global AI-generated resources (shared across all users)
     match /generatedResources/{interestId} {
-      // Anyone authenticated can read
-      allow read: if request.auth != null;
-
-      // Only authenticated users can write (to generate resources)
-      allow write: if request.auth != null;
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
 
       // Resources sub-collection
       match /resources/{resourceId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null;
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
       }
     }
   }

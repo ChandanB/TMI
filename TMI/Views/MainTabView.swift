@@ -22,28 +22,30 @@ struct MainTabView: View {
   @State private var interestsStateModel = InterestsAndHobbiesStateModel()
 
   enum Tab: String, CaseIterable, Identifiable {
-    case dashboard, students, tmiPlans, forms, careerExplorer, interests, resources, settings
+    case dashboard, districtDashboard, students, tmiPlans, forms, careerExplorer, interests, resources, settings
     var id: Self { self }
     
     // Define which roles can access each tab - MVP focuses on educators
     var allowedRoles: Set<UserRole> {
       switch self {
       case .dashboard:
-        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian]
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .superintendent, .districtAdmin]
+      case .districtDashboard:
+        return [.superintendent, .districtAdmin] // District-level only
       case .students:
-        return [.teacher, .counselor, .administrator, .admin, .socialWorker]
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin]
       case .tmiPlans:
-        return [.teacher, .counselor, .administrator, .admin, .socialWorker]
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin]
       case .forms:
-        return [] // Temporarily disabled for MVP
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin]
       case .careerExplorer:
-        return [] // Temporarily disabled for MVP
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .student, .superintendent, .districtAdmin]
       case .interests:
-        return [] // Temporarily disabled for MVP - [.teacher, .counselor, .administrator, .admin, .socialWorker, .student]
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .student, .superintendent, .districtAdmin]
       case .resources:
-        return [] // Temporarily disabled for MVP - [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian]
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .superintendent, .districtAdmin]
       case .settings:
-        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .student]
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .student, .superintendent, .districtAdmin]
       }
     }
     
@@ -162,6 +164,8 @@ struct MainTabView: View {
     switch tab {
     case .dashboard:
       DashboardView()
+    case .districtDashboard:
+      DistrictDashboardView()
     case .students:
       StudentListView()
     case .tmiPlans:
@@ -183,6 +187,7 @@ struct MainTabView: View {
   func tabLabel(for tab: Tab) -> String {
     switch tab {
     case .dashboard: return "Dashboard"
+    case .districtDashboard: return "District"
     case .students: return "Students"
     case .tmiPlans: return "TMI Plans"
     case .forms: return "Forms & Surveys"
@@ -196,6 +201,7 @@ struct MainTabView: View {
   func iconName(for tab: Tab) -> String {
     switch tab {
     case .dashboard: return "chart.bar.fill"
+    case .districtDashboard: return "building.2.fill"
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
     case .forms: return "list.clipboard.fill"

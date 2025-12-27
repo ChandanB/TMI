@@ -16,13 +16,70 @@ struct FormSubmission: Codable, Identifiable, @unchecked Sendable { // @unchecke
     var formId: String
     var data: [String: AnyCodable]
     var submissionDate: Date = Date()
-    
-    init(id: String? = nil, formId: String, data: [String: AnyCodable], submissionDate: Date = Date()) {
-          self.id = id
-          self.formId = formId
-          self.data = data
-          self.submissionDate = submissionDate
-      }
+
+    // Phase 1: Enhanced fields for assignment workflow
+    var assignmentId: String?
+    var studentId: String?
+    var status: String = "draft" // draft, submitted, reviewed
+    var updatedAt: Date?
+    var score: Double?
+    var maxScore: Double?
+    var reviewedBy: String?
+    var reviewedByName: String?
+    var reviewedAt: Date?
+    var feedback: String?
+
+    init(
+        id: String? = nil,
+        formId: String,
+        data: [String: AnyCodable],
+        submissionDate: Date = Date(),
+        assignmentId: String? = nil,
+        studentId: String? = nil,
+        status: String = "draft",
+        updatedAt: Date? = nil,
+        score: Double? = nil,
+        maxScore: Double? = nil,
+        reviewedBy: String? = nil,
+        reviewedByName: String? = nil,
+        reviewedAt: Date? = nil,
+        feedback: String? = nil
+    ) {
+        self.id = id
+        self.formId = formId
+        self.data = data
+        self.submissionDate = submissionDate
+        self.assignmentId = assignmentId
+        self.studentId = studentId
+        self.status = status
+        self.updatedAt = updatedAt
+        self.score = score
+        self.maxScore = maxScore
+        self.reviewedBy = reviewedBy
+        self.reviewedByName = reviewedByName
+        self.reviewedAt = reviewedAt
+        self.feedback = feedback
+    }
+
+    var completionPercentage: Double {
+        let totalFields = data.count
+        guard totalFields > 0 else { return 0 }
+
+        let filledFields = data.values.filter { value in
+            if let string = value.value as? String {
+                return !string.isEmpty
+            }
+            return true
+        }.count
+
+        return Double(filledFields) / Double(totalFields) * 100
+    }
+
+    var isOverdue: Bool {
+        guard status != "submitted" && status != "reviewed" else { return false }
+        // Would need assignment due date to determine this
+        return false
+    }
 }
 
 struct FormSection: Codable, Identifiable, Transferable, @unchecked Sendable {
@@ -85,10 +142,17 @@ struct FormTemplate: Codable, Identifiable, @unchecked Sendable {
     var author: String?
     var uses: Int = 0
     var tags: [String] = []
-    
+
     /// New hex color string (e.g. "#FF5733") stored in Firestore
     var colorHex: String?
-    
+
+    // Phase 1: District Pilot fields
+    var isPublic: Bool = false
+    var districtId: String?
+    var schoolId: String?
+    var version: Int = 1
+    var createdBy: String?
+
     // Computed helper to turn the hex into a SwiftUI Color
     var themeColor: Color {
         Color(colorHex ?? "#FFFFFF")
@@ -108,7 +172,12 @@ struct FormTemplate: Codable, Identifiable, @unchecked Sendable {
         author: String? = nil,
         uses: Int = 0,
         tags: [String] = [],
-        colorHex: String? = nil
+        colorHex: String? = nil,
+        isPublic: Bool = false,
+        districtId: String? = nil,
+        schoolId: String? = nil,
+        version: Int = 1,
+        createdBy: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -124,6 +193,11 @@ struct FormTemplate: Codable, Identifiable, @unchecked Sendable {
         self.uses = uses
         self.tags = tags
         self.colorHex = colorHex
+        self.isPublic = isPublic
+        self.districtId = districtId
+        self.schoolId = schoolId
+        self.version = version
+        self.createdBy = createdBy
     }
 
     // Ensure Firestore encodes/decodes the new field
@@ -142,6 +216,11 @@ struct FormTemplate: Codable, Identifiable, @unchecked Sendable {
         case uses
         case tags
         case colorHex
+        case isPublic
+        case districtId
+        case schoolId
+        case version
+        case createdBy
     }
 }
 

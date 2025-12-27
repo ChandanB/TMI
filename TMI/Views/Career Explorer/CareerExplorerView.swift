@@ -2,54 +2,66 @@ import SwiftUI
 import Foundation
 
 struct CareerExplorerView: View {
-  // Search-focused state
-  @State private var searchText = ""
-  @State private var searchResults: [Career] = []
-  @State private var searchInsights: CareerDiscoveryInsights? = nil
-  @State private var isSearching = false
-  @State private var hasSearched = false
-  @State private var lastSearchQuery = ""
-  
-  // Student context
-  @State private var selectedStudent: Student? = nil
-  @State private var showingStudentPicker = false
-  @State private var showingInsightsSheet = false
-  
+  @Environment(\.careerExplorerStateModel) private var stateModel
+
   // Animation states
+  @State private var headerAppeared = false
   @State private var searchBoxAppeared = false
   @State private var resultsAppeared = false
-  @State private var headerAppeared = false
-  
-  // Search suggestions
   @State private var showingSuggestions = false
+  @State private var showingStudentPicker = false
+  @State private var showingInsightsSheet = false // UI only state
+  
+  // Legacy filter state simulation for UI compatibility
+  @State private var salaryFilter: ClosedRange<Double> = 30000...150000
+  @State private var selectedSkills: Set<String> = []
+  
+  // Legacy animation states (mapped to new ones or kept if needed)
+  @State private var searchAppeared = false
+  @State private var filtersAppeared = false
+  @State private var statsAppeared = false
+  @State private var animateCards = false
+  
+  @State private var lastSearchQuery = ""
   @State private var searchSuggestions: [String] = [
     "Software Engineer", "Nurse", "Teacher", "Doctor", "Designer",
     "Technology", "Healthcare", "Education", "Business", "Arts",
     "Biology", "Mathematics", "Psychology", "Computer Science", "Art"
   ]
   
-  // Legacy state variables for compatibility
-  @State private var careers: [Career] = []
-  @State private var trendingCareers: [Career] = []
-  @State private var personalizedRecommendations: [Career] = []
-  @State private var careerInsights: CareerDiscoveryInsights? = nil
-  @State private var careerStatistics: CareerStatistics? = nil
-  @State private var selectedField: String? = nil
-  @State private var selectedSkills: Set<String> = []
-  @State private var salaryFilter: ClosedRange<Double> = 30000...150000
-  @State private var isLoading = false
-  @State private var error: Error? = nil
-  @State private var isFilterSheetPresented = false
-  @State private var showPersonalizedSection = false
-  @State private var showTrendingSection = true
+  // Computed properties mapping to StateModel
+  private var searchText: String {
+      get { stateModel.searchText }
+      nonmutating set { stateModel.searchText = newValue }
+  }
   
-  // Animation state
-  @State private var searchAppeared = false
-  @State private var filtersAppeared = false
-  @State private var statsAppeared = false
-  @State private var animateCards = false
-
-  private let careerService = CareerService.shared
+  private var searchTextBinding: Binding<String> {
+      Binding(get: { stateModel.searchText }, set: { stateModel.searchText = $0 })
+  }
+  
+  private var searchResults: [Career] { stateModel.searchResults }
+  private var searchInsights: CareerDiscoveryInsights? { stateModel.searchInsights }
+  private var hasSearched: Bool { stateModel.hasSearched }
+  private var isSearching: Bool { stateModel.isSearching }
+  private var selectedStudent: Student? { stateModel.selectedStudent }
+  private var personalizedRecommendations: [Career] { stateModel.personalizedRecommendations }
+  private var trendingCareers: [Career] { stateModel.trendingCareers }
+  
+  // Wrappers for direct service access if needed, though mostly StateModel should handle
+  private var careerService: CareerService { CareerService.shared } 
+  
+  // Legacy/Compatibility stubs
+  private var careers: [Career] { [] } 
+  private var selectedField: String? { stateModel.selectedField }
+  private var careerStatistics: CareerStatistics? { nil } 
+  private var isLoading: Bool { stateModel.isLoading }
+  private var error: Error? { stateModel.errorMessage.map { NSError(domain: "TMI", code: 0, userInfo: [NSLocalizedDescriptionKey: $0]) } }
+  private var showPersonalizedSection: Bool { stateModel.showPersonalizedSection }
+  private var showTrendingSection: Bool { true }
+  private var isFilterSheetPresented: Bool { 
+    get { false } 
+    nonmutating set {} 
+  }
 
   // Get all unique skills across careers
   private var allSkills: [String] {
@@ -204,13 +216,18 @@ struct CareerExplorerView: View {
       studentPickerSheet
     }
     .sheet(isPresented: $showingInsightsSheet) {
-      if let insights = searchInsights {
-        CareerInsightsSheet(insights: insights, student: selectedStudent)
+      Group {
+        if let insights = searchInsights {
+          CareerInsightsSheet(insights: insights, student: selectedStudent)
+        } else {
+          EmptyView()
+        }
       }
     }
     .preferredColorScheme(.dark)
     .onAppear {
       performInitialAnimation()
+      Task { await stateModel.fetch() }
     }
   }
   
@@ -269,7 +286,7 @@ struct CareerExplorerView: View {
                 .font(.system(size: 20))
                 .foregroundColor(.white.opacity(0.7))
               
-              TextField("Search careers, fields, or subjects...", text: $searchText)
+              TextField("Search careers, fields, or subjects...", text: searchTextBinding)
                 .font(.system(size: 18))
                 .foregroundColor(.white)
                 .onSubmit {
@@ -334,7 +351,7 @@ struct CareerExplorerView: View {
                 .font(.system(size: 16))
                 .foregroundColor(.white.opacity(0.7))
               
-              TextField("Search careers...", text: $searchText)
+              TextField("Search careers...", text: searchTextBinding)
                 .font(.system(size: 16))
                 .foregroundColor(.white)
                 .onSubmit {
@@ -572,57 +589,16 @@ struct CareerExplorerView: View {
   // MARK: - Actions
   
   private func performSearch() {
-    guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      print("[CareerExplorer] Empty search text, skipping search")
-      return
-    }
-    
-    print("[CareerExplorer] Starting search for: '\(searchText)'")
-    isSearching = true
-    showingSuggestions = false
-    lastSearchQuery = searchText
-    
     Task {
-      do {
-        print("[CareerExplorer] Calling careerService.searchCareersWithAI with query: '\(searchText)', student: \(selectedStudent?.name ?? "none")")
-        let response = try await careerService.searchCareersWithAI(query: searchText, student: selectedStudent)
-        
-        await MainActor.run {
-          print("[CareerExplorer] Received response - careers: \(response.careers.count), insights available: \(response.insights)")
-          
-          searchResults = response.careers
-          searchInsights = response.insights
-          hasSearched = true
-          isSearching = false
-          
-          withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
-            resultsAppeared = true
-          }
-          
-          print("[CareerExplorer] Search completed successfully - Found \(response.careers.count) AI-generated careers for '\(searchText)'")
-          
-          // Debug: Print first few career titles
-          for (index, career) in response.careers.prefix(3).enumerated() {
-            print("[CareerExplorer] Career \(index + 1): \(career.title) in \(career.field)")
-          }
-        }
-      } catch {
-        await MainActor.run {
-          isSearching = false
-          hasSearched = true // Show empty state instead of search home
-          print("[CareerExplorer] Search failed with error: \(error)")
-          print("[CareerExplorer] Error type: \(type(of: error))")
-        }
+      await stateModel.performSearch()
+      withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+         resultsAppeared = true
       }
     }
   }
   
   private func resetSearch() {
-    searchText = ""
-    searchResults = []
-    searchInsights = nil
-    hasSearched = false
-    lastSearchQuery = ""
+    stateModel.clearSearch()
     resultsAppeared = false
     showingSuggestions = false
   }
@@ -643,35 +619,12 @@ struct CareerExplorerView: View {
   
   private var studentPickerSheet: some View {
     StudentPickerSheet(
-      selectedStudent: $selectedStudent,
+      selectedStudent: Binding(get: { stateModel.selectedStudent }, set: { stateModel.selectedStudent = $0 }),
       onStudentSelected: { student in
-        selectedStudent = student
-        showPersonalizedSection = true
+        stateModel.selectedStudent = student
         showingStudentPicker = false
-        // Load personalized recommendations using AI-powered CareerService
         Task {
-          do {
-            // Get AI-powered personalized recommendations
-            personalizedRecommendations = try await careerService.getCareerRecommendations(for: student)
-            
-            // Get AI-powered career insights
-            careerInsights = try await careerService.getCareerDiscoveryInsights(for: student)
-            
-            print("[CareerExplorer] Loaded \(personalizedRecommendations.count) AI-powered recommendations for \(student.name)")
-          } catch {
-            print("[CareerExplorer] Failed to load AI-powered career data: \(error)")
-            // Fallback to basic recommendations from existing careers
-            personalizedRecommendations = Array(careers.prefix(5))
-            careerInsights = CareerDiscoveryInsights(
-              totalCareersExplored: careers.count,
-              personalizedRecommendations: 5,
-              topInterestCategory: student.interests.first?.category.first?.rawValue ?? "General",
-              strongestCareerFields: Array(Set(careers.map { $0.field }).prefix(3)),
-              emergingOpportunities: [],
-              skillGaps: [],
-              nextSteps: ["Explore online courses", "Attend career fairs", "Connect with professionals"]
-            )
-          }
+            await stateModel.loadPersonalizedRecommendations()
         }
       }
     )
@@ -687,9 +640,7 @@ struct CareerExplorerView: View {
   
   @MainActor
   private func loadBasicCareerData() async {
-    // Load sample data for legacy components that might still be referenced
-    careers = Career.sampleCareers
-    trendingCareers = Array(Career.sampleCareers.prefix(5))
+    // Legacy data loading is now handled by stateModel.fetch() called in .task()
   }
 
   // MARK: - UI Components
@@ -802,9 +753,9 @@ struct CareerExplorerView: View {
     TMITextField(
       icon: "magnifyingglass",
       placeholder: "Search careers...",
-      text: $searchText
+      text: searchTextBinding
     )
-    .onChange(of: searchText) { _, newValue in
+    .onChange(of: stateModel.searchText) { newValue in
       // Perform real-time search
       if !newValue.isEmpty {
         Task {
@@ -831,7 +782,7 @@ struct CareerExplorerView: View {
       style: .filter(isSelected: selectedField == nil),
       action: {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-          selectedField = nil
+          stateModel.ui.set("selectedField", value: nil as String?)
         }
       }
     )
@@ -845,7 +796,7 @@ struct CareerExplorerView: View {
         style: .filter(isSelected: selectedField == field),
         action: {
           withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            selectedField = selectedField == field ? nil : field
+            stateModel.ui.set("selectedField", value: stateModel.selectedField == field ? nil as String? : field)
           }
         }
       )
@@ -998,7 +949,7 @@ struct CareerExplorerView: View {
 
       Button(action: {
         searchText = ""
-        selectedField = nil
+        stateModel.ui.set("selectedField", value: nil as String?)
         selectedSkills = []
         salaryFilter = 30000...150000
       }) {
