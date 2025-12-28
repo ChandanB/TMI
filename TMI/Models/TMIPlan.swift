@@ -49,8 +49,16 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     var createdBy: String
     var resources: [Resource]
 
+    // Phase 1: Approval Workflow (PR #6)
+    var approvalStatus: PlanApprovalStatus
+    var approvalHistory: [ApprovalHistoryEntry]
+    var submittedForApprovalAt: Date?
+    var approvedBy: String?
+    var approvedAt: Date?
+    var rejectionReason: String?
 
-    init(id: String? = nil, title: String, description: String? = nil, students: [Student], model: TMIPlanModel, interests: [Interest], startDate: Date, endDate: Date?, creationDate: Date, lastUpdated: Date, goals: [Goal], progress: Double, notes: String, strategies: [String]? = nil, progressTracking: [ProgressEntry]? = nil, createdBy: String, resources: [Resource] = []) {
+
+    init(id: String? = nil, title: String, description: String? = nil, students: [Student], model: TMIPlanModel, interests: [Interest], startDate: Date, endDate: Date?, creationDate: Date, lastUpdated: Date, goals: [Goal], progress: Double, notes: String, strategies: [String]? = nil, progressTracking: [ProgressEntry]? = nil, createdBy: String, resources: [Resource] = [], approvalStatus: PlanApprovalStatus = .draft, approvalHistory: [ApprovalHistoryEntry] = [], submittedForApprovalAt: Date? = nil, approvedBy: String? = nil, approvedAt: Date? = nil, rejectionReason: String? = nil) {
         self.id = id
         self.title = title
         self.description = description
@@ -68,6 +76,12 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
         self.progressTracking = progressTracking
         self.createdBy = createdBy
         self.resources = resources
+        self.approvalStatus = approvalStatus
+        self.approvalHistory = approvalHistory
+        self.submittedForApprovalAt = submittedForApprovalAt
+        self.approvedBy = approvedBy
+        self.approvedAt = approvedAt
+        self.rejectionReason = rejectionReason
     }
 
     public static func == (lhs: TMIPlan, rhs: TMIPlan) -> Bool {
@@ -118,8 +132,30 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
             "progress": progress,
             "notes": notes,
             "createdBy": createdBy,
-            "resources": resources.map { try? Firestore.Encoder().encode($0) }
+            "resources": resources.map { try? Firestore.Encoder().encode($0) },
+            "approvalStatus": approvalStatus.rawValue,
+            "approvalHistory": approvalHistory.map { entry in
+                [
+                    "action": entry.action.rawValue,
+                    "actionBy": entry.actionBy,
+                    "timestamp": entry.timestamp.timeIntervalSince1970,
+                    "comment": entry.comment as Any
+                ]
+            }
         ]
+
+        if let submittedAt = submittedForApprovalAt {
+            data["submittedForApprovalAt"] = submittedAt.timeIntervalSince1970
+        }
+        if let approvedBy = approvedBy {
+            data["approvedBy"] = approvedBy
+        }
+        if let approvedAt = approvedAt {
+            data["approvedAt"] = approvedAt.timeIntervalSince1970
+        }
+        if let rejectionReason = rejectionReason {
+            data["rejectionReason"] = rejectionReason
+        }
 
         // Convert students array
         data["students"] = students.map { student in
@@ -258,5 +294,77 @@ struct Goal: Identifiable, Codable, Sendable, Hashable {
 
     static func == (lhs: Goal, rhs: Goal) -> Bool {
         lhs.id == rhs.id
+    }
+}
+
+// MARK: - Approval Workflow (Phase 1: PR #6)
+
+enum PlanApprovalStatus: String, Codable, CaseIterable, Sendable {
+    case draft = "draft"
+    case pendingApproval = "pending_approval"
+    case approved = "approved"
+    case rejected = "rejected"
+    case changesRequested = "changes_requested"
+
+    var displayName: String {
+        switch self {
+        case .draft: return "Draft"
+        case .pendingApproval: return "Pending Approval"
+        case .approved: return "Approved"
+        case .rejected: return "Rejected"
+        case .changesRequested: return "Changes Requested"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .draft: return "doc.text"
+        case .pendingApproval: return "clock.fill"
+        case .approved: return "checkmark.circle.fill"
+        case .rejected: return "xmark.circle.fill"
+        case .changesRequested: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    var color: String {
+        switch self {
+        case .draft: return "gray"
+        case .pendingApproval: return "orange"
+        case .approved: return "green"
+        case .rejected: return "red"
+        case .changesRequested: return "yellow"
+        }
+    }
+}
+
+enum ApprovalAction: String, Codable, Sendable {
+    case submitted = "submitted"
+    case approved = "approved"
+    case rejected = "rejected"
+    case changesRequested = "changes_requested"
+    case resubmitted = "resubmitted"
+
+    var displayName: String {
+        switch self {
+        case .submitted: return "Submitted for Approval"
+        case .approved: return "Approved"
+        case .rejected: return "Rejected"
+        case .changesRequested: return "Changes Requested"
+        case .resubmitted: return "Resubmitted"
+        }
+    }
+}
+
+struct ApprovalHistoryEntry: Codable, Sendable, Hashable {
+    let action: ApprovalAction
+    let actionBy: String // User ID
+    let timestamp: Date
+    let comment: String?
+
+    init(action: ApprovalAction, actionBy: String, timestamp: Date = Date(), comment: String? = nil) {
+        self.action = action
+        self.actionBy = actionBy
+        self.timestamp = timestamp
+        self.comment = comment
     }
 }

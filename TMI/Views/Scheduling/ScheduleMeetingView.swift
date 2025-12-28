@@ -541,6 +541,7 @@ struct ScheduleMeetingView: View {
                     status: .scheduled,
                     notes: notes.isEmpty ? nil : notes,
                     completedAt: nil,
+                    actionItems: [], // Action items can be added after meeting is created
                     createdAt: Date(),
                     lastUpdated: Date()
                 )

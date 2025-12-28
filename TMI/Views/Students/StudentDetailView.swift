@@ -23,8 +23,11 @@ struct StudentDetailView: View {
     @State private var planStateModel = TMIPlanListStateModel()
     @State private var interestsStateModel = InterestsAndHobbiesStateModel()
     @State private var studentService = StudentService()
+    @State private var studentMeetings: [Meeting] = []
 
     @Environment(\.studentModeSession) private var studentModeSession
+
+    private let meetingService = MeetingService.shared
 
     init(student: Student) {
         self.initialStudent = student
@@ -52,6 +55,9 @@ struct StudentDetailView: View {
 
                     // TMI Plans Section (NEW)
                     tmiPlansSection
+
+                    // Meetings Section
+                    meetingsSection
 
                     // Engagement Chart
 //                    if let engagementHistory = student.engagementHistory, !engagementHistory.isEmpty {
@@ -91,10 +97,12 @@ struct StudentDetailView: View {
         .task {
             await refreshStudent()
             await planStateModel.fetch()
+            await loadMeetings()
         }
         .refreshable {
             await refreshStudent()
             await planStateModel.fetch()
+            await loadMeetings()
         }
         .sheet(isPresented: $showingCreatePlan) {
             NavigationStack {
@@ -487,6 +495,150 @@ struct StudentDetailView: View {
         }
     }
 
+    // MARK: - Meetings Section
+
+    private var meetingsSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Meetings")
+                        .font(.tmiTitle3)
+                        .foregroundColor(.tmiTextPrimary)
+
+                    Text("Scheduled meetings for this student")
+                        .font(.tmiCaption)
+                        .foregroundColor(.tmiTextSecondary)
+                }
+
+                Spacer()
+
+                if !studentMeetings.isEmpty {
+                    TMIBadge(
+                        text: "\(studentMeetings.count)",
+                        color: .tmiPrimary,
+                        style: .solid
+                    )
+                }
+            }
+
+            if !studentMeetings.isEmpty {
+                VStack(spacing: TMISpacing.sm) {
+                    ForEach(studentMeetings.prefix(3)) { meeting in
+                        NavigationLink(destination: MeetingDetailView(meeting: meeting, onUpdate: { Task { await loadMeetings() } })) {
+                            meetingMiniCard(meeting)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if studentMeetings.count > 3 {
+                        NavigationLink(destination: MeetingListView()) {
+                            HStack {
+                                Text("View All \(studentMeetings.count) Meetings")
+                                    .font(.tmiCaption)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundColor(.tmiPrimary)
+                            .padding(.vertical, TMISpacing.sm)
+                            .padding(.horizontal, TMISpacing.md)
+                            .background(
+                                RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                    .fill(Color.tmiPrimary.opacity(0.1))
+                            )
+                        }
+                    }
+                }
+            } else {
+                VStack(spacing: TMISpacing.md) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 32))
+                        .foregroundColor(.tmiTextTertiary)
+
+                    Text("No meetings scheduled")
+                        .font(.tmiBody)
+                        .foregroundColor(.tmiTextSecondary)
+
+                    Text("Schedule a meeting to discuss \(student.name)'s progress")
+                        .font(.tmiCaption)
+                        .foregroundColor(.tmiTextTertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, TMISpacing.lg)
+            }
+        }
+        .tmiCard()
+    }
+
+    private func meetingMiniCard(_ meeting: Meeting) -> some View {
+        HStack(spacing: TMISpacing.md) {
+            // Meeting Type Icon
+            ZStack {
+                Circle()
+                    .fill(Color(hex: meeting.meetingType.color).opacity(0.2))
+                    .frame(width: 40, height: 40)
+
+                Image(systemName: meeting.meetingType.icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(Color(hex: meeting.meetingType.color))
+            }
+
+            // Meeting Info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(meeting.title)
+                    .font(.tmiBody)
+                    .fontWeight(.medium)
+                    .foregroundColor(.tmiTextPrimary)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 10))
+                    Text(meeting.startTime.formatted(date: .abbreviated, time: .shortened))
+                        .font(.tmiCaption)
+                }
+                .foregroundColor(.tmiTextSecondary)
+
+                if let location = meeting.location {
+                    HStack(spacing: 4) {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 10))
+                        Text(location)
+                            .font(.tmiCaption)
+                    }
+                    .foregroundColor(.tmiTextSecondary)
+                }
+            }
+
+            Spacer()
+
+            // Status indicator
+            Circle()
+                .fill(meetingStatusColor(meeting.status))
+                .frame(width: 8, height: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.tmiTextTertiary)
+        }
+        .padding(TMISpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .fill(Color.tmiSurface)
+        )
+    }
+
+    private func meetingStatusColor(_ status: Meeting.MeetingStatus) -> Color {
+        switch status {
+        case .scheduled: return .orange
+        case .confirmed: return .cyan
+        case .completed: return .green
+        case .cancelled: return .red
+        case .rescheduled: return .yellow
+        }
+    }
+
     private func planMiniCard(_ plan: TMIPlan) -> some View {
         HStack(spacing: TMISpacing.md) {
             // Model Icon
@@ -760,6 +912,20 @@ struct StudentDetailView: View {
         } catch {
             // If fetch fails, keep using the existing student
             print("Failed to refresh student: \(error)")
+        }
+    }
+
+    @MainActor
+    private func loadMeetings() async {
+        do {
+            let allMeetings = try await meetingService.fetchMeetings()
+            studentMeetings = allMeetings.filter { meeting in
+                meeting.relatedStudentIds.contains(student.id ?? "")
+            }
+            .sorted { $0.startTime < $1.startTime }
+        } catch {
+            print("Failed to load meetings: \(error)")
+            studentMeetings = []
         }
     }
 

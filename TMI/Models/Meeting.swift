@@ -26,6 +26,7 @@ extension Meeting {
         case status
         case notes
         case completedAt
+        case actionItems
         case createdAt
         case lastUpdated
     }
@@ -52,6 +53,9 @@ struct Meeting: Codable, Identifiable, Hashable {
     var status: MeetingStatus
     var notes: String?
     var completedAt: Date?
+
+    // Action Items
+    var actionItems: [ActionItem]
 
     let createdAt: Date
     var lastUpdated: Date
@@ -121,6 +125,7 @@ struct Meeting: Codable, Identifiable, Hashable {
             "participants": participants.map { $0.toFirestoreData() },
             "relatedStudentIds": relatedStudentIds,
             "status": status.rawValue,
+            "actionItems": actionItems.map { $0.toFirestoreData() },
             "createdAt": Timestamp(date: createdAt),
             "lastUpdated": Timestamp(date: lastUpdated)
         ]
@@ -146,6 +151,18 @@ struct Meeting: Codable, Identifiable, Hashable {
         }
 
         return data
+    }
+
+    var hasActionItems: Bool {
+        !actionItems.isEmpty
+    }
+
+    var completedActionItemsCount: Int {
+        actionItems.filter { $0.isCompleted }.count
+    }
+
+    var overdueActionItemsCount: Int {
+        actionItems.filter { $0.isOverdue }.count
     }
 }
 
@@ -204,6 +221,92 @@ struct MeetingParticipant: Codable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Action Item
+
+struct ActionItem: Codable, Hashable, Identifiable {
+    var id: String { itemId }
+    let itemId: String
+    let description: String
+    let assignedTo: String? // User ID
+    let dueDate: Date?
+    var isCompleted: Bool
+    var completedAt: Date?
+    let createdAt: Date
+
+    enum ActionItemPriority: String, Codable, CaseIterable {
+        case low = "Low"
+        case medium = "Medium"
+        case high = "High"
+
+        var icon: String {
+            switch self {
+            case .low: return "arrow.down.circle.fill"
+            case .medium: return "minus.circle.fill"
+            case .high: return "arrow.up.circle.fill"
+            }
+        }
+
+        var color: String {
+            switch self {
+            case .low: return "#3498DB"
+            case .medium: return "#F39C12"
+            case .high: return "#E74C3C"
+            }
+        }
+    }
+
+    var priority: ActionItemPriority
+
+    init(
+        itemId: String = UUID().uuidString,
+        description: String,
+        assignedTo: String? = nil,
+        dueDate: Date? = nil,
+        priority: ActionItemPriority = .medium,
+        isCompleted: Bool = false,
+        completedAt: Date? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.itemId = itemId
+        self.description = description
+        self.assignedTo = assignedTo
+        self.dueDate = dueDate
+        self.priority = priority
+        self.isCompleted = isCompleted
+        self.completedAt = completedAt
+        self.createdAt = createdAt
+    }
+
+    var isOverdue: Bool {
+        guard let dueDate = dueDate else { return false }
+        return !isCompleted && dueDate < Date()
+    }
+
+    func toFirestoreData() -> [String: Any] {
+        var data: [String: Any] = [
+            "itemId": itemId,
+            "description": description,
+            "priority": priority.rawValue,
+            "isCompleted": isCompleted,
+            "createdAt": Timestamp(date: createdAt)
+        ]
+
+        if let assignedTo = assignedTo {
+            data["assignedTo"] = assignedTo
+        }
+
+        if let dueDate = dueDate {
+            data["dueDate"] = Timestamp(date: dueDate)
+        }
+
+        if let completedAt = completedAt {
+            data["completedAt"] = Timestamp(date: completedAt)
+        }
+
+        return data
+    }
+}
+
 // MARK: - Sample Data
 
 extension Meeting {
@@ -236,6 +339,20 @@ extension Meeting {
             status: .scheduled,
             notes: nil,
             completedAt: nil,
+            actionItems: [
+                ActionItem(
+                    description: "Follow up with student about goals",
+                    assignedTo: "user-1",
+                    dueDate: Date().addingTimeInterval(604800), // 1 week
+                    priority: .high
+                ),
+                ActionItem(
+                    description: "Update intervention strategy document",
+                    assignedTo: "user-2",
+                    dueDate: Date().addingTimeInterval(259200), // 3 days
+                    priority: .medium
+                )
+            ],
             createdAt: Date(),
             lastUpdated: Date()
         )

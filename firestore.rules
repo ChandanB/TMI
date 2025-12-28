@@ -129,5 +129,48 @@ service cloud.firestore {
         allow write: if isAuthenticated();
       }
     }
+
+    // Global form templates collection (Phase 1: District Pilot - PR #3)
+    match /formTemplates/{templateId} {
+      allow read: if isAuthenticated() && (
+        // Public templates in same district
+        (resource.data.get('isPublic', false) == true &&
+         isSameDistrict(resource.data.get('districtId', ''))) ||
+        // Own templates
+        resource.data.get('createdBy', '') == request.auth.uid ||
+        // District admins can see all in their district
+        (isDistrictAdmin() && isSameDistrict(resource.data.get('districtId', '')))
+      );
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.get('createdBy', '') == request.auth.uid ||
+        isDistrictAdmin()
+      );
+    }
+
+    // Global resource assignments collection (Phase 1: District Pilot - PR #5)
+    match /resourceAssignments/{assignmentId} {
+      allow read: if isAuthenticated() && (
+        // Student can read their own assignments
+        resource.data.get('studentId', '') == request.auth.uid ||
+        // Assigner can read assignments they created
+        resource.data.get('assignedBy', '') == request.auth.uid ||
+        // District admins can read all
+        isDistrictAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        // Student can update their own assignments (status, notes)
+        resource.data.get('studentId', '') == request.auth.uid ||
+        // Assigner can update
+        resource.data.get('assignedBy', '') == request.auth.uid ||
+        // District admins can update all
+        isDistrictAdmin()
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.get('assignedBy', '') == request.auth.uid ||
+        isDistrictAdmin()
+      );
+    }
   }
 }

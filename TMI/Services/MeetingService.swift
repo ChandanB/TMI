@@ -206,4 +206,116 @@ final class MeetingService {
 
         print("[MeetingService] ✅ Meeting deleted")
     }
+
+    // MARK: - Action Items
+
+    /// Add an action item to a meeting
+    func addActionItem(to meetingId: String, actionItem: ActionItem) async throws {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "MeetingService", code: 401)
+        }
+
+        print("[MeetingService] ➕ Adding action item to meeting")
+
+        let docRef = db.collection("users").document(userId)
+            .collection("meetings")
+            .document(meetingId)
+
+        try await docRef.updateData([
+            "actionItems": FieldValue.arrayUnion([actionItem.toFirestoreData()]),
+            "lastUpdated": Timestamp(date: Date())
+        ])
+
+        print("[MeetingService] ✅ Action item added")
+    }
+
+    /// Update an action item within a meeting
+    func updateActionItem(meetingId: String, actionItem: ActionItem, currentMeeting: Meeting) async throws {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "MeetingService", code: 401)
+        }
+
+        print("[MeetingService] 📝 Updating action item")
+
+        // Remove old version and add new version (Firestore doesn't support direct array element updates)
+        var updatedMeeting = currentMeeting
+        updatedMeeting.actionItems.removeAll { $0.itemId == actionItem.itemId }
+        updatedMeeting.actionItems.append(actionItem)
+        updatedMeeting.lastUpdated = Date()
+
+        let docRef = db.collection("users").document(userId)
+            .collection("meetings")
+            .document(meetingId)
+
+        try await docRef.setData(updatedMeeting.toFirestoreData())
+
+        print("[MeetingService] ✅ Action item updated")
+    }
+
+    /// Toggle action item completion status
+    func toggleActionItemCompletion(meetingId: String, actionItemId: String, currentMeeting: Meeting) async throws {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "MeetingService", code: 401)
+        }
+
+        print("[MeetingService] ✅ Toggling action item completion")
+
+        var updatedMeeting = currentMeeting
+        if let index = updatedMeeting.actionItems.firstIndex(where: { $0.itemId == actionItemId }) {
+            var actionItem = updatedMeeting.actionItems[index]
+            actionItem.isCompleted.toggle()
+            actionItem.completedAt = actionItem.isCompleted ? Date() : nil
+            updatedMeeting.actionItems[index] = actionItem
+        }
+        updatedMeeting.lastUpdated = Date()
+
+        let docRef = db.collection("users").document(userId)
+            .collection("meetings")
+            .document(meetingId)
+
+        try await docRef.setData(updatedMeeting.toFirestoreData())
+
+        print("[MeetingService] ✅ Action item completion toggled")
+    }
+
+    /// Delete an action item from a meeting
+    func deleteActionItem(from meetingId: String, actionItemId: String, currentMeeting: Meeting) async throws {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "MeetingService", code: 401)
+        }
+
+        print("[MeetingService] 🗑️ Deleting action item")
+
+        var updatedMeeting = currentMeeting
+        updatedMeeting.actionItems.removeAll { $0.itemId == actionItemId }
+        updatedMeeting.lastUpdated = Date()
+
+        let docRef = db.collection("users").document(userId)
+            .collection("meetings")
+            .document(meetingId)
+
+        try await docRef.setData(updatedMeeting.toFirestoreData())
+
+        print("[MeetingService] ✅ Action item deleted")
+    }
+
+    /// Fetch all action items across all meetings
+    func fetchAllActionItems() async throws -> [ActionItem] {
+        let meetings = try await fetchMeetings()
+        return meetings.flatMap { $0.actionItems }
+    }
+
+    /// Fetch action items assigned to a specific user
+    func fetchActionItems(assignedTo userId: String) async throws -> [ActionItem] {
+        let meetings = try await fetchMeetings()
+        return meetings.flatMap { $0.actionItems }
+            .filter { $0.assignedTo == userId }
+    }
+
+    /// Fetch overdue action items
+    func fetchOverdueActionItems() async throws -> [ActionItem] {
+        let meetings = try await fetchMeetings()
+        return meetings.flatMap { $0.actionItems }
+            .filter { $0.isOverdue }
+    }
 }
