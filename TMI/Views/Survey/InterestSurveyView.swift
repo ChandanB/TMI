@@ -3,49 +3,87 @@
 //  TMI
 //
 //  View for conducting an interest survey within a TMI Plan
+//  Uses global interest library and student interest edges
 //
 
 import SwiftUI
 
 struct InterestSurveyView: View {
     let plan: TMIPlan
+    let studentId: String  // Required for saving student interest edges
     let onComplete: ([Interest]) -> Void
-    
+
     @Environment(\.dismiss) private var dismiss
     @State private var currentStep = 0
-    @State private var selectedInterests: [Interest] = []
+    @State private var selectedInterestLevels: [String: Int] = [:]  // interestId: level
+    @State private var allInterests: [Interest] = []
     @State private var isSaving = false
-    
-    // Mock data for survey steps
-    private let steps = [
-        "What subjects do you enjoy most?",
-        "What do you like to do in your free time?",
-        "What kind of careers sound interesting?",
-        "What skills would you like to learn?"
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    private let interestLibraryService = InterestLibraryService.shared
+    private let studentInterestService = StudentInterestService.shared
+
+    // Survey steps with category filters
+    private let steps: [(title: String, categories: [InterestCategory])] = [
+        ("What subjects do you enjoy most?", [.academics, .mathematics, .science]),
+        ("What do you like to do in your free time?", [.arts, .music, .sports, .gaming, .outdoors]),
+        ("What kind of careers sound interesting?", [.technology, .leadership, .socialCauses]),
+        ("What skills would you like to learn?", [.communication, .learning, .crafts])
     ]
     
     var body: some View {
         ZStack {
             TMIBackgroundView(variant: .default)
                 .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Progress Bar
-                progressBar
-                
-                // Content
-                ScrollView {
-                    VStack(spacing: 32) {
-                        headerSection
-                        
-                        optionsGrid
+
+            if isLoading {
+                ProgressView("Loading interests...")
+                    .tint(.tmiPrimary)
+                    .foregroundColor(.white)
+            } else if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 48))
+                        .foregroundColor(.red)
+                    Text("Error")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    Text(error)
+                        .font(.body)
+                        .foregroundColor(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                    Button("Retry") {
+                        Task {
+                            await loadInterests()
+                        }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 32)
+                    .padding()
+                    .background(Color.tmiPrimary)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
                 }
-                
-                // Footer
-                footerSection
+                .padding()
+            } else {
+                VStack(spacing: 0) {
+                    // Progress Bar
+                    progressBar
+
+                    // Content
+                    ScrollView {
+                        VStack(spacing: 32) {
+                            headerSection
+
+                            optionsGrid
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 32)
+                    }
+
+                    // Footer
+                    footerSection
+                }
             }
         }
         .navigationTitle("Interest Survey")
@@ -56,6 +94,9 @@ struct InterestSurveyView: View {
                     dismiss()
                 }
             }
+        }
+        .task {
+            await loadInterests()
         }
         .preferredColorScheme(.dark)
     }
@@ -95,13 +136,13 @@ struct InterestSurveyView: View {
     
     private var headerSection: some View {
         VStack(spacing: 12) {
-            Text(steps[currentStep])
+            Text(steps[currentStep].title)
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(.white)
                 .multilineTextAlignment(.center)
-            
-            Text("Select all that apply")
+
+            Text("Tap to rate your interest level (1-5)")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.7))
         }
@@ -109,32 +150,20 @@ struct InterestSurveyView: View {
     
     private var optionsGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 16) {
-            // Mock options based on step
-            ForEach(getOptionsForStep(currentStep), id: \.self) { option in
-                Button(action: { toggleSelection(option) }) {
-                    VStack(spacing: 12) {
-                        Image(systemName: getIconForOption(option))
-                            .font(.system(size: 32))
-                            .foregroundColor(isSelected(option) ? .white : .tmiPrimary)
-                        
-                        Text(option)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(isSelected(option) ? .white : .white.opacity(0.9))
-                            .multilineTextAlignment(.center)
+            ForEach(getInterestsForCurrentStep(), id: \.id) { interest in
+                InterestRatingCard(
+                    interest: interest,
+                    currentLevel: selectedInterestLevels[interest.id ?? ""] ?? 0,
+                    onTap: { level in
+                        if let id = interest.id {
+                            if level == selectedInterestLevels[id] {
+                                selectedInterestLevels.removeValue(forKey: id)
+                            } else {
+                                selectedInterestLevels[id] = level
+                            }
+                        }
                     }
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(1.0, contentMode: .fit)
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(isSelected(option) ? Color.tmiPrimary : Color.white.opacity(0.05))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(isSelected(option) ? Color.white.opacity(0.5) : Color.white.opacity(0.1), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(ScaleButtonStyle())
+                )
             }
         }
     }
@@ -183,110 +212,115 @@ struct InterestSurveyView: View {
     }
     
     // MARK: - Logic
-    
-    private func getOptionsForStep(_ step: Int) -> [String] {
-        switch step {
-        case 0: return ["Math", "Science", "Art", "History", "Music", "PE"]
-        case 1: return ["Video Games", "Sports", "Reading", "Drawing", "Coding", "Cooking"]
-        case 2: return ["Engineer", "Artist", "Doctor", "Teacher", "Athlete", "Developer"]
-        case 3: return ["Leadership", "Creativity", "Teamwork", "Problem Solving", "Communication"]
-        default: return []
+
+    /// Load interests from global library
+    @MainActor
+    private func loadInterests() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            allInterests = try await interestLibraryService.fetchAllInterests()
+            print("[InterestSurveyView] Loaded \(allInterests.count) interests from library")
+        } catch {
+            errorMessage = "Failed to load interests: \(error.localizedDescription)"
+            print("[InterestSurveyView] Error: \(errorMessage ?? "")")
         }
+
+        isLoading = false
     }
-    
-    private func getIconForOption(_ option: String) -> String {
-        // Simple mapping for demo
-        switch option {
-        case "Math": return "x.squareroot"
-        case "Science": return "flask.fill"
-        case "Art": return "paintbrush.fill"
-        case "Video Games": return "gamecontroller.fill"
-        case "Sports": return "sportscourt.fill"
-        case "Coding": return "laptopcomputer"
-        default: return "star.fill"
+
+    /// Get interests filtered by current step's categories
+    private func getInterestsForCurrentStep() -> [Interest] {
+        let currentCategories = steps[currentStep].categories
+        return allInterests.filter { interest in
+            !Set(interest.category).isDisjoint(with: Set(currentCategories))
         }
+        .sorted { ($0.popularityScore ?? 0) > ($1.popularityScore ?? 0) }
+        .prefix(12)  // Limit to 12 interests per step
+        .map { $0 }
     }
-    
-    private func isSelected(_ option: String) -> Bool {
-        // In a real app, we'd track selection per step.
-        // For this mock, we'll just check if we've created an interest with this name
-        return selectedInterests.contains { $0.name == option }
-    }
-    
-    private func toggleSelection(_ option: String) {
-        if let index = selectedInterests.firstIndex(where: { $0.name == option }) {
-            selectedInterests.remove(at: index)
-        } else {
-            // Create a mock interest object
-            let interest = Interest(
-                id: UUID().uuidString,
-                name: option,
-                category: categoriesForOption(option),
-                description: "Selected from survey",
-                academicRelevance: [],
-                interventionModels: [],
-                popularityScore: 80,
-                isFeatured: false,
-                createdAt: Date()
-            )
-            selectedInterests.append(interest)
-        }
-    }
-    
+
     private func nextStep() {
         if currentStep < steps.count - 1 {
             withAnimation {
                 currentStep += 1
             }
         } else {
-            finishSurvey()
+            Task {
+                await finishSurvey()
+            }
         }
     }
-    
-    private func categoriesForOption(_ option: String) -> [InterestCategory] {
-        switch option {
-        // Step 0: Subjects
-        case "Math": return [.mathematics]
-        case "Science": return [.science]
-        case "Art": return [.arts]
-        case "History": return [.academics]
-        case "Music": return [.music]
-        case "PE": return [.sports]
-        
-        // Step 1: Free time
-        case "Video Games": return [.gaming]
-        case "Sports": return [.sports]
-        case "Reading": return [.literature]
-        case "Drawing": return [.arts]
-        case "Coding": return [.technology]
-        case "Cooking": return [.cooking]
-        
-        // Step 2: Careers
-        case "Engineer": return [.technology, .science]
-        case "Artist": return [.arts]
-        case "Doctor": return [.science]
-        case "Teacher": return [.academics]
-        case "Athlete": return [.sports]
-        case "Developer": return [.technology]
-        
-        // Step 3: Skills to learn
-        case "Leadership": return [.leadership]
-        case "Creativity": return [.arts]
-        case "Teamwork": return [.social]
-        case "Problem Solving": return [.academics]
-        case "Communication": return [.communication]
-        
-        default: return [.other]
-        }
-    }
-    
-    private func finishSurvey() {
+
+    @MainActor
+    private func finishSurvey() async {
         isSaving = true
-        
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+
+        do {
+            // Save to student interest edges
+            try await studentInterestService.saveSurveyResults(
+                studentId: studentId,
+                results: selectedInterestLevels
+            )
+
+            // Resolve selected interests for callback
+            let selectedInterests = allInterests.filter { interest in
+                guard let id = interest.id else { return false }
+                return selectedInterestLevels[id] != nil
+            }
+
+            print("[InterestSurveyView] Survey complete: \(selectedInterests.count) interests saved")
+
+            // Call completion handler
             onComplete(selectedInterests)
             dismiss()
+        } catch {
+            errorMessage = "Failed to save survey results: \(error.localizedDescription)"
+            isSaving = false
         }
+    }
+}
+
+// MARK: - Interest Rating Card
+
+private struct InterestRatingCard: View {
+    let interest: Interest
+    let currentLevel: Int
+    let onTap: (Int) -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: interest.iconName)
+                .font(.system(size: 32))
+                .foregroundColor(currentLevel > 0 ? .white : .tmiPrimary)
+
+            Text(interest.name)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+
+            // Rating stars
+            HStack(spacing: 4) {
+                ForEach(1...5, id: \.self) { level in
+                    Button(action: { onTap(level) }) {
+                        Image(systemName: level <= currentLevel ? "star.fill" : "star")
+                            .font(.system(size: 12))
+                            .foregroundColor(level <= currentLevel ? .yellow : .white.opacity(0.3))
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(currentLevel > 0 ? Color.tmiPrimary.opacity(0.8) : Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(currentLevel > 0 ? Color.white.opacity(0.5) : Color.white.opacity(0.1), lineWidth: 1)
+        )
     }
 }

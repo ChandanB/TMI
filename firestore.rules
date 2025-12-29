@@ -172,5 +172,75 @@ service cloud.firestore {
         isDistrictAdmin()
       );
     }
+
+    // Global Interest Library (Phase 1: Unified Architecture)
+    match /interests/{interestId} {
+      // All authenticated users can read global interests
+      allow read: if isAuthenticated();
+      // District admins can create/update global and district interests
+      // Personal interests can be created by anyone
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        // Own personal interests
+        (request.resource.data.get('scope', 'global') == 'personal' &&
+         request.resource.data.get('ownerUid', '') == request.auth.uid) ||
+        // District admins can manage district/global interests
+        isDistrictAdmin()
+      );
+    }
+
+    // Global Career Library (Phase 1: Unified Architecture)
+    match /careers/{careerId} {
+      // All authenticated users can read careers
+      allow read: if isAuthenticated();
+      // Anyone can cache AI-generated careers
+      allow create: if isAuthenticated();
+      // District admins can update/delete careers
+      allow update, delete: if isAuthenticated() && isDistrictAdmin();
+    }
+
+    // Global Resource Library (Phase 1: Unified Architecture)
+    match /resources/{resourceId} {
+      // All authenticated users can read resources
+      allow read: if isAuthenticated();
+      // Anyone can create resources
+      allow create: if isAuthenticated();
+      // Update/delete based on scope
+      allow update, delete: if isAuthenticated() && (
+        // Own personal resources
+        (request.resource.data.get('scope', 'global') == 'personal' &&
+         request.resource.data.get('ownerUid', '') == request.auth.uid) ||
+        // District admins can manage district/global resources
+        isDistrictAdmin()
+      );
+    }
+
+    // Student Interest Edges (Phase 2: Student Data)
+    match /students/{studentId}/studentInterests/{interestId} {
+      // Educators can read their students' interests
+      allow read: if isAuthenticated();
+      // Only authorized users can write student data
+      allow write: if isAuthenticated();
+    }
+
+    // Student Career State (Phase 3: Career Tracking)
+    match /students/{studentId}/careerState/{careerId} {
+      // Educators can read their students' career state
+      allow read: if isAuthenticated();
+      // Only authorized users can write student data
+      allow write: if isAuthenticated();
+    }
+
+    // TMI Plans Collection (Phase 4: Plan Resources)
+    match /plans/{planId} {
+      // Educators can read/write their plans
+      allow read, write: if isAuthenticated();
+
+      // Plan Resource Links (Phase 4: Resources)
+      match /planResources/{resourceId} {
+        // Educators can manage plan resources
+        allow read, write: if isAuthenticated();
+      }
+    }
   }
 }

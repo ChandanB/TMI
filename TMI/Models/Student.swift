@@ -20,7 +20,13 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
     
     // MARK: - TMI Related Properties
     let tmiPlans: [TMIPlan]?
+
+    // DEPRECATED: Use StudentInterestService.getStudentInterests() instead
+    // This field is maintained for backward compatibility during migration
+    // Will be removed in a future release
+    @available(*, deprecated, message: "Use StudentInterestService.getStudentInterests(studentId:) to fetch interests from edge collection")
     var interests: [Interest] // Now includes both interests and hobbies
+
     var surveyResults: [SurveyResult]?
     
     // MARK: - Academic & Performance Tracking
@@ -67,7 +73,9 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
         Calendar.current.dateComponents([.year], from: dateOfBirth, to: Date()).year ?? 0
     }
     
+    // DEPRECATED: Use StudentInterestService to fetch interest categories
     // Primary interest categories for quick reference
+    @available(*, deprecated, message: "Use StudentInterestService.getStudentInterests(studentId:) and extract categories from the result")
     var primaryInterestCategories: [InterestCategory] {
         let categories = interests.flatMap { $0.category }
         let uniqueCategories = Set(categories)
@@ -270,16 +278,14 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
         if let lastInteractionDate = lastInteractionDate {
             data["lastInteractionDate"] = lastInteractionDate.timeIntervalSince1970
         }
-        
-        // Convert interests to basic data
-        data["interests"] = interests.map { interest in
-            [
-                "id": interest.id ?? UUID().uuidString,
-                "name": interest.name
-            ]
-        }
-        
-        // Note: Hobbies are now included in interests array
+
+        // MIGRATION NOTE: Interests are no longer stored inline in Student documents
+        // They are now stored in edge collections: students/{studentId}/studentInterests/{interestId}
+        // Use StudentInterestService to manage student interests
+        // Keeping empty array for backward compatibility with existing reads
+        data["interests"] = []
+
+        // Note: Hobbies are now included in interests edge collection
         
         // Convert survey results
         if let surveyResults = surveyResults {

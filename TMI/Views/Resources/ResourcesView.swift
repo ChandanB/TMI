@@ -848,7 +848,11 @@ extension ResourcesView {
           createdAt: Date(),
           updatedAt: Date(),
           tags: ["interests", "student-engagement"],
-          recommendedFor: [student.grade]
+          recommendedFor: [student.grade],
+          isFeatured: false,
+          scope: .global,
+          districtId: nil,
+          ownerUid: nil
         )
       ]
     }

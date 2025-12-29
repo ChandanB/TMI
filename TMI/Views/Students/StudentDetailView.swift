@@ -25,9 +25,16 @@ struct StudentDetailView: View {
     @State private var studentService = StudentService()
     @State private var studentMeetings: [Meeting] = []
 
+    // Phase 2: Student Interest Edges
+    @State private var studentInterestEdges: [StudentInterest] = []
+    @State private var resolvedInterests: [Interest] = []
+    @State private var isLoadingInterests = false
+
     @Environment(\.studentModeSession) private var studentModeSession
 
     private let meetingService = MeetingService.shared
+    private let studentInterestService = StudentInterestService.shared
+    private let interestLibraryService = InterestLibraryService.shared
 
     init(student: Student) {
         self.initialStudent = student
@@ -98,11 +105,13 @@ struct StudentDetailView: View {
             await refreshStudent()
             await planStateModel.fetch()
             await loadMeetings()
+            await loadStudentInterests()
         }
         .refreshable {
             await refreshStudent()
             await planStateModel.fetch()
             await loadMeetings()
+            await loadStudentInterests()
         }
         .sheet(isPresented: $showingCreatePlan) {
             NavigationStack {
@@ -252,7 +261,7 @@ struct StudentDetailView: View {
             )
 
             statCard(
-                value: "\(student.interests.count)",
+                value: "\(resolvedInterests.count)",
                 label: "Interests"
             )
         }
@@ -316,7 +325,15 @@ struct StudentDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            if student.interests.isEmpty {
+            if isLoadingInterests {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(.tmiPrimary)
+                    Spacer()
+                }
+                .padding(.vertical, TMISpacing.lg)
+            } else if resolvedInterests.isEmpty {
                 VStack(spacing: TMISpacing.md) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 32))
@@ -353,11 +370,10 @@ struct StudentDetailView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: TMISpacing.sm) {
-                        ForEach(student.interests, id: \.id) { interest in
-                            TMIBadge(
-                                text: interest.name,
-                                color: interest.primaryCategory?.color ?? .tmiPrimary,
-                                style: .solid
+                        ForEach(resolvedInterests, id: \.id) { interest in
+                            StudentInterestBadge(
+                                interest: interest,
+                                level: getInterestLevel(for: interest.id ?? "")
                             )
                         }
                     }
@@ -940,6 +956,45 @@ struct StudentDetailView: View {
         showingSurvey = true
     }
 
+    // MARK: - Student Interest Loading (Phase 2)
+
+    /// Load student interests from edge collection and resolve them via library
+    @MainActor
+    private func loadStudentInterests() async {
+        guard let studentId = student.id else {
+            print("[StudentDetailView] Cannot load interests: student has no ID")
+            return
+        }
+
+        isLoadingInterests = true
+
+        do {
+            // Fetch student interest edges
+            studentInterestEdges = try await studentInterestService.getStudentInterests(studentId: studentId)
+
+            // Resolve interest IDs to full Interest objects
+            var interests: [Interest] = []
+            for edge in studentInterestEdges {
+                if let interest = try await interestLibraryService.fetchInterest(id: edge.interestId) {
+                    interests.append(interest)
+                }
+            }
+
+            resolvedInterests = interests
+            print("[StudentDetailView] Loaded \(resolvedInterests.count) interests for student \(student.name)")
+        } catch {
+            print("[StudentDetailView] Error loading student interests: \(error.localizedDescription)")
+            resolvedInterests = []
+        }
+
+        isLoadingInterests = false
+    }
+
+    /// Get the affinity level for a specific interest
+    private func getInterestLevel(for interestId: String) -> Int {
+        studentInterestEdges.first { $0.interestId == interestId }?.level ?? 0
+    }
+
     // MARK: - Student Mode
 
     private func enableStudentMode() {
@@ -950,6 +1005,44 @@ struct StudentDetailView: View {
             studentModeSession.startStudentMode(for: student)
             print("[StudentDetail] 🎓 Active student after start: \(studentModeSession.activeStudent?.name ?? "nil")")
         }
+    }
+}
+
+// MARK: - Student Interest Badge (Phase 2)
+
+/// Badge showing interest with affinity level indicator
+private struct StudentInterestBadge: View {
+    let interest: Interest
+    let level: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            // Interest name
+            Text(interest.name)
+                .font(.tmiCaption)
+                .fontWeight(.medium)
+
+            // Affinity level stars
+            if level > 0 {
+                HStack(spacing: 2) {
+                    ForEach(1...level, id: \.self) { _ in
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 8))
+                            .foregroundColor(.yellow)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(interest.primaryCategory?.color.opacity(0.2) ?? Color.tmiPrimary.opacity(0.2))
+        )
+        .overlay(
+            Capsule()
+                .stroke(interest.primaryCategory?.color ?? .tmiPrimary, lineWidth: 1)
+        )
     }
 }
 

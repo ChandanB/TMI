@@ -366,7 +366,7 @@ struct ResourceDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(careerRecommendations.prefix(3), id: \.id) { career in
-                            NavigationLink(destination: CareerDetailView(career: career)) {
+                            NavigationLink(destination: CareerDetailView(career: career, student: nil)) {
                                 CompactCareerCard(career: career)
                             }
                         }

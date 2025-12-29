@@ -134,7 +134,11 @@ class TMIPlanService {
                             let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
                             let isFeatured = resourceData["isFeatured"] as? Bool ?? false
                             let thumbnail = resourceData["thumbnail"] as? String
-                            
+                            let scopeRaw = resourceData["scope"] as? String
+                            let scope = scopeRaw.flatMap { Resource.ResourceScope(rawValue: $0) }
+                            let districtId = resourceData["districtId"] as? String
+                            let ownerUid = resourceData["ownerUid"] as? String
+
                             return Resource(
                                 id: resourceData["id"] as? String,
                                 title: title,
@@ -146,7 +150,10 @@ class TMIPlanService {
                                 tags: tags,
                                 recommendedFor: recommendedFor,
                                 isFeatured: isFeatured,
-                                thumbnail: thumbnail
+                                thumbnail: thumbnail,
+                                scope: scope,
+                                districtId: districtId,
+                                ownerUid: ownerUid
                             )
                         }
                     } else {
@@ -297,7 +304,11 @@ class TMIPlanService {
                     let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
                     let isFeatured = resourceData["isFeatured"] as? Bool ?? false
                     let thumbnail = resourceData["thumbnail"] as? String
-                    
+                    let scopeRaw = resourceData["scope"] as? String
+                    let scope = scopeRaw.flatMap { Resource.ResourceScope(rawValue: $0) }
+                    let districtId = resourceData["districtId"] as? String
+                    let ownerUid = resourceData["ownerUid"] as? String
+
                     return Resource(
                         id: resourceData["id"] as? String,
                         title: title,
@@ -309,7 +320,10 @@ class TMIPlanService {
                         tags: tags,
                         recommendedFor: recommendedFor,
                         isFeatured: isFeatured,
-                        thumbnail: thumbnail
+                        thumbnail: thumbnail,
+                        scope: scope,
+                        districtId: districtId,
+                        ownerUid: ownerUid
                     )
                 }
             } else {
@@ -462,7 +476,11 @@ class TMIPlanService {
                     let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
                     let isFeatured = resourceData["isFeatured"] as? Bool ?? false
                     let thumbnail = resourceData["thumbnail"] as? String
-                    
+                    let scopeRaw = resourceData["scope"] as? String
+                    let scope = scopeRaw.flatMap { Resource.ResourceScope(rawValue: $0) }
+                    let districtId = resourceData["districtId"] as? String
+                    let ownerUid = resourceData["ownerUid"] as? String
+
                     return Resource(
                         id: resourceData["id"] as? String,
                         title: title,
@@ -474,7 +492,10 @@ class TMIPlanService {
                         tags: tags,
                         recommendedFor: recommendedFor,
                         isFeatured: isFeatured,
-                        thumbnail: thumbnail
+                        thumbnail: thumbnail,
+                        scope: scope,
+                        districtId: districtId,
+                        ownerUid: ownerUid
                     )
                 }
             } else {
@@ -671,7 +692,11 @@ class TMIPlanService {
                         let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
                         let isFeatured = resourceData["isFeatured"] as? Bool ?? false
                         let thumbnail = resourceData["thumbnail"] as? String
-                        
+                        let scopeRaw = resourceData["scope"] as? String
+                        let scope = scopeRaw.flatMap { Resource.ResourceScope(rawValue: $0) }
+                        let districtId = resourceData["districtId"] as? String
+                        let ownerUid = resourceData["ownerUid"] as? String
+
                         return Resource(
                             id: resourceData["id"] as? String,
                             title: title,
@@ -683,7 +708,10 @@ class TMIPlanService {
                             tags: tags,
                             recommendedFor: recommendedFor,
                             isFeatured: isFeatured,
-                            thumbnail: thumbnail
+                            thumbnail: thumbnail,
+                            scope: scope,
+                            districtId: districtId,
+                            ownerUid: ownerUid
                         )
                     }
                 } else {
@@ -832,7 +860,11 @@ class TMIPlanService {
                             let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
                             let isFeatured = resourceData["isFeatured"] as? Bool ?? false
                             let thumbnail = resourceData["thumbnail"] as? String
-                            
+                            let scopeRaw = resourceData["scope"] as? String
+                            let scope = scopeRaw.flatMap { Resource.ResourceScope(rawValue: $0) }
+                            let districtId = resourceData["districtId"] as? String
+                            let ownerUid = resourceData["ownerUid"] as? String
+
                             return Resource(
                                 id: resourceData["id"] as? String,
                                 title: title,
@@ -844,7 +876,10 @@ class TMIPlanService {
                                 tags: tags,
                                 recommendedFor: recommendedFor,
                                 isFeatured: isFeatured,
-                                thumbnail: thumbnail
+                                thumbnail: thumbnail,
+                                scope: scope,
+                                districtId: districtId,
+                                ownerUid: ownerUid
                             )
                         }
                     } else {

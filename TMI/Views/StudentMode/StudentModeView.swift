@@ -350,7 +350,7 @@ struct StudentCareersTab: View {
                         .textCase(.uppercase)
                         .tracking(1.2)
                     
-                    NavigationLink(destination: CareerDetailView(career: convertToCareer(topMatch.career))) {
+                    NavigationLink(destination: CareerDetailView(career: convertToCareer(topMatch.career), student: student)) {
                         FeaturedCareerCard(match: topMatch)
                     }
                     .buttonStyle(.plain)
@@ -365,7 +365,7 @@ struct StudentCareersTab: View {
 
             VStack(spacing: TMISpacing.md) {
                 ForEach(Array(careerMatches.dropFirst().prefix(9))) { match in
-                    NavigationLink(destination: CareerDetailView(career: convertToCareer(match.career))) {
+                    NavigationLink(destination: CareerDetailView(career: convertToCareer(match.career), student: student)) {
                         CareerMatchCard(match: match)
                     }
                     .buttonStyle(.plain)

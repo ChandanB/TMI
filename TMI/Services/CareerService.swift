@@ -13,12 +13,15 @@ import FirebaseAuth
 final class CareerService: @unchecked Sendable {
   static let shared = CareerService()
   private let firestore = FirebaseManager.shared.firestore
-  
+
+  // Phase 3: Global Career Library Integration
+  private let careerLibraryService = CareerLibraryService.shared
+
   // In-memory cache for performance
   private var careerCache: [Career] = []
   private var lastCacheUpdate: Date?
   private let cacheExpirationTime: TimeInterval = 300 // 5 minutes
-  
+
   private init() {
     // Initialize with sample data
     careerCache = Career.sampleCareers
@@ -27,55 +30,91 @@ final class CareerService: @unchecked Sendable {
   // MARK: - AI-Powered Career Search
 
   /// Search for careers using AI-powered generation based on query
+  /// Phase 3: Now caches AI-generated careers in global library
   func searchCareersWithAI(query: String, student: Student? = nil) async throws -> AICareerResponse {
     print("[CareerService] searchCareersWithAI called with query: '\(query)'")
-    
+
     guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       print("[CareerService] Empty query provided")
       throw CareerServiceError.invalidCareerData
     }
-    
+
+    var aiResponse: AICareerResponse
+
     if #available(iOS 26.0, *) {
       print("[CareerService] iOS 26+ available, attempting AI search")
       do {
-        let aiResponse = try await AIInsightsService.shared.generateCareerDataFromSearch(query: query, student: student)
+        aiResponse = try await AIInsightsService.shared.generateCareerDataFromSearch(query: query, student: student)
         print("[CareerService] AI search successful - Generated \(aiResponse.careers.count) AI careers for query: '\(query)'")
-        return aiResponse
       } catch {
         print("[CareerService] AI career search failed for '\(query)': \(error)")
         print("[CareerService] Falling back to enhanced AI career generation")
         // Enhanced fallback using AICareerGenerator
-        return AIInsightsService.shared.generateSampleCareerSearchResponse(query: query, student: student)
+        aiResponse = AIInsightsService.shared.generateSampleCareerSearchResponse(query: query, student: student)
       }
     } else {
       print("[CareerService] iOS 26+ not available, using enhanced AI career generation fallback")
       // Enhanced fallback using AICareerGenerator with intelligent career generation
-      let aiResponse = AIInsightsService.shared.generateSampleCareerSearchResponse(query: query, student: student)
+      aiResponse = AIInsightsService.shared.generateSampleCareerSearchResponse(query: query, student: student)
       print("[CareerService] Enhanced fallback generated \(aiResponse.careers.count) careers for query: '\(query)'")
-      return aiResponse
+    }
+
+    // Phase 3: Cache AI-generated careers in global library
+    await cacheAICareers(aiResponse.careers)
+
+    return aiResponse
+  }
+
+  /// Cache AI-generated careers in global library
+  private func cacheAICareers(_ careers: [Career]) async {
+    for career in careers {
+      do {
+        _ = try await careerLibraryService.cacheAICareer(career)
+        print("[CareerService] Cached AI career: \(career.title)")
+      } catch {
+        // Don't fail the entire operation if caching fails
+        print("[CareerService] Failed to cache career '\(career.title)': \(error.localizedDescription)")
+      }
     }
   }
 
   // MARK: - Enhanced Career Data Management
   
   /// Fetch all available careers with enhanced caching and analytics
-  func fetchAllCareers(forceRefresh: Bool = false) async throws -> [Career] {
-    // Check cache first
+  /// Phase 3: Now fetches from global library first, then generates if needed
+  func fetchAllCareers(forceRefresh: Bool = false, districtId: String? = nil) async throws -> [Career] {
+    // Check in-memory cache first
     if !forceRefresh, let lastUpdate = lastCacheUpdate,
        Date().timeIntervalSince(lastUpdate) < cacheExpirationTime,
        !careerCache.isEmpty {
       return careerCache
     }
-    
-    // Use AIInsightsService to generate careers
+
+    // Phase 3: Fetch from global library
+    do {
+      let globalCareers = try await careerLibraryService.fetchAllCareers(districtId: districtId)
+      if !globalCareers.isEmpty {
+        print("[CareerService] Fetched \(globalCareers.count) careers from global library")
+        careerCache = globalCareers
+        lastCacheUpdate = Date()
+        return careerCache
+      }
+    } catch {
+      print("[CareerService] Failed to fetch from global library: \(error)")
+    }
+
+    // If global library is empty, generate with AI and cache
     if #available(iOS 26.0, *) {
         do {
             let aiResponse = try await AIInsightsService.shared.generateCareerData(for: nil)
+            print("[CareerService] Generated \(aiResponse.careers.count) careers with AI")
+            // Cache in global library
+            await cacheAICareers(aiResponse.careers)
             careerCache = aiResponse.careers
             lastCacheUpdate = Date()
             return careerCache
         } catch {
-            print("Failed to generate careers with AI: \(error)")
+            print("[CareerService] Failed to generate careers with AI: \(error)")
             // Fallback to sample data if AI generation fails
             careerCache = Career.sampleCareers
             lastCacheUpdate = Date()
@@ -175,13 +214,16 @@ final class CareerService: @unchecked Sendable {
   }
   
   /// Get comprehensive career recommendations based on student interests, performance, and engagement
+  /// Phase 3: Now caches AI-generated recommendations in global library
   func getCareerRecommendations(for student: Student) async throws -> [Career] {
     if #available(iOS 26.0, *) {
         do {
             let aiResponse = try await AIInsightsService.shared.generateCareerData(for: student)
-            return aiResponse.careers // AI generates personalized careers
+            // Phase 3: Cache AI-generated recommendations
+            await cacheAICareers(aiResponse.careers)
+            return aiResponse.careers
         } catch {
-            print("Failed to generate personalized careers with AI: \(error)")
+            print("[CareerService] Failed to generate personalized careers with AI: \(error)")
             // Fallback to rule-based recommendations if AI fails
             let allCareers = try await fetchAllCareers()
             return generateRuleBasedCareerRecommendations(for: student, allCareers: allCareers)
@@ -320,12 +362,7 @@ final class CareerService: @unchecked Sendable {
   }
   
   // MARK: - Firebase Integration
-  
-  private func fetchCareersFromFirebase() async throws -> [Career] {
-    // For now, return empty array - in future this would fetch from global career database
-    // This allows the service to work without Firebase career data
-    return []
-  }
+  // Phase 3: Firebase integration now handled by CareerLibraryService
   
   /// Save user's career interests/bookmarks
   func saveCareerBookmark(career: Career) async throws {

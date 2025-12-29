@@ -12,23 +12,33 @@ import FirebaseAuth
 final class ResourceService: @unchecked Sendable {
     static let shared = ResourceService()
     private let firestore = FIRESTORE_DATABASE
-    
+
+    // Phase 4: Global Resource Library Integration
+    private let resourceLibraryService = ResourceLibraryService.shared
+
   private init() {}
   
   // MARK: - Add Resource
+  /// Phase 4: Adds to global library if scope is set, otherwise user-scoped
   func addResource(_ resource: Resource) async throws -> String {
     guard let currentUser = Auth.auth().currentUser else {
       throw ResourceServiceError.userNotAuthenticated
     }
-    
-    // Don't manually set @DocumentID - let Firestore manage it
+
+    // Phase 4: If resource has scope, add to global library
+    if let scope = resource.scope, scope != .personal {
+      let savedResource = try await resourceLibraryService.saveResource(resource)
+      return savedResource.id ?? ""
+    }
+
+    // Otherwise, add to user-scoped collection (backward compatibility)
     let resourceToSave = resource
-    
+
     let collection = firestore
       .collection(FirestoreCollection.users.rawValue)
       .document(currentUser.uid)
       .collection(FirestoreCollection.resources.rawValue)
-    
+
     let docRef = try collection.addDocument(from: resourceToSave)
     return docRef.documentID
   }
@@ -55,23 +65,46 @@ final class ResourceService: @unchecked Sendable {
   }
   
   // MARK: - Fetch All Resources
-  func fetchAllResources() async throws -> [Resource] {
+  /// Phase 4: Fetches from both global library and user-scoped resources
+  func fetchAllResources(scope: Resource.ResourceScope? = nil, districtId: String? = nil) async throws -> [Resource] {
     guard let currentUser = Auth.auth().currentUser else {
       throw ResourceServiceError.userNotAuthenticated
     }
-    
+
+    var allResources: [Resource] = []
+
+    // Phase 4: Fetch from global resource library
+    do {
+      let globalResources = try await resourceLibraryService.fetchResources(scope: scope, districtId: districtId)
+      allResources.append(contentsOf: globalResources)
+      print("[ResourceService] Fetched \(globalResources.count) resources from global library")
+    } catch {
+      print("[ResourceService] Failed to fetch from global library: \(error)")
+    }
+
+    // Fetch user-scoped resources (backward compatibility)
     let collection = firestore
       .collection(FirestoreCollection.users.rawValue)
       .document(currentUser.uid)
       .collection(FirestoreCollection.resources.rawValue)
-    
+
     let snapshot = try await collection
       .order(by: "createdAt", descending: true)
       .getDocuments()
-    
-    return try snapshot.documents.compactMap { document in
+
+    let userResources = try snapshot.documents.compactMap { document in
       try document.data(as: Resource.self)
     }
+
+    allResources.append(contentsOf: userResources)
+    print("[ResourceService] Fetched \(userResources.count) user-scoped resources")
+
+    // Remove duplicates based on ID
+    let uniqueResources = Dictionary(grouping: allResources, by: { $0.id ?? UUID().uuidString })
+      .compactMap { $0.value.first }
+      .sorted { ($0.createdAt ?? Date()) > ($1.createdAt ?? Date()) }
+
+    return uniqueResources
   }
   
   // MARK: - Fetch Resources by Category

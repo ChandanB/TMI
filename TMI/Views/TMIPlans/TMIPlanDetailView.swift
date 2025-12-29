@@ -165,7 +165,7 @@ struct TMIPlanDetailView: View {
         }
         .sheet(isPresented: $showingCompleteSurvey) {
             NavigationStack {
-                InterestSurveyView(plan: plan, onComplete: { interests in
+                InterestSurveyView(plan: plan, studentId: plan.primaryStudent?.id ?? "", onComplete: { interests in
                     Task {
                         await addInterestsFromSurvey(interests)
                     }
@@ -1644,6 +1644,7 @@ extension TMIPlanModel {
 
 
 // MARK: - All Resources View
+
 
 
 

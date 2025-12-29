@@ -9,6 +9,8 @@ import SwiftUI
 
 struct CareerDetailView: View {
   let career: Career
+  let student: Student? // Phase 3: Student context for career tracking
+
   @State private var selectedTab = 0
   @State private var isShowingRelatedCareers = false
   @State private var animateContent = false
@@ -20,9 +22,15 @@ struct CareerDetailView: View {
   @State private var error: Error?
   @State private var showResourcesSheet = false
   @State private var alignmentScore: Double = 0.0
+
+  // Phase 3: Student Career State
+  @State private var careerState: StudentCareerState?
+  @State private var isFavorite = false
+
   @Environment(\.presentationMode) var presentationMode
 
   private let careerService = CareerService.shared
+  private let studentCareerService = StudentCareerService.shared // Phase 3
 
   // Sample progress data - in a real app, this would come from user data
   private let progressData: [(String, Double)] = [
@@ -1252,7 +1260,7 @@ struct CareerDetailView: View {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 16) {
             ForEach(relatedCareers) { career in
-              NavigationLink(destination: CareerDetailView(career: career)) {
+              NavigationLink(destination: CareerDetailView(career: career, student: student)) {
                 RelatedCareerCard(career: career)
               }
               .buttonStyle(PlainButtonStyle())
@@ -1620,18 +1628,24 @@ struct CareerDetailView: View {
   @MainActor
   private func loadCareerData() async {
     isLoading = true
-    
+
     do {
       // Load related careers
       relatedCareers = try await careerService.getRelatedCareers(to: career, limit: 3)
-      
+
       // Load career-specific resources
       careerResources = await careerService.getCareerResources(for: career)
-      
+
       // Check if career is bookmarked
       let bookmarks = try await careerService.fetchCareerBookmarks()
       isBookmarked = bookmarks.contains { $0.careerTitle == career.title }
-      
+
+      // Phase 3: Load student career state if student is viewing
+      await loadStudentCareerState()
+
+      // Phase 3: Track career view for student
+      await trackCareerView()
+
     } catch {
       self.error = error
       // Fallback to sample data
@@ -1652,13 +1666,83 @@ struct CareerDetailView: View {
       } else {
         try await careerService.saveCareerBookmark(career: career)
         isBookmarked = true
-        
+
         // Track bookmark action
         try? await careerService.trackCareerExploration(career: career, action: .bookmarked)
       }
     } catch {
       // Handle error silently for now
       print("Failed to toggle bookmark: \(error)")
+    }
+  }
+
+  // MARK: - Phase 3: Student Career Tracking
+
+  /// Load student career state if student context is available
+  @MainActor
+  private func loadStudentCareerState() async {
+    guard let student = student,
+          let studentId = student.id,
+          let careerId = career.id else {
+      return
+    }
+
+    do {
+      careerState = try await studentCareerService.getStudentCareer(studentId: studentId, careerId: careerId)
+      isFavorite = careerState?.isFavorite ?? false
+      print("[CareerDetailView] Loaded career state for student \(student.name): \(careerState?.status.displayName ?? "none")")
+    } catch {
+      print("[CareerDetailView] Failed to load student career state: \(error.localizedDescription)")
+    }
+  }
+
+  /// Track that student viewed this career
+  @MainActor
+  private func trackCareerView() async {
+    guard let student = student,
+          let studentId = student.id,
+          let careerId = career.id else {
+      return
+    }
+
+    do {
+      // If career state exists, update last viewed timestamp
+      if let existingState = careerState {
+        try await studentCareerService.markAsViewed(studentId: studentId, careerId: careerId)
+        print("[CareerDetailView] Updated career view timestamp for \(student.name)")
+      } else {
+        // Create new career state with "exploring" status
+        try await studentCareerService.addCareer(
+          studentId: studentId,
+          careerId: careerId,
+          status: .exploring,
+          progress: 0.0
+        )
+        print("[CareerDetailView] Created new career state for \(student.name): exploring \(career.title)")
+      }
+
+      // Track via legacy tracking as well
+      try await careerService.trackCareerExploration(career: career, action: .viewed)
+    } catch {
+      print("[CareerDetailView] Failed to track career view: \(error.localizedDescription)")
+    }
+  }
+
+  /// Toggle favorite status for student
+  @MainActor
+  private func toggleStudentFavorite() async {
+    guard let student = student,
+          let studentId = student.id,
+          let careerId = career.id else {
+      return
+    }
+
+    do {
+      try await studentCareerService.toggleFavorite(studentId: studentId, careerId: careerId)
+      isFavorite.toggle()
+      print("[CareerDetailView] Toggled favorite for \(student.name): \(isFavorite)")
+    } catch {
+      print("[CareerDetailView] Failed to toggle favorite: \(error.localizedDescription)")
     }
   }
 }
@@ -2295,6 +2379,6 @@ struct CareerResourcesView: View {
 // Preview
 #Preview {
   NavigationView {
-    CareerDetailView(career: Career.sampleCareers.first!)
+    CareerDetailView(career: Career.sampleCareers.first!, student: nil)
   }
 }

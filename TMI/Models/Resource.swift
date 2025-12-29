@@ -22,6 +22,11 @@ struct Resource: Identifiable, Codable, @unchecked Sendable, Hashable {
     var isFeatured: Bool = false
     var thumbnail: String? = nil
 
+    // Library Scope Properties
+    let scope: ResourceScope?
+    let districtId: String?
+    let ownerUid: String?
+
     enum ResourceCategory: String, CaseIterable, Codable, Sendable {
         case article, video, course, book, tool, interactiveContent
 
@@ -47,7 +52,13 @@ struct Resource: Identifiable, Codable, @unchecked Sendable, Hashable {
             }
         }
     }
-    
+
+    enum ResourceScope: String, CaseIterable, Codable, Sendable {
+        case global = "global"
+        case district = "district"
+        case personal = "personal"
+    }
+
     public static func == (lhs: Resource, rhs: Resource) -> Bool {
         lhs.id == rhs.id
     }
@@ -68,7 +79,10 @@ struct Resource: Identifiable, Codable, @unchecked Sendable, Hashable {
                 updatedAt: Date().addingTimeInterval(-86400 * 7),
                 tags: ["engagement", "research", "metrics", "classroom-management"],
                 recommendedFor: ["Teachers", "Counselors", "Administrators"],
-                isFeatured: true
+                isFeatured: true,
+                scope: .global,
+                districtId: nil,
+                ownerUid: nil
             ),
             Resource(
                 title: "TMI Implementation Course",
@@ -79,7 +93,10 @@ struct Resource: Identifiable, Codable, @unchecked Sendable, Hashable {
                 updatedAt: Date().addingTimeInterval(-86400 * 30),
                 tags: ["implementation", "training", "certification", "trauma-informed"],
                 recommendedFor: ["Administrators", "Program Coordinators", "Counselors"],
-                isFeatured: true
+                isFeatured: true,
+                scope: .global,
+                districtId: nil,
+                ownerUid: nil
             ),
             Resource(
                 title: "Student Interest Assessment Toolkit",
@@ -90,7 +107,10 @@ struct Resource: Identifiable, Codable, @unchecked Sendable, Hashable {
                 updatedAt: Date().addingTimeInterval(-86400 * 15),
                 tags: ["assessment", "interests", "toolkit", "validated-instruments"],
                 recommendedFor: ["Counselors", "Teachers", "Researchers"],
-                isFeatured: true
+                isFeatured: true,
+                scope: .global,
+                districtId: nil,
+                ownerUid: nil
             )
         ]
     }

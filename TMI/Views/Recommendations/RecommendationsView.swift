@@ -139,7 +139,7 @@ struct RecommendationsView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
                     ForEach(careers.prefix(5), id: \.id) { career in
-                        NavigationLink(destination: CareerDetailView(career: career)) {
+                        NavigationLink(destination: CareerDetailView(career: career, student: student)) {
                             RecommendedCareerCard(career: career)
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -230,7 +230,7 @@ struct RecommendationsView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
                                 ForEach(dashboard.trendingCareers.prefix(4), id: \.id) { career in
-                                    NavigationLink(destination: CareerDetailView(career: career)) {
+                                    NavigationLink(destination: CareerDetailView(career: career, student: student)) {
                                         TrendingItemCard(
                                             title: career.title,
                                             subtitle: career.field,

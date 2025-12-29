@@ -2,230 +2,499 @@
 //  RecommendationsService.swift
 //  TMI
 //
-//  Created by Chandan Brown on 8/11/25.
+//  Phase 5: ID-based Recommendations Service
+//  Returns lightweight ID arrays instead of full objects
+//  Views resolve IDs via library services
 //
 
 import Foundation
+import FirebaseAuth
+import Observation
 
-@Observable
-final class RecommendationsService: @unchecked Sendable {
-    static let shared = RecommendationsService()
-    
-    private let careerService = CareerService.shared
-    private let resourceService = ResourceService.shared
-    
-    private init() {}
-    
-    // MARK: - Career Recommendations
-    
-    /// Get career recommendations based on student's interests and hobbies
-    func getCareerRecommendations(for student: Student) async throws -> [Career] {
-        return try await careerService.getCareerRecommendations(for: student)
-    }
-    
-    /// Get career recommendations based on specific interests
-    func getCareerRecommendations(for interests: [Interest]) async throws -> [Career] {
-        let allCareers = try await careerService.fetchAllCareers()
-        
-        var scoredCareers: [(career: Career, score: Double)] = []
-        
-        for career in allCareers {
-            var score = 0.0
-            
-            // Score based on interests
-            for interest in interests {
-                // Check if career field matches interest
-                if career.field.lowercased().contains(interest.name.lowercased()) ||
-                   career.title.lowercased().contains(interest.name.lowercased()) ||
-                   career.description.lowercased().contains(interest.name.lowercased()) {
-                    let scoreMultiplier = Double(interest.popularityScore ?? 5) / 10.0
-                    score += scoreMultiplier * 0.4
-                }
-                
-                // Check if career skills match interest
-                for skill in career.skills {
-                    if skill.lowercased().contains(interest.name.lowercased()) {
-                        let scoreMultiplier = Double(interest.popularityScore ?? 5) / 10.0
-                        score += scoreMultiplier * 0.2
-                    }
-                }
-            }
-            
-            if score > 0 {
-                scoredCareers.append((career: career, score: score))
-            }
-        }
-        
-        // Return top 10 recommendations sorted by score
-        return Array(scoredCareers.sorted { $0.score > $1.score }.prefix(10).map { $0.career })
-    }
-    
-    // MARK: - Resource Recommendations
-    
-    /// Get resource recommendations based on student's interests and current career exploration
-    func getResourceRecommendations(for student: Student) async throws -> [Resource] {
-        var recommendations: [Resource] = []
-        
-        // Get resources based on interests
-        for interest in student.interests {
-            let interestResources = try await resourceService.searchResources(query: interest.name)
-            recommendations.append(contentsOf: interestResources.prefix(2))
-        }
-        
-        // Note: Hobbies are now included in interests array above
-        
-        // Remove duplicates and return top 8
-        let uniqueRecommendations = Array(Set(recommendations.map { $0.id ?? "" }))
-            .compactMap { id in recommendations.first { $0.id == id } }
-        
-        return Array(uniqueRecommendations.prefix(8))
-    }
-    
-    /// Get resources recommended for a specific career
-    func getResourcesForCareer(_ career: Career) async throws -> [Resource] {
-        var resources: [Resource] = []
-        
-        // Get resources based on career field
-        let fieldResources = try await resourceService.searchResources(query: career.field)
-        resources.append(contentsOf: fieldResources.prefix(3))
-        
-        // Get resources based on career skills
-        for skill in career.skills.prefix(3) {
-            let skillResources = try await resourceService.searchResources(query: skill)
-            resources.append(contentsOf: skillResources.prefix(1))
-        }
-        
-        // Get resources by tags that match career
-        let careerTags = [career.field.lowercased(), "career", "skills"]
-        let taggedResources = try await resourceService.fetchResources(withTags: careerTags)
-        resources.append(contentsOf: taggedResources.prefix(2))
-        
-        // Remove duplicates and return top 6
-        let uniqueResources = Array(Set(resources.map { $0.id ?? "" }))
-            .compactMap { id in resources.first { $0.id == id } }
-        
-        return Array(uniqueResources.prefix(6))
-    }
-    
-    // MARK: - Personalized Recommendations
-    
-    /// Generate a comprehensive recommendation dashboard for a student
-    func getPersonalizedDashboard(for student: Student) async throws -> PersonalizedDashboard {
-        async let careerRecs = getCareerRecommendations(for: student)
-        async let resourceRecs = getResourceRecommendations(for: student)
-        async let trendingCareers = careerService.fetchTrendingCareers()
-        async let featuredResources = resourceService.fetchFeaturedResources()
-        
-        return PersonalizedDashboard(
-            recommendedCareers: try await careerRecs,
-            recommendedResources: try await resourceRecs,
-            trendingCareers: try await trendingCareers,
-            featuredResources: try await featuredResources,
-            student: student
-        )
-    }
-    
-    /// Get recommendations based on what similar students are exploring
-    func getSimilarStudentRecommendations(for student: Student) async throws -> [Career] {
-        // This would use collaborative filtering in a real implementation
-        // For now, return careers that match the student's top interests
-        let topInterests = student.interests.sorted { ($0.popularityScore ?? 0) > ($1.popularityScore ?? 0) }.prefix(3)
-        return try await getCareerRecommendations(for: Array(topInterests))
-    }
-    
-    // MARK: - Smart Suggestions
-    
-    /// Get smart suggestions for improving TMI plans
-    func getTMIPlanSuggestions(for student: Student) async throws -> [TMIPlanSuggestion] {
-        var suggestions: [TMIPlanSuggestion] = []
-        
-        // Suggest careers based on interests not yet explored
-        let careerSuggestions = try await getCareerRecommendations(for: student)
-        for career in careerSuggestions.prefix(3) {
-            suggestions.append(
-                TMIPlanSuggestion(
-                    type: .careerExploration,
-                    title: "Explore \(career.title)",
-                    description: "Based on your interests in \(student.interests.map { $0.name }.joined(separator: ", "))",
-                    actionItem: "Learn about \(career.title) and add it to your career exploration list",
-                    relatedCareer: career
-                )
-            )
-        }
-        
-        // Suggest resources for skill development
-        let resourceSuggestions = try await getResourceRecommendations(for: student)
-        for resource in resourceSuggestions.prefix(2) {
-            suggestions.append(
-                TMIPlanSuggestion(
-                    type: .skillDevelopment,
-                    title: "Develop skills with \(resource.title)",
-                    description: "This \(resource.category.rawValue) can help you build relevant skills",
-                    actionItem: "Review \(resource.title) and apply the concepts to your interests",
-                    relatedResource: resource
-                )
-            )
-        }
-        
-        return suggestions
+// MARK: - Recommendation Models
+
+struct StudentRecommendations: Codable, Sendable, Equatable {
+    let studentId: String
+    let generatedAt: Date
+    let interestIds: [String]
+    let careerIds: [String]
+    let resourceIds: [String]
+    let nextSteps: [String]
+
+    init(
+        studentId: String,
+        generatedAt: Date = Date(),
+        interestIds: [String] = [],
+        careerIds: [String] = [],
+        resourceIds: [String] = [],
+        nextSteps: [String] = []
+    ) {
+        self.studentId = studentId
+        self.generatedAt = generatedAt
+        self.interestIds = interestIds
+        self.careerIds = careerIds
+        self.resourceIds = resourceIds
+        self.nextSteps = nextSteps
     }
 }
 
-// MARK: - Supporting Models
-
-struct PersonalizedDashboard {
+struct PersonalizedDashboard: Sendable {
     let recommendedCareers: [Career]
     let recommendedResources: [Resource]
     let trendingCareers: [Career]
     let featuredResources: [Resource]
-    let student: Student
-    let generatedAt: Date = Date()
 }
 
-struct TMIPlanSuggestion: Identifiable {
-    let id = UUID()
-    let type: SuggestionType
+struct TMIPlanSuggestion: Identifiable, Sendable {
+    let id: String
     let title: String
     let description: String
     let actionItem: String
-    let relatedCareer: Career?
-    let relatedResource: Resource?
-    let createdAt: Date = Date()
-    
-    init(type: SuggestionType, title: String, description: String, actionItem: String, relatedCareer: Career? = nil, relatedResource: Resource? = nil) {
-        self.type = type
-        self.title = title
-        self.description = description
-        self.actionItem = actionItem
-        self.relatedCareer = relatedCareer
-        self.relatedResource = relatedResource
+    let type: TMIPlanType
+
+    enum TMIPlanType: Sendable {
+        case chaseYourSpace
+        case acknowledgeInterests
+        case meetStudentNeeds
+        case yourBehaviorMyResponse
+        case planningAndGoalSetting
+        case celebrateEffort
+
+        var icon: String {
+            switch self {
+            case .chaseYourSpace: return "figure.run"
+            case .acknowledgeInterests: return "star.fill"
+            case .meetStudentNeeds: return "heart.fill"
+            case .yourBehaviorMyResponse: return "arrow.left.arrow.right"
+            case .planningAndGoalSetting: return "target"
+            case .celebrateEffort: return "party.popper.fill"
+            }
+        }
     }
 }
 
-enum SuggestionType: String, CaseIterable {
-    case careerExploration = "career_exploration"
-    case skillDevelopment = "skill_development"
-    case interestExpansion = "interest_expansion"
-    case resourceReview = "resource_review"
-    case planOptimization = "plan_optimization"
-    
-    var icon: String {
-        switch self {
-        case .careerExploration: return "briefcase.fill"
-        case .skillDevelopment: return "star.fill"
-        case .interestExpansion: return "heart.fill"
-        case .resourceReview: return "book.fill"
-        case .planOptimization: return "chart.line.uptrend.xyaxis"
+// MARK: - Recommendations Service
+
+@Observable
+final class RecommendationsService: @unchecked Sendable {
+    static let shared = RecommendationsService()
+
+    // Phase 5: Library Services
+    private let interestLibraryService = InterestLibraryService.shared
+    private let careerLibraryService = CareerLibraryService.shared
+    private let resourceLibraryService = ResourceLibraryService.shared
+    private let studentInterestService = StudentInterestService.shared
+    private let studentCareerService = StudentCareerService.shared
+
+    private init() {}
+
+    // MARK: - Error Types
+
+    enum RecommendationsError: Error, LocalizedError {
+        case generationFailed(String)
+        case invalidStudentId
+        case userNotAuthenticated
+
+        var errorDescription: String? {
+            switch self {
+            case .generationFailed(let message):
+                return "Failed to generate recommendations: \(message)"
+            case .invalidStudentId:
+                return "Invalid student ID"
+            case .userNotAuthenticated:
+                return "User not authenticated"
+            }
         }
     }
-    
-    var color: String {
-        switch self {
-        case .careerExploration: return "blue"
-        case .skillDevelopment: return "green"
-        case .interestExpansion: return "purple"
-        case .resourceReview: return "orange"
-        case .planOptimization: return "red"
+
+    // MARK: - Main Recommendation Generation
+
+    /// Phase 5: Generate comprehensive recommendations for a student
+    /// Returns IDs only - caller resolves via library services
+    func generateRecommendations(for student: Student) async throws -> StudentRecommendations {
+        guard let studentId = student.id else {
+            throw RecommendationsError.invalidStudentId
+        }
+
+        print("[RecommendationsService] Generating recommendations for student \(student.name)")
+
+        async let interestIds = recommendInterests(for: student, studentId: studentId)
+        async let careerIds = recommendCareers(for: student, studentId: studentId)
+        async let resourceIds = recommendResources(for: student, studentId: studentId)
+        async let nextSteps = generateNextSteps(for: student, studentId: studentId)
+
+        let recommendations = StudentRecommendations(
+            studentId: studentId,
+            generatedAt: Date(),
+            interestIds: try await interestIds,
+            careerIds: try await careerIds,
+            resourceIds: try await resourceIds,
+            nextSteps: try await nextSteps
+        )
+
+        print("[RecommendationsService] Generated \(recommendations.interestIds.count) interests, \(recommendations.careerIds.count) careers, \(recommendations.resourceIds.count) resources")
+
+        return recommendations
+    }
+
+    // MARK: - Interest Recommendations
+
+    /// Recommend interests based on student's current interests
+    private func recommendInterests(for student: Student, studentId: String) async throws -> [String] {
+        // Fetch all global interests
+        let allInterests = try await interestLibraryService.fetchAllInterests()
+
+        // Get student's existing interest IDs
+        let existingInterests = try await studentInterestService.getStudentInterests(studentId: studentId)
+        let existingInterestIds = Set(existingInterests.map { $0.interestId })
+
+        // Find related interests based on categories and tags
+        var scoredInterests: [(id: String, score: Double)] = []
+
+        for interest in allInterests {
+            guard let interestId = interest.id else { continue }
+
+            // Skip if student already has this interest
+            if existingInterestIds.contains(interestId) {
+                continue
+            }
+
+            var score = 0.0
+
+            // Score based on category overlap with existing interests
+            for existingEdge in existingInterests {
+                if let existingInterest = try? await interestLibraryService.fetchInterest(id: existingEdge.interestId) {
+                    // Same category = high score
+                    if interest.primaryCategory == existingInterest.primaryCategory {
+                        score += Double(existingEdge.level) * 0.5
+                    }
+
+                    // Tag overlap
+                    let tagOverlap = Set(interest.tags).intersection(Set(existingInterest.tags))
+                    score += Double(tagOverlap.count) * 0.3
+                }
+            }
+
+            if score > 0 {
+                scoredInterests.append((id: interestId, score: score))
+            }
+        }
+
+        // Return top 10 recommendations
+        return scoredInterests
+            .sorted { $0.score > $1.score }
+            .prefix(10)
+            .map { $0.id }
+    }
+
+    // MARK: - Career Recommendations
+
+    /// Recommend careers based on student interests and career exploration
+    private func recommendCareers(for student: Student, studentId: String) async throws -> [String] {
+        // Get student's interest affinities
+        let studentInterests = try await studentInterestService.getHighAffinityInterests(studentId: studentId)
+
+        // Get all careers from global library
+        let allCareers = try await careerLibraryService.fetchAllCareers(districtId: nil)
+
+        // Get careers student is already exploring
+        let exploredCareers = try await studentCareerService.getStudentCareers(studentId: studentId)
+        let exploredCareerIds = Set(exploredCareers.map { $0.careerId })
+
+        var scoredCareers: [(id: String, score: Double)] = []
+
+        for career in allCareers {
+            guard let careerId = career.id else { continue }
+
+            // Skip if already exploring
+            if exploredCareerIds.contains(careerId) {
+                continue
+            }
+
+            var score = 0.0
+
+            // Score based on interest alignment
+            for interestEdge in studentInterests {
+                if let interest = try? await interestLibraryService.fetchInterest(id: interestEdge.interestId) {
+                    // Check if career field matches interest
+                    if career.field.lowercased().contains(interest.name.lowercased()) {
+                        score += Double(interestEdge.level) * 0.6
+                    }
+
+                    // Check tags
+                    if career.tags.contains(where: { tag in
+                        interest.tags.contains(where: { $0.lowercased() == tag.lowercased() })
+                    }) {
+                        score += Double(interestEdge.level) * 0.4
+                    }
+
+                    // Check related interests
+                    if career.relatedInterests.contains(interestEdge.interestId) {
+                        score += Double(interestEdge.level) * 0.5
+                    }
+                }
+            }
+
+            // Boost high-growth careers slightly
+            if career.growthRate > 0.1 {
+                score += career.growthRate * 0.2
+            }
+
+            if score > 0 {
+                scoredCareers.append((id: careerId, score: score))
+            }
+        }
+
+        // Return top 8 recommendations
+        return scoredCareers
+            .sorted { $0.score > $1.score }
+            .prefix(8)
+            .map { $0.id }
+    }
+
+    // MARK: - Resource Recommendations
+
+    /// Recommend resources based on interests and career goals
+    private func recommendResources(for student: Student, studentId: String) async throws -> [String] {
+        // Get student interests and careers
+        let studentInterests = try await studentInterestService.getStudentInterests(studentId: studentId)
+        let studentCareers = try await studentCareerService.getActiveCareers(studentId: studentId)
+
+        // Get all resources from global library
+        let allResources = try await resourceLibraryService.fetchResources(scope: nil, districtId: nil)
+
+        var scoredResources: [(id: String, score: Double)] = []
+
+        for resource in allResources {
+            guard let resourceId = resource.id else { continue }
+
+            var score = 0.0
+
+            // Score based on interest alignment
+            for interestEdge in studentInterests {
+                if let interest = try? await interestLibraryService.fetchInterest(id: interestEdge.interestId) {
+                    // Tag matching
+                    let tagMatches = resource.tags.filter { tag in
+                        interest.tags.contains(where: { $0.lowercased() == tag.lowercased() })
+                    }
+                    score += Double(tagMatches.count) * Double(interestEdge.level) * 0.3
+
+                    // Title/description matching
+                    if resource.title.lowercased().contains(interest.name.lowercased()) {
+                        score += Double(interestEdge.level) * 0.4
+                    }
+                }
+            }
+
+            // Score based on career alignment
+            for careerEdge in studentCareers {
+                if let career = try? await careerLibraryService.fetchCareer(id: careerEdge.careerId) {
+                    // Tag matching
+                    let careerTagMatches = resource.tags.filter { tag in
+                        career.tags.contains(where: { $0.lowercased() == tag.lowercased() })
+                    }
+                    score += Double(careerTagMatches.count) * careerEdge.progress * 0.5
+
+                    // Field matching
+                    if resource.tags.contains(where: { $0.lowercased().contains(career.field.lowercased()) }) {
+                        score += careerEdge.progress * 0.6
+                    }
+                }
+            }
+
+            if score > 0 {
+                scoredResources.append((id: resourceId, score: score))
+            }
+        }
+
+        // Return top 12 recommendations
+        return scoredResources
+            .sorted { $0.score > $1.score }
+            .prefix(12)
+            .map { $0.id }
+    }
+
+    // MARK: - Next Steps
+
+    /// Generate actionable next steps for the student
+    private func generateNextSteps(for student: Student, studentId: String) async throws -> [String] {
+        var steps: [String] = []
+
+        // Check interest exploration
+        let studentInterests = try await studentInterestService.getStudentInterests(studentId: studentId)
+        if studentInterests.isEmpty {
+            steps.append("Complete the interest survey to discover activities you enjoy")
+        } else if studentInterests.count < 5 {
+            steps.append("Explore more interests to find what excites you")
+        }
+
+        // Check career exploration
+        let studentCareers = try await studentCareerService.getStudentCareers(studentId: studentId)
+        if studentCareers.isEmpty {
+            steps.append("Browse careers that match your interests")
+        } else {
+            let activeCareers = studentCareers.filter { $0.isActivePursuit }
+            if activeCareers.isEmpty {
+                steps.append("Mark careers you're interested in pursuing")
+            } else if activeCareers.count >= 3 {
+                steps.append("Focus on your top 2-3 career paths for deeper exploration")
+            }
+        }
+
+        // Engagement-based steps
+        if student.engagementScore < 0.5 {
+            steps.append("Connect with a counselor to discuss your goals")
+        }
+
+        // Generic helpful steps
+        steps.append("Set up a meeting to create your personalized TMI plan")
+
+        return Array(steps.prefix(4))
+    }
+
+    // MARK: - Dashboard & Suggestions (for UI)
+
+    /// Get personalized dashboard with resolved objects for the student
+    func getPersonalizedDashboard(for student: Student) async throws -> PersonalizedDashboard {
+        guard let studentId = student.id else {
+            throw RecommendationsError.invalidStudentId
+        }
+
+        // Generate recommendations (IDs only)
+        let recommendations = try await generateRecommendations(for: student)
+
+        // Resolve career IDs to Career objects
+        let recommendedCareers = try await resolveCareers(ids: recommendations.careerIds)
+
+        // Resolve resource IDs to Resource objects
+        let recommendedResources = try await resolveResources(ids: recommendations.resourceIds)
+
+        // Get trending careers (high growth rate)
+        let allCareers = try await careerLibraryService.fetchAllCareers(districtId: nil)
+        let trendingCareers = allCareers
+            .filter { $0.growthRate > 0.1 }
+            .sorted { $0.growthRate > $1.growthRate }
+            .prefix(4)
+            .map { $0 }
+
+        // Get featured resources
+        let featuredResources = try await resourceLibraryService.fetchFeaturedResources(districtId: nil)
+            .prefix(4)
+            .map { $0 }
+
+        return PersonalizedDashboard(
+            recommendedCareers: recommendedCareers,
+            recommendedResources: recommendedResources,
+            trendingCareers: Array(trendingCareers),
+            featuredResources: Array(featuredResources)
+        )
+    }
+
+    /// Get TMI plan suggestions for the student
+    func getTMIPlanSuggestions(for student: Student) async throws -> [TMIPlanSuggestion] {
+        guard let studentId = student.id else {
+            throw RecommendationsError.invalidStudentId
+        }
+
+        var suggestions: [TMIPlanSuggestion] = []
+
+        // Get student data
+        let studentInterests = try await studentInterestService.getStudentInterests(studentId: studentId)
+        let studentCareers = try await studentCareerService.getStudentCareers(studentId: studentId)
+
+        // Chase Your Space - if student has low engagement
+        if student.engagementScore < 0.5 {
+            suggestions.append(TMIPlanSuggestion(
+                id: UUID().uuidString,
+                title: "Create Your Space",
+                description: "Build a comfortable environment that reflects your interests",
+                actionItem: "Set up a personalized learning space based on your favorite activities",
+                type: .chaseYourSpace
+            ))
+        }
+
+        // Acknowledge Interests - if student has interests but no careers
+        if !studentInterests.isEmpty && studentCareers.isEmpty {
+            suggestions.append(TMIPlanSuggestion(
+                id: UUID().uuidString,
+                title: "Explore Career Paths",
+                description: "Connect your interests to potential careers",
+                actionItem: "Review careers that match your top interests",
+                type: .acknowledgeInterests
+            ))
+        }
+
+        // Meet Student Needs - general suggestion
+        suggestions.append(TMIPlanSuggestion(
+            id: UUID().uuidString,
+            title: "Set Personal Goals",
+            description: "Identify what you want to achieve this semester",
+            actionItem: "Schedule a meeting with your counselor to create goals",
+            type: .meetStudentNeeds
+        ))
+
+        // Planning and Goal Setting - if student has careers
+        if !studentCareers.isEmpty {
+            suggestions.append(TMIPlanSuggestion(
+                id: UUID().uuidString,
+                title: "Create Action Plan",
+                description: "Build a roadmap toward your career goals",
+                actionItem: "Develop a step-by-step plan with milestones and resources",
+                type: .planningAndGoalSetting
+            ))
+        }
+
+        // Celebrate Effort - if student is engaged
+        if student.engagementScore >= 0.7 {
+            suggestions.append(TMIPlanSuggestion(
+                id: UUID().uuidString,
+                title: "Celebrate Progress",
+                description: "Recognize your achievements and growth",
+                actionItem: "Share your successes with teachers and peers",
+                type: .celebrateEffort
+            ))
+        }
+
+        return suggestions
+    }
+
+    // MARK: - Helper Methods
+
+    /// Resolve career IDs to Career objects
+    private func resolveCareers(ids: [String]) async throws -> [Career] {
+        try await withThrowingTaskGroup(of: Career?.self) { group in
+            for id in ids {
+                group.addTask {
+                    try? await self.careerLibraryService.fetchCareer(id: id)
+                }
+            }
+
+            var careers: [Career] = []
+            for try await career in group {
+                if let career = career {
+                    careers.append(career)
+                }
+            }
+            return careers
+        }
+    }
+
+    /// Resolve resource IDs to Resource objects
+    private func resolveResources(ids: [String]) async throws -> [Resource] {
+        try await withThrowingTaskGroup(of: Resource?.self) { group in
+            for id in ids {
+                group.addTask {
+                    try? await self.resourceLibraryService.fetchResource(id: id)
+                }
+            }
+
+            var resources: [Resource] = []
+            for try await resource in group {
+                if let resource = resource {
+                    resources.append(resource)
+                }
+            }
+            return resources
         }
     }
 }

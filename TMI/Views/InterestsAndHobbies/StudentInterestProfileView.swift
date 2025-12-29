@@ -63,7 +63,7 @@ struct StudentInterestProfileView: View {
         .sheet(isPresented: $showingCareerDetail) {
             if let career = selectedCareer {
                 NavigationStack {
-                    CareerDetailView(career: career)
+                    CareerDetailView(career: career, student: student)
                 }
             }
         }

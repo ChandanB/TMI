@@ -163,7 +163,10 @@ actor ResourceGenerationService {
                 tags: item.tags + [interest.name],
                 recommendedFor: ["Students", "Educators"],
                 isFeatured: false,
-                thumbnail: nil
+                thumbnail: nil,
+                scope: .global,
+                districtId: nil,
+                ownerUid: nil
             )
         }
 
@@ -264,7 +267,10 @@ actor ResourceGenerationService {
             tags: tags + [interest.name],
             recommendedFor: ["Students", "Educators"],
             isFeatured: false,
-            thumbnail: nil
+            thumbnail: nil,
+            scope: .global,
+            districtId: nil,
+            ownerUid: nil
         )
     }
 
@@ -279,7 +285,10 @@ actor ResourceGenerationService {
                 updatedAt: Date(),
                 tags: [interest.name, "beginner", "guide"],
                 recommendedFor: ["Students"],
-                isFeatured: false
+                isFeatured: false,
+                scope: .global,
+                districtId: nil,
+                ownerUid: nil
             ),
             Resource(
                 title: "Career Paths in \(interest.name)",
@@ -290,7 +299,10 @@ actor ResourceGenerationService {
                 updatedAt: Date(),
                 tags: [interest.name, "career", "exploration"],
                 recommendedFor: ["Students", "Counselors"],
-                isFeatured: false
+                isFeatured: false,
+                scope: .global,
+                districtId: nil,
+                ownerUid: nil
             ),
             Resource(
                 title: "\(interest.name) Interactive Activities",
@@ -301,7 +313,10 @@ actor ResourceGenerationService {
                 updatedAt: Date(),
                 tags: [interest.name, "interactive", "activities"],
                 recommendedFor: ["Students", "Teachers"],
-                isFeatured: false
+                isFeatured: false,
+                scope: .global,
+                districtId: nil,
+                ownerUid: nil
             )
         ]
     }

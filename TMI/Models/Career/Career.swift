@@ -9,7 +9,7 @@ import FirebaseFirestore
 import SwiftUI
 
 struct Career: Identifiable, Codable, Sendable, Equatable {
-    let id: UUID
+    @DocumentID var id: String?
     let title: String
     let field: String
     let description: String
@@ -19,17 +19,42 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
     let jobOutlook: String
     let growthRate: Double
 
-    // Custom CodingKeys for salaryRange
+    // AI Generation metadata
+    let aiGenerated: Bool
+    let generatedAt: Date?
+
+    // Related data
+    let relatedInterests: [String]
+    let tags: [String]
+
+    // Timestamps
+    let createdAt: Date
+    let updatedAt: Date
+
+    // Library Scope
+    let scope: CareerScope
+    let districtId: String?
+
+    // Custom CodingKeys for salaryRange and new fields
     enum CodingKeys: String, CodingKey, Sendable {
         case id, title, field, description, skills, education, jobOutlook, growthRate
+        case aiGenerated, generatedAt, relatedInterests, tags
+        case createdAt, updatedAt, scope, districtId
         case salaryRangeLowerBound
         case salaryRangeUpperBound
+    }
+
+    enum CareerScope: String, Codable, CaseIterable, Identifiable, Sendable {
+        case global = "global"
+        case district = "district"
+
+        var id: String { rawValue }
     }
 
     // Custom initializer for decoding
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
+        id = try container.decodeIfPresent(String.self, forKey: .id)
         title = try container.decode(String.self, forKey: .title)
         field = try container.decode(String.self, forKey: .field)
         description = try container.decode(String.self, forKey: .description)
@@ -37,6 +62,15 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
         education = try container.decode(String.self, forKey: .education)
         jobOutlook = try container.decode(String.self, forKey: .jobOutlook)
         growthRate = try container.decode(Double.self, forKey: .growthRate)
+
+        aiGenerated = try container.decodeIfPresent(Bool.self, forKey: .aiGenerated) ?? false
+        generatedAt = try container.decodeIfPresent(Date.self, forKey: .generatedAt)
+        relatedInterests = try container.decodeIfPresent([String].self, forKey: .relatedInterests) ?? []
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+        scope = try container.decodeIfPresent(CareerScope.self, forKey: .scope) ?? .global
+        districtId = try container.decodeIfPresent(String.self, forKey: .districtId)
 
         let lowerBound = try container.decode(Double.self, forKey: .salaryRangeLowerBound)
         let upperBound = try container.decode(Double.self, forKey: .salaryRangeUpperBound)
@@ -46,7 +80,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
     // Custom encoder for encoding
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(id, forKey: .id)
         try container.encode(title, forKey: .title)
         try container.encode(field, forKey: .field)
         try container.encode(description, forKey: .description)
@@ -54,13 +88,39 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
         try container.encode(education, forKey: .education)
         try container.encode(jobOutlook, forKey: .jobOutlook)
         try container.encode(growthRate, forKey: .growthRate)
+        try container.encode(aiGenerated, forKey: .aiGenerated)
+        try container.encodeIfPresent(generatedAt, forKey: .generatedAt)
+        try container.encode(relatedInterests, forKey: .relatedInterests)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(scope, forKey: .scope)
+        try container.encodeIfPresent(districtId, forKey: .districtId)
         try container.encode(salaryRange.lowerBound, forKey: .salaryRangeLowerBound)
         try container.encode(salaryRange.upperBound, forKey: .salaryRangeUpperBound)
     }
 
     // Existing initializer (must be kept for sample data and direct creation)
-    init(title: String, field: String, description: String, skills: [String], education: String, salaryRange: ClosedRange<Double>, jobOutlook: String, growthRate: Double) {
-        self.id = UUID()
+    init(
+        id: String? = nil,
+        title: String,
+        field: String,
+        description: String,
+        skills: [String],
+        education: String,
+        salaryRange: ClosedRange<Double>,
+        jobOutlook: String,
+        growthRate: Double,
+        aiGenerated: Bool = false,
+        generatedAt: Date? = nil,
+        relatedInterests: [String] = [],
+        tags: [String] = [],
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        scope: CareerScope = .global,
+        districtId: String? = nil
+    ) {
+        self.id = id
         self.title = title
         self.field = field
         self.description = description
@@ -69,6 +129,14 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
         self.salaryRange = salaryRange
         self.jobOutlook = jobOutlook
         self.growthRate = growthRate
+        self.aiGenerated = aiGenerated
+        self.generatedAt = generatedAt
+        self.relatedInterests = relatedInterests
+        self.tags = tags
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.scope = scope
+        self.districtId = districtId
     }
 
     // Sample careers for preview

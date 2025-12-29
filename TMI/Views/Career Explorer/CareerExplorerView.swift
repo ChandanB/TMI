@@ -123,7 +123,7 @@ struct CareerExplorerView: View {
       ForEach(filteredCareers.indices, id: \.self) { index in
         let career = filteredCareers[index]
         NavigationLink(
-          destination: CareerDetailView(career: career)
+          destination: CareerDetailView(career: career, student: selectedStudent)
         ) {
           PremiumCareerCard(career: career)
             .scaleEffect(animateCards ? 1 : 0.9)
@@ -446,7 +446,7 @@ struct CareerExplorerView: View {
           ) {
             ForEach(searchResults.indices, id: \.self) { index in
               let career = searchResults[index]
-              NavigationLink(destination: CareerDetailView(career: career)) {
+              NavigationLink(destination: CareerDetailView(career: career, student: selectedStudent)) {
                 PremiumCareerCard(career: career)
                   .opacity(resultsAppeared ? 1 : 0)
                   .offset(y: resultsAppeared ? 0 : 20)
@@ -685,7 +685,7 @@ struct CareerExplorerView: View {
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 12) {
           ForEach(personalizedRecommendations.prefix(5), id: \.id) { career in
-            NavigationLink(destination: CareerDetailView(career: career)) {
+            NavigationLink(destination: CareerDetailView(career: career, student: selectedStudent)) {
               PersonalizedCareerCard(career: career)
             }
           }
@@ -735,7 +735,7 @@ struct CareerExplorerView: View {
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 12) {
           ForEach(trendingCareers, id: \.id) { career in
-            NavigationLink(destination: CareerDetailView(career: career)) {
+            NavigationLink(destination: CareerDetailView(career: career, student: selectedStudent)) {
               TrendingCareerCard(career: career)
             }
           }

@@ -140,7 +140,10 @@ struct AddResourceView: View {
             recommendedFor: recommendedFor.split(separator: ",").map {
                 String($0.trimmingCharacters(in: .whitespaces))
             },
-            isFeatured: isFeatured
+            isFeatured: isFeatured,
+            scope: .personal,
+            districtId: nil,
+            ownerUid: nil
         )
         onResourceAdded(newResource)
         dismiss()

@@ -26,7 +26,14 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
     var interventionModels: [InterventionModel]
     var popularityScore: Int?
     var isFeatured: Bool
-    var createdAt: Date // Add createdAt property
+    var createdAt: Date
+    var updatedAt: Date
+    var tags: [String]
+
+    // MARK: - Library Scope Properties
+    var scope: InterestScope
+    var districtId: String?
+    var ownerUid: String?
     
     // MARK: - TMI Specific Properties
     var academicBenefits: String?
@@ -54,6 +61,11 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         popularityScore: Int? = nil,
         isFeatured: Bool = false,
         createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        tags: [String] = [],
+        scope: InterestScope = .global,
+        districtId: String? = nil,
+        ownerUid: String? = nil,
         academicBenefits: String? = nil,
         careerPathways: [CareerPathway]? = nil,
         educationalActivities: [String]? = nil,
@@ -72,7 +84,12 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         self.interventionModels = interventionModels
         self.popularityScore = popularityScore
         self.isFeatured = isFeatured
-        self.createdAt = createdAt // Assign createdAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.tags = tags
+        self.scope = scope
+        self.districtId = districtId
+        self.ownerUid = ownerUid
         self.academicBenefits = academicBenefits
         self.careerPathways = careerPathways
         self.educationalActivities = educationalActivities
@@ -92,13 +109,14 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
     // MARK: - Codable Implementation
     enum CodingKeys: String, CodingKey {
         case id, firestoreID, name, category, description, academicRelevance, interventionModels
-        case popularityScore, isFeatured, createdAt, academicBenefits, careerPathways, educationalActivities
+        case popularityScore, isFeatured, createdAt, updatedAt, tags, scope, districtId, ownerUid
+        case academicBenefits, careerPathways, educationalActivities
         case behavioralBenefits, skillsDeveloped, tierRelevance, relatedInterests, relatedStudents, schemaVersion
     }
     
     required init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        
+
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         category = try container.decode([InterestCategory].self, forKey: .category)
@@ -107,7 +125,12 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         interventionModels = try container.decodeIfPresent([InterventionModel].self, forKey: .interventionModels) ?? []
         popularityScore = try container.decodeIfPresent(Int.self, forKey: .popularityScore)
         isFeatured = try container.decodeIfPresent(Bool.self, forKey: .isFeatured) ?? false
-        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date() // Decode createdAt
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        scope = try container.decodeIfPresent(InterestScope.self, forKey: .scope) ?? .global
+        districtId = try container.decodeIfPresent(String.self, forKey: .districtId)
+        ownerUid = try container.decodeIfPresent(String.self, forKey: .ownerUid)
         academicBenefits = try container.decodeIfPresent(String.self, forKey: .academicBenefits)
         careerPathways = try container.decodeIfPresent([CareerPathway].self, forKey: .careerPathways)
         educationalActivities = try container.decodeIfPresent([String].self, forKey: .educationalActivities)
@@ -121,7 +144,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        
+
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
         try container.encode(category, forKey: .category)
@@ -130,7 +153,12 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         try container.encode(interventionModels, forKey: .interventionModels)
         try container.encodeIfPresent(popularityScore, forKey: .popularityScore)
         try container.encode(isFeatured, forKey: .isFeatured)
-        try container.encode(createdAt, forKey: .createdAt) // Encode createdAt
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(scope, forKey: .scope)
+        try container.encodeIfPresent(districtId, forKey: .districtId)
+        try container.encodeIfPresent(ownerUid, forKey: .ownerUid)
         try container.encodeIfPresent(academicBenefits, forKey: .academicBenefits)
         try container.encodeIfPresent(careerPathways, forKey: .careerPathways)
         try container.encodeIfPresent(educationalActivities, forKey: .educationalActivities)
@@ -174,8 +202,15 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
             tiers = [.tier1, .tier2]
         }
         
-        let createdAtTimestamp = data["createdAt"] as? Timestamp ?? Timestamp(date: Date()) // Decode createdAt from Timestamp
+        let createdAtTimestamp = data["createdAt"] as? Timestamp ?? Timestamp(date: Date())
         let createdAtDate = createdAtTimestamp.dateValue()
+
+        let updatedAtTimestamp = data["updatedAt"] as? Timestamp ?? Timestamp(date: Date())
+        let updatedAtDate = updatedAtTimestamp.dateValue()
+
+        // Parse scope
+        let scopeString = data["scope"] as? String ?? "global"
+        let scope = InterestScope(rawValue: scopeString) ?? .global
 
         return Interest(
             id: id,
@@ -186,7 +221,12 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
             interventionModels: models,
             popularityScore: data["popularityScore"] as? Int,
             isFeatured: data["isFeatured"] as? Bool ?? false,
-            createdAt: createdAtDate, // Assign decoded createdAt
+            createdAt: createdAtDate,
+            updatedAt: updatedAtDate,
+            tags: data["tags"] as? [String] ?? [],
+            scope: scope,
+            districtId: data["districtId"] as? String,
+            ownerUid: data["ownerUid"] as? String,
             academicBenefits: data["academicBenefits"] as? String,
             careerPathways: parseCareerPathways(data["careerPathways"]),
             educationalActivities: data["educationalActivities"] as? [String],
@@ -220,11 +260,16 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
             "tierRelevance": tierRelevance.map { $0.rawValue },
             "isFeatured": isFeatured,
             "schemaVersion": schemaVersion,
-            "createdAt": Timestamp(date: createdAt) // Encode createdAt as Timestamp
+            "createdAt": Timestamp(date: createdAt),
+            "updatedAt": Timestamp(date: updatedAt),
+            "tags": tags,
+            "scope": scope.rawValue
         ]
-        
+
         if let description = description { data["description"] = description }
         if let popularityScore = popularityScore { data["popularityScore"] = popularityScore }
+        if let districtId = districtId { data["districtId"] = districtId }
+        if let ownerUid = ownerUid { data["ownerUid"] = ownerUid }
         if let academicBenefits = academicBenefits { data["academicBenefits"] = academicBenefits }
         if let careerPathways = careerPathways {
             data["careerPathways"] = careerPathways.map { $0.rawValue }
@@ -357,6 +402,14 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
 }
 
 // MARK: - Support Enums and Types
+
+enum InterestScope: String, Codable, CaseIterable, Identifiable, Sendable {
+    case global = "global"
+    case district = "district"
+    case personal = "personal"
+
+    var id: String { rawValue }
+}
 
 enum InterventionModel: String, Codable, CaseIterable, Identifiable, Sendable {
     case chaseYourSpace = "Chase Your Space"
