@@ -183,7 +183,7 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
     func generateCareerData(for student: Student?, promptBuilder: AIPromptBuilder) async throws -> AICareerResponse {
         guard await isAppleIntelligenceAvailable() else {
             print("[FoundationModelsService] Apple Intelligence not available for career data, falling back to sample data.")
-            return AICareerGenerator.shared.generateSampleAICareerResponse(for: student)
+            return await AICareerGenerator.shared.generateSampleAICareerResponse(for: student)
         }
 
         do {
@@ -202,7 +202,7 @@ final class FoundationModelsService: FoundationModelsServiceProtocol {
             #endif
         } catch {
             print("[FoundationModelsService] AI career data generation failed: \(error), falling back to sample data.")
-            return AICareerGenerator.shared.generateSampleAICareerResponse(for: student)
+            return await AICareerGenerator.shared.generateSampleAICareerResponse(for: student)
         }
     }
     
@@ -537,7 +537,7 @@ final class FallbackFoundationModelsService: FoundationModelsServiceProtocol {
     
     func generateCareerData(for student: Student?, promptBuilder: AIPromptBuilder) async throws -> AICareerResponse {
         print("[FallbackFoundationModelsService] Foundation Models not available on this iOS version, using sample data.")
-        return AICareerGenerator.shared.generateSampleAICareerResponse(for: student)
+        return await AICareerGenerator.shared.generateSampleAICareerResponse(for: student)
     }
     
     func generateAIInsights(from dashboardData: DashboardData, promptBuilder: AIPromptBuilder) async throws -> [AIInsight] {

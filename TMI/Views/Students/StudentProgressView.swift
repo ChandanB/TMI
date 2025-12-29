@@ -12,6 +12,8 @@ struct StudentProgressView: View {
     let student: Student
     let plans: [TMIPlan]
 
+    @State private var interestCount: Int = 0
+
     var body: some View {
         ZStack {
             Color.tmiBackground
@@ -46,6 +48,21 @@ struct StudentProgressView: View {
         }
         .navigationTitle("Progress")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await loadInterestCount()
+        }
+    }
+
+    // MARK: - Data Loading
+
+    @MainActor
+    private func loadInterestCount() async {
+        do {
+            interestCount = try await student.getInterestCount()
+        } catch {
+            print("[StudentProgressView] Error loading interest count: \(error.localizedDescription)")
+            interestCount = 0
+        }
     }
 
     // MARK: - Header
@@ -97,7 +114,7 @@ struct StudentProgressView: View {
                 )
 
                 metricCard(
-                    value: "\(student.interests.count)",
+                    value: "\(interestCount)",
                     label: "Interests",
                     icon: "heart.fill",
                     color: .pink

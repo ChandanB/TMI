@@ -14,7 +14,9 @@ struct RecommendationsView: View {
     @State private var isLoading = false
     @State private var error: Error?
     @State private var animateContent = false
-    
+    @State private var interests: [Interest] = []
+    @State private var interestCount: Int = 0
+
     private let recommendationsService = RecommendationsService.shared
     
     var body: some View {
@@ -62,6 +64,7 @@ struct RecommendationsView: View {
             .foregroundColor(.white)
             .task {
                 await loadRecommendations()
+                await loadInterests()
             }
             .onAppear {
                 withAnimation(.easeOut(duration: 0.8)) {
@@ -103,12 +106,12 @@ struct RecommendationsView: View {
             
             HStack(spacing: 16) {
                 InterestPill(text: "Grade \(student.grade)", color: .blue)
-                
-                if let topInterest = student.interests.max(by: { ($0.popularityScore ?? 0) < ($1.popularityScore ?? 0) }) {
+
+                if let topInterest = interests.max(by: { ($0.popularityScore ?? 0) < ($1.popularityScore ?? 0) }) {
                     InterestPill(text: topInterest.name, color: .tmiSecondary)
                 }
-                
-                InterestPill(text: "\(student.interests.count) interests", color: .purple)
+
+                InterestPill(text: "\(interestCount) interests", color: .purple)
             }
             .opacity(animateContent ? 1 : 0)
             .offset(y: animateContent ? 0 : 20)
@@ -298,6 +301,18 @@ struct RecommendationsView: View {
         }
         
         isLoading = false
+    }
+
+    @MainActor
+    private func loadInterests() async {
+        do {
+            interests = try await student.fetchInterestsFromEdgeCollection()
+            interestCount = try await student.getInterestCount()
+        } catch {
+            print("[RecommendationsView] Error loading interests: \(error.localizedDescription)")
+            interests = []
+            interestCount = 0
+        }
     }
 }
 

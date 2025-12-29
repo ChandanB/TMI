@@ -17,12 +17,6 @@ extension Student {
                 school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -15, to: Date()) ?? Date(),
                 studentID: "ST-001",
-                interests: [
-                    Interest(name: "Robotics", category: [.technology, .science]),
-                    Interest(name: "Computer Programming", category: [.technology]),
-                    Interest(name: "Arduino Projects", category: [.technology]),
-                    Interest(name: "Video Game Development", category: [.gaming, .technology])
-                ],
                 surveyResults: [
                     SurveyResult(
                         id: "survey_alex_001",
@@ -77,14 +71,6 @@ extension Student {
                 school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -16, to: Date()) ?? Date(),
                 studentID: "ST-002",
-                interests: [
-                    Interest(name: "Creative Writing", category: [.literature, .arts]),
-                    Interest(name: "Drama & Theater", category: [.arts, .entertainment]),
-                    Interest(name: "Digital Art", category: [.arts, .technology]),
-                    Interest(name: "Poetry Writing", category: [.arts, .literature]),
-                    Interest(name: "Digital Photography", category: [.arts, .technology]),
-                    Interest(name: "Theater Performance", category: [.arts, .entertainment])
-                ],
                 surveyResults: [
                     SurveyResult(
                         id: "survey_maria_001",
@@ -139,13 +125,6 @@ extension Student {
                 school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -17, to: Date()) ?? Date(),
                 studentID: "ST-003",
-                interests: [
-                    Interest(name: "Basketball", category: [.sports]),
-                    Interest(name: "Sports Medicine", category: [.science, .wellness]),
-                    Interest(name: "Team Leadership", category: [.leadership]),
-                    Interest(name: "Fitness Training", category: [.sports, .wellness]),
-                    Interest(name: "Sports Statistics Analysis", category: [.mathematics, .sports])
-                ],
                 surveyResults: [
                     SurveyResult(
                         id: "survey_jordan_001",
@@ -200,13 +179,6 @@ extension Student {
                 school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -14, to: Date()) ?? Date(),
                 studentID: "ST-004",
-                interests: [
-                    Interest(name: "Music Production", category: [.music, .technology]),
-                    Interest(name: "Social Media", category: [.entertainment, .technology]),
-                    Interest(name: "Making Beats", category: [.music, .technology]),
-                    Interest(name: "TikTok Creation", category: [.entertainment, .social]),
-                    Interest(name: "Skateboarding", category: [.sports])
-                ],
                 surveyResults: [
                     SurveyResult(
                         id: "survey_taylor_001",
@@ -263,14 +235,6 @@ extension Student {
                 school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -16, to: Date()) ?? Date(),
                 studentID: "ST-005",
-                interests: [
-                    Interest(name: "Environmental Science", category: [.science, .outdoors, .socialCauses]),
-                    Interest(name: "Marine Biology", category: [.science, .outdoors]),
-                    Interest(name: "Climate Action", category: [.socialCauses, .science]),
-                    Interest(name: "Nature Photography", category: [.arts, .outdoors]),
-                    Interest(name: "Gardening", category: [.outdoors, .science]),
-                    Interest(name: "Science Fair Projects", category: [.science, .academics])
-                ],
                 surveyResults: [
                     SurveyResult(
                         id: "survey_aisha_001",
@@ -325,14 +289,6 @@ extension Student {
                 school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -15, to: Date()) ?? Date(),
                 studentID: "ST-006",
-                interests: [
-                    Interest(name: "Reading Fantasy Novels", category: [.literature]),
-                    Interest(name: "Digital Art", category: [.arts, .technology]),
-                    Interest(name: "Board Games", category: [.entertainment, .socialCauses]),
-                    Interest(name: "Book Reading", category: [.literature]),
-                    Interest(name: "Digital Drawing", category: [.arts, .technology]),
-                    Interest(name: "Chess", category: [.gaming, .academics])
-                ],
                 surveyResults: [
                     SurveyResult(
                         id: "survey_sam_001",
@@ -387,14 +343,6 @@ extension Student {
                 school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -17, to: Date()) ?? Date(),
                 studentID: "ST-007",
-                interests: [
-                    Interest(name: "Student Government", category: [.leadership, .socialCauses]),
-                    Interest(name: "Community Service", category: [.socialCauses, .leadership]),
-                    Interest(name: "Public Speaking", category: [.leadership]),
-                    Interest(name: "Debate Club", category: [.academics, .leadership]),
-                    Interest(name: "Volunteer Work", category: [.socialCauses]),
-                    Interest(name: "Event Planning", category: [.social, .leadership])
-                ],
                 surveyResults: [
                     SurveyResult(
                         id: "survey_marcus_001",
@@ -449,14 +397,6 @@ extension Student {
                 school: "Sample High School",
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -16, to: Date()) ?? Date(),
                 studentID: "ST-008",
-                interests: [
-                    Interest(name: "Automotive Repair", category: [.technology, .crafts]),
-                    Interest(name: "Hip-Hop Music", category: [.music, .entertainment]),
-                    Interest(name: "Martial Arts", category: [.sports, .wellness]),
-                    Interest(name: "Car Restoration", category: [.technology, .crafts]),
-                    Interest(name: "Rap Music Writing", category: [.music, .literature]),
-                    Interest(name: "Boxing", category: [.sports, .wellness])
-                ],
                 surveyResults: [
                     SurveyResult(
                         id: "survey_devon_001",

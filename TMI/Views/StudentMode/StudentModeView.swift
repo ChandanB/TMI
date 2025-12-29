@@ -277,12 +277,18 @@ struct StudentInterestsTab: View {
         }
     }
 
+    @MainActor
     private func loadInterests() async {
         isLoading = true
         defer { isLoading = false }
 
-        // Load interests from student
-        interests = student.interests
+        // Load interests from edge collection
+        do {
+            interests = try await student.fetchInterestsFromEdgeCollection()
+        } catch {
+            print("[StudentInterestsTab] Error loading interests: \(error.localizedDescription)")
+            interests = []
+        }
     }
 }
 
@@ -391,17 +397,26 @@ struct StudentCareersTab: View {
         )
     }
 
+    @MainActor
     private func loadCareerMatches() async {
         isLoading = true
         defer { isLoading = false }
 
-        // Generate career matches from student interests
-        if !student.interests.isEmpty {
-            // Convert interests to interest clusters
-            let clusters = convertInterestsToClusters(student.interests)
+        // Load student interests from edge collection
+        do {
+            let interests = try await student.fetchInterestsFromEdgeCollection()
 
-            let service = CareerMatchingService.shared
-            careerMatches = service.matchCareers(from: clusters, dreamJob: nil)
+            // Generate career matches from student interests
+            if !interests.isEmpty {
+                // Convert interests to interest clusters
+                let clusters = convertInterestsToClusters(interests)
+
+                let service = CareerMatchingService.shared
+                careerMatches = service.matchCareers(from: clusters, dreamJob: nil)
+            }
+        } catch {
+            print("[StudentCareersTab] Error loading interests for career matching: \(error.localizedDescription)")
+            careerMatches = []
         }
     }
 

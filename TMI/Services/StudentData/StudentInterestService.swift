@@ -110,6 +110,42 @@ final class StudentInterestService {
         return allInterests.filter { $0.isHighAffinity }
     }
 
+    /// Get all student IDs that have a specific interest (Collection Group Query)
+    func getStudentIdsWithInterest(interestId: String) async throws -> [String] {
+        guard !interestId.isEmpty else {
+            throw StudentInterestError.invalidInterestId
+        }
+        
+        do {
+            // Use a collection group query to search across all studentInterests subcollections
+            let querySnapshot = try await withTimeout(seconds: 10) {
+                try await self.db.collectionGroup("studentInterests")
+                    .whereField("interestId", isEqualTo: interestId)
+                    .getDocuments()
+            }
+            
+            // Extract unique student IDs from the found documents
+            let studentIds = querySnapshot.documents.compactMap { document -> String? in
+                // The document data should contain studentId, or we can parse the parent path
+                if let data = try? document.data(as: StudentInterest.self) {
+                    return data.studentId
+                }
+                // Fallback to parsing path if data is missing studentId (unlikely with this model)
+                let pathComponents = document.reference.path.components(separatedBy: "/")
+                if pathComponents.count >= 3 && pathComponents[pathComponents.count - 3] == "students" {
+                    return pathComponents[pathComponents.count - 2]
+                }
+                return nil
+            }
+            
+            return Array(Set(studentIds)) // Return unique IDs
+            
+        } catch {
+            print("[StudentInterestService] Error fetching students with interest: \(error.localizedDescription)")
+            throw StudentInterestError.fetchFailed(error.localizedDescription)
+        }
+    }
+
     // MARK: - Write Operations
 
     /// Save survey results for a student

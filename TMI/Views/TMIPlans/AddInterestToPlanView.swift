@@ -20,6 +20,8 @@ struct AddInterestToPlanView: View {
     @State private var isAdding = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var loadedStudentInterests: [Interest] = []
+    @State private var isLoadingInterests = true
 
     init(plan: TMIPlan, onInterestAdded: ((TMIPlan) -> Void)? = nil) {
         self.plan = plan
@@ -28,7 +30,7 @@ struct AddInterestToPlanView: View {
 
     // Check if an interest belongs to any student in the plan
     private func isStudentInterest(_ interest: Interest) -> Bool {
-        let studentInterestNames = Set(plan.students.flatMap { $0.interests }.map { $0.name.lowercased() })
+        let studentInterestNames = Set(loadedStudentInterests.map { $0.name.lowercased() })
         return studentInterestNames.contains(interest.name.lowercased())
     }
 
@@ -38,13 +40,13 @@ struct AddInterestToPlanView: View {
         let planInterestNames = Set(plan.interests.map { $0.name.lowercased() })
 
         // Get student interests first (from the plan's students)
-        let studentInterests = plan.students.flatMap { $0.interests }
-        let uniqueStudentInterests = Array(Set(studentInterests)).filter { interest in
+        // Use loaded interests instead of synchronous mapping
+        let uniqueStudentInterests = Array(Set(loadedStudentInterests)).filter { interest in
             !planInterestNames.contains(interest.name.lowercased())
         }
 
         // Then add other predefined interests not already in student interests
-        let studentInterestNames = Set(studentInterests.map { $0.name.lowercased() })
+        let studentInterestNames = Set(loadedStudentInterests.map { $0.name.lowercased() })
         let otherInterests = PredefinedInterestsData.allPredefinedInterests.filter { interest in
             !planInterestNames.contains(interest.name.lowercased()) &&
             !studentInterestNames.contains(interest.name.lowercased())
@@ -138,6 +140,9 @@ struct AddInterestToPlanView: View {
         } message: {
             Text(errorMessage)
         }
+        .task {
+            await loadStudentInterests()
+        }
     }
 
     // MARK: - Header Section
@@ -175,7 +180,7 @@ struct AddInterestToPlanView: View {
             }
 
             if !plan.students.isEmpty {
-                let studentInterestCount = Set(plan.students.flatMap { $0.interests }).count
+                let studentInterestCount = Set(loadedStudentInterests).count
                 HStack(spacing: 4) {
                     Text("For \(plan.students.count) student\(plan.students.count == 1 ? "" : "s")")
                     if studentInterestCount > 0 {
@@ -268,6 +273,33 @@ struct AddInterestToPlanView: View {
         case .bullyToBoss: return .red
         case .meekToProtector: return .green
         }
+    }
+
+    private func loadStudentInterests() async {
+        isLoadingInterests = true
+        defer { isLoadingInterests = false }
+
+        var allInterests: [Interest] = []
+        
+        // Parallel fetch for all students
+        await withTaskGroup(of: [Interest].self) { group in
+            for student in plan.students {
+                group.addTask {
+                    do {
+                        return try await student.fetchInterestsFromEdgeCollection()
+                    } catch {
+                        print("Error fetching interests for student \(student.id ?? "unknown"): \(error)")
+                        return []
+                    }
+                }
+            }
+            
+            for await interests in group {
+                allInterests.append(contentsOf: interests)
+            }
+        }
+        
+        self.loadedStudentInterests = allInterests
     }
 
     // MARK: - Actions

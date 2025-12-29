@@ -16,6 +16,7 @@ struct StudentListView: View {
     @State private var studentToDelete: Student? = nil
     @State private var showingDeleteConfirmation = false
     @State private var studentForNewPlan: Student? = nil
+    @State private var studentsWithInterests: Set<String> = []  // Student IDs who have interests
 
     enum EngagementFilter: String, CaseIterable {
         case all = "All Students"
@@ -141,9 +142,11 @@ struct StudentListView: View {
         }
         .task {
             await stateModel.fetch()
+            await loadStudentsWithInterests()
         }
         .refreshable {
             await stateModel.fetch()
+            await loadStudentsWithInterests()
         }
     }
 
@@ -285,7 +288,7 @@ struct StudentListView: View {
                     }
 
                     // Survey status
-                    if student.interests.count > 0 {
+                    if let studentId = student.id, studentsWithInterests.contains(studentId) {
                         surveyCompleteBadge()
                     }
                 }
@@ -460,6 +463,28 @@ struct StudentListView: View {
             },
             actionLabel: "Try Again"
         )
+    }
+
+    // MARK: - Data Loading
+
+    @MainActor
+    private func loadStudentsWithInterests() async {
+        var studentIds: Set<String> = []
+
+        for student in stateModel.students {
+            guard let studentId = student.id else { continue }
+
+            do {
+                let count = try await student.getInterestCount()
+                if count > 0 {
+                    studentIds.insert(studentId)
+                }
+            } catch {
+                print("[StudentListView] Error loading interest count for student \(student.name): \(error.localizedDescription)")
+            }
+        }
+
+        studentsWithInterests = studentIds
     }
 }
 

@@ -55,7 +55,7 @@ final class DynamicFormStateModel: BaseStateModel<FormTemplate, IdentifiableErro
     // load default sections
     formSections = [
       DefaultSectionTemplates.personalDetails,
-      DefaultSectionTemplates.eductionBackground,
+      DefaultSectionTemplates.educationBackground,
       DefaultSectionTemplates.emergencyContact,
       DefaultSectionTemplates.fileUpload
     ]

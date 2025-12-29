@@ -148,16 +148,16 @@ final class AIInsightsService: Sendable  {
         return careerGenerator.generateIntelligentCareers(for: query, student: student)
     }
     
-    func generatePersonalizedCareers(for student: Student?) -> [Career] {
-        return careerGenerator.generatePersonalizedCareers(for: student)
+    func generatePersonalizedCareers(for student: Student?) async -> [Career] {
+        return await careerGenerator.generatePersonalizedCareers(for: student)
     }
     
     func generateSampleCareerSearchResponse(query: String, student: Student?) -> AICareerResponse {
         return careerGenerator.generateSampleCareerSearchResponse(query: query, student: student)
     }
     
-    func generateSampleAICareerResponse(for student: Student?) -> AICareerResponse {
-        return careerGenerator.generateSampleAICareerResponse(for: student)
+    func generateSampleAICareerResponse(for student: Student?) async -> AICareerResponse {
+        return await careerGenerator.generateSampleAICareerResponse(for: student)
     }
     
     // MARK: - Basketball Career Generation (Delegated)

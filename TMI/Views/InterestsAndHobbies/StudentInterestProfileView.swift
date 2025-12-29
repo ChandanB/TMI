@@ -21,6 +21,9 @@ struct StudentInterestProfileView: View {
     @State private var showingResourceAssignment = false
     @State private var selectedResource: Resource?
 
+    @State private var interests: [Interest] = []
+    @State private var interestCount: Int = 0
+
     private let careerService = CareerService.shared
     private let assignmentService = ResourceAssignmentService()
 
@@ -97,7 +100,7 @@ struct StudentInterestProfileView: View {
                             .font(.title2.bold())
                             .foregroundColor(.white)
 
-                        Text("\(student.interests.count) Interests")
+                        Text("\(interestCount) Interests")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                     }
@@ -117,7 +120,7 @@ struct StudentInterestProfileView: View {
                 .font(.title3.bold())
                 .foregroundColor(.white)
 
-            if student.interests.isEmpty {
+            if interests.isEmpty {
                 TMIGlassCard(style: .default) {
                     VStack(spacing: 12) {
                         Image(systemName: "lightbulb.slash")
@@ -140,7 +143,7 @@ struct StudentInterestProfileView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible())
                 ], spacing: 12) {
-                    ForEach(student.interests) { interest in
+                    ForEach(interests) { interest in
                         StudentInterestCard(interest: interest)
                     }
                 }
@@ -173,6 +176,7 @@ struct StudentInterestProfileView: View {
                     career: career,
                     rank: index + 1,
                     student: student,
+                    interests: interests,
                     onTap: {
                         selectedCareer = career
                         showingCareerDetail = true
@@ -306,6 +310,10 @@ struct StudentInterestProfileView: View {
         isLoading = true
 
         do {
+            // Load student interests from edge collection
+            interests = try await student.fetchInterestsFromEdgeCollection()
+            interestCount = try await student.getInterestCount()
+
             // Load career recommendations
             careerRecommendations = try await careerService.getCareerRecommendations(for: student)
 
@@ -317,6 +325,8 @@ struct StudentInterestProfileView: View {
 
         } catch {
             print("[StudentInterestProfileView] Failed to load profile: \(error)")
+            interests = []
+            interestCount = 0
         }
 
         isLoading = false
@@ -352,6 +362,7 @@ private struct CareerRecommendationCard: View {
     let career: Career
     let rank: Int
     let student: Student
+    let interests: [Interest]
     let onTap: () -> Void
 
     var body: some View {
@@ -387,7 +398,7 @@ private struct CareerRecommendationCard: View {
                     }
 
                     // Match explanation
-                    MatchExplanationView(career: career, student: student)
+                    MatchExplanationView(career: career, student: student, interests: interests)
                 }
                 .padding()
             }
@@ -408,6 +419,7 @@ private struct CareerRecommendationCard: View {
 private struct MatchExplanationView: View {
     let career: Career
     let student: Student
+    let interests: [Interest]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -416,7 +428,7 @@ private struct MatchExplanationView: View {
                 .foregroundColor(.white.opacity(0.8))
 
             // Show matching interests
-            let matchingInterests = student.interests.filter { interest in
+            let matchingInterests = interests.filter { interest in
                 career.title.lowercased().contains(interest.name.lowercased()) ||
                 career.field.lowercased().contains(interest.name.lowercased()) ||
                 career.skills.contains { skill in
@@ -640,3 +652,4 @@ private struct ResourceAssignmentSheet: View {
         StudentInterestProfileView(student: .sampleStudents[0])
     }
 }
+

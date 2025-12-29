@@ -74,18 +74,20 @@ final class AIPromptBuilder: Sendable {
 
         if let student = student {
             prompt += """
-            
+
             **STUDENT PERSONALIZATION:**
             - Name: \(student.name)
             - Grade: \(student.grade)
-            - Interests: \(student.interests.map { $0.name }.joined(separator: ", "))
+            - Interests: [Fetched from StudentInterestService edge collection]
             - Academic Performance (GPA): \(student.academicPerformance?.gpa ?? 0.0)
-            
+
             **PERSONALIZATION INSTRUCTIONS:**
             - Prioritize careers within the search domain that align with student interests
             - Adjust education requirements suggestions based on current grade level
             - Include student-appropriate entry pathways and progression routes
             - Tailor skill gaps and next steps specifically for this student's profile
+
+            NOTE: For full interest-based personalization, call StudentInterestService.shared.getStudentInterests(studentId:)
             """
         }
 
@@ -135,7 +137,7 @@ final class AIPromptBuilder: Sendable {
             **STUDENT PROFILE FOR PERSONALIZATION:**
             - Name: \(student.name)
             - Grade: \(student.grade)
-            - Interests: \(student.interests.map { $0.name }.joined(separator: ", "))
+            - Interests: [Fetched from StudentInterestService edge collection]
             - Academic Performance (GPA): \(student.academicPerformance?.gpa ?? 0.0)
             - Academic Subjects: \(student.academicPerformance?.subjects.map { "\($0.name) (\($0.grade))" }.joined(separator: ", ") ?? "N/A")
             
@@ -219,9 +221,9 @@ final class AIPromptBuilder: Sendable {
         **STUDENT PROFILE:**
         - Name: \(student.name)
         - Grade: \(student.grade)
-        - Interests: \(student.interests.map { $0.name }.joined(separator: ", "))
+        - Interests: [Fetched from StudentInterestService edge collection]
         - Academic Performance (GPA): \(student.academicPerformance?.gpa ?? 0.0)
-        
+
         **TASK:**
         Identify 3-5 key skill gaps that this student should develop for future career success based on their interests and academic profile.
         
@@ -238,9 +240,9 @@ final class AIPromptBuilder: Sendable {
         **STUDENT PROFILE:**
         - Name: \(student.name)
         - Grade: \(student.grade)
-        - Interests: \(student.interests.map { $0.name }.joined(separator: ", "))
+        - Interests: [Fetched from StudentInterestService edge collection]
         - Academic Performance (GPA): \(student.academicPerformance?.gpa ?? 0.0)
-        
+
         **TASK:**
         Create 3-5 specific, actionable next steps this student can take to advance their career exploration and development.
         
@@ -259,9 +261,9 @@ final class AIPromptBuilder: Sendable {
         **STUDENT PROFILE:**
         - Name: \(student.name)
         - Grade: \(student.grade)
-        - Interests: \(student.interests.map { $0.name }.joined(separator: ", "))
+        - Interests: [Fetched from StudentInterestService edge collection]
         - Current Challenges: \(currentChallenges.joined(separator: ", "))
-        
+
         **TASK:**
         Create a comprehensive intervention plan including:
         1. Root cause analysis
@@ -295,5 +297,26 @@ final class AIPromptBuilder: Sendable {
         **OUTPUT FORMAT:**
         Return comprehensive analysis as structured JSON.
         """
+    }
+
+    // MARK: - Helper Methods
+
+    /// Format student interests for prompt inclusion
+    /// Fetches interests from edge collection and formats as comma-separated string
+    private func formatStudentInterests(for student: Student) async -> String {
+        guard let studentId = student.id else {
+            return "No interests recorded"
+        }
+
+        do {
+            let interests = try await student.fetchInterestsFromEdgeCollection()
+            if interests.isEmpty {
+                return "No interests recorded"
+            }
+            return interests.map { $0.name }.joined(separator: ", ")
+        } catch {
+            print("[AIPromptBuilder] Error fetching interests: \(error.localizedDescription)")
+            return "Error loading interests"
+        }
     }
 }

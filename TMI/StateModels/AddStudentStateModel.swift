@@ -84,6 +84,18 @@ final class AddStudentStateModel {
     // MARK: - Actions
     
     @MainActor
+    func loadInterests() async {
+        guard let student = student else { return }
+        
+        do {
+            self.interests = try await student.fetchInterestsFromEdgeCollection()
+        } catch {
+            print("[AddStudentStateModel] Error loading interests: \(error)")
+            // Don't fail the UI, just show empty interests
+        }
+    }
+
+    @MainActor
     func saveStudent() async -> Student? {
         guard validateForm() else {
             errorMessage = "Please fix the errors above"
@@ -94,6 +106,7 @@ final class AddStudentStateModel {
         isLoading = true
         errorMessage = nil
         
+        // Create student object (without interests, as they are managed separately)
         let studentToSave = Student(
             id: student?.id,
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -101,8 +114,7 @@ final class AddStudentStateModel {
             school: school.trimmingCharacters(in: .whitespacesAndNewlines),
             dateOfBirth: dateOfBirth,
             studentID: studentID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : studentID.trimmingCharacters(in: .whitespacesAndNewlines),
-            interests: interests,
-            // Note: Hobbies are now included in interests
+            photoURL: student?.photoURL ?? nil // Preserve photo URL if editing
         )
         
         do {
@@ -116,6 +128,10 @@ final class AddStudentStateModel {
                 savedStudent = try await studentService.addStudent(studentToSave)
                 print("[DEBUG] Student added successfully: \(savedStudent.name)")
             }
+            
+            // Sync interests to edge collection
+            try await saveInterests(for: savedStudent)
+            
             isLoading = false
             print("[DEBUG] Save operation completed successfully")
             return savedStudent
@@ -127,6 +143,47 @@ final class AddStudentStateModel {
             errorMessage = "Failed to save student: \(error.localizedDescription)"
             showingAlert = true
             return nil
+        }
+    }
+    
+    private func saveInterests(for student: Student) async throws {
+        guard let studentId = student.id else { return }
+        
+        // Get current interests from edge collection
+        let currentEdges = try await StudentInterestService.shared.getStudentInterests(studentId: studentId)
+        let currentInterestIds = Set(currentEdges.map { $0.interestId })
+        let targetInterestIds = Set(self.interests.compactMap { $0.id })
+        
+        // Use task group for parallel operations
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            // Add new interests
+            for interest in self.interests {
+                guard let interestId = interest.id else { continue }
+                if !currentInterestIds.contains(interestId) {
+                    group.addTask {
+                        try await StudentInterestService.shared.addInterest(
+                            studentId: studentId,
+                            interestId: interestId,
+                            level: 3,
+                            source: .staff
+                        )
+                    }
+                }
+            }
+            
+            // Remove deleted interests
+            for edge in currentEdges {
+                if !targetInterestIds.contains(edge.interestId) {
+                    group.addTask {
+                        try await StudentInterestService.shared.removeInterest(
+                            studentId: studentId,
+                            interestId: edge.interestId
+                        )
+                    }
+                }
+            }
+            
+            try await group.waitForAll()
         }
     }
     

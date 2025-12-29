@@ -21,6 +21,9 @@ struct AddInterestToStudentView: View {
     @State private var showError = false
     @State private var errorMessage = ""
 
+    @State private var studentInterests: [Interest] = []
+    @State private var interestCount: Int = 0
+
     // Separate survey-based interests from manually added
     private var surveyBasedInterests: [Interest] {
         // If student has survey results, consider interests that came from survey
@@ -29,12 +32,12 @@ struct AddInterestToStudentView: View {
         guard let surveyResults = student.surveyResults, !surveyResults.isEmpty else {
             return []
         }
-        return student.interests
+        return studentInterests
     }
 
     // Filter interests that the student doesn't already have
     private var availableInterests: [Interest] {
-        let studentInterestNames = Set(student.interests.map { $0.name.lowercased() })
+        let studentInterestNames = Set(studentInterests.map { $0.name.lowercased() })
         var interests = PredefinedInterestsData.allPredefinedInterests.filter { interest in
             !studentInterestNames.contains(interest.name.lowercased())
         }
@@ -134,10 +137,27 @@ struct AddInterestToStudentView: View {
         .navigationTitle("Add Interests")
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
+        .task {
+            await loadInterests()
+        }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
+        }
+    }
+
+    // MARK: - Data Loading
+
+    @MainActor
+    private func loadInterests() async {
+        do {
+            studentInterests = try await student.fetchInterestsFromEdgeCollection()
+            interestCount = try await student.getInterestCount()
+        } catch {
+            print("[AddInterestToStudentView] Error loading interests: \(error.localizedDescription)")
+            studentInterests = []
+            interestCount = 0
         }
     }
 
@@ -169,8 +189,8 @@ struct AddInterestToStudentView: View {
                 Spacer()
             }
 
-            if !student.interests.isEmpty {
-                Text("Current interests: \(student.interests.count)")
+            if !studentInterests.isEmpty {
+                Text("Current interests: \(interestCount)")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.6))
             }

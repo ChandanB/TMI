@@ -62,7 +62,7 @@ struct FormDetailEditorView: View {
 
 
 #Preview {
-    FormDetailEditorView(template: DefaultFormTemplates.camperRegistrationFormTemplate)
+    FormDetailEditorView(template: DefaultFormTemplates.studentEnrollmentFormTemplate)
 }
 
 

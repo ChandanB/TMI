@@ -12,7 +12,7 @@ import Observation
 
 @Observable
 class MyFormsViewModel {
-    var formTemplates: [FormTemplate] = [DefaultFormTemplates.camperRegistrationFormTemplate, DefaultFormTemplates.jobApplicationFormTemplate, DefaultFormTemplates.camperRegistrationFormTemplate]
+    var formTemplates: [FormTemplate] = [DefaultFormTemplates.studentEnrollmentFormTemplate, DefaultFormTemplates.mentorApplicationFormTemplate, DefaultFormTemplates.studentEnrollmentFormTemplate]
     
     private var listener: ListenerRegistration?
 

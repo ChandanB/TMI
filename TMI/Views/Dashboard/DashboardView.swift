@@ -74,7 +74,22 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       let totalStudents = students.count
       let activeTMIPlans = plans.count
       let surveysCompleted = students.filter { !($0.surveyResults?.isEmpty ?? true) }.count
-      let interestsIdentified = students.reduce(0) { $0 + $1.interests.count }
+      // Calculate total interests identified asynchronously
+      
+      // Use ThrowingTaskGroup for parallel fetching of interest counts
+      let interestsIdentified: Int = try await withThrowingTaskGroup(of: Int.self) { group in
+          for student in students {
+              group.addTask {
+                  try await student.getInterestCount()
+              }
+          }
+
+          var total = 0
+          for try await count in group {
+              total += count
+          }
+          return total
+      }
       
       // Calculate plans aligned (students with plans vs total students)
       let studentsWithPlans = Set(plans.flatMap { $0.students.compactMap { $0.id } }).count
@@ -672,4 +687,5 @@ struct DashboardView: View {
 }
 
 // MARK: - Actionable Cards moved to Components/ActionableCards.swift
+
 

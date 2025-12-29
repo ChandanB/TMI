@@ -9,8 +9,8 @@ import Foundation
 
 struct DefaultSectionTemplates {
     
-    static let camperPersonalDetails = FormSection(
-        title: "Camper Details",
+    static let studentPersonalDetails = FormSection(
+        title: "Student Details",
         fields: [
             FormField( label: "First Name", type: .text, isRequired: true),
             FormField( label: "Last Name", type: .text, isRequired: true),
@@ -60,7 +60,7 @@ struct DefaultSectionTemplates {
         title: "Emergency Contact",
         fields: [
             FormField( label: "Emergency Contact Name", type: .text, isRequired: true),
-            FormField( label: "Relationship to Camper", type: .text, isRequired: true),
+            FormField( label: "Relationship to Student", type: .text, isRequired: true),
             FormField( label: "Emergency Contact Phone", type: .phoneNumber, isRequired: true, validationRules: [
                 ValidationRule.custom(message: "Enter a valid phone number", validator: { value in
                     guard let text = value as? String else { return false }
@@ -90,7 +90,7 @@ struct DefaultSectionTemplates {
         ]
     )
     
-    static let eductionBackground = FormSection(
+    static let educationBackground = FormSection(
         title: "Education Background",
         fields: [FormField( label: "Highest Level of Education", type: .dropdown, isRequired: true, options: ["High School", "Associate's", "Bachelor's", "Master's", "Doctorate", "Other"]),
         ]
@@ -111,6 +111,6 @@ struct DefaultSectionTemplates {
         ]
     )
     
-    static let all: [FormSection] = [camperPersonalDetails, personalDetails, address, emergencyContact, medicalForm, photoConsent, employmentHistory, eductionBackground, fileUpload, declaration]
+    static let all: [FormSection] = [studentPersonalDetails, personalDetails, address, emergencyContact, medicalForm, photoConsent, employmentHistory, educationBackground, fileUpload, declaration]
 }
 

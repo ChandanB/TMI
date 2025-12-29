@@ -20,6 +20,9 @@ struct NewTMIPlanView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
+    @State private var interests: [Interest] = []
+    @State private var interestCount: Int = 0
+
     private let tmiPlanService = TMIPlanService()
 
     init(student: Student, onPlanCreated: (() -> Void)? = nil) {
@@ -29,9 +32,9 @@ struct NewTMIPlanView: View {
 
     var suggestedModel: TMIPlanModel {
         // Smart suggestion based on student data
-        if student.interests.count >= 5 {
+        if interestCount >= 5 {
             return .chaseYourSpace
-        } else if student.interests.count >= 2 {
+        } else if interestCount >= 2 {
             return .acknowledgeInterests
         } else {
             return .alignYourMind
@@ -66,7 +69,7 @@ struct NewTMIPlanView: View {
                     planTitleSection
 
                     // Interest Selection
-                    if !student.interests.isEmpty {
+                    if !interests.isEmpty {
                         interestSelectionSection
                     }
 
@@ -95,10 +98,27 @@ struct NewTMIPlanView: View {
                 }
             }
         }
+        .task {
+            await loadInterests()
+        }
         .onAppear {
             // Pre-populate with suggested model
             selectedModel = suggestedModel
             planTitle = "\(suggestedModel.rawValue) - \(student.name)"
+        }
+    }
+
+    // MARK: - Data Loading
+
+    @MainActor
+    private func loadInterests() async {
+        do {
+            interests = try await student.fetchInterestsFromEdgeCollection()
+            interestCount = try await student.getInterestCount()
+        } catch {
+            print("[NewTMIPlanView] Error loading interests: \(error.localizedDescription)")
+            interests = []
+            interestCount = 0
         }
     }
 
@@ -133,7 +153,7 @@ struct NewTMIPlanView: View {
                     .font(.tmiLabelLarge)
                     .foregroundColor(.tmiTextPrimary)
 
-                Text("Grade \(student.grade) • \(student.interests.count) interests")
+                Text("Grade \(student.grade) • \(interestCount) interests")
                     .font(.tmiCaption)
                     .foregroundColor(.tmiTextSecondary)
             }
@@ -304,7 +324,7 @@ struct NewTMIPlanView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: TMISpacing.sm) {
-                    ForEach(student.interests, id: \.id) { interest in
+                    ForEach(interests, id: \.id) { interest in
                         interestChip(interest)
                     }
                 }

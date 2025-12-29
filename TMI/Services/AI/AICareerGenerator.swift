@@ -47,17 +47,30 @@ final class AICareerGenerator: Sendable {
         
         // Apply student personalization if available
         if let student = student {
-            generatedCareers = personalizeCareerRecommendations(careers: generatedCareers, for: student)
+            Task {
+                generatedCareers = await personalizeCareerRecommendations(careers: generatedCareers, for: student)
+            }
         }
         
         return Array(generatedCareers.prefix(10)) // Limit to 10 careers
     }
     
     /// Generate career recommendations personalized to a given student profile
-    func generatePersonalizedCareers(for student: Student?) -> [Career] {
+    @MainActor
+    func generatePersonalizedCareers(for student: Student?) async -> [Career] {
         guard let student = student else { return [] }
+
+        // Load interests from edge collection
+        let interests: [Interest]
+        do {
+            interests = try await student.fetchInterestsFromEdgeCollection()
+        } catch {
+            print("[AICareerGenerator] Error loading interests: \(error.localizedDescription)")
+            return []
+        }
+
         // Use all interests as seed queries
-        let queries = student.interests.map { $0.name }
+        let queries = interests.map { $0.name }
         var allCareers: [Career] = []
         for query in queries {
             let context = analyzeSearchContext(query: query)
@@ -548,13 +561,23 @@ extension AICareerGenerator {
         return baseSalary
     }
     
-    func personalizeCareerRecommendations(careers: [Career], for student: Student) -> [Career] {
+    @MainActor
+    func personalizeCareerRecommendations(careers: [Career], for student: Student) async -> [Career] {
+        // Load interests from edge collection
+        let interests: [Interest]
+        do {
+            interests = try await student.fetchInterestsFromEdgeCollection()
+        } catch {
+            print("[AICareerGenerator] Error loading interests: \(error.localizedDescription)")
+            interests = []
+        }
+
         // Score careers based on student interests and academic performance
         let scoredCareers = careers.map { career -> (Career, Double) in
             var score = 0.0
-            
+
             // Interest alignment scoring
-            for interest in student.interests {
+            for interest in interests {
                 if career.skills.contains(where: { $0.lowercased().contains(interest.name.lowercased()) }) {
                     score += 0.3
                 }
@@ -604,7 +627,7 @@ extension AICareerGenerator {
         let insights = CareerDiscoveryInsights(
             totalCareersExplored: aiGeneratedCareers.count,
             personalizedRecommendations: student != nil ? min(aiGeneratedCareers.count, 5) : 0,
-            topInterestCategory: student?.interests.first?.category.first?.rawValue ?? inferTopCategory(from: query),
+            topInterestCategory: inferTopCategory(from: query),
             strongestCareerFields: Array(Set(aiGeneratedCareers.map { $0.field }).prefix(3)),
             emergingOpportunities: aiGeneratedCareers.filter { $0.growthRate > 0.15 }.prefix(3).map { $0 },
             skillGaps: generateSkillGaps(for: query, student: student),
@@ -614,15 +637,28 @@ extension AICareerGenerator {
         return AICareerResponse(careers: aiGeneratedCareers, insights: insights)
     }
 
-    func generateSampleAICareerResponse(for student: Student?) -> AICareerResponse {
-        let personalizedCareers = generatePersonalizedCareers(for: student)
+    func generateSampleAICareerResponse(for student: Student?) async -> AICareerResponse {
+        let personalizedCareers = await generatePersonalizedCareers(for: student)
+        let topCategory: String = await {
+            if let student = student {
+                do {
+                    let interests = try await student.fetchInterestsFromEdgeCollection()
+                    let categories = interests.flatMap { $0.category }
+                    return categories.first?.rawValue ?? "General"
+                } catch {
+                    return "General"
+                }
+            } else {
+                return "General"
+            }
+        }()
         let sampleInsights = CareerDiscoveryInsights(
             totalCareersExplored: personalizedCareers.count,
             personalizedRecommendations: student != nil ? personalizedCareers.count : 0,
-            topInterestCategory: student?.interests.first?.category.first?.rawValue ?? "General",
+            topInterestCategory: topCategory,
             strongestCareerFields: Array(Set(personalizedCareers.map { $0.field }).prefix(3)),
             emergingOpportunities: personalizedCareers.filter { $0.growthRate > 0.15 }.prefix(3).map { $0 },
-            skillGaps: student != nil ? generatePersonalizedSkillGaps(for: student!) : [],
+            skillGaps: student != nil ? await generatePersonalizedSkillGaps(for: student!) : [],
             nextSteps: student != nil ? generatePersonalizedNextSteps(for: student!) : []
         )
         return AICareerResponse(careers: personalizedCareers, insights: sampleInsights)
@@ -682,27 +718,33 @@ extension AICareerGenerator {
         return baseSteps
     }
     
-    func generatePersonalizedSkillGaps(for student: Student) -> [String] {
+    func generatePersonalizedSkillGaps(for student: Student) async -> [String] {
         var skillGaps: [String] = []
-        
-        // Analyze student interests and suggest skill development
-        let interestCategories = student.interests.flatMap { $0.category }
-        
-        // Check for specific interest categories based on available enum values
+
+        // Load interests from edge collection
+        let interests: [Interest]
+        do {
+            interests = try await student.fetchInterestsFromEdgeCollection()
+        } catch {
+            print("[AICareerGenerator] Error loading interests: \(error.localizedDescription)")
+            interests = []
+        }
+
+        let interestCategories = interests.flatMap { $0.category }
         let categoryStrings = interestCategories.map { $0.rawValue.lowercased() }
-        
+
         if categoryStrings.contains(where: { $0.contains("stem") || $0.contains("science") || $0.contains("math") }) {
             skillGaps.append(contentsOf: ["Advanced Mathematics", "Programming", "Data Analysis"])
         }
-        
+
         if categoryStrings.contains(where: { $0.contains("creative") || $0.contains("art") }) {
             skillGaps.append(contentsOf: ["Design Software", "Creative Writing", "Digital Media"])
         }
-        
+
         if categoryStrings.contains(where: { $0.contains("social") || $0.contains("leadership") }) {
             skillGaps.append(contentsOf: ["Public Speaking", "Leadership", "Conflict Resolution"])
         }
-        
+
         return Array(Set(skillGaps).prefix(5))
     }
     
@@ -724,3 +766,4 @@ extension AICareerGenerator {
         return nextSteps
     }
 }
+

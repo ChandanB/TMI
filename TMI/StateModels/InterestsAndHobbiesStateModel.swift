@@ -17,7 +17,8 @@ import SwiftUI
 @Observable
 final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesData, IdentifiableError> {
     // MARK: - Dependencies
-    private let interestService = InterestService()
+    private let interestLibraryService = InterestLibraryService.shared
+    private let studentInterestService = StudentInterestService.shared
     private let studentService = StudentService()
     private let tmiPlanService = TMIPlanService()
 
@@ -174,21 +175,17 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
         do {
             // Add timeout protection
             let interests = try await withTimeout(seconds: 10) {
-                try await self.interestService.fetchInterests()
+                try await self.interestLibraryService.fetchAllInterests()
             }
 
             let data = InterestsAndHobbiesData(interests: interests)
             updateState(.loaded(data))
         } catch is TimeoutError {
-            print("[InterestsAndHobbiesStateModel] Fetch timed out, using offline data")
-            // Use sample data as fallback when timeout occurs
-            let data = InterestsAndHobbiesData(interests: Interest.expandedSampleInterests)
-            updateState(.loaded(data))
+            print("[InterestsAndHobbiesStateModel] Fetch timed out")
+            updateState(.error(IdentifiableError(message: "Fetch timed out")))
         } catch {
             print("[InterestsAndHobbiesStateModel] Error fetching data: \(error)")
-            // Use sample data as fallback on any error
-            let data = InterestsAndHobbiesData(interests: Interest.expandedSampleInterests)
-            updateState(.loaded(data))
+            updateState(.error(IdentifiableError(message: error.localizedDescription)))
         }
     }
 
@@ -215,7 +212,7 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
     @MainActor
     func addInterest(_ interest: Interest) async {
         do {
-            let savedInterest = try await interestService.saveInterest(interest)
+            let savedInterest = try await interestLibraryService.saveInterest(interest)
             
             guard case .loaded(var data) = state else { return }
             data.interests.append(savedInterest)
@@ -236,7 +233,7 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
         }
 
         do {
-            let updatedInterest = try await interestService.updateInterest(interest)
+            let updatedInterest = try await interestLibraryService.saveInterest(interest)
 
             guard case .loaded(var data) = state else { return }
             if let index = data.interests.firstIndex(where: { $0.id == interestId }) {
@@ -263,7 +260,7 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
             }
 
             // Then delete from Firestore
-            try await interestService.deleteInterest(interestId)
+            try await interestLibraryService.deleteInterest(id: interestId)
         } catch {
             // If deletion fails, refresh to restore the correct state
             await refresh()
@@ -382,9 +379,23 @@ struct InterestsAndHobbiesData: Equatable {
 
 extension StudentService {
     func fetchStudentsWithInterest(_ interest: Interest) async throws -> [Student] {
-        let students = try await fetchStudents()
-        return students.filter { student in
-            student.interests.contains { $0.name == interest.name }
+        guard let interestId = interest.id else { return [] }
+        
+        do {
+            // Use StudentInterestService to get IDs of students with this interest using Collection Group Query
+            let studentIds = try await StudentInterestService.shared.getStudentIdsWithInterest(interestId: interestId)
+            
+            guard !studentIds.isEmpty else { return [] }
+            
+            // Fetch students using these IDs
+            let allStudents = try await fetchStudents()
+            return allStudents.filter { student in
+                guard let sid = student.id else { return false }
+                return studentIds.contains(sid)
+            }
+        } catch {
+            print("Error fetching students with interest: \(error)")
+            return []
         }
     }
     
@@ -402,90 +413,7 @@ extension TMIPlanService {
 
 // MARK: - Service Classes
 
-class InterestService {
-    private let db = Firestore.firestore()
-    
-    func fetchInterests() async throws -> [Interest] {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            print("[InterestService] No authenticated user, returning sample data")
-            return Interest.expandedSampleInterests
-        }
-        
-        do {
-            let collection = db.collection("users").document(uid).collection("interests")
-            let querySnapshot = try await collection.getDocuments()
-            
-            let interests = querySnapshot.documents.compactMap { document -> Interest? in
-                do {
-                    // @DocumentID will be automatically populated by Firestore
-                    let interest = try document.data(as: Interest.self)
-                    return interest
-                } catch {
-                    print("[InterestService] Failed to decode interest: \(error)")
-                    return nil
-                }
-            }
-
-            // Deduplicate interests by ID and name
-            let uniqueInterests = Array(Dictionary(grouping: interests) { $0.id ?? $0.name }
-                .compactMap { $0.value.first })
-
-            print("[InterestService] Fetched \(interests.count) documents, \(uniqueInterests.count) unique interests")
-
-            // Return sample data if no user data exists
-            return uniqueInterests.isEmpty ? Interest.expandedSampleInterests : uniqueInterests
-        } catch {
-            print("[InterestService] Firestore error: \(error)")
-            // Return sample data as fallback, but still throw the error for proper error handling
-            throw error
-        }
-    }
-    
-    func saveInterest(_ interest: Interest) async throws -> Interest {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw InterestError.userNotAuthenticated
-        }
-
-        let collection = db.collection("users").document(uid).collection("interests")
-        let docRef = try await collection.addDocument(data: interest.toFirestoreData())
-
-        // Re-fetch the document to get the auto-populated @DocumentID
-        let savedInterest = try await docRef.getDocument(as: Interest.self)
-        return savedInterest
-    }
-
-    func updateInterest(_ interest: Interest) async throws -> Interest {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw InterestError.userNotAuthenticated
-        }
-
-        guard let interestId = interest.id else {
-            throw InterestError.invalidData
-        }
-
-        let collection = db.collection("users").document(uid).collection("interests")
-
-        // Use updateData instead of setData to avoid creating duplicates
-        // But first convert to Firestore data
-        let data = interest.toFirestoreData()
-
-        // Use setData with merge: false to completely replace the document
-        try await collection.document(interestId).setData(data, merge: false)
-
-        // Re-fetch the document to ensure consistency
-        let updatedInterest = try await collection.document(interestId).getDocument(as: Interest.self)
-        return updatedInterest
-    }
-
-    func deleteInterest(_ interestId: String) async throws {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw InterestError.userNotAuthenticated
-        }
-
-        let collection = db.collection("users").document(uid).collection("interests")
-        try await collection.document(interestId).delete()
-    }
-}
+// Note: Internal InterestService class removed in favor of global InterestLibraryService
 
 // Note: HobbyService removed - now using unified InterestService
 
@@ -506,3 +434,4 @@ enum InterestError: Error, LocalizedError {
         }
     }
 }
+

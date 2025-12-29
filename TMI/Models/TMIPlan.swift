@@ -229,7 +229,7 @@ extension TMIPlan {
             description: "A sample plan for acknowledging interests.",
             students: [Student.sampleStudents[1]],
             model: .acknowledgeInterests,
-            interests: student.interests,
+            interests: [],
             startDate: Date(),
             endDate: nil,
             creationDate: Date(),
@@ -245,7 +245,7 @@ extension TMIPlan {
             description: "A sample plan for aligning your mind.",
             students: [Student.sampleStudents[2]],
             model: .alignYourMind,
-            interests: student.interests,
+            interests: [],
             startDate: Date(),
             endDate: nil,
             creationDate: Date(),
@@ -368,3 +368,4 @@ struct ApprovalHistoryEntry: Codable, Sendable, Hashable {
         self.comment = comment
     }
 }
+

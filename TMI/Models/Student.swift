@@ -20,14 +20,11 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
     
     // MARK: - TMI Related Properties
     let tmiPlans: [TMIPlan]?
-
-    // DEPRECATED: Use StudentInterestService.getStudentInterests() instead
-    // This field is maintained for backward compatibility during migration
-    // Will be removed in a future release
-    @available(*, deprecated, message: "Use StudentInterestService.getStudentInterests(studentId:) to fetch interests from edge collection")
-    var interests: [Interest] // Now includes both interests and hobbies
-
     var surveyResults: [SurveyResult]?
+
+    // MIGRATION NOTE: Interests are now managed via StudentInterestService edge collection
+    // Use: StudentInterestService.shared.getStudentInterests(studentId:)
+    // Or: student.fetchInterestsFromEdgeCollection() (convenience method)
     
     // MARK: - Academic & Performance Tracking
     var academicPerformance: AcademicPerformance?
@@ -73,14 +70,8 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
         Calendar.current.dateComponents([.year], from: dateOfBirth, to: Date()).year ?? 0
     }
     
-    // DEPRECATED: Use StudentInterestService to fetch interest categories
-    // Primary interest categories for quick reference
-    @available(*, deprecated, message: "Use StudentInterestService.getStudentInterests(studentId:) and extract categories from the result")
-    var primaryInterestCategories: [InterestCategory] {
-        let categories = interests.flatMap { $0.category }
-        let uniqueCategories = Set(categories)
-        return uniqueCategories.sorted()
-    }
+    // MIGRATION NOTE: Interest categories now fetched via StudentInterestService
+    // Use: student.fetchInterestCategories() (convenience method)
 
     // Status indicators
     var hasTMIPlan: Bool {
@@ -146,14 +137,13 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
          dateOfBirth: Date,
          tmiPlans: [TMIPlan]? = nil,
          studentID: String? = nil,
-         interests: [Interest] = [],
          photoURL: URL? = nil,
          surveyResults: [SurveyResult]? = nil,
          academicPerformance: AcademicPerformance? = nil,
          engagementHistory: [EngagementRecord]? = nil,
          notes: [StudentNote]? = nil,
          lastInteractionDate: Date? = nil) {
-        
+
         self.id = id
         self.name = name
         self.grade = grade
@@ -161,7 +151,6 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
         self.dateOfBirth = dateOfBirth
         self.tmiPlans = tmiPlans
         self.studentID = studentID
-        self.interests = interests
         self.photoURL = photoURL
         self.surveyResults = surveyResults
         self.academicPerformance = academicPerformance
@@ -225,10 +214,8 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
             }
         }
 
-        // Validate interests (now includes former hobbies)
-        if interests.count > 40 {
-            throw StudentValidationError.tooManyInterests("Cannot have more than 40 interests")
-        }
+        // NOTE: Interests are now managed via StudentInterestService edge collection
+        // Validation for interest count should be done at the service level
     }
 
     /// Quick validation for UI feedback (non-throwing)
@@ -279,13 +266,9 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
             data["lastInteractionDate"] = lastInteractionDate.timeIntervalSince1970
         }
 
-        // MIGRATION NOTE: Interests are no longer stored inline in Student documents
-        // They are now stored in edge collections: students/{studentId}/studentInterests/{interestId}
-        // Use StudentInterestService to manage student interests
-        // Keeping empty array for backward compatibility with existing reads
-        data["interests"] = []
-
-        // Note: Hobbies are now included in interests edge collection
+        // NOTE: Interests are managed via StudentInterestService edge collection
+        // students/{studentId}/studentInterests/{interestId}
+        // Not serialized to Student document
         
         // Convert survey results
         if let surveyResults = surveyResults {
@@ -490,7 +473,6 @@ extension Student {
             grade: "10",
             school: "Sample High School",
             dateOfBirth: Date(),
-            interests: [],
             surveyResults: surveyResults,
             academicPerformance: academicPerformance,
             engagementHistory: engagementHistory,
@@ -557,3 +539,46 @@ enum StudentValidationError: LocalizedError, Equatable {
     }
 }
 
+// MARK: - Legacy Compatibility (Interests)
+extension Student {
+    /// Deprecated: Student interests are now stored in the edge collection
+    /// Use StudentInterestService.shared.getStudentInterests(studentId:) instead.
+    @available(*, deprecated, message: "Use StudentInterestService edge collection APIs instead of Student.interests")
+    var interests: [Interest] { [] }
+
+    /// Deprecated convenience initializer that accepts an `interests` parameter.
+    /// This initializer ignores the `interests` and forwards to the designated initializer.
+    @available(*, deprecated, message: "Use StudentInterestService edge collection for interests; this init ignores the interests parameter")
+    init(
+        id: String? = nil,
+        name: String,
+        grade: String,
+        school: String,
+        dateOfBirth: Date,
+        interests: [Interest]? = nil,
+        tmiPlans: [TMIPlan]? = nil,
+        studentID: String? = nil,
+        photoURL: URL? = nil,
+        surveyResults: [SurveyResult]? = nil,
+        academicPerformance: AcademicPerformance? = nil,
+        engagementHistory: [EngagementRecord]? = nil,
+        notes: [StudentNote]? = nil,
+        lastInteractionDate: Date? = nil
+    ) {
+        self.init(
+            id: id,
+            name: name,
+            grade: grade,
+            school: school,
+            dateOfBirth: dateOfBirth,
+            tmiPlans: tmiPlans,
+            studentID: studentID,
+            photoURL: photoURL,
+            surveyResults: surveyResults,
+            academicPerformance: academicPerformance,
+            engagementHistory: engagementHistory,
+            notes: notes,
+            lastInteractionDate: lastInteractionDate
+        )
+    }
+}

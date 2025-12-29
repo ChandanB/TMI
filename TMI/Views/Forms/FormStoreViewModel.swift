@@ -20,8 +20,8 @@ class FormStoreViewModel {
             
             await MainActor.run {
                 self.formTemplates = [
-                    DefaultFormTemplates.camperRegistrationFormTemplate,
-                    DefaultFormTemplates.jobApplicationFormTemplate
+                    DefaultFormTemplates.studentEnrollmentFormTemplate,
+                    DefaultFormTemplates.mentorApplicationFormTemplate
                 ]
                 self.isLoading = false
             }

@@ -178,8 +178,8 @@ class FormTemplateBuilderViewModel {
         }
     }
     
-    func importDefaultCamperRegistrationTemplate() {
-        let template = DefaultFormTemplates.camperRegistrationFormTemplate
+    func importDefaultStudentEnrollmentTemplate() {
+        let template = DefaultFormTemplates.studentEnrollmentFormTemplate
         formTemplate = template
         //        saveTemplate()
     }

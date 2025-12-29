@@ -68,14 +68,6 @@ extension Student: Validatable {
             }
         }
         
-        // Validate interests
-        validator.add(field: "interests") {
-            if self.interests.count > 20 {
-                return .error("Too many interests selected (maximum 20)")
-            }
-            return .valid
-        }
-        
         // Note: Hobbies are now included in interests array
         
         // Run all validations
@@ -94,9 +86,22 @@ extension Student: Validatable {
         // This would typically involve a database query
         logger.debug("Validating business rules for student")
         
+        // Load interests via edge collection (migration helpers)
+        let interests: [Interest] = (try? await self.fetchInterestsFromEdgeCollection()) ?? []
+        let interestCount: Int = (try? await self.getInterestCount()) ?? interests.count
+        
+        // Enforce maximum interests rule (moved from synchronous batch validation)
+        if interestCount > 20 {
+            throw ValidationError.validationFailed(
+                field: "interests",
+                message: "Too many interests selected (maximum 20)"
+            )
+        }
+        
         // Example: Validate that student is not too young for selected interests
         let hasAgeRestrictedInterests = interests.contains { interest in
-            interest.careerPathways?.contains(.business) == true || interest.category.contains(.technology)
+            (interest.careerPathways?.contains(CareerPathway.business) == true) ||
+            (interest.category.contains(InterestCategory.technology))
         }
         
         if age < 13 && hasAgeRestrictedInterests {
@@ -193,7 +198,6 @@ extension Student {
             dateOfBirth: dateOfBirth,
             tmiPlans: tmiPlans,
             studentID: studentID.map(Sanitizer.sanitizeText),
-            interests: interests,
             photoURL: photoURL,
             surveyResults: surveyResults,
             academicPerformance: academicPerformance,
@@ -239,3 +243,4 @@ enum StudentField: String, CaseIterable, Sendable {
         }
     }
 }
+

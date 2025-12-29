@@ -13,6 +13,8 @@ struct StudentPeerProfileView: View {
 
     @State private var commonInterests: [Interest] = []
     @State private var peerInterests: [Interest] = []
+    @State private var isLoading = true
+    @State private var peerTotalInterestCount = 0
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -20,31 +22,36 @@ struct StudentPeerProfileView: View {
             Color.tmiBackground
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: TMISpacing.xl) {
-                    // Peer Header
-                    peerHeader
+            if isLoading {
+                ProgressView()
+                    .tint(.tmiPrimary)
+            } else {
+                ScrollView {
+                    VStack(spacing: TMISpacing.xl) {
+                        // Peer Header
+                        peerHeader
 
-                    // Common Interests Section
-                    if !commonInterests.isEmpty {
-                        commonInterestsSection
+                        // Common Interests Section
+                        if !commonInterests.isEmpty {
+                            commonInterestsSection
+                        }
+
+                        // Their Interests Section
+                        if !peerInterests.isEmpty {
+                            theirInterestsSection
+                        }
+
+                        // Connection Message
+                        connectionMessage
                     }
-
-                    // Their Interests Section
-                    if !peerInterests.isEmpty {
-                        theirInterestsSection
-                    }
-
-                    // Connection Message
-                    connectionMessage
+                    .padding(TMISpacing.screenPadding)
                 }
-                .padding(TMISpacing.screenPadding)
             }
         }
         .navigationTitle("Classmate")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            calculateCommonInterests()
+        .task {
+            await loadInterests()
         }
     }
 
@@ -74,7 +81,7 @@ struct StudentPeerProfileView: View {
                 HStack(spacing: TMISpacing.xl) {
                     statBadge(
                         icon: "heart.fill",
-                        count: peerStudent.interests.count,
+                        count: peerTotalInterestCount,
                         label: "Interests"
                     )
 
@@ -184,18 +191,39 @@ struct StudentPeerProfileView: View {
 
     // MARK: - Helpers
 
-    private func calculateCommonInterests() {
-        let currentInterestIds = Set(currentStudent.interests.map { $0.id })
-        let peerInterestIds = Set(peerStudent.interests.map { $0.id })
+    private func loadInterests() async {
+        isLoading = true
+        defer { isLoading = false }
 
-        // Common interests (in both lists)
-        commonInterests = peerStudent.interests.filter { interest in
-            currentInterestIds.contains(interest.id)
-        }
+        do {
+            // Fetch interests for both students
+            async let currentInterestsTask = currentStudent.fetchInterestsFromEdgeCollection()
+            async let peerInterestsTask = peerStudent.fetchInterestsFromEdgeCollection()
 
-        // Peer's unique interests (not in common)
-        peerInterests = peerStudent.interests.filter { interest in
-            !currentInterestIds.contains(interest.id)
+            let (currentList, peerList) = try await (currentInterestsTask, peerInterestsTask)
+
+            let currentMap = Set(currentList.map { $0.id })
+
+            // Common interests
+            commonInterests = peerList.filter { interest in
+                guard let id = interest.id else { return false }
+                return currentMap.contains(id)
+            }
+
+            // Peer's unique interests
+            peerInterests = peerList.filter { interest in
+                guard let id = interest.id else { return true }
+                return !currentMap.contains(id)
+            }
+
+            peerTotalInterestCount = peerList.count
+
+        } catch {
+            print("Error loading peer interests: \(error)")
+            // Fallback to empty states
+            commonInterests = []
+            peerInterests = []
+            peerTotalInterestCount = 0
         }
     }
 }

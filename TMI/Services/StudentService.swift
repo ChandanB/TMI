@@ -116,46 +116,46 @@ class StudentService {
     }
 
     /// Add interests to a student with automatic deduplication
+    /// Now uses StudentInterestService edge collection
     func addInterests(_ newInterests: [Interest], to student: Student) async throws -> Student {
         print("[StudentService] Adding \(newInterests.count) interests to student: \(student.name)")
 
-        // Get existing interest IDs (by matching name since Interest uses class identity)
-        let existingNames = Set(student.interests.map { $0.name.lowercased() })
-
-        // Filter out duplicates by name
-        let uniqueNewInterests = newInterests.filter { interest in
-            let isDuplicate = existingNames.contains(interest.name.lowercased())
-            if isDuplicate {
-                print("[StudentService] ⚠️ Skipping duplicate interest: \(interest.name)")
-            }
-            return !isDuplicate
+        guard let studentId = student.id else {
+            throw StudentServiceError.invalidStudentId
         }
 
-        print("[StudentService] ✅ Adding \(uniqueNewInterests.count) unique interests (filtered \(newInterests.count - uniqueNewInterests.count) duplicates)")
+        // Get existing interest edges from edge collection
+        let existingEdges = try await StudentInterestService.shared.getStudentInterests(studentId: studentId)
+        let existingInterestIds = Set(existingEdges.map { $0.interestId })
 
-        // Combine interests
-        var updatedInterests = student.interests
-        updatedInterests.append(contentsOf: uniqueNewInterests)
+        // Filter out duplicates by ID
+        var duplicateCount = 0
+        for interest in newInterests {
+            guard let interestId = interest.id else {
+                print("[StudentService] ⚠️ Skipping interest without ID: \(interest.name)")
+                continue
+            }
 
-        // Create updated student
-        let updatedStudent = Student(
-            id: student.id,
-            name: student.name,
-            grade: student.grade,
-            school: student.school,
-            dateOfBirth: student.dateOfBirth,
-            studentID: student.studentID,
-            interests: updatedInterests,
-            photoURL: student.photoURL,
-            surveyResults: student.surveyResults,
-            academicPerformance: student.academicPerformance,
-            engagementHistory: student.engagementHistory,
-            notes: student.notes,
-            lastInteractionDate: student.lastInteractionDate
-        )
+            // Skip if already exists
+            if existingInterestIds.contains(interestId) {
+                print("[StudentService] ⚠️ Skipping duplicate interest: \(interest.name)")
+                duplicateCount += 1
+                continue
+            }
 
-        // Update in Firestore
-        return try await updateStudent(updatedStudent)
+            // Add to edge collection
+            try await StudentInterestService.shared.addInterest(
+                studentId: studentId,
+                interestId: interestId,
+                level: 3,  // Default level
+                source: .staff  // Added by staff
+            )
+        }
+
+        print("[StudentService] ✅ Added \(newInterests.count - duplicateCount) unique interests (filtered \(duplicateCount) duplicates)")
+
+        // Return the student unchanged (interests now managed via edge collection)
+        return student
     }
     
     /// Delete a student from Firestore
@@ -307,7 +307,6 @@ class StudentService {
             school: "",
             dateOfBirth: dateOfBirth,
             studentID: studentID,
-            interests: interests,
             photoURL: photoURL,
             surveyResults: surveyResults,
             academicPerformance: academicPerformance,
@@ -416,7 +415,6 @@ class StudentService {
             school: "",
             dateOfBirth: dateOfBirth,
             studentID: studentID,
-            interests: interests,
             photoURL: photoURL,
             surveyResults: surveyResults,
             academicPerformance: academicPerformance,
@@ -470,7 +468,6 @@ class MockStudentService: StudentService {
             school: "",
             dateOfBirth: $0.dateOfBirth,
             studentID: $0.studentID,
-            interests: $0.interests,
             photoURL: $0.photoURL,
             surveyResults: $0.surveyResults,
             academicPerformance: $0.academicPerformance,
@@ -495,7 +492,6 @@ class MockStudentService: StudentService {
             school: "",
             dateOfBirth: student.dateOfBirth,
             studentID: student.studentID,
-            interests: student.interests,
             photoURL: student.photoURL,
             surveyResults: student.surveyResults,
             academicPerformance: student.academicPerformance,
@@ -517,8 +513,7 @@ class MockStudentService: StudentService {
                 school: "",
                 dateOfBirth: student.dateOfBirth,
                 studentID: student.studentID,
-                interests: student.interests,
-                    photoURL: student.photoURL,
+                photoURL: student.photoURL,
                 surveyResults: student.surveyResults,
                 academicPerformance: student.academicPerformance,
                 engagementHistory: student.engagementHistory,

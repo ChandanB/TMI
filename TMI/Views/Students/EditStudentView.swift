@@ -634,9 +634,8 @@ struct EditStudentView: View {
                     grade: selectedGrade,
                     school: school,
                     dateOfBirth: dateOfBirth,
-                    tmiPlans: student.tmiPlans,
-                    studentID: studentID.isEmpty ? nil : studentID,
-                    interests: student.interests,
+                    interests: [], tmiPlans: student.tmiPlans,
+                    studentID: studentID.isEmpty ? nil : studentID,  // Managed via StudentInterestService edge collection
                     photoURL: student.photoURL,
                     surveyResults: student.surveyResults,
                     academicPerformance: academicPerformance,

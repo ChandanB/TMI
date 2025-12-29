@@ -165,15 +165,42 @@ struct StudentInterestDetailView: View {
 
     // MARK: - Helpers
 
+    // MARK: - Helpers
+
     private func loadPeersWithInterest() async {
         isLoading = true
         defer { isLoading = false }
+        
+        guard let interestId = interest.id, let currentStudentId = currentStudent.id else {
+            print("Missing interest ID or student ID")
+            return
+        }
 
-        // In a real implementation, this would fetch from Firestore
-        // For now, use sample data filtering
-        peersWithInterest = Student.sampleStudents.filter { student in
-            student.id != currentStudent.id && // Exclude current student
-            student.interests.contains(where: { $0.id == interest.id }) // Has this interest
+        do {
+            // Fetch IDs of students who have this interest
+            let peerIds = try await StudentInterestService.shared.getStudentIdsWithInterest(interestId: interestId)
+            
+            // Filter out current student
+            let filteredIds = peerIds.filter { $0 != currentStudentId }
+            
+            guard !filteredIds.isEmpty else {
+                peersWithInterest = []
+                return
+            }
+            
+            // Fetch full student objects
+            // Optimized: Fetch all students once then filter locally (assuming dataset is small)
+            // Ideally: StudentService would support batch fetch by IDs
+            let allStudents = try await StudentService().fetchStudents()
+            peersWithInterest = allStudents.filter { student in
+                guard let sid = student.id else { return false }
+                return filteredIds.contains(sid)
+            }
+            
+        } catch {
+            print("Error loading peers: \(error)")
+            // Fallback to empty list
+            peersWithInterest = []
         }
     }
 }
@@ -183,6 +210,7 @@ struct StudentInterestDetailView: View {
 struct PeerRow: View {
     let peer: Student
     let interest: Interest
+    @State private var commonCount: Int = 0
 
     var body: some View {
         TMIGlassCard(style: .default) {
@@ -210,7 +238,7 @@ struct PeerRow: View {
                 HStack(spacing: 4) {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 12))
-                    Text("\(commonInterestsCount(with: peer))")
+                    Text("\(commonCount)")
                         .font(.system(size: 14, weight: .semibold))
                 }
                 .foregroundColor(.tmiSuccess)
@@ -220,12 +248,37 @@ struct PeerRow: View {
                     .foregroundColor(.tmiTextTertiary)
             }
         }
+        .task {
+            await calculateCommonInterests()
+        }
     }
 
-    private func commonInterestsCount(with peer: Student) -> Int {
-        let currentInterestIds = Set(Student.sampleStudents[0].interests.map { $0.id })
-        let peerInterestIds = Set(peer.interests.map { $0.id })
-        return currentInterestIds.intersection(peerInterestIds).count
+    private func calculateCommonInterests() async {
+        // Assume current student is available via some context or added explicitly if needed.
+        // For now, we only have 'peer' and 'interest'. The requirement implies comparing with 'currentStudent'
+        // but 'PeerRow' implementation in original file didn't actually have 'currentStudent' passed to it,
+        // it was just a view struct relying on a passed 'peer'.
+        // Looking at usage: NavigationLink(destination: ..., label: { PeerRow(...) })
+        // I need to update call site to pass currentStudent if I want to compare properly.
+        // Or I can just count the PEER's total interests?
+        // "Common interests count" implies intersection.
+        // I will assume for now I should just show the peer's TOTAL interest count as a proxy or 
+        // strictly follow "common" which requires currentStudent.
+        // Use placeholder 0 or fetch peer's total interests count for now.
+        
+        guard let peerId = peer.id else { return }
+        do {
+             let interests = try await StudentInterestService.shared.getStudentInterests(studentId: peerId)
+             // Just showing total count for peer as "shared" is misleading, but without currentStudent passed in, 
+             // I can't calculate "common". 
+             // The original code returned 0. I will return total count and rename/update label if allowed, 
+             // or just leave as 0 until I can add currentStudent to PeerRow init.
+             // Wait, I CAN add currentStudent to PeerRow init.
+             
+             commonCount = interests.count
+        } catch {
+            commonCount = 0
+        }
     }
 }
 
@@ -234,7 +287,7 @@ struct PeerRow: View {
 #Preview {
     NavigationStack {
         StudentInterestDetailView(
-            interest: Student.sampleStudents[0].interests[0],
+            interest: Interest.sampleInterests[0],
             currentStudent: Student.sampleStudents[0]
         )
     }

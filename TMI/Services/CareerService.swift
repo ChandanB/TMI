@@ -138,35 +138,35 @@ final class CareerService: @unchecked Sendable {
             print("Failed to generate career insights with AI: \(error)")
             // Fallback to rule-based insights if AI fails
             let allCareers = try await fetchAllCareers()
-            return generateRuleBasedCareerDiscoveryInsights(for: student, allCareers: allCareers)
+            return await generateRuleBasedCareerDiscoveryInsights(for: student, allCareers: allCareers)
         }
     } else {
         // Fallback to rule-based insights for older iOS versions
         let allCareers = try await fetchAllCareers()
-        return generateRuleBasedCareerDiscoveryInsights(for: student, allCareers: allCareers)
+        return await generateRuleBasedCareerDiscoveryInsights(for: student, allCareers: allCareers)
     }
   }
 
   // New helper function for rule-based insights (extracted from original getCareerDiscoveryInsights)
-  private func generateRuleBasedCareerDiscoveryInsights(for student: Student, allCareers: [Career]) -> CareerDiscoveryInsights {
-    let recommendations = generateRuleBasedCareerRecommendations(for: student, allCareers: allCareers)
-    
+  private func generateRuleBasedCareerDiscoveryInsights(for student: Student, allCareers: [Career]) async -> CareerDiscoveryInsights {
+    let interests = await fetchStudentInterests(student)
+    let recommendations = await generateRuleBasedCareerRecommendations(for: student, allCareers: allCareers)
+
     // Analyze student's interest patterns
-    let allCategories = student.interests.flatMap { $0.category }
+    let allCategories = interests.flatMap { $0.category }
     let interestCategories = Dictionary(grouping: allCategories) { $0 }
     let topInterestCategory = interestCategories.max { $0.value.count < $1.value.count }?.key.rawValue ?? "General"
-    
+
     // Find career fields with highest representation
-    let _ = Dictionary(grouping: allCareers) { $0.field }
     let recommendedFields = Dictionary(grouping: recommendations) { $0.field }
-    
+
     return CareerDiscoveryInsights(
       totalCareersExplored: allCareers.count,
       personalizedRecommendations: recommendations.count,
       topInterestCategory: topInterestCategory,
       strongestCareerFields: Array(recommendedFields.keys.prefix(3)),
       emergingOpportunities: getEmergingCareers(from: recommendations),
-      skillGaps: identifySkillGaps(student: student, targetCareers: recommendations),
+      skillGaps: identifySkillGaps(studentInterestNames: interests.map { $0.name }, targetCareers: recommendations),
       nextSteps: generateNextSteps(for: student, basedOn: recommendations)
     )
   }
@@ -226,24 +226,25 @@ final class CareerService: @unchecked Sendable {
             print("[CareerService] Failed to generate personalized careers with AI: \(error)")
             // Fallback to rule-based recommendations if AI fails
             let allCareers = try await fetchAllCareers()
-            return generateRuleBasedCareerRecommendations(for: student, allCareers: allCareers)
+            return await generateRuleBasedCareerRecommendations(for: student, allCareers: allCareers)
         }
     } else {
         // Fallback to rule-based recommendations for older iOS versions
         let allCareers = try await fetchAllCareers()
-        return generateRuleBasedCareerRecommendations(for: student, allCareers: allCareers)
+        return await generateRuleBasedCareerRecommendations(for: student, allCareers: allCareers)
     }
   }
 
   // New helper function for rule-based recommendations (extracted from original getCareerRecommendations)
-  private func generateRuleBasedCareerRecommendations(for student: Student, allCareers: [Career]) -> [Career] {
+  private func generateRuleBasedCareerRecommendations(for student: Student, allCareers: [Career]) async -> [Career] {
+    let interests = await fetchStudentInterests(student)
     var scoredCareers: [(career: Career, score: Double)] = []
     
     for career in allCareers {
       var score = 0.0
       
       // Interest-based scoring with weighted categories
-      for interest in student.interests {
+      for interest in interests {
         let interestWeight = Double(interest.popularityScore ?? 1)
         let categoryWeight = getInterestCategoryWeight(interest.category.first?.rawValue ?? "")
         
@@ -505,8 +506,8 @@ final class CareerService: @unchecked Sendable {
     return careers.filter { $0.growthRate > 0.15 }.prefix(3).map { $0 }
   }
   
-  private func identifySkillGaps(student: Student, targetCareers: [Career]) -> [String] {
-    let studentSkills = Set(student.interests.map { $0.name })
+  private func identifySkillGaps(studentInterestNames: [String], targetCareers: [Career]) -> [String] {
+    let studentSkills = Set(studentInterestNames)
     let requiredSkills = Set(targetCareers.flatMap { $0.skills })
     return Array(requiredSkills.subtracting(studentSkills)).prefix(5).map { $0 }
   }
@@ -524,6 +525,27 @@ final class CareerService: @unchecked Sendable {
     }
     
     return steps
+  }
+  
+  // New helper method to fetch student interests from edge collection
+  private func fetchStudentInterests(_ student: Student) async -> [Interest] {
+    guard let studentId = student.id else { return [] }
+    let studentInterestService = StudentInterestService.shared
+    let interestLibraryService = InterestLibraryService.shared
+
+    do {
+        let edges = try await studentInterestService.getStudentInterests(studentId: studentId)
+        var interests: [Interest] = []
+        for edge in edges {
+            if let interest = try await interestLibraryService.fetchInterest(id: edge.interestId) {
+                interests.append(interest)
+            }
+        }
+        return interests
+    } catch {
+        print("[CareerService] Failed to fetch interests for student: \(error)")
+        return []
+    }
   }
   
   // MARK: - Resource Integration
@@ -559,10 +581,11 @@ final class CareerService: @unchecked Sendable {
     do {
       let allResources = try await resourceService.fetchAllResources()
       let careerRecommendations = try await getCareerRecommendations(for: student)
+      let studentInterests = await fetchStudentInterests(student)
+      let studentInterestNames = Set(studentInterests.map { $0.name.lowercased() })
       
       // Get resources that match student's recommended career fields
       let relevantFields = Set(careerRecommendations.map { $0.field.lowercased() })
-      let studentInterests = Set(student.interests.map { $0.name.lowercased() })
       
       return allResources.filter { resource in
         // Check if resource is relevant to recommended career fields
@@ -571,7 +594,7 @@ final class CareerService: @unchecked Sendable {
         
         return relevantFields.contains { field in
           resourceKeywords.contains { $0.contains(field) }
-        } || studentInterests.contains { interest in
+        } || studentInterestNames.contains { interest in
           resourceKeywords.contains { $0.contains(interest) }
         }
       }.prefix(8).map { $0 }

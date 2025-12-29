@@ -670,37 +670,24 @@ struct InterestDetailView: View {
 
     @MainActor
     private func connectStudentToInterest(_ student: Student) async {
-        // Create a mutable copy of the student with the new interest
-        var updatedStudent = student
+        guard let studentId = student.id, let interestId = interest.id else {
+            print("Failed to connect: Missing student or interest ID")
+            return
+        }
 
-        // Check if the interest is already in the student's interests
-        if !updatedStudent.interests.contains(where: { $0.id == interest.id }) {
-            updatedStudent = Student(
-                id: student.id,
-                name: student.name,
-                grade: student.grade,
-                school: student.school,
-                dateOfBirth: student.dateOfBirth,
-                tmiPlans: student.tmiPlans,
-                studentID: student.studentID,
-                interests: student.interests + [interest],
-                photoURL: student.photoURL,
-                surveyResults: student.surveyResults,
-                academicPerformance: student.academicPerformance,
-                engagementHistory: student.engagementHistory,
-                notes: student.notes,
-                lastInteractionDate: student.lastInteractionDate
-            )
+        // Check if the student already has this interest using edge collection
+        do {
+            let hasInterest = try await student.hasInterest(interestId: interestId)
 
-            // Update student in Firestore
-            let studentService = StudentService()
-            do {
-                _ = try await studentService.updateStudent(updatedStudent)
+            if !hasInterest {
+                // Add interest to student via edge collection
+                try await student.addInterest(interest, level: 3, source: .staff)
+
                 // Refresh the associated data to show the newly connected student
                 await loadAssociatedData()
-            } catch {
-                print("Failed to connect student to interest: \(error)")
             }
+        } catch {
+            print("Failed to connect student to interest: \(error)")
         }
     }
 }
@@ -882,21 +869,9 @@ struct ConnectStudentSheet: View {
     @Environment(\.dismiss) var dismiss
     @State private var studentService = StudentService()
     @State private var students: [Student] = []
+    @State private var filteredStudents: [Student] = []
     @State private var isLoading = false
     @State private var searchText = ""
-
-    var filteredStudents: [Student] {
-        if searchText.isEmpty {
-            return students.filter { student in
-                !student.interests.contains(where: { $0.id == interest.id })
-            }
-        } else {
-            return students.filter { student in
-                student.name.localizedCaseInsensitiveContains(searchText) &&
-                !student.interests.contains(where: { $0.id == interest.id })
-            }
-        }
-    }
 
     var body: some View {
         NavigationStack {
@@ -970,18 +945,82 @@ struct ConnectStudentSheet: View {
             .task {
                 await loadStudents()
             }
+            .onChange(of: searchText) { _, _ in
+                filterStudents()
+            }
         }
     }
 
+    @MainActor
     private func loadStudents() async {
         isLoading = true
         defer { isLoading = false }
 
         do {
+            // Load all students
             students = try await studentService.fetchStudents()
+
+            // Filter out students who already have this interest
+            guard let interestId = interest.id else {
+                filteredStudents = students
+                return
+            }
+
+            // Check each student asynchronously
+            var studentsWithoutInterest: [Student] = []
+            for student in students {
+                guard let studentId = student.id else { continue }
+
+                do {
+                    let hasInterest = try await student.hasInterest(interestId: interestId)
+                    if !hasInterest {
+                        studentsWithoutInterest.append(student)
+                    }
+                } catch {
+                    // If we can't check, include the student to be safe
+                    studentsWithoutInterest.append(student)
+                }
+            }
+
+            filteredStudents = studentsWithoutInterest
         } catch {
-            print("Failed to load students: \(error)")
+            print("[ConnectStudentSheet] Failed to load students: \(error)")
             students = []
+            filteredStudents = []
+        }
+    }
+
+    @MainActor
+    private func filterStudents() {
+        // Start with all students (not filtered students, since we need to re-apply search)
+        Task {
+            guard let interestId = interest.id else {
+                filteredStudents = students
+                return
+            }
+
+            // Check each student asynchronously and apply search filter
+            var studentsWithoutInterest: [Student] = []
+            for student in students {
+                // Apply search filter first
+                if !searchText.isEmpty && !student.name.localizedCaseInsensitiveContains(searchText) {
+                    continue
+                }
+
+                guard let studentId = student.id else { continue }
+
+                do {
+                    let hasInterest = try await student.hasInterest(interestId: interestId)
+                    if !hasInterest {
+                        studentsWithoutInterest.append(student)
+                    }
+                } catch {
+                    // If we can't check, include the student to be safe
+                    studentsWithoutInterest.append(student)
+                }
+            }
+
+            filteredStudents = studentsWithoutInterest
         }
     }
 }
