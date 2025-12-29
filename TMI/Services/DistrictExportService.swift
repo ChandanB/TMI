@@ -10,6 +10,9 @@ import UIKit
 
 /// Service for exporting district reports to various formats
 class DistrictExportService {
+  static let shared = DistrictExportService()
+  
+  private init() {}
 
   // MARK: - Export Methods
 

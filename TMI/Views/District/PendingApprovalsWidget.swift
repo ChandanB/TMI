@@ -15,7 +15,7 @@ struct PendingApprovalsWidget: View {
     @State private var pendingPlans: [TMIPlan] = []
     @State private var isLoading = false
 
-    private let approvalService = PlanApprovalService()
+    private let approvalService = PlanApprovalService.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -186,7 +186,7 @@ struct PendingApprovalsWidget: View {
         isLoading = true
 
         do {
-            pendingPlans = try await approvalService.fetchPendingApprovalPlans(districtId: districtId)
+            pendingPlans = try await approvalService.fetchPendingApprovals(districtId: districtId)
         } catch {
             print("[PendingApprovalsWidget] Failed to load pending plans: \(error)")
         }

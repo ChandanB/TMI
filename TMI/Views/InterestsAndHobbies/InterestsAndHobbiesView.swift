@@ -2,7 +2,8 @@
 //  InterestsAndHobbiesView.swift
 //  TMI
 //
-//  Enhanced with modern SwiftUI patterns and TMI component library
+//  Enhanced with modern SwiftUI patterns and TMI component library.
+//  Now context-aware: shows student-specific interests when context is set.
 //
 
 import SwiftUI
@@ -11,6 +12,8 @@ import SwiftUI
 
 struct InterestsAndHobbiesView: View {
     @Environment(\.interestsStateModel) var stateModel
+    @Environment(\.studentContext) private var studentContext
+    @Environment(\.studentAccessMode) private var accessMode
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Namespace private var segmentNamespace
 
@@ -23,6 +26,15 @@ struct InterestsAndHobbiesView: View {
 
     // Dynamic data
     @State private var activeStudentCount = 0
+    
+    // Context-aware mode
+    private var isStudentContext: Bool {
+        studentContext.hasActiveStudent
+    }
+    
+    private var contextStudent: Student? {
+        studentContext.cachedStudent
+    }
 
     private let studentService = StudentService()
     
@@ -35,18 +47,20 @@ struct InterestsAndHobbiesView: View {
             ZStack(alignment: .bottomTrailing) {
                 contentView
                 
-                // Floating action button
-                TMIButton(
-                    text: "",
-                    icon: "plus",
-                    style: .floating,
-                    action: { stateModel.showingAddSheet = true }
-                )
-                .padding(.trailing, 20)
-                .padding(.bottom, 20)
-                .offset(y: fabAppeared ? 0 : 100)
-                .opacity(fabAppeared ? 1 : 0)
-                .accessibilityLabel("Add new \(stateModel.selectedSegment.rawValue.lowercased())")
+                // Floating action button - only show for staff
+                if StudentAccessPolicy.canEdit(in: accessMode) {
+                    TMIButton(
+                        text: "",
+                        icon: "plus",
+                        style: .floating,
+                        action: { stateModel.showingAddSheet = true }
+                    )
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
+                    .offset(y: fabAppeared ? 0 : 100)
+                    .opacity(fabAppeared ? 1 : 0)
+                    .accessibilityLabel("Add new \(stateModel.selectedSegment.rawValue.lowercased())")
+                }
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -61,6 +75,11 @@ struct InterestsAndHobbiesView: View {
         .task {
             await stateModel.fetch()
             await loadActiveStudentCount()
+            
+            // If we have a student context, use prefetched interests
+            if isStudentContext && !studentContext.prefetchedInterests.isEmpty {
+                print("[InterestsAndHobbiesView] Using \(studentContext.prefetchedInterests.count) prefetched interests for student context")
+            }
         }
         .refreshable {
             await stateModel.refresh()

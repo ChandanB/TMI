@@ -2,18 +2,28 @@
 //  StudentModeView.swift
 //  TMI
 //
-//  Restricted interface for students - only shows their own data
+//  Restricted interface for students - only shows their own data.
+//  Uses StudentAccessPolicy for consistent access control.
 //
 
 import SwiftUI
 
 struct StudentModeView: View {
     let student: Student
-
+    
     @Environment(\.studentModeSession) private var session
-    @State private var selectedTab = 0
+    @Environment(\.studentContext) private var studentContext
+    @Environment(\.studentAccessMode) private var accessMode
+    
+    @State private var selectedTab: StudentTab = .myInterests
     @State private var showingExitConfirmation = false
     @State private var isExiting = false
+    
+    /// Tabs allowed for this mode
+    private var allowedTabs: [StudentTab] {
+        Array(StudentAccessPolicy.allowedTabs(in: .studentMode))
+            .sorted { $0.rawValue < $1.rawValue }
+    }
 
     var body: some View {
         ZStack {
@@ -27,32 +37,20 @@ struct StudentModeView: View {
                 // Student header
                 studentHeader
 
-                // Tab view
+                // Tab view - using StudentAccessPolicy
                 TabView(selection: $selectedTab) {
-                    // My Interests
-                    StudentInterestsTab(student: student)
-                        .tag(0)
-                        .tabItem {
-                            Label("My Interests", systemImage: "heart.fill")
-                        }
-
-                    // Career Explorer
-                    StudentCareersTab(student: student)
-                        .tag(1)
-                        .tabItem {
-                            Label("Careers", systemImage: "briefcase.fill")
-                        }
-
-                    // My Progress
-                    StudentProgressTab(student: student)
-                        .tag(2)
-                        .tabItem {
-                            Label("My Progress", systemImage: "chart.line.uptrend.xyaxis")
-                        }
+                    ForEach(allowedTabs) { tab in
+                        tabContent(for: tab)
+                            .tag(tab)
+                            .tabItem {
+                                Label(tab.title, systemImage: tab.icon)
+                            }
+                    }
                 }
                 .tint(.tmiPrimary)
             }
         }
+        .environment(\.studentAccessMode, .studentMode)
         .alert("Exit Student Mode?", isPresented: $showingExitConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Exit", role: .destructive) {
@@ -63,11 +61,37 @@ struct StudentModeView: View {
         }
         .interactiveDismissDisabled(true)
         .preferredColorScheme(.dark)
+        .task {
+            // Set student context for cross-module access
+            await studentContext.setActiveStudent(
+                student.id,
+                student: student,
+                scope: .studentMode,
+                prefetchEdges: true
+            )
+        }
         .onAppear {
             session.updateActivity()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             checkSessionTimeout()
+        }
+    }
+    
+    // MARK: - Tab Content
+    
+    @ViewBuilder
+    private func tabContent(for tab: StudentTab) -> some View {
+        switch tab {
+        case .myInterests:
+            StudentInterestsTab(student: student)
+        case .careers:
+            StudentCareersTab(student: student)
+        case .myProgress:
+            StudentProgressTab(student: student)
+        default:
+            // Other tabs not available in student mode
+            RestrictedAccessPlaceholder(mode: .studentMode)
         }
     }
 

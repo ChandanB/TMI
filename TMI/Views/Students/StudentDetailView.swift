@@ -2,7 +2,8 @@
 //  StudentDetailView.swift
 //  TMI
 //
-//  Simplified single-scroll student profile with pinned actions
+//  Simplified single-scroll student profile with pinned actions.
+//  Sets shared StudentContext when displayed for cross-module coordination.
 //
 
 import SwiftUI
@@ -19,6 +20,7 @@ struct StudentDetailView: View {
     @State private var showingProgress = false
     @State private var showingSurvey = false
     @State private var showRetakeConfirmation = false
+    @State private var showingScheduleMeeting = false
     @State private var expandedSections: Set<String> = []
     @State private var planStateModel = TMIPlanListStateModel()
     @State private var interestsStateModel = InterestsAndHobbiesStateModel()
@@ -30,7 +32,10 @@ struct StudentDetailView: View {
     @State private var resolvedInterests: [Interest] = []
     @State private var isLoadingInterests = false
 
+    // Environment dependencies
     @Environment(\.studentModeSession) private var studentModeSession
+    @Environment(\.studentContext) private var studentContext
+    @Environment(\.scheduleMeetingCoordinator) private var scheduleMeetingCoordinator
 
     private let meetingService = MeetingService.shared
     private let studentInterestService = StudentInterestService.shared
@@ -102,6 +107,14 @@ struct StudentDetailView: View {
             }
         }
         .task {
+            // Set shared student context for cross-module coordination
+            await studentContext.setActiveStudent(
+                student.id,
+                student: student,
+                scope: .staff,
+                prefetchEdges: true
+            )
+            
             await refreshStudent()
             await planStateModel.fetch()
             await loadMeetings()
@@ -580,12 +593,36 @@ struct StudentDetailView: View {
                         .font(.tmiCaption)
                         .foregroundColor(.tmiTextTertiary)
                         .multilineTextAlignment(.center)
+                    
+                    TMIButton(
+                        text: "Schedule Meeting",
+                        icon: "calendar.badge.plus",
+                        style: .secondary,
+                        action: {
+                            scheduleMeetingCoordinator.startScheduling(
+                                forStudentId: student.id,
+                                withStudents: [student]
+                            )
+                        }
+                    )
+                    .padding(.top, TMISpacing.sm)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, TMISpacing.lg)
             }
         }
         .tmiCard()
+        .sheet(isPresented: Binding(
+            get: { scheduleMeetingCoordinator.isShowingScheduler },
+            set: { scheduleMeetingCoordinator.isShowingScheduler = $0 }
+        )) {
+            if let studentId = student.id {
+                ScheduleMeetingView(
+                    planId: scheduleMeetingCoordinator.planId ?? "",
+                    relatedStudentIds: [studentId]
+                )
+            }
+        }
     }
 
     private func meetingMiniCard(_ meeting: Meeting) -> some View {

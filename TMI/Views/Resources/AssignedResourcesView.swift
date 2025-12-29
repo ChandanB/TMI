@@ -19,7 +19,7 @@ struct AssignedResourcesView: View {
     @State private var selectedAssignment: ResourceAssignment?
     @State private var showingDetail = false
 
-    private let assignmentService = ResourceAssignmentService()
+    private let assignmentService = ResourceAssignmentService.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,21 +68,21 @@ struct AssignedResourcesView: View {
         TMIGlassCard(style: .default) {
             VStack(spacing: 16) {
                 HStack(spacing: 24) {
-                    AnalyticsMetric(
+                    AssignmentAnalyticsMetric(
                         title: "Total",
                         value: "\(analytics.totalAssignments)",
                         icon: "doc.fill",
                         color: .blue
                     )
 
-                    AnalyticsMetric(
+                    AssignmentAnalyticsMetric(
                         title: "Completed",
                         value: "\(analytics.completedAssignments)",
                         icon: "checkmark.circle.fill",
                         color: .green
                     )
 
-                    AnalyticsMetric(
+                    AssignmentAnalyticsMetric(
                         title: "In Progress",
                         value: "\(analytics.inProgressAssignments)",
                         icon: "clock.fill",
@@ -241,8 +241,10 @@ struct AssignedResourcesView: View {
         isLoading = true
 
         do {
-            assignments = try await assignmentService.fetchAssignments(for: studentId)
-            analytics = try await assignmentService.getAssignmentAnalytics(for: studentId)
+            assignments = try await assignmentService.getAssignments(forStudentId: studentId)
+            
+            // Calculate analytics from assignments
+            analytics = ResourceAssignmentAnalytics(assignments: assignments)
         } catch {
             print("[AssignedResourcesView] Failed to load assignments: \(error)")
         }
@@ -262,7 +264,7 @@ struct AssignedResourcesView: View {
 
 // MARK: - Supporting Views
 
-private struct AnalyticsMetric: View {
+private struct AssignmentAnalyticsMetric: View {
     let title: String
     let value: String
     let icon: String

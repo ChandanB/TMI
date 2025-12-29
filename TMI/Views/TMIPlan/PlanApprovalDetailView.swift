@@ -362,9 +362,8 @@ struct PlanApprovalDetailView: View {
                 switch action {
                 case .approve:
                     try await approvalService.approvePlan(
-                        plan.id!,
-                        createdBy: plan.createdBy,
-                        comment: comment.isEmpty ? nil : comment
+                        planId: plan.id!,
+                        comments: comment.isEmpty ? nil : comment
                     )
 
                 case .reject:
@@ -375,8 +374,7 @@ struct PlanApprovalDetailView: View {
                         return
                     }
                     try await approvalService.rejectPlan(
-                        plan.id!,
-                        createdBy: plan.createdBy,
+                        planId: plan.id!,
                         reason: comment
                     )
 
@@ -387,9 +385,8 @@ struct PlanApprovalDetailView: View {
                         }
                         return
                     }
-                    try await approvalService.requestChanges(
-                        plan.id!,
-                        createdBy: plan.createdBy,
+                    try await approvalService.requestRevisions(
+                        planId: plan.id!,
                         feedback: comment
                     )
                 }
@@ -499,7 +496,7 @@ struct ActivityViewController: UIViewControllerRepresentable {
     NavigationStack {
         PlanApprovalDetailView(
             plan: .samplePlan,
-            approvalService: PlanApprovalService(),
+            approvalService: .shared,
             onUpdate: {}
         )
     }

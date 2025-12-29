@@ -35,8 +35,8 @@ struct RecommendationsView: View {
                             studentHeaderView
                             
                             // Recommended careers section
-                            if let dashboard = dashboard, !dashboard.recommendedCareers.isEmpty {
-                                recommendedCareersSection(dashboard.recommendedCareers)
+                            if let dashboard = dashboard, !dashboard.trendingCareers.isEmpty {
+                                recommendedCareersSection(dashboard.trendingCareers)
                             }
                             
                             // Recommended resources section
@@ -249,7 +249,7 @@ struct RecommendationsView: View {
                     }
                 }
                 
-                if !dashboard.featuredResources.isEmpty {
+                if !dashboard.recommendedResources.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Featured Resources")
                             .font(.system(size: 16, weight: .semibold))
@@ -258,7 +258,7 @@ struct RecommendationsView: View {
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
-                                ForEach(dashboard.featuredResources.prefix(4), id: \.id) { resource in
+                                ForEach(dashboard.recommendedResources.prefix(4), id: \.id) { resource in
                                     NavigationLink(destination: ResourceDetailView(resource: resource)) {
                                         TrendingItemCard(
                                             title: resource.title,
@@ -452,47 +452,56 @@ struct SuggestionCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: suggestion.type.icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(.tmiSecondary)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(suggestion.title)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                    
-                    Text(suggestion.description)
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
-                }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.5))
-            }
+            headerContent
             
-            Text(suggestion.actionItem)
+            Text(suggestion.rationale)
                 .font(.system(size: 13))
                 .foregroundColor(.tmiSecondary)
                 .lineLimit(2)
         }
         .padding(16)
-        .background(
+        .background(cardBackground)
+        .overlay(cardBorder)
+    }
+    
+    private var headerContent: some View {
+        HStack {
+            Image(systemName: suggestion.type.icon)
+                .font(.system(size: 20))
+                .foregroundColor(.tmiSecondary)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(suggestion.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Text(suggestion.description)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.5))
+        }
+    }
+    
+    private var cardBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+                .opacity(0.3)
+            
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white.opacity(0.05))
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.3)
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
-        )
+        }
+    }
+    
+    private var cardBorder: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
     }
 }
 

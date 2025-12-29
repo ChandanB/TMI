@@ -3,6 +3,8 @@ import Foundation
 
 struct CareerExplorerView: View {
   @Environment(\.careerExplorerStateModel) private var stateModel
+  @Environment(\.studentContext) private var studentContext
+  @Environment(\.studentAccessMode) private var accessMode
 
   // Animation states
   @State private var headerAppeared = false
@@ -28,6 +30,19 @@ struct CareerExplorerView: View {
     "Technology", "Healthcare", "Education", "Business", "Arts",
     "Biology", "Mathematics", "Psychology", "Computer Science", "Art"
   ]
+  
+  // Context awareness
+  private var isStudentContext: Bool {
+    studentContext.hasActiveStudent
+  }
+  
+  private var contextCareerState: StudentCareerState? {
+    studentContext.prefetchedCareerState
+  }
+  
+  private var canBookmark: Bool {
+    StudentAccessPolicy.canBookmarkCareers(in: accessMode)
+  }
   
   // Computed properties mapping to StateModel
   private var searchText: String {

@@ -2,7 +2,8 @@
 //  DashboardView.swift
 //  TMI
 //
-//  Simplified, purposeful dashboard with unified insight panel
+//  Simplified, purposeful dashboard with unified insight panel.
+//  Now uses shared caches from AppBootstrapService and shows next best action.
 //
 
 import Charts
@@ -25,6 +26,42 @@ struct DashboardData: Equatable, Sendable {
   var surveysCompleted: Int = 0
   var plansAligned: Int = 0
   var recentActivities: [RecentActivity] = []
+  
+  // Next Best Action
+  var nextBestAction: NextBestAction?
+}
+
+// MARK: - Next Best Action
+
+struct NextBestAction: Equatable, Sendable {
+  let id: String
+  let type: ActionType
+  let title: String
+  let description: String
+  let priority: ActionPriority
+  let targetStudentId: String?
+  let targetPlanId: String?
+  
+  enum ActionType: String, Sendable {
+    case createPlan = "create_plan"
+    case reviewPlan = "review_plan"
+    case scheduleMeeting = "schedule_meeting"
+    case completeNotes = "complete_notes"
+    case addInterests = "add_interests"
+    case checkProgress = "check_progress"
+    case pendingApproval = "pending_approval"
+  }
+  
+  enum ActionPriority: Int, Sendable, Comparable {
+    case low = 0
+    case medium = 1
+    case high = 2
+    case urgent = 3
+    
+    static func < (lhs: ActionPriority, rhs: ActionPriority) -> Bool {
+      lhs.rawValue < rhs.rawValue
+    }
+  }
 }
 
 // MARK: - Environment Key

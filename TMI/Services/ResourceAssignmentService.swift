@@ -2,248 +2,247 @@
 //  ResourceAssignmentService.swift
 //  TMI
 //
-//  Created for Phase 1: District Pilot - PR #5
+//  Service for assigning resources to students/plans.
 //
 
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
 
-/// Service for managing resource assignments to students
-@Observable
-class ResourceAssignmentService {
+// MARK: - Resource Assignment Service
+
+final class ResourceAssignmentService {
+    static let shared = ResourceAssignmentService()
+    
     private let db = Firestore.firestore()
-
+    
+    private init() {}
+    
     // MARK: - Assignment Operations
-
+    
     /// Assign a resource to a student
-    func assignResource(
-        to studentId: String,
-        resource: Resource,
-        reason: String? = nil,
-        relatedCareer: String? = nil,
-        relatedInterest: String? = nil
-    ) async throws -> ResourceAssignment {
-        guard let currentUser = Auth.auth().currentUser else {
+    func assignResource(resourceId: String, studentId: String, planId: String?, resourceTitle: String, resourceCategory: String, resourceURL: String) async throws {
+        guard let uid = Auth.auth().currentUser?.uid else {
             throw ResourceAssignmentError.userNotAuthenticated
         }
-
-        guard let resourceId = resource.id else {
-            throw ResourceAssignmentError.invalidResource
-        }
-
+        
         let assignment = ResourceAssignment(
+            id: nil,
             studentId: studentId,
             resourceId: resourceId,
-            assignedBy: currentUser.uid,
-            resourceTitle: resource.title,
-            resourceCategory: resource.category.rawValue,
-            resourceURL: resource.url,
-            reason: reason,
-            relatedCareer: relatedCareer,
-            relatedInterest: relatedInterest
+            assignedBy: uid,
+            assignedAt: Date(),
+            resourceTitle: resourceTitle,
+            resourceCategory: resourceCategory,
+            resourceURL: resourceURL,
+            reason: nil,
+            relatedCareer: nil,
+            relatedInterest: nil,
+            status: .assigned,
+            viewedAt: nil,
+            completedAt: nil,
+            notes: nil
         )
-
-        let data = try Firestore.Encoder().encode(assignment)
-        let docRef = try await db.collection("resourceAssignments").addDocument(data: data)
-
-        var savedAssignment = assignment
-        savedAssignment.id = docRef.documentID
-
-        print("[ResourceAssignmentService] Assigned resource '\(resource.title)' to student \(studentId)")
-        return savedAssignment
-    }
-
-    /// Bulk assign a resource to multiple students
-    func assignResourceToMultipleStudents(
-        studentIds: [String],
-        resource: Resource,
-        reason: String? = nil
-    ) async throws -> [ResourceAssignment] {
-        var assignments: [ResourceAssignment] = []
-
-        for studentId in studentIds {
-            do {
-                let assignment = try await assignResource(
-                    to: studentId,
-                    resource: resource,
-                    reason: reason
-                )
-                assignments.append(assignment)
-            } catch {
-                print("[ResourceAssignmentService] Failed to assign resource to student \(studentId): \(error)")
-            }
+        
+        let collection = db.collection("users").document(uid).collection("resourceAssignments")
+        var data: [String: Any] = [
+            "studentId": assignment.studentId,
+            "resourceId": assignment.resourceId,
+            "assignedBy": assignment.assignedBy,
+            "assignedAt": Timestamp(date: assignment.assignedAt),
+            "resourceTitle": assignment.resourceTitle,
+            "resourceCategory": assignment.resourceCategory,
+            "resourceURL": assignment.resourceURL,
+            "status": assignment.status.rawValue
+        ]
+        
+        if let reason = assignment.reason {
+            data["reason"] = reason
         }
-
-        return assignments
+        if let relatedCareer = assignment.relatedCareer {
+            data["relatedCareer"] = relatedCareer
+        }
+        if let relatedInterest = assignment.relatedInterest {
+            data["relatedInterest"] = relatedInterest
+        }
+        if let viewedAt = assignment.viewedAt {
+            data["viewedAt"] = Timestamp(date: viewedAt)
+        }
+        if let completedAt = assignment.completedAt {
+            data["completedAt"] = Timestamp(date: completedAt)
+        }
+        if let notes = assignment.notes {
+            data["notes"] = notes
+        }
+        
+        try await collection.addDocument(data: data)
+        
+        print("[ResourceAssignmentService] Assigned resource \(resourceId) to student \(studentId)")
     }
-
-    /// Fetch all resource assignments for a student
-    func fetchAssignments(for studentId: String) async throws -> [ResourceAssignment] {
-        let querySnapshot = try await db.collection("resourceAssignments")
-            .whereField("studentId", isEqualTo: studentId)
-            .order(by: "assignedAt", descending: true)
-            .getDocuments()
-
-        return querySnapshot.documents.compactMap { try? $0.data(as: ResourceAssignment.self) }
+    
+    /// Get assignments for a student
+    func getAssignments(forStudentId studentId: String) async throws -> [ResourceAssignment] {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw ResourceAssignmentError.userNotAuthenticated
+        }
+        
+        let collection = db.collection("users").document(uid).collection("resourceAssignments")
+        let query = collection.whereField("studentId", isEqualTo: studentId)
+        let snapshot = try await query.getDocuments()
+        
+        return snapshot.documents.compactMap { parseAssignment(from: $0) }
     }
-
-    /// Fetch assignments by status
-    func fetchAssignments(
-        for studentId: String,
-        status: ResourceAssignment.AssignmentStatus
-    ) async throws -> [ResourceAssignment] {
-        let querySnapshot = try await db.collection("resourceAssignments")
-            .whereField("studentId", isEqualTo: studentId)
-            .whereField("status", isEqualTo: status.rawValue)
-            .order(by: "assignedAt", descending: true)
-            .getDocuments()
-
-        return querySnapshot.documents.compactMap { try? $0.data(as: ResourceAssignment.self) }
+    
+    /// Get assignments for a plan
+    func getAssignments(forPlanId planId: String) async throws -> [ResourceAssignment] {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw ResourceAssignmentError.userNotAuthenticated
+        }
+        
+        let collection = db.collection("users").document(uid).collection("resourceAssignments")
+        let query = collection.whereField("planId", isEqualTo: planId)
+        let snapshot = try await query.getDocuments()
+        
+        return snapshot.documents.compactMap { parseAssignment(from: $0) }
     }
-
-    /// Fetch assignments related to a specific career
-    func fetchCareerRelatedAssignments(
-        for studentId: String,
-        career: String
-    ) async throws -> [ResourceAssignment] {
-        let querySnapshot = try await db.collection("resourceAssignments")
-            .whereField("studentId", isEqualTo: studentId)
-            .whereField("relatedCareer", isEqualTo: career)
-            .order(by: "assignedAt", descending: true)
-            .getDocuments()
-
-        return querySnapshot.documents.compactMap { try? $0.data(as: ResourceAssignment.self) }
+    
+    /// Update assignment progress
+    func updateProgress(assignmentId: String, progress: Double) async throws {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw ResourceAssignmentError.userNotAuthenticated
+        }
+        
+        let docRef = db.collection("users").document(uid).collection("resourceAssignments").document(assignmentId)
+        
+        var updates: [String: Any] = [
+            "updatedAt": Date().timeIntervalSince1970
+        ]
+        
+        if progress >= 1.0 {
+            updates["status"] = ResourceAssignment.AssignmentStatus.completed.rawValue
+            updates["completedAt"] = Timestamp(date: Date())
+        } else if progress > 0 {
+            updates["status"] = ResourceAssignment.AssignmentStatus.inProgress.rawValue
+        }
+        
+        try await docRef.updateData(updates)
     }
-
-    /// Fetch assignments related to a specific interest
-    func fetchInterestRelatedAssignments(
-        for studentId: String,
-        interest: String
-    ) async throws -> [ResourceAssignment] {
-        let querySnapshot = try await db.collection("resourceAssignments")
-            .whereField("studentId", isEqualTo: studentId)
-            .whereField("relatedInterest", isEqualTo: interest)
-            .order(by: "assignedAt", descending: true)
-            .getDocuments()
-
-        return querySnapshot.documents.compactMap { try? $0.data(as: ResourceAssignment.self) }
+    
+    /// Remove an assignment
+    func removeAssignment(assignmentId: String) async throws {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw ResourceAssignmentError.userNotAuthenticated
+        }
+        
+        try await db.collection("users").document(uid).collection("resourceAssignments").document(assignmentId).delete()
     }
-
+    
     /// Update assignment status
-    func updateAssignmentStatus(
-        _ assignmentId: String,
-        status: ResourceAssignment.AssignmentStatus,
-        notes: String? = nil
-    ) async throws {
-        var updateData: [String: Any] = ["status": status.rawValue]
-
-        // Update timestamps based on status
-        switch status {
-        case .viewed:
-            updateData["viewedAt"] = Timestamp(date: Date())
-        case .completed:
-            updateData["completedAt"] = Timestamp(date: Date())
-        default:
-            break
+    func updateAssignmentStatus(_ assignmentId: String, status: ResourceAssignment.AssignmentStatus, notes: String?) async throws {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw ResourceAssignmentError.userNotAuthenticated
         }
-
+        
+        let docRef = db.collection("users").document(uid).collection("resourceAssignments").document(assignmentId)
+        
+        var updates: [String: Any] = [
+            "status": status.rawValue,
+            "updatedAt": Date().timeIntervalSince1970
+        ]
+        
         if let notes = notes {
-            updateData["notes"] = notes
+            updates["notes"] = notes
         }
-
-        try await db.collection("resourceAssignments")
-            .document(assignmentId)
-            .updateData(updateData)
-
-        print("[ResourceAssignmentService] Updated assignment \(assignmentId) status to \(status.displayName)")
-    }
-
-    /// Delete an assignment
-    func deleteAssignment(_ assignmentId: String) async throws {
-        try await db.collection("resourceAssignments")
-            .document(assignmentId)
-            .delete()
-
-        print("[ResourceAssignmentService] Deleted assignment: \(assignmentId)")
-    }
-
-    // MARK: - Analytics
-
-    /// Get assignment analytics for a student
-    func getAssignmentAnalytics(for studentId: String) async throws -> ResourceAssignmentAnalytics {
-        let assignments = try await fetchAssignments(for: studentId)
-        return ResourceAssignmentAnalytics(assignments: assignments)
-    }
-
-    /// Get district-wide assignment analytics
-    func getDistrictAssignmentAnalytics(districtId: String) async throws -> ResourceAssignmentAnalytics {
-        // First get all students in district
-        let studentsSnapshot = try await db.collection("users")
-            .whereField("districtId", isEqualTo: districtId)
-            .whereField("role", isEqualTo: "student")
-            .getDocuments()
-
-        let studentIds = studentsSnapshot.documents.compactMap { $0.documentID }
-
-        // Fetch assignments for all students in district
-        var allAssignments: [ResourceAssignment] = []
-        for studentId in studentIds {
-            let assignments = try await fetchAssignments(for: studentId)
-            allAssignments.append(contentsOf: assignments)
+        
+        if status == .completed {
+            updates["completedAt"] = Timestamp(date: Date())
+        } else if status == .inProgress {
+            updates["viewedAt"] = Timestamp(date: Date())
         }
-
-        return ResourceAssignmentAnalytics(assignments: allAssignments)
+        
+        try await docRef.updateData(updates)
     }
-
-    // MARK: - Recommendations
-
-    /// Get recommended resource assignments for a student based on their interests and career goals
-    func getRecommendedAssignments(for student: Student) async -> [Resource] {
-        let careerService = CareerService.shared
-
-        // Get personalized resource recommendations based on student's career interests
-        let recommendedResources = await careerService.getRecommendedResources(for: student)
-
-        // Filter out resources already assigned to this student
-        guard let studentId = student.id else { return recommendedResources }
-
-        do {
-            let existingAssignments = try await fetchAssignments(for: studentId)
-            let assignedResourceIds = Set(existingAssignments.map { $0.resourceId })
-
-            return recommendedResources.filter { resource in
-                guard let resourceId = resource.id else { return true }
-                return !assignedResourceIds.contains(resourceId)
-            }
-        } catch {
-            print("[ResourceAssignmentService] Failed to filter existing assignments: \(error)")
-            return recommendedResources
+    
+    // MARK: - Private Helpers
+    
+    private func parseAssignment(from document: DocumentSnapshot) -> ResourceAssignment? {
+        guard let data = document.data() else { return nil }
+        
+        guard let resourceId = data["resourceId"] as? String,
+              let studentId = data["studentId"] as? String,
+              let assignedBy = data["assignedBy"] as? String,
+              let resourceTitle = data["resourceTitle"] as? String,
+              let resourceCategory = data["resourceCategory"] as? String,
+              let resourceURL = data["resourceURL"] as? String,
+              let statusRaw = data["status"] as? String,
+              let status = ResourceAssignment.AssignmentStatus(rawValue: statusRaw) else {
+            return nil
         }
+        
+        // Parse dates
+        let assignedAt: Date
+        if let assignedAtTimestamp = data["assignedAt"] as? Timestamp {
+            assignedAt = assignedAtTimestamp.dateValue()
+        } else if let assignedAtDouble = data["assignedAt"] as? Double {
+            assignedAt = Date(timeIntervalSince1970: assignedAtDouble)
+        } else {
+            return nil
+        }
+        
+        let completedAt: Date?
+        if let completedAtTimestamp = data["completedAt"] as? Timestamp {
+            completedAt = completedAtTimestamp.dateValue()
+        } else if let completedAtDouble = data["completedAt"] as? Double {
+            completedAt = Date(timeIntervalSince1970: completedAtDouble)
+        } else {
+            completedAt = nil
+        }
+        
+        let viewedAt: Date?
+        if let viewedAtTimestamp = data["viewedAt"] as? Timestamp {
+            viewedAt = viewedAtTimestamp.dateValue()
+        } else if let viewedAtDouble = data["viewedAt"] as? Double {
+            viewedAt = Date(timeIntervalSince1970: viewedAtDouble)
+        } else {
+            viewedAt = nil
+        }
+        
+        return ResourceAssignment(
+            id: document.documentID,
+            studentId: studentId,
+            resourceId: resourceId,
+            assignedBy: assignedBy,
+            assignedAt: assignedAt,
+            resourceTitle: resourceTitle,
+            resourceCategory: resourceCategory,
+            resourceURL: resourceURL,
+            reason: data["reason"] as? String,
+            relatedCareer: data["relatedCareer"] as? String,
+            relatedInterest: data["relatedInterest"] as? String,
+            status: status,
+            viewedAt: viewedAt,
+            completedAt: completedAt,
+            notes: data["notes"] as? String
+        )
     }
 }
 
-// MARK: - Error Handling
 
-enum ResourceAssignmentError: Error, LocalizedError {
+// MARK: - Errors
+
+enum ResourceAssignmentError: LocalizedError {
     case userNotAuthenticated
-    case invalidResource
     case assignmentNotFound
-    case fetchFailed(String)
-    case saveFailed(String)
-
+    case updateFailed(String)
+    
     var errorDescription: String? {
         switch self {
         case .userNotAuthenticated:
-            return "User not authenticated"
-        case .invalidResource:
-            return "Invalid resource provided"
+            return "User is not authenticated"
         case .assignmentNotFound:
             return "Assignment not found"
-        case .fetchFailed(let message):
-            return "Failed to fetch assignments: \(message)"
-        case .saveFailed(let message):
-            return "Failed to save assignment: \(message)"
+        case .updateFailed(let message):
+            return "Failed to update assignment: \(message)"
         }
     }
 }

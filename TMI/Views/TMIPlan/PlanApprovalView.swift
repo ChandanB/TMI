@@ -18,7 +18,7 @@ struct PlanApprovalView: View {
     @State private var showingDetail = false
     @State private var statistics: PlanApprovalStatistics?
 
-    private let approvalService = PlanApprovalService()
+    private let approvalService = PlanApprovalService.shared
 
     var body: some View {
         VStack(spacing: 0) {

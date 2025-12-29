@@ -276,3 +276,26 @@ extension StudentConsent {
         )
     }
 }
+
+/// Summary of all consents for a student
+struct ConsentSummary {
+    let studentId: String
+    let consents: [StudentConsent]
+    
+    var activeConsents: Int {
+        consents.filter { $0.isActive }.count
+    }
+    
+    var expiredConsents: Int {
+        consents.filter { $0.isExpired }.count
+    }
+    
+    var missingConsentTypes: [StudentConsent.ConsentType] {
+        let grantedTypes = Set(consents.filter { $0.isActive }.map { $0.consentType })
+        return StudentConsent.ConsentType.allCases.filter { !grantedTypes.contains($0) }
+    }
+    
+    var allConsentsActive: Bool {
+        missingConsentTypes.isEmpty && expiredConsents == 0
+    }
+}

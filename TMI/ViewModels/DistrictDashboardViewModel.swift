@@ -12,9 +12,9 @@ import Observation
 @MainActor
 class DistrictDashboardViewModel {
   // Services
-  private let analyticsService = DistrictAnalyticsService()
-  private let exportService = DistrictExportService()
-  private let districtService = DistrictService()
+  private let analyticsService = DistrictAnalyticsService.shared
+  private let exportService = DistrictExportService.shared
+  private let districtService = DistrictService.shared
 
   // State
   var districtId: String?

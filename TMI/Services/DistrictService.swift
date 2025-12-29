@@ -13,7 +13,11 @@ import Observation
 /// Service for managing district and school data operations with Firestore
 @Observable
 class DistrictService {
+  static let shared = DistrictService()
+  
   private let db = Firestore.firestore()
+  
+  private init() {}
 
   // MARK: - Collection References
 

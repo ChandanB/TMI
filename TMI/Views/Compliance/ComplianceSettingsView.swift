@@ -551,24 +551,24 @@ struct ComplianceSettingsView: View {
             settings = loadedSettings
 
             // Populate form state
-            coppaEnabled = loadedSettings.coppaEnabled
-            coppaMinimumAge = loadedSettings.coppaMinimumAge
-            ferpaEnabled = loadedSettings.ferpaEnabled
-            requireParentalConsent = loadedSettings.requireParentalConsent
-            consentExpirationDays = loadedSettings.consentExpirationDays
-            dataRetentionEnabled = loadedSettings.dataRetentionEnabled
-            retentionPolicyDays = loadedSettings.retentionPolicyDays
-            autoDeleteEnabled = loadedSettings.autoDeleteEnabled
-            auditLoggingEnabled = loadedSettings.auditLoggingEnabled
-            auditRetentionDays = loadedSettings.auditRetentionDays
-            logSensitiveOperations = loadedSettings.logSensitiveOperations
-            requireConsentForSurveys = loadedSettings.requireConsentForSurveys
-            requireConsentForDataSharing = loadedSettings.requireConsentForDataSharing
-            allowDataExport = loadedSettings.allowDataExport
-            allowThirdPartyIntegrations = loadedSettings.allowThirdPartyIntegrations
-            notifyOnDataAccess = loadedSettings.notifyOnDataAccess
-            notifyOnDataExport = loadedSettings.notifyOnDataExport
-            notifyParentsOnMajorChanges = loadedSettings.notifyParentsOnMajorChanges
+            coppaEnabled = loadedSettings?.coppaEnabled ?? coppaEnabled
+            coppaMinimumAge = loadedSettings?.coppaMinimumAge ?? coppaMinimumAge
+            ferpaEnabled = loadedSettings?.ferpaEnabled ?? ferpaEnabled
+            requireParentalConsent = loadedSettings?.requireParentalConsent ?? requireParentalConsent
+            consentExpirationDays = loadedSettings?.consentExpirationDays
+            dataRetentionEnabled = loadedSettings?.dataRetentionEnabled ?? dataRetentionEnabled
+            retentionPolicyDays = loadedSettings?.retentionPolicyDays ?? retentionPolicyDays
+            autoDeleteEnabled = loadedSettings?.autoDeleteEnabled ?? autoDeleteEnabled
+            auditLoggingEnabled = loadedSettings?.auditLoggingEnabled ?? auditLoggingEnabled
+            auditRetentionDays = loadedSettings?.auditRetentionDays ?? auditRetentionDays
+            logSensitiveOperations = loadedSettings?.logSensitiveOperations ?? logSensitiveOperations
+            requireConsentForSurveys = loadedSettings?.requireConsentForSurveys ?? requireConsentForSurveys
+            requireConsentForDataSharing = loadedSettings?.requireConsentForDataSharing ?? requireConsentForDataSharing
+            allowDataExport = loadedSettings?.allowDataExport ?? allowDataExport
+            allowThirdPartyIntegrations = loadedSettings?.allowThirdPartyIntegrations ?? allowThirdPartyIntegrations
+            notifyOnDataAccess = loadedSettings?.notifyOnDataAccess ?? notifyOnDataAccess
+            notifyOnDataExport = loadedSettings?.notifyOnDataExport ?? notifyOnDataExport
+            notifyParentsOnMajorChanges = loadedSettings?.notifyParentsOnMajorChanges ?? notifyParentsOnMajorChanges
 
             print("[ComplianceSettingsView] ✅ Loaded settings")
         } catch {
@@ -612,7 +612,7 @@ struct ComplianceSettingsView: View {
         )
 
         do {
-            try await complianceService.updateSettings(updatedSettings)
+            try await complianceService.updateSettings(districtId: districtId, settings: updatedSettings)
             hasUnsavedChanges = false
             showingSuccessAlert = true
             print("[ComplianceSettingsView] ✅ Settings saved")

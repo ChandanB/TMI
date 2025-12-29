@@ -25,7 +25,7 @@ struct StudentInterestProfileView: View {
     @State private var interestCount: Int = 0
 
     private let careerService = CareerService.shared
-    private let assignmentService = ResourceAssignmentService()
+    private let assignmentService = ResourceAssignmentService.shared
 
     var body: some View {
         ScrollView {
@@ -320,8 +320,8 @@ struct StudentInterestProfileView: View {
             // Load career insights
             careerInsights = try await careerService.getCareerDiscoveryInsights(for: student)
 
-            // Load recommended resources
-            recommendedResources = await assignmentService.getRecommendedAssignments(for: student)
+            // Load recommended resources (stub for now)
+            recommendedResources = []
 
         } catch {
             print("[StudentInterestProfileView] Failed to load profile: \(error)")
@@ -613,16 +613,20 @@ private struct ResourceAssignmentSheet: View {
     }
 
     private func assignResource() {
-        guard let studentId = student.id else { return }
+        guard let studentId = student.id,
+              let resourceId = resource.id else { return }
 
         isAssigning = true
 
         Task {
             do {
-                _ = try await assignmentService.assignResource(
-                    to: studentId,
-                    resource: resource,
-                    reason: reason.isEmpty ? nil : reason
+                try await assignmentService.assignResource(
+                    resourceId: resourceId,
+                    studentId: studentId,
+                    planId: nil,
+                    resourceTitle: resource.title,
+                    resourceCategory: resource.category.rawValue,
+                    resourceURL: resource.url
                 )
 
                 await MainActor.run {

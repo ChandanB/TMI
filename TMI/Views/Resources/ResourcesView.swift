@@ -11,6 +11,10 @@ struct ResourcesView: View {
   // State Model
   @State private var stateModel = ResourcesStateModel()
   
+  // Context awareness
+  @Environment(\.studentContext) private var studentContext
+  @Environment(\.studentAccessMode) private var accessMode
+  
   // Student integration
   @State private var selectedStudent: Student?
   @State private var studentRecommendations: [Resource] = []
@@ -20,6 +24,15 @@ struct ResourcesView: View {
   
   // Animation states
   @State private var isLoaded = false
+  
+  // Context awareness
+  private var isStudentContext: Bool {
+    studentContext.hasActiveStudent
+  }
+  
+  private var contextStudent: Student? {
+    studentContext.cachedStudent
+  }
 
   private var showSearchBar: Bool { true }
 

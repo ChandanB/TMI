@@ -2,104 +2,157 @@
 //  ComplianceService.swift
 //  TMI
 //
-//  Created for Phase 1: District Pilot - PR #8
-//  Service for managing compliance settings and student consent
+//  Service for managing compliance settings and audits.
+//  Used by district administrators for regulatory compliance.
 //
 
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
 
+// MARK: - Compliance Service
+
 final class ComplianceService {
     static let shared = ComplianceService()
+    
     private let db = Firestore.firestore()
-
+    
     private init() {}
-
-    // MARK: - Compliance Settings
-
+    
+    // MARK: - Settings Operations
+    
     /// Fetch compliance settings for a district
-    func fetchSettings(districtId: String) async throws -> ComplianceSettings {
-        let doc = try await db.collection("districts")
-            .document(districtId)
-            .collection("settings")
-            .document("compliance")
-            .getDocument()
-
-        if let settings = try? doc.data(as: ComplianceSettings.self) {
-            print("[ComplianceService] ✅ Fetched compliance settings for district")
-            return settings
-        } else {
-            // Return default settings if none exist
-            print("[ComplianceService] ⚠️ No settings found, using defaults")
-            return ComplianceSettings(districtId: districtId)
+    func fetchSettings(districtId: String) async throws -> ComplianceSettings? {
+        let docRef = db.collection("districts").document(districtId).collection("settings").document("compliance")
+        let document = try await docRef.getDocument()
+        
+        if document.exists, let data = document.data() {
+            return try? document.data(as: ComplianceSettings.self)
         }
+        
+        return nil
     }
-
+    
     /// Update compliance settings for a district
-    func updateSettings(_ settings: ComplianceSettings) async throws {
-        var updatedSettings = settings
-        updatedSettings.lastUpdated = Date()
-
-        try await db.collection("districts")
-            .document(settings.districtId)
-            .collection("settings")
-            .document("compliance")
-            .setData(updatedSettings.toFirestoreData())
-
-        print("[ComplianceService] ✅ Updated compliance settings")
-
-        // Log the change
-        try await AuditLogService.shared.log(
-            action: .dataRetentionPolicyApplied,
-            entityType: .district,
-            entityId: settings.districtId,
-            metadata: [
-                "retentionDays": "\(settings.retentionPolicyDays)",
-                "auditRetentionDays": "\(settings.auditRetentionDays)"
-            ]
+    func updateSettings(districtId: String, settings: ComplianceSettings) async throws {
+        let docRef = db.collection("districts").document(districtId).collection("settings").document("compliance")
+        let data = settings.toFirestoreData()
+        
+        try await docRef.setData(data, merge: true)
+        
+        print("[ComplianceService] Updated compliance settings for district: \(districtId)")
+    }
+    
+    // MARK: - Audit Operations
+    
+    /// Get compliance audit results for a district
+    func getAuditResults(districtId: String, dateRange: ClosedRange<Date>?) async throws -> [ComplianceAuditResult] {
+        var query: Query = db.collection("districts").document(districtId).collection("complianceAudits")
+        
+        if let dateRange = dateRange {
+            query = query
+                .whereField("auditDate", isGreaterThanOrEqualTo: dateRange.lowerBound.timeIntervalSince1970)
+                .whereField("auditDate", isLessThanOrEqualTo: dateRange.upperBound.timeIntervalSince1970)
+        }
+        
+        let snapshot = try await query.getDocuments()
+        return snapshot.documents.compactMap { parseAuditResult(from: $0) }
+    }
+    
+    /// Run a compliance check
+    func runComplianceCheck(districtId: String) async throws -> ComplianceAuditResult {
+        print("[ComplianceService] Running compliance check for district: \(districtId)")
+        
+        // In production, this would perform actual compliance checks
+        // For now, return a stub result
+        
+        let result = ComplianceAuditResult(
+            id: UUID().uuidString,
+            districtId: districtId,
+            auditDate: Date(),
+            overallScore: 0.85,
+            categories: [
+                ComplianceCategory(
+                    name: "Data Privacy",
+                    score: 0.9,
+                    issues: [],
+                    recommendations: ["Consider enabling additional encryption options"]
+                ),
+                ComplianceCategory(
+                    name: "Student Records",
+                    score: 0.8,
+                    issues: ["Some records missing required fields"],
+                    recommendations: ["Review student intake process"]
+                )
+            ],
+            summary: "Overall compliance is good with minor areas for improvement."
         )
+        
+        // Save the audit result
+        try await saveAuditResult(districtId: districtId, result: result)
+        
+        return result
     }
-
-    // MARK: - Student Consent
-
-    /// Fetch all consent records for a student
-    func fetchConsents(studentId: String) async throws -> [StudentConsent] {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "ComplianceService", code: 401)
+    
+    // MARK: - Consent Operations
+    
+    /// Get consent summary for a student
+    func getConsentSummary(studentId: String) async throws -> ConsentSummary {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "ComplianceService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
         }
-
-        let snapshot = try await db.collection("users")
-            .document(userId)
-            .collection("students")
-            .document(studentId)
-            .collection("consents")
-            .getDocuments()
-
+        
+        let collection = db.collection("users").document(uid).collection("students").document(studentId).collection("consents")
+        let snapshot = try await collection.getDocuments()
+        
         let consents = snapshot.documents.compactMap { doc -> StudentConsent? in
-            try? doc.data(as: StudentConsent.self)
+            let data = doc.data()
+            guard !data.isEmpty else { return nil }
+            
+            guard let consentTypeRaw = data["consentType"] as? String,
+                  let consentType = StudentConsent.ConsentType(rawValue: consentTypeRaw),
+                  let granted = data["granted"] as? Bool else {
+                return nil
+            }
+            
+            let grantedBy = data["grantedBy"] as? String
+            let grantedByName = data["grantedByName"] as? String
+            let grantedAtTimestamp = data["grantedAt"] as? Timestamp
+            let revokedAtTimestamp = data["revokedAt"] as? Timestamp
+            let expiresAtTimestamp = data["expiresAt"] as? Timestamp
+            let notes = data["notes"] as? String
+            
+            return StudentConsent(
+                id: doc.documentID,
+                studentId: studentId,
+                consentType: consentType,
+                granted: granted,
+                grantedBy: grantedBy,
+                grantedByName: grantedByName,
+                grantedAt: grantedAtTimestamp?.dateValue(),
+                revokedAt: revokedAtTimestamp?.dateValue(),
+                expiresAt: expiresAtTimestamp?.dateValue(),
+                notes: notes
+            )
         }
-
-        print("[ComplianceService] 📖 Fetched \(consents.count) consents for student")
-        return consents
+        
+        return ConsentSummary(studentId: studentId, consents: consents)
     }
-
+    
     /// Grant consent for a student
     func grantConsent(
         studentId: String,
         consentType: StudentConsent.ConsentType,
         grantedBy: String,
         grantedByName: String,
-        expirationDays: Int? = nil
+        expirationDays: Int?
     ) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "ComplianceService", code: 401)
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "ComplianceService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
         }
-
-        let expiresAt: Date? = expirationDays.map {
-            Date().addingTimeInterval(Double($0 * 86400))
-        }
-
+        
+        let expiresAt = expirationDays.map { Date().addingTimeInterval(TimeInterval($0 * 86400)) }
+        
         let consent = StudentConsent(
             studentId: studentId,
             consentType: consentType,
@@ -107,170 +160,117 @@ final class ComplianceService {
             grantedBy: grantedBy,
             grantedByName: grantedByName,
             grantedAt: Date(),
-            expiresAt: expiresAt
+            revokedAt: nil,
+            expiresAt: expiresAt,
+            notes: nil
         )
-
-        try await db.collection("users")
-            .document(userId)
-            .collection("students")
-            .document(studentId)
-            .collection("consents")
-            .document(consentType.rawValue)
-            .setData(consent.toFirestoreData())
-
-        print("[ComplianceService] ✅ Granted consent: \(consentType.displayName)")
-
-        // Log the consent grant
-        try await AuditLogService.shared.log(
-            action: .consentGranted,
-            entityType: .student,
-            entityId: studentId,
-            metadata: [
-                "consentType": consentType.rawValue,
-                "grantedBy": grantedByName
-            ]
-        )
+        
+        let collection = db.collection("users").document(uid).collection("students").document(studentId).collection("consents")
+        try await collection.document(consentType.rawValue).setData(consent.toFirestoreData())
+        
+        print("[ComplianceService] Granted consent \(consentType.rawValue) for student \(studentId)")
     }
-
+    
     /// Revoke consent for a student
-    func revokeConsent(
-        studentId: String,
-        consentType: StudentConsent.ConsentType
-    ) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "ComplianceService", code: 401)
+    func revokeConsent(studentId: String, consentType: StudentConsent.ConsentType) async throws {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "ComplianceService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
         }
-
-        // Update existing consent to revoked
-        try await db.collection("users")
-            .document(userId)
-            .collection("students")
-            .document(studentId)
-            .collection("consents")
-            .document(consentType.rawValue)
-            .updateData([
-                "granted": false,
-                "revokedAt": Timestamp(date: Date())
-            ])
-
-        print("[ComplianceService] ❌ Revoked consent: \(consentType.displayName)")
-
-        // Log the consent revocation
-        try await AuditLogService.shared.log(
-            action: .consentRevoked,
-            entityType: .student,
-            entityId: studentId,
-            metadata: [
-                "consentType": consentType.rawValue
-            ]
-        )
+        
+        let collection = db.collection("users").document(uid).collection("students").document(studentId).collection("consents")
+        let docRef = collection.document(consentType.rawValue)
+        
+        try await docRef.updateData([
+            "granted": false,
+            "revokedAt": Timestamp(date: Date())
+        ])
+        
+        print("[ComplianceService] Revoked consent \(consentType.rawValue) for student \(studentId)")
     }
-
-    /// Check if student has active consent for a specific type
-    func hasActiveConsent(studentId: String, consentType: StudentConsent.ConsentType) async throws -> Bool {
-        let consents = try await fetchConsents(studentId: studentId)
-
-        if let consent = consents.first(where: { $0.consentType == consentType }) {
-            return consent.isActive
+    
+    // MARK: - Private Helpers
+    
+    private func saveAuditResult(districtId: String, result: ComplianceAuditResult) async throws {
+        let collection = db.collection("districts").document(districtId).collection("complianceAudits")
+        let data = result.toFirestoreData()
+        
+        try await collection.document(result.id).setData(data)
+    }
+    
+    
+    private func parseAuditResult(from document: DocumentSnapshot) -> ComplianceAuditResult? {
+        guard let data = document.data() else { return nil }
+        
+        guard let districtId = data["districtId"] as? String,
+              let auditDateTimestamp = data["auditDate"] as? Double,
+              let overallScore = data["overallScore"] as? Double else {
+            return nil
         }
-
-        return false
-    }
-
-    // MARK: - COPPA Compliance
-
-    /// Check if student meets COPPA age requirement
-    func meetsCOPPAAgeRequirement(birthDate: Date, settings: ComplianceSettings) -> Bool {
-        let age = Calendar.current.dateComponents([.year], from: birthDate, to: Date()).year ?? 0
-        return age >= settings.coppaMinimumAge
-    }
-
-    /// Get students requiring parental consent (under COPPA age)
-    func getStudentsRequiringConsent(students: [Student], settings: ComplianceSettings) -> [Student] {
-        guard settings.coppaEnabled else { return [] }
-
-        return students.filter { student in
-            !meetsCOPPAAgeRequirement(birthDate: student.dateOfBirth, settings: settings)
+        
+        var categories: [ComplianceCategory] = []
+        if let categoriesData = data["categories"] as? [[String: Any]] {
+            categories = categoriesData.compactMap { catData in
+                guard let name = catData["name"] as? String,
+                      let score = catData["score"] as? Double else {
+                    return nil
+                }
+                return ComplianceCategory(
+                    name: name,
+                    score: score,
+                    issues: catData["issues"] as? [String] ?? [],
+                    recommendations: catData["recommendations"] as? [String] ?? []
+                )
+            }
         }
-    }
-
-    // MARK: - Data Retention
-
-    /// Apply data retention policy (delete old student data)
-    func applyDataRetentionPolicy(districtId: String, settings: ComplianceSettings) async throws -> Int {
-        guard settings.dataRetentionEnabled && settings.autoDeleteEnabled else {
-            print("[ComplianceService] ⚠️ Data retention not enabled or auto-delete disabled")
-            return 0
-        }
-
-        let cutoffDate = Date().addingTimeInterval(-Double(settings.retentionPolicyDays * 86400))
-
-        print("[ComplianceService] 🗑️ Applying data retention policy (cutoff: \(cutoffDate.formatted()))")
-
-        // This is a placeholder - in production, you would:
-        // 1. Query for students with exitDate < cutoffDate
-        // 2. Archive their data
-        // 3. Delete the records
-        // 4. Log the deletion
-
-        // For now, just return 0 as this is a sensitive operation
-        // that should be carefully implemented with backups
-
-        try await AuditLogService.shared.log(
-            action: .dataRetentionPolicyApplied,
-            entityType: .district,
-            entityId: districtId,
-            metadata: [
-                "retentionDays": "\(settings.retentionPolicyDays)",
-                "cutoffDate": cutoffDate.ISO8601Format()
-            ]
-        )
-
-        return 0
-    }
-
-    // MARK: - Consent Summary
-
-    /// Get consent summary for a student
-    func getConsentSummary(studentId: String) async throws -> ConsentSummary {
-        let consents = try await fetchConsents(studentId: studentId)
-
-        let activeConsents = consents.filter { $0.isActive }
-        let expiredConsents = consents.filter { $0.isExpired }
-        let revokedConsents = consents.filter { !$0.granted }
-
-        // Check which consent types are missing
-        let allTypes = StudentConsent.ConsentType.allCases
-        let existingTypes = Set(consents.map { $0.consentType })
-        let missingTypes = allTypes.filter { !existingTypes.contains($0) }
-
-        return ConsentSummary(
-            totalConsents: consents.count,
-            activeConsents: activeConsents.count,
-            expiredConsents: expiredConsents.count,
-            revokedConsents: revokedConsents.count,
-            missingConsentTypes: missingTypes,
-            consents: consents
+        
+        return ComplianceAuditResult(
+            id: document.documentID,
+            districtId: districtId,
+            auditDate: Date(timeIntervalSince1970: auditDateTimestamp),
+            overallScore: overallScore,
+            categories: categories,
+            summary: data["summary"] as? String
         )
     }
 }
 
-// MARK: - Supporting Types
 
-struct ConsentSummary: Codable, Sendable {
-    let totalConsents: Int
-    let activeConsents: Int
-    let expiredConsents: Int
-    let revokedConsents: Int
-    let missingConsentTypes: [StudentConsent.ConsentType]
-    let consents: [StudentConsent]
+// MARK: - Compliance Audit Result
 
-    var allConsentsActive: Bool {
-        totalConsents > 0 && expiredConsents == 0 && revokedConsents == 0
+struct ComplianceAuditResult: Identifiable, Codable {
+    let id: String
+    let districtId: String
+    let auditDate: Date
+    let overallScore: Double
+    let categories: [ComplianceCategory]
+    let summary: String?
+    
+    func toFirestoreData() -> [String: Any] {
+        var data: [String: Any] = [
+            "districtId": districtId,
+            "auditDate": auditDate.timeIntervalSince1970,
+            "overallScore": overallScore,
+            "categories": categories.map { cat in
+                [
+                    "name": cat.name,
+                    "score": cat.score,
+                    "issues": cat.issues,
+                    "recommendations": cat.recommendations
+                ]
+            }
+        ]
+        
+        if let summary = summary {
+            data["summary"] = summary
+        }
+        
+        return data
     }
+}
 
-    var hasRequiredConsents: Bool {
-        // At minimum, should have general data collection consent
-        consents.contains { $0.consentType == .generalDataCollection && $0.isActive }
-    }
+struct ComplianceCategory: Codable {
+    let name: String
+    let score: Double
+    let issues: [String]
+    let recommendations: [String]
 }
