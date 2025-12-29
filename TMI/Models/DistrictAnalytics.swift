@@ -5,7 +5,7 @@
 //  Created for Phase 1: District Pilot - PR #2
 //
 
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 import Foundation
 
 // MARK: - District Analytics (Daily Aggregation)

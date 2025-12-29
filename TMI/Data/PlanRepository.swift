@@ -142,7 +142,7 @@ actor PlanRepository {
         let planRef = collection.document(planId)
         let document = try await planRef.getDocument()
         
-        guard document.exists, var data = document.data() else {
+        guard document.exists, let data = document.data() else {
             throw PlanRepositoryError.planNotFound
         }
         
@@ -168,7 +168,7 @@ actor PlanRepository {
         let planRef = collection.document(planId)
         let document = try await planRef.getDocument()
         
-        guard document.exists, var data = document.data() else {
+        guard document.exists, let data = document.data() else {
             throw PlanRepositoryError.planNotFound
         }
         

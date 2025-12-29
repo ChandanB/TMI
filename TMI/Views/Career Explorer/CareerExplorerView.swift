@@ -459,20 +459,20 @@ struct CareerExplorerView: View {
             columns: [GridItem(.adaptive(minimum: 170), spacing: 16)],
             spacing: 20
           ) {
-            ForEach(searchResults.indices, id: \.self) { index in
-              let career = searchResults[index]
-              NavigationLink(destination: CareerDetailView(career: career, student: selectedStudent)) {
-                PremiumCareerCard(career: career)
-                  .opacity(resultsAppeared ? 1 : 0)
-                  .offset(y: resultsAppeared ? 0 : 20)
-                  .animation(
-                    .spring(response: 0.4, dampingFraction: 0.7)
-                      .delay(Double(index % 6) * 0.05),
-                    value: resultsAppeared
-                  )
+            ForEach(searchResults, id: \.id) { career in
+                NavigationLink(destination: CareerDetailView(career: career, student: selectedStudent)) {
+                  PremiumCareerCard(career: career)
+                    .opacity(resultsAppeared ? 1 : 0)
+                    .offset(y: resultsAppeared ? 0 : 20)
+                    .animation(
+                      .spring(response: 0.4, dampingFraction: 0.7)
+                        // Use a safe index calculation or just a fixed delay if index isn't available
+                        .delay(Double(searchResults.firstIndex(where: { $0.id == career.id }) ?? 0) * 0.05),
+                      value: resultsAppeared
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
               }
-              .buttonStyle(PlainButtonStyle())
-            }
           }
           .padding(20)
           .padding(.bottom, 80)

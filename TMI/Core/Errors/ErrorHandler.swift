@@ -223,7 +223,7 @@ final class ErrorHandler {
 }
 
 // MARK: - Error Context
-struct ErrorContext: Sendable {
+struct ErrorContext: @unchecked Sendable {
     let operation: String
     let userId: String?
     let metadata: [String: Any]?

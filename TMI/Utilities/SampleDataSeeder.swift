@@ -26,7 +26,7 @@ class SampleDataSeeder {
       // 1. Create District
       seedingStatus = "Creating district..."
       let district = District.sampleDistrict
-      try await db.collection(FirestoreCollection.districts.rawValue)
+      try db.collection(FirestoreCollection.districts.rawValue)
         .document(district.id ?? "demo-district-001")
         .setData(from: district)
       
@@ -38,7 +38,7 @@ class SampleDataSeeder {
           .collection(FirestoreCollection.schools.rawValue)
           .document(school.id ?? UUID().uuidString)
         
-        try await schoolRef.setData(from: school)
+        try schoolRef.setData(from: school)
       }
       
       // 3. Create District Admin User (if needed for testing)

@@ -172,11 +172,11 @@ final class ResourceLibraryService {
 
             if let id = resource.id {
                 // Update existing
-                try await globalCollection.document(id).setData(from: resource, merge: true)
+                try globalCollection.document(id).setData(from: resource, merge: true)
                 updatedResource.id = id
             } else {
                 // Create new
-                let docRef = try await globalCollection.addDocument(from: resource)
+                let docRef = try globalCollection.addDocument(from: resource)
                 updatedResource.id = docRef.documentID
             }
 

@@ -5,7 +5,7 @@
 //  Created by Chandan Brown on 9/14/24.
 //
 
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 import SwiftUI
 
 struct Career: Identifiable, Codable, Sendable, Equatable {

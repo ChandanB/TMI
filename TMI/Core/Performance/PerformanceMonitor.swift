@@ -45,12 +45,12 @@ final class PerformanceMonitor: Sendable {
     private let maxNetworkMetrics = 500
     private let maxMemoryMetrics = 200
     
-    // Memory and system monitoring
-    private var memoryTimer: Timer?
-    private var systemInfoTimer: Timer?
+    // Memory and system monitoring (nonisolated for deinit cleanup)
+    nonisolated(unsafe) private var memoryTimer: Timer?
+    nonisolated(unsafe) private var systemInfoTimer: Timer?
     private var isMonitoringMemory = false
-    private var batteryLevelObserver: NSObjectProtocol?
-    private var thermalStateObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var batteryLevelObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var thermalStateObserver: NSObjectProtocol?
     
     // Metrics collection queue
     private let metricsQueue = DispatchQueue(label: "com.tmi.performance.metrics", qos: .utility)
@@ -62,17 +62,15 @@ final class PerformanceMonitor: Sendable {
     }
     
     deinit {
-        Task { @MainActor in
-            networkMonitor.cancel()
-            stopMemoryMonitoring()
-            systemInfoTimer?.invalidate()
-            
-            if let observer = batteryLevelObserver {
-                NotificationCenter.default.removeObserver(observer)
-            }
-            if let observer = thermalStateObserver {
-                NotificationCenter.default.removeObserver(observer)
-            }
+        networkMonitor.cancel()
+        memoryTimer?.invalidate()
+        systemInfoTimer?.invalidate()
+        
+        if let observer = batteryLevelObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = thermalStateObserver {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
     
@@ -671,7 +669,9 @@ final class PerformanceMonitor: Sendable {
             queue: .main
         ) { [weak self] _ in
             self?.logger.info("App entered background")
-            self?.generateAndLogReport()
+            Task { @MainActor in
+                self?.generateAndLogReport()
+            }
         }
         
         notificationCenter.addObserver(

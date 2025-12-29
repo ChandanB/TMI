@@ -5,7 +5,7 @@
 //  Created for Phase 1: District Pilot
 //
 
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 import Foundation
 
 // MARK: - School Model

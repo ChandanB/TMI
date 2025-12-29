@@ -102,7 +102,7 @@ final class ResourceService: @unchecked Sendable {
     // Remove duplicates based on ID
     let uniqueResources = Dictionary(grouping: allResources, by: { $0.id ?? UUID().uuidString })
       .compactMap { $0.value.first }
-      .sorted { ($0.createdAt ?? Date()) > ($1.createdAt ?? Date()) }
+      .sorted { ($0.createdAt) > ($1.createdAt) }
 
     return uniqueResources
   }

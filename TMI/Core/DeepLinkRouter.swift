@@ -63,7 +63,7 @@ final class DeepLinkRouter {
                 planId: id
             )
             
-        case .meeting(let id):
+        case .meeting:
             // Meetings are accessed through plans
             return NavigationAction(
                 targetTab: .tmiPlans,
@@ -72,7 +72,7 @@ final class DeepLinkRouter {
                 planId: nil // Would need to look up the plan for this meeting
             )
             
-        case .resource(let id):
+        case .resource:
             return NavigationAction(
                 targetTab: .resources,
                 destination: destination,
@@ -162,7 +162,7 @@ final class DeepLinkRouter {
         }
         
         if let planId = action.planId {
-            await context.setActivePlan(planId)
+            context.setActivePlan(planId)
         }
         
         // Navigate to tab

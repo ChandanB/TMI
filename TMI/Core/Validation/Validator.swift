@@ -299,12 +299,13 @@ enum ValidationParameters: Codable, Hashable, Sendable {
 
 // MARK: - Field Validation Configuration
 struct FieldValidation: Codable, Hashable, Identifiable, Sendable {
-    let id: String = UUID().uuidString
+    let id: String
     let fieldName: String
     let rules: [ValidationRule]
     let isRequired: Bool
     
     init(fieldName: String, rules: [ValidationRule], isRequired: Bool = false) {
+        self.id = UUID().uuidString
         self.fieldName = fieldName
         self.rules = isRequired ? [.required()] + rules : rules
         self.isRequired = isRequired

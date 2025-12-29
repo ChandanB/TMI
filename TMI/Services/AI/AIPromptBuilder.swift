@@ -304,7 +304,7 @@ final class AIPromptBuilder: Sendable {
     /// Format student interests for prompt inclusion
     /// Fetches interests from edge collection and formats as comma-separated string
     private func formatStudentInterests(for student: Student) async -> String {
-        guard let studentId = student.id else {
+        guard student.id != nil else {
             return "No interests recorded"
         }
 

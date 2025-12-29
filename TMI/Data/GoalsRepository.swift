@@ -37,7 +37,7 @@ actor GoalsRepository {
         
         // Get current plan
         let document = try await planRef.getDocument()
-        guard document.exists, var data = document.data() else {
+        guard document.exists, let data = document.data() else {
             throw GoalsRepositoryError.planNotFound
         }
         
@@ -71,7 +71,7 @@ actor GoalsRepository {
         
         // Get current plan
         let document = try await planRef.getDocument()
-        guard document.exists, var data = document.data() else {
+        guard document.exists, let data = document.data() else {
             throw GoalsRepositoryError.planNotFound
         }
         
@@ -108,7 +108,7 @@ actor GoalsRepository {
         
         // Get current plan
         let document = try await planRef.getDocument()
-        guard document.exists, var data = document.data() else {
+        guard document.exists, let data = document.data() else {
             throw GoalsRepositoryError.planNotFound
         }
         
@@ -155,7 +155,7 @@ actor GoalsRepository {
     ///   - progress: New progress value (0.0 - 1.0)
     ///   - planId: The plan ID containing the goal
     func updateProgress(goalId: UUID, progress: Double, inPlanId planId: String) async throws {
-        var goals = try await getGoals(forPlanId: planId)
+        let goals = try await getGoals(forPlanId: planId)
         
         guard let index = goals.firstIndex(where: { $0.id == goalId }) else {
             throw GoalsRepositoryError.goalNotFound
@@ -180,7 +180,7 @@ actor GoalsRepository {
     ///   - status: New status
     ///   - planId: The plan ID containing the goal
     func updateStatus(goalId: UUID, status: GoalStatus, inPlanId planId: String) async throws {
-        var goals = try await getGoals(forPlanId: planId)
+        let goals = try await getGoals(forPlanId: planId)
         
         guard let index = goals.firstIndex(where: { $0.id == goalId }) else {
             throw GoalsRepositoryError.goalNotFound
@@ -225,7 +225,7 @@ actor GoalsRepository {
     ///   - goalIds: Ordered array of goal IDs
     ///   - planId: The plan ID
     func reorderGoals(_ goalIds: [UUID], inPlanId planId: String) async throws {
-        var goals = try await getGoals(forPlanId: planId)
+        let goals = try await getGoals(forPlanId: planId)
         
         // Reorder based on provided IDs
         var reorderedGoals: [Goal] = []

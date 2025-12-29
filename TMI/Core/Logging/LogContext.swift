@@ -79,7 +79,7 @@ actor LogContext {
 
 // MARK: - Supporting Types
 
-struct LogEntry: Sendable {
+struct LogEntry: @unchecked Sendable {
     let level: TMILogger.Level
     let category: String
     let message: String

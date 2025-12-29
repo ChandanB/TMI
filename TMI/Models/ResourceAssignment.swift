@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 
 /// Represents a resource assignment to a student
 struct ResourceAssignment: Codable, Identifiable, Sendable {

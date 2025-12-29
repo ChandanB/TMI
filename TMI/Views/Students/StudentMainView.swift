@@ -73,7 +73,7 @@ struct StudentMainView: View {
         .confirmationDialog("Sign Out", isPresented: $showingSignOutConfirmation, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
                 Task {
-                    await authStateModel.signOut()
+                    authStateModel.signOut()
                 }
             }
             Button("Cancel", role: .cancel) {}

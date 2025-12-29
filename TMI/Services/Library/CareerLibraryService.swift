@@ -125,7 +125,7 @@ final class CareerLibraryService {
 
             // Save new career
             var updatedCareer = career
-            let docRef = try await globalCollection.addDocument(from: career)
+            let docRef = try globalCollection.addDocument(from: career)
             updatedCareer.id = docRef.documentID
 
             print("[CareerLibraryService] Cached AI career: \(updatedCareer.title)")
@@ -143,11 +143,11 @@ final class CareerLibraryService {
 
             if let id = career.id {
                 // Update existing
-                try await globalCollection.document(id).setData(from: career, merge: true)
+                try globalCollection.document(id).setData(from: career, merge: true)
                 updatedCareer.id = id
             } else {
                 // Create new
-                let docRef = try await globalCollection.addDocument(from: career)
+                let docRef = try globalCollection.addDocument(from: career)
                 updatedCareer.id = docRef.documentID
             }
 

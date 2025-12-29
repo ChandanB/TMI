@@ -360,7 +360,7 @@ actor CrashReporter {
 }
 
 // MARK: - Supporting Types
-struct AnalyticsEvent: Sendable {
+struct AnalyticsEvent: @unchecked Sendable {
     enum EventType: String, Sendable {
         case error = "error"
         case userAction = "user_action"

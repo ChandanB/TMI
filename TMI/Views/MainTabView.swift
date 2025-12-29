@@ -183,7 +183,7 @@ struct MainTabView: View {
             Button("Sign Out", role: .destructive) {
                 Task {
                     // Clear context on sign out
-                    await studentContext.clearContext()
+                    studentContext.clearContext()
                     authStateModel.signOut()
                 }
             }
@@ -363,7 +363,7 @@ struct WorkspacePanelView: View {
                     
                     Button {
                         Task {
-                            await context.clearContext()
+                            context.clearContext()
                         }
                     } label: {
                         Image(systemName: "xmark.circle.fill")

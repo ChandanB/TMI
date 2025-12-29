@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 
 struct StudentCareerState: Identifiable, Codable, Sendable, Equatable {
     @DocumentID var id: String?

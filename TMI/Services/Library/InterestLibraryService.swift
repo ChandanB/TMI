@@ -120,7 +120,7 @@ final class InterestLibraryService {
     /// Add or update an interest in the global library
     func saveInterest(_ interest: Interest) async throws -> Interest {
         do {
-            var updatedInterest = interest
+            let updatedInterest = interest
             let data = updatedInterest.toFirestoreData()
 
             if let id = interest.id {

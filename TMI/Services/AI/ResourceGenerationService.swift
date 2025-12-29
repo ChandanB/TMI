@@ -42,13 +42,10 @@ actor ResourceGenerationService {
     func checkAvailability() async -> Bool {
         do {
             // Check if we can create a language model session
-            let session = try await LanguageModelSession()
+            let session = LanguageModelSession()
             languageModelSession = session
             return true
-        } catch {
-            print("[ResourceGeneration] Foundation Models not available: \(error)")
-            return false
-        }
+        } 
     }
 
     // MARK: - Resource Generation
@@ -84,7 +81,7 @@ actor ResourceGenerationService {
     private func generateResourcesWithAI(for interest: Interest, plan: TMIPlan) async throws -> [Resource] {
         // Initialize session if needed
         if languageModelSession == nil {
-            languageModelSession = try await LanguageModelSession()
+            languageModelSession = LanguageModelSession()
         }
 
         guard let session = languageModelSession else {

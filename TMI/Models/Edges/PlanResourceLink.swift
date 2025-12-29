@@ -8,7 +8,7 @@
 //
 
 import Foundation
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 
 struct PlanResourceLink: Identifiable, Codable, Sendable, Equatable {
     @DocumentID var id: String?
