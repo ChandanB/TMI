@@ -61,7 +61,7 @@ final class TMIPlanListStateModel: BaseStateModel<[TMIPlan], IdentifiableError> 
     // Dependencies
     private let planService: TMIPlanService
     
-    init(planService: TMIPlanService = TMIPlanService()) {
+    init(planService: TMIPlanService = TMIPlanService.shared) {
         self.planService = planService
         super.init()
     }

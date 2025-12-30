@@ -14,7 +14,7 @@ struct AddInterestToPlanView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.interestsStateModel) var interestsStateModel
 
-    @State private var planService = TMIPlanService()
+    @State private var planService = TMIPlanService.shared
     @State private var searchText = ""
     @State private var selectedCategory: InterestCategory?
     @State private var isAdding = false

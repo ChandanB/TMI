@@ -185,19 +185,19 @@ class StudentService {
         guard let collection = userStudentsCollection else {
             throw StudentServiceError.userNotAuthenticated
         }
-        
+
         do {
             print("[StudentService] Fetching student with ID: \(id)")
             let document = try await withTimeout(seconds: 10) {
                 try await collection.document(id).getDocument()
             }
-            
+
             guard document.exists else {
                 return nil
             }
-            
+
             return try parseStudent(from: document)
-            
+
         } catch let error as StudentServiceError {
             throw error
         } catch {
@@ -205,7 +205,41 @@ class StudentService {
             throw StudentServiceError.fetchFailed(error.localizedDescription)
         }
     }
-    
+
+    /// Listen to real-time updates for a specific student
+    /// Returns a ListenerRegistration that should be removed when no longer needed
+    func listenToStudent(id: String, onChange: @escaping (Result<Student, Error>) -> Void) -> ListenerRegistration? {
+        guard let collection = userStudentsCollection else {
+            onChange(.failure(StudentServiceError.userNotAuthenticated))
+            return nil
+        }
+
+        print("[StudentService] Starting listener for student: \(id)")
+
+        return collection.document(id).addSnapshotListener { snapshot, error in
+            if let error {
+                print("[StudentService] Listener error: \(error)")
+                onChange(.failure(error))
+                return
+            }
+
+            guard let snapshot, snapshot.exists else {
+                print("[StudentService] Student document not found: \(id)")
+                onChange(.failure(StudentServiceError.studentNotFound))
+                return
+            }
+
+            do {
+                let student = try self.parseStudent(from: snapshot)
+                print("[StudentService] Student updated: \(student.name)")
+                onChange(.success(student))
+            } catch {
+                print("[StudentService] Failed to parse student: \(error)")
+                onChange(.failure(error))
+            }
+        }
+    }
+
     // MARK: - Private Parsing Helper
     
     private func parseStudent(from document: QueryDocumentSnapshot) throws -> Student {
@@ -430,18 +464,21 @@ class StudentService {
 enum StudentServiceError: Error, LocalizedError {
     case userNotAuthenticated
     case invalidStudentId
+    case studentNotFound
     case fetchFailed(String)
     case saveFailed(String)
     case updateFailed(String)
     case deleteFailed(String)
     case dataParsingFailed(documentID: String, underlyingError: Error)
-    
+
     var errorDescription: String? {
         switch self {
         case .userNotAuthenticated:
             return "User is not authenticated"
         case .invalidStudentId:
             return "Student ID is invalid or missing"
+        case .studentNotFound:
+            return "Student not found"
         case .fetchFailed(let message):
             return "Failed to fetch students: \(message)"
         case .saveFailed(let message):

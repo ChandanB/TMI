@@ -550,7 +550,7 @@ struct StudentProgressTab: View {
         defer { isLoading = false }
 
         do {
-            let service = TMIPlanService()
+            let service = TMIPlanService.shared
             let allPlans = try await service.fetchPlans()
 
             // Filter to only plans containing this student

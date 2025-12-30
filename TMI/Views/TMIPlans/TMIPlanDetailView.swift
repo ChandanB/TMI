@@ -127,8 +127,10 @@ struct TMIPlanDetailView: View {
             Text("Are you sure you want to delete this TMI plan? This action cannot be undone.")
         }
         .sheet(item: $selectedStudent) { student in
-            NavigationStack {
-                StudentDetailView(student: student)
+            if let studentId = student.id {
+                NavigationStack {
+                    StudentDetailView(studentId: studentId)
+                }
             }
         }
         .sheet(isPresented: $showingAddInterest) {
@@ -165,11 +167,10 @@ struct TMIPlanDetailView: View {
         }
         .sheet(isPresented: $showingCompleteSurvey) {
             NavigationStack {
-                InterestSurveyView(plan: plan, studentId: plan.primaryStudent?.id ?? "", onComplete: { interests in
-                    Task {
-                        await addInterestsFromSurvey(interests)
-                    }
-                })
+                StudentSurveyFlow(
+                    studentId: plan.primaryStudent?.id ?? "",
+                    context: .planDetail(planId: plan.id ?? "")
+                )
             }
         }
         .sheet(isPresented: $showingAddResource) {
@@ -945,7 +946,7 @@ struct TMIPlanDetailView: View {
     private func deletePlan() {
         Task {
             do {
-                try await TMIPlanService().deletePlan(plan)
+                try await TMIPlanService.shared.deletePlan(plan)
                 await MainActor.run {
                     dismiss()
                 }
@@ -961,7 +962,7 @@ struct TMIPlanDetailView: View {
             var goals = plan.goals
             goals.append(newGoal)
 
-            let service = TMIPlanService()
+            let service = TMIPlanService.shared
             let planWithNewGoals = TMIPlan(
                 id: plan.id,
                 title: plan.title,
@@ -998,7 +999,7 @@ struct TMIPlanDetailView: View {
                 goals[index] = updatedGoal
             }
 
-            let service = TMIPlanService()
+            let service = TMIPlanService.shared
             let planWithUpdatedGoals = TMIPlan(
                 id: plan.id,
                 title: plan.title,
@@ -1033,7 +1034,7 @@ struct TMIPlanDetailView: View {
                 !plan.interests.contains(where: { $0.id == newInterest.id })
             }
 
-            let service = TMIPlanService()
+            let service = TMIPlanService.shared
             let planWithNewInterests = TMIPlan(
                 id: plan.id,
                 title: plan.title,
@@ -1066,7 +1067,7 @@ struct TMIPlanDetailView: View {
         guard let planId = plan.id else { return }
 
         do {
-            let service = TMIPlanService()
+            let service = TMIPlanService.shared
             if let refreshedPlan = try await service.fetchPlan(byId: planId) {
                 plan = refreshedPlan
             }
@@ -1098,7 +1099,7 @@ struct TMIPlanDetailView: View {
             var resources = plan.resources
             resources.append(resource)
 
-            let service = TMIPlanService()
+            let service = TMIPlanService.shared
             let planWithNewResources = TMIPlan(
                 id: plan.id,
                 title: plan.title,
@@ -1133,7 +1134,7 @@ struct TMIPlanDetailView: View {
             var resources = plan.resources
             resources.removeAll { $0.id == resource.id }
 
-            let service = TMIPlanService()
+            let service = TMIPlanService.shared
             let planWithUpdatedResources = TMIPlan(
                 id: plan.id,
                 title: plan.title,

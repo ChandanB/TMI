@@ -8,7 +8,9 @@
 
 import Foundation
 import Observation
+import FirebaseFirestore
 
+@MainActor
 @Observable
 class StudentDetailStateModel {
     enum State {
@@ -17,27 +19,66 @@ class StudentDetailStateModel {
         case loaded
         case error(Error)
     }
-    
-    var state: State = .idle
+
+    var state: State = .loading
+    var student: Student?
     var tmiPlans: [TMIPlan] = []
-    
-    private let student: Student
-    private let planService = TMIPlanService()
-    
-    init(student: Student) {
-        self.student = student
+    var errorMessage: String?
+
+    private let studentId: String
+    private let studentService = StudentService.shared
+    private let planService = TMIPlanService.shared
+    nonisolated(unsafe) private var studentListener: ListenerRegistration?
+
+    init(studentId: String) {
+        self.studentId = studentId
     }
-    
-    @MainActor
-    func fetchTMIPlans() async {
+
+    deinit {
+        stopListening()
+    }
+
+    func startListening() {
+        print("[StudentDetailStateModel] Starting listener for student: \(studentId)")
         state = .loading
-        do {
-            if let studentId = student.id {
-                tmiPlans = try await planService.getPlansForStudent(studentId)
+
+        studentListener = studentService.listenToStudent(id: studentId) { [weak self] result in
+            Task { @MainActor in
+                guard let self else { return }
+
+                switch result {
+                case .success(let student):
+                    print("[StudentDetailStateModel] Student updated: \(student.name)")
+                    self.student = student
+                    self.state = .loaded
+                    self.errorMessage = nil
+
+                    // Fetch TMI plans when student loads
+                    await self.fetchTMIPlans()
+
+                case .failure(let error):
+                    print("[StudentDetailStateModel] Error: \(error)")
+                    self.state = .error(error)
+                    self.errorMessage = error.localizedDescription
+                }
             }
-            state = .loaded
+        }
+    }
+
+    nonisolated func stopListening() {
+        print("[StudentDetailStateModel] Stopping listener for student: \(studentId)")
+        studentListener?.remove()
+        studentListener = nil
+    }
+
+    private func fetchTMIPlans() async {
+        do {
+            tmiPlans = try await planService.getPlansForStudent(studentId)
+            print("[StudentDetailStateModel] Fetched \(tmiPlans.count) TMI plans")
         } catch {
-            state = .error(error)
+            print("[StudentDetailStateModel] Failed to fetch TMI plans: \(error)")
+            // Don't override the main state - student data is still valid
+            // Just log the error
         }
     }
 }

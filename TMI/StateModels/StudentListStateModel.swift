@@ -22,7 +22,7 @@ final class StudentListStateModel: BaseStateModel<[Student], IdentifiableError> 
     private let studentService: StudentService
     private let tmiPlanService: TMIPlanService
     
-    init(studentService: StudentService = StudentService(), tmiPlanService: TMIPlanService = TMIPlanService()) {
+    init(studentService: StudentService = StudentService(), tmiPlanService: TMIPlanService = TMIPlanService.shared) {
         self.studentService = studentService
         self.tmiPlanService = tmiPlanService
         super.init()

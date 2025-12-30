@@ -233,21 +233,25 @@ extension FormTemplate {
         templateDescription: "This module addresses the unique challenges faced by students who have experienced parental incarceration, offering targeted support, assessment, and resources.",
         sections: [
             FormSection(
+                id: UUID().uuidString,
                 title: "Parental Incarceration Details",
                 fields: [
                     FormField(
+                        id: UUID().uuidString,
                         label: "Which parent is currently incarcerated?",
                         type: .multipleChoice,
                         isRequired: true,
                         options: ["Mother", "Father", "Both parents", "Other primary caregiver"]
                     ),
                     FormField(
+                        id: UUID().uuidString,
                         label: "How frequently do you have contact with your incarcerated parent?",
                         type: .multipleChoice,
                         isRequired: true,
                         options: ["Multiple times per week", "Once per week", "A few times per month", "Once per month", "Less than once per month", "No contact"]
                     ),
                     FormField(
+                        id: UUID().uuidString,
                         label: "How old were you when your parent(s) was first incarcerated?",
                         type: .number,
                         isRequired: true,
@@ -259,15 +263,18 @@ extension FormTemplate {
                 ]
             ),
             FormSection(
+                id: UUID().uuidString,
                 title: "Impact Assessment",
                 fields: [
                     FormField(
+                        id: UUID().uuidString,
                         label: "How does your parent's incarceration affect your schooling and daily life?",
                         type: .longText,
                         isRequired: false,
                         placeholder: "Consider academics, social life, emotions, attendance, etc."
                     ),
                     FormField(
+                        id: UUID().uuidString,
                         label: "What areas are most impacted?",
                         type: .multipleChoice,
                         isRequired: false,
@@ -276,9 +283,11 @@ extension FormTemplate {
                 ]
             ),
             FormSection(
+                id: UUID().uuidString,
                 title: "Living Arrangement",
                 fields: [
                     FormField(
+                        id: UUID().uuidString,
                         label: "What is your current living arrangement?",
                         type: .multipleChoice,
                         isRequired: true,
@@ -287,9 +296,11 @@ extension FormTemplate {
                 ]
             ),
             FormSection(
+                id: UUID().uuidString,
                 title: "Support Resources",
                 fields: [
                     FormField(
+                        id: UUID().uuidString,
                         label: "What support or resources would help you most right now?",
                         type: .longText,
                         isRequired: false,

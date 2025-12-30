@@ -23,7 +23,7 @@ struct NewTMIPlanView: View {
     @State private var interests: [Interest] = []
     @State private var interestCount: Int = 0
 
-    private let tmiPlanService = TMIPlanService()
+    private let tmiPlanService = TMIPlanService.shared
 
     init(student: Student, onPlanCreated: (() -> Void)? = nil) {
         self.student = student

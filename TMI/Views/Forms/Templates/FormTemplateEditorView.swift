@@ -50,21 +50,21 @@ struct FormTemplateEditorView: View {
           Toggle("Active", isOn: $template.isActive)
         }
         
-        ForEach($template.sections.indices, id: \.self) { index in
+        ForEach(Array($template.sections.enumerated()), id: \.element.id) { index, $section in
           Section {
-            TextField("Section Title", text: $template.sections[index].title)
-            
-            ForEach($template.sections[index].fields.indices, id: \.self) { fieldIndex in
+            TextField("Section Title", text: $section.title)
+
+            ForEach(Array($section.fields.enumerated()), id: \.element.id) { fieldIndex, $field in
               HStack {
                   VStack(alignment: .leading) {
-                      Text(template.sections[index].fields[fieldIndex].label)
+                      Text(field.label)
                           .font(.body)
-                      Text(template.sections[index].fields[fieldIndex].type.rawValue.capitalized)
+                      Text(field.type.rawValue.capitalized)
                           .font(.caption)
                           .foregroundColor(.secondary)
                   }
                   Spacer()
-                  if template.sections[index].fields[fieldIndex].isRequired {
+                  if field.isRequired {
                       Text("Required")
                           .font(.caption)
                           .foregroundColor(.red)
@@ -72,9 +72,9 @@ struct FormTemplateEditorView: View {
               }
             }
             .onDelete { offsets in
-                template.sections[index].fields.remove(atOffsets: offsets)
+                section.fields.remove(atOffsets: offsets)
             }
-            
+
             Button("Add Field") {
                 currentSectionIndex = index
                 showingFieldSheet = true

@@ -10,9 +10,8 @@ import SwiftUI
 import Charts
 
 struct StudentDetailView: View {
-    let initialStudent: Student
-    @State private var student: Student
-    @State private var refreshID = UUID()
+    let studentId: String
+    @State private var stateModel: StudentDetailStateModel
     @State private var showingCreatePlan = false
     @State private var showingEditStudent = false
     @State private var showingAddInterest = false
@@ -24,7 +23,6 @@ struct StudentDetailView: View {
     @State private var expandedSections: Set<String> = []
     @State private var planStateModel = TMIPlanListStateModel()
     @State private var interestsStateModel = InterestsAndHobbiesStateModel()
-    @State private var studentService = StudentService()
     @State private var studentMeetings: [Meeting] = []
 
     // Phase 2: Student Interest Edges
@@ -41,9 +39,9 @@ struct StudentDetailView: View {
     private let studentInterestService = StudentInterestService.shared
     private let interestLibraryService = InterestLibraryService.shared
 
-    init(student: Student) {
-        self.initialStudent = student
-        _student = State(initialValue: student)
+    init(studentId: String) {
+        self.studentId = studentId
+        _stateModel = State(initialValue: StudentDetailStateModel(studentId: studentId))
     }
 
     var body: some View {
@@ -51,52 +49,9 @@ struct StudentDetailView: View {
             TMIBackgroundView(variant: .default)
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: TMISpacing.lg) {
-                    // Hero Section
-                    heroSection
-
-                    // Quick Actions
-                    quickActionsRow
-
-                    // Key Stats
-                    keyStatsSection
-
-                    // Interests Section
-                    interestsSection
-
-                    // TMI Plans Section (NEW)
-                    tmiPlansSection
-
-                    // Meetings Section
-                    meetingsSection
-
-                    // Engagement Chart
-//                    if let engagementHistory = student.engagementHistory, !engagementHistory.isEmpty {
-//                        engagementChartSection(engagementHistory)
-//                    }
-
-                    // Academic Performance
-                    if let academic = student.academicPerformance {
-                        academicSection(academic)
-                    }
-
-                    // Notes & History
-                    if let notes = student.notes, !notes.isEmpty {
-                        notesSection(notes)
-                    }
-
-                    Spacer(minLength: 80) // Space for action bar
-                }
-                .padding(.horizontal, TMISpacing.screenPadding)
-                .padding(.top, TMISpacing.md)
-            }
-            .id(refreshID)
-
-            // Bottom Action Bar (Optional - can remove if using quick actions)
-            // primaryActionBar
+            contentView
         }
-        .navigationTitle(student.name)
+        .navigationTitle(stateModel.student?.name ?? "Student")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -107,64 +62,73 @@ struct StudentDetailView: View {
             }
         }
         .task {
-            // Set shared student context for cross-module coordination
-            await studentContext.setActiveStudent(
-                student.id,
-                student: student,
-                scope: .staff,
-                prefetchEdges: true
-            )
-            
-            await refreshStudent()
+            // Start listening for real-time student updates
+            stateModel.startListening()
+
+            // Set shared student context when student loads
+            if let student = stateModel.student {
+                await studentContext.setActiveStudent(
+                    studentId,
+                    student: student,
+                    scope: .staff,
+                    prefetchEdges: true
+                )
+            }
+
             await planStateModel.fetch()
             await loadMeetings()
             await loadStudentInterests()
         }
-        .refreshable {
-            await refreshStudent()
-            await planStateModel.fetch()
-            await loadMeetings()
-            await loadStudentInterests()
+        .onDisappear {
+            // Stop listening when view disappears
+            stateModel.stopListening()
         }
         .sheet(isPresented: $showingCreatePlan) {
-            NavigationStack {
-                NewTMIPlanView(student: student) {
-                    Task {
-                        await planStateModel.refresh()
+            if let student = stateModel.student {
+                NavigationStack {
+                    NewTMIPlanView(student: student) {
+                        Task {
+                            await planStateModel.refresh()
+                        }
                     }
                 }
             }
         }
         .sheet(isPresented: $showingEditStudent) {
-            NavigationStack {
-                EditStudentView(student: student) { updatedStudent in
-                    student = updatedStudent
-                    refreshID = UUID()
+            if let student = stateModel.student {
+                NavigationStack {
+                    EditStudentView(student: student) { _ in
+                        // No need to manually refresh - listener will update automatically
+                    }
                 }
             }
         }
         .sheet(isPresented: $showingAllPlans) {
-            NavigationStack {
-                StudentPlansListView(student: student, plans: studentPlans)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") {
-                                showingAllPlans = false
+            if let student = stateModel.student {
+                NavigationStack {
+                    StudentPlansListView(student: student, plans: studentPlans(for: student))
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") {
+                                    showingAllPlans = false
+                                }
                             }
                         }
-                    }
+                }
             }
         }
         .sheet(isPresented: $showingProgress) {
-            NavigationStack {
-                StudentProgressView(student: student, plans: studentPlans)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") {
-                                showingProgress = false
+            if let student = stateModel.student {
+                NavigationStack {
+                    StudentProgressView(student: student, plans: studentPlans(for: student))
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") {
+                                    showingProgress = false
+                                }
                             }
                         }
-                    }
+                }
             }
         }
         .alert("Retake Survey?", isPresented: $showRetakeConfirmation) {
@@ -173,18 +137,105 @@ struct StudentDetailView: View {
                 retakeSurvey()
             }
         } message: {
-            Text("This will allow \(student.name) to take the interest survey again. Current survey results will be replaced, but manually added interests will be preserved.")
+            if let student = stateModel.student {
+                Text("This will allow \(student.name) to take the interest survey again. Current survey results will be replaced, but manually added interests will be preserved.")
+            }
+        }
+    }
+
+    // MARK: - Content View
+
+    @ViewBuilder
+    private var contentView: some View {
+        switch stateModel.state {
+        case .loading:
+            VStack(spacing: TMISpacing.md) {
+                ProgressView()
+                    .tint(.tmiPrimary)
+                Text("Loading student...")
+                    .font(.tmiBody)
+                    .foregroundColor(.tmiTextSecondary)
+            }
+
+        case .error(let error):
+            VStack(spacing: TMISpacing.md) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 48))
+                    .foregroundColor(.red)
+                Text("Failed to load student")
+                    .font(.tmiTitle3)
+                    .foregroundColor(.tmiTextPrimary)
+                Text(error.localizedDescription)
+                    .font(.tmiBody)
+                    .foregroundColor(.tmiTextSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(TMISpacing.screenPadding)
+
+        case .loaded, .idle:
+            if let student = stateModel.student {
+                studentContentView(student: student)
+            } else {
+                VStack(spacing: TMISpacing.md) {
+                    ProgressView()
+                        .tint(.tmiPrimary)
+                    Text("Loading student...")
+                        .font(.tmiBody)
+                        .foregroundColor(.tmiTextSecondary)
+                }
+            }
+        }
+    }
+
+    // MARK: - Student Content View
+
+    @ViewBuilder
+    private func studentContentView(student: Student) -> some View {
+        ScrollView {
+            VStack(spacing: TMISpacing.lg) {
+                // Hero Section
+                heroSection(student: student)
+
+                // Quick Actions
+                quickActionsRow(student: student)
+
+                // Key Stats
+                keyStatsSection(student: student)
+
+                // Interests Section
+                interestsSection(student: student)
+
+                // TMI Plans Section
+                tmiPlansSection(student: student)
+
+                // Meetings Section
+                meetingsSection(student: student)
+
+                // Academic Performance
+                if let academic = student.academicPerformance {
+                    academicSection(academic)
+                }
+
+                // Notes & History
+                if let notes = student.notes, !notes.isEmpty {
+                    notesSection(notes)
+                }
+
+                Spacer(minLength: 80) // Space for action bar
+            }
+            .padding(.horizontal, TMISpacing.screenPadding)
+            .padding(.top, TMISpacing.md)
         }
     }
 
     // MARK: - Hero Section
 
-    private var heroSection: some View {
+    private func heroSection(student: Student) -> some View {
         VStack(spacing: TMISpacing.md) {
             // Avatar
             TMIAvatar(
                 initials: student.initials,
-                color: avatarColor,
+                color: avatarColor(for: student),
                 size: TMISizing.avatarLg
             )
 
@@ -205,14 +256,14 @@ struct StudentDetailView: View {
 
     // MARK: - Quick Actions
 
-    private var quickActionsRow: some View {
+    private func quickActionsRow(student: Student) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: TMISpacing.md) {
                 quickActionButton(
                     icon: "person.crop.circle.badge.checkmark",
                     label: "Student Mode",
                     color: .tmiSuccess,
-                    action: { enableStudentMode() }
+                    action: { enableStudentMode(student: student) }
                 )
 
                 quickActionButton(
@@ -261,7 +312,7 @@ struct StudentDetailView: View {
 
     // MARK: - Key Stats
 
-    private var keyStatsSection: some View {
+    private func keyStatsSection(student: Student) -> some View {
         HStack(spacing: TMISpacing.md) {
             statCard(
                 value: "\(student.age)",
@@ -297,7 +348,7 @@ struct StudentDetailView: View {
 
     // MARK: - Interests Section
 
-    private var interestsSection: some View {
+    private func interestsSection(student: Student) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
                 Text("Interests")
@@ -307,7 +358,7 @@ struct StudentDetailView: View {
                 Spacer()
 
                 // Show "Retake Survey" button if student has completed a survey
-                if hasSurveyResults {
+                if hasSurveyResults(for: student) {
                     Button(action: {
                         showRetakeConfirmation = true
                     }) {
@@ -395,24 +446,25 @@ struct StudentDetailView: View {
         }
         .tmiCard()
         .sheet(isPresented: $showingAddInterest) {
-            NavigationStack {
-                AddInterestToStudentView(student: student) { updatedStudent in
-                    student = updatedStudent
-                    refreshID = UUID()
-                }
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            showingAddInterest = false
+            if let student = stateModel.student {
+                NavigationStack {
+                    AddInterestToStudentView(student: student) { _ in
+                        // No need to manually refresh - listener will update automatically
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") {
+                                showingAddInterest = false
+                            }
                         }
                     }
                 }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingSurvey) {
-            if let studentId = student.id {
+            if let student = stateModel.student, let studentId = student.id {
                 NavigationStack {
                     StudentSurveyFlow(studentId: studentId)
                         .toolbar {
@@ -424,20 +476,17 @@ struct StudentDetailView: View {
                             }
                         }
                 }
-                .onDisappear {
-                    // Refresh student data after survey completion
-                    Task {
-                        await refreshStudent()
-                    }
-                }
+                // No need to manually refresh - listener will update automatically
             }
         }
     }
 
     // MARK: - TMI Plans Section
 
-    private var tmiPlansSection: some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
+    private func tmiPlansSection(student: Student) -> some View {
+        let studentPlans = self.studentPlans(for: student)
+
+        return VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("TMI Plans")
@@ -451,7 +500,7 @@ struct StudentDetailView: View {
 
                 Spacer()
 
-                if studentHasPlans {
+                if !studentPlans.isEmpty {
                     TMIBadge(
                         text: "\(studentPlans.count)",
                         color: .tmiPrimary,
@@ -460,7 +509,7 @@ struct StudentDetailView: View {
                 }
             }
 
-            if studentHasPlans {
+            if !studentPlans.isEmpty {
                 VStack(spacing: TMISpacing.sm) {
                     ForEach(studentPlans.prefix(3)) { plan in
                         NavigationLink(destination: TMIPlanDetailView(plan: plan)) {
@@ -519,14 +568,11 @@ struct StudentDetailView: View {
             }
         }
         .tmiCard()
-        .task {
-            await planStateModel.fetch()
-        }
     }
 
     // MARK: - Meetings Section
 
-    private var meetingsSection: some View {
+    private func meetingsSection(student: Student) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
@@ -593,7 +639,7 @@ struct StudentDetailView: View {
                         .font(.tmiCaption)
                         .foregroundColor(.tmiTextTertiary)
                         .multilineTextAlignment(.center)
-                    
+
                     TMIButton(
                         text: "Schedule Meeting",
                         icon: "calendar.badge.plus",
@@ -748,11 +794,7 @@ struct StudentDetailView: View {
         )
     }
 
-    private var studentHasPlans: Bool {
-        !studentPlans.isEmpty
-    }
-
-    private var studentPlans: [TMIPlan] {
+    private func studentPlans(for student: Student) -> [TMIPlan] {
         planStateModel.plans.filter { plan in
             plan.students.contains(where: { $0.id == student.id })
         }
@@ -936,7 +978,7 @@ struct StudentDetailView: View {
 
     // MARK: - Helpers
 
-    private var avatarColor: Color {
+    private func avatarColor(for student: Student) -> Color {
         switch student.avatarColor {
         case .blue: return .blue
         case .green: return .green
@@ -957,23 +999,11 @@ struct StudentDetailView: View {
     }
 
     @MainActor
-    private func refreshStudent() async {
-        do {
-            if let updatedStudent = try await studentService.getStudent(by: student.id ?? "") {
-                student = updatedStudent
-            }
-        } catch {
-            // If fetch fails, keep using the existing student
-            print("Failed to refresh student: \(error)")
-        }
-    }
-
-    @MainActor
     private func loadMeetings() async {
         do {
             let allMeetings = try await meetingService.fetchMeetings()
             studentMeetings = allMeetings.filter { meeting in
-                meeting.relatedStudentIds.contains(student.id ?? "")
+                meeting.relatedStudentIds.contains(studentId)
             }
             .sorted { $0.startTime < $1.startTime }
         } catch {
@@ -982,7 +1012,7 @@ struct StudentDetailView: View {
         }
     }
 
-    private var hasSurveyResults: Bool {
+    private func hasSurveyResults(for student: Student) -> Bool {
         return student.surveyResults?.isEmpty == false
     }
 
@@ -998,11 +1028,6 @@ struct StudentDetailView: View {
     /// Load student interests from edge collection and resolve them via library
     @MainActor
     private func loadStudentInterests() async {
-        guard let studentId = student.id else {
-            print("[StudentDetailView] Cannot load interests: student has no ID")
-            return
-        }
-
         isLoadingInterests = true
 
         do {
@@ -1018,7 +1043,7 @@ struct StudentDetailView: View {
             }
 
             resolvedInterests = interests
-            print("[StudentDetailView] Loaded \(resolvedInterests.count) interests for student \(student.name)")
+            print("[StudentDetailView] Loaded \(resolvedInterests.count) interests for student ID: \(studentId)")
         } catch {
             print("[StudentDetailView] Error loading student interests: \(error.localizedDescription)")
             resolvedInterests = []
@@ -1034,7 +1059,7 @@ struct StudentDetailView: View {
 
     // MARK: - Student Mode
 
-    private func enableStudentMode() {
+    private func enableStudentMode(student: Student) {
         print("[StudentDetail] 🎓 Button tapped - Enabling student mode for: \(student.name)")
 
         // Use Task to avoid "modifying state during view update" warning
@@ -1085,6 +1110,6 @@ private struct StudentInterestBadge: View {
 
 #Preview {
     NavigationStack {
-        StudentDetailView(student: Student.sampleStudent)
+        StudentDetailView(studentId: Student.sampleStudent.id ?? "preview-student-id")
     }
 }

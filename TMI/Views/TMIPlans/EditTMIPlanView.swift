@@ -325,7 +325,7 @@ struct EditTMIPlanView: View {
         
         Task {
             do {
-                let savedPlan = try await TMIPlanService().updatePlan(updatedPlan)
+                let savedPlan = try await TMIPlanService.shared.updatePlan(updatedPlan)
                 
                 await MainActor.run {
                     onSave(savedPlan)

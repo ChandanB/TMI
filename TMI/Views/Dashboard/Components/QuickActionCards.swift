@@ -234,15 +234,16 @@ struct StudentsNeedingSupportView: View {
                 )
             } else {
                 List(studentsNeedingSupport) { student in
-                    NavigationLink(destination: StudentDetailView(student: student)) {
-                        HStack(spacing: TMISpacing.md) {
-                            TMIAvatar(
-                                initials: student.initials,
-                                color: avatarColor(for: student),
-                                size: TMISizing.avatarSm
-                            )
+                    if let studentId = student.id {
+                        NavigationLink(destination: StudentDetailView(studentId: studentId)) {
+                            HStack(spacing: TMISpacing.md) {
+                                TMIAvatar(
+                                    initials: student.initials,
+                                    color: avatarColor(for: student),
+                                    size: TMISizing.avatarSm
+                                )
 
-                            VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: 4) {
                                 Text(student.name)
                                     .font(.tmiBody)
                                     .foregroundColor(.tmiTextPrimary)
@@ -254,17 +255,18 @@ struct StudentsNeedingSupportView: View {
                                 Text("Engagement: \(Int(student.engagementScore * 100))%")
                                     .font(.tmiFootnote)
                                     .foregroundColor(.tmiWarning)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.tmiTextTertiary)
                             }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.tmiTextTertiary)
+                            .padding(.vertical, TMISpacing.sm)
                         }
-                        .padding(.vertical, TMISpacing.sm)
+                        .listRowBackground(Color.tmiBackground)
                     }
-                    .listRowBackground(Color.tmiBackground)
                 }
                 .listStyle(.plain)
             }

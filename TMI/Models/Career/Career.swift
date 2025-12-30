@@ -142,6 +142,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
     // Sample careers for preview
     static let sampleCareers: [Career] = [
         Career(
+            id: "sample-software-developer",
             title: "Software Developer",
             field: "Technology",
             description: "Design, build, and maintain computer programs. Work with various programming languages to create software solutions for businesses and consumers.",
@@ -152,6 +153,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
             growthRate: 0.22
         ),
         Career(
+            id: "sample-data-scientist",
             title: "Data Scientist",
             field: "Technology",
             description: "Analyze large datasets to extract meaningful insights. Use statistical methods and machine learning algorithms to solve complex problems and inform business decisions.",
@@ -162,6 +164,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
             growthRate: 0.31
         ),
         Career(
+            id: "sample-nurse-practitioner",
             title: "Nurse Practitioner",
             field: "Healthcare",
             description: "Provide advanced nursing care to patients, including diagnosing illnesses, prescribing medications, and developing treatment plans.",
@@ -172,6 +175,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
             growthRate: 0.45
         ),
         Career(
+            id: "sample-marketing-manager",
             title: "Marketing Manager",
             field: "Business",
             description: "Develop and implement marketing strategies to promote products or services. Analyze market trends and oversee marketing campaigns to drive business growth.",
@@ -182,6 +186,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
             growthRate: 0.10
         ),
         Career(
+            id: "sample-civil-engineer",
             title: "Civil Engineer",
             field: "Engineering",
             description: "Design, construct, and maintain infrastructure projects and systems, including roads, bridges, dams, and water supply systems.",
@@ -192,6 +197,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
             growthRate: 0.08
         ),
         Career(
+            id: "sample-high-school-teacher",
             title: "High School Teacher",
             field: "Education",
             description: "Educate students in grades 9-12 in specific subject areas. Develop lesson plans, assess student progress, and prepare them for college or careers.",
@@ -202,6 +208,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
             growthRate: 0.04
         ),
         Career(
+            id: "sample-graphic-designer",
             title: "Graphic Designer",
             field: "Arts",
             description: "Create visual concepts to communicate ideas. Design layouts for websites, advertisements, brochures, magazines, and corporate reports.",
@@ -212,6 +219,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
             growthRate: 0.03
         ),
         Career(
+            id: "sample-financial-analyst",
             title: "Financial Analyst",
             field: "Business",
             description: "Evaluate investment opportunities and provide guidance for businesses and individuals. Analyze financial data to forecast business, industry, and economic conditions.",
@@ -222,6 +230,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
             growthRate: 0.09
         ),
         Career(
+            id: "sample-environmental-scientist",
             title: "Environmental Scientist",
             field: "Science",
             description: "Study environmental problems and develop solutions. Collect and analyze data to monitor environmental impacts and protect human health and natural resources.",

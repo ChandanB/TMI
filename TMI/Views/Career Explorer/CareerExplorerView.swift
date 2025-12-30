@@ -135,8 +135,7 @@ struct CareerExplorerView: View {
       columns: [GridItem(.adaptive(minimum: 170), spacing: 16)],
       spacing: 20
     ) {
-      ForEach(filteredCareers.indices, id: \.self) { index in
-        let career = filteredCareers[index]
+      ForEach(Array(filteredCareers.enumerated()), id: \.element.id) { index, career in
         NavigationLink(
           destination: CareerDetailView(career: career, student: selectedStudent)
         ) {

@@ -7,8 +7,15 @@
 
 import SwiftUI
 
+/// Context for survey completion - determines post-survey actions
+enum SurveyContext {
+    case studentDetail
+    case planDetail(planId: String)
+}
+
 struct StudentSurveyFlow: View {
     let studentId: String
+    var context: SurveyContext = .studentDetail
     var showCancelButton: Bool = true
 
     @Environment(\.dismiss) private var dismiss
@@ -63,6 +70,7 @@ struct StudentSurveyFlow: View {
                     studentId: studentId,
                     responses: responses,
                     surveyDuration: Date().timeIntervalSince(surveyStartTime),
+                    context: context,
                     onDismiss: {
                         // Dismiss the entire survey modal
                         dismiss()

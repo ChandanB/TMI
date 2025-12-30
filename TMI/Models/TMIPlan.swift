@@ -80,6 +80,11 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
   var approvedAt: Date?
   var rejectionReason: String?
 
+  // Phase 1A: Survey snapshot fields for interest tracking
+  var latestInterestSurveyId: String?
+  var interestIdsSnapshot: [String]?
+  var snapshotUpdatedAt: Date?
+
   init(
     id: String? = nil, title: String, description: String? = nil, students: [Student],
     model: TMIPlanModel, interests: [Interest], startDate: Date, endDate: Date?, creationDate: Date,
@@ -87,7 +92,8 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     progressTracking: [ProgressEntry]? = nil, createdBy: String, resources: [Resource] = [],
     approvalStatus: PlanApprovalStatus = .draft, approvalHistory: [ApprovalHistoryEntry] = [],
     submittedForApprovalAt: Date? = nil, approvedBy: String? = nil, approvedAt: Date? = nil,
-    rejectionReason: String? = nil
+    rejectionReason: String? = nil,
+    latestInterestSurveyId: String? = nil, interestIdsSnapshot: [String]? = nil, snapshotUpdatedAt: Date? = nil
   ) {
     self.id = id
     self.title = title
@@ -112,6 +118,9 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     self.approvedBy = approvedBy
     self.approvedAt = approvedAt
     self.rejectionReason = rejectionReason
+    self.latestInterestSurveyId = latestInterestSurveyId
+    self.interestIdsSnapshot = interestIdsSnapshot
+    self.snapshotUpdatedAt = snapshotUpdatedAt
   }
 
   public static func == (lhs: TMIPlan, rhs: TMIPlan) -> Bool {

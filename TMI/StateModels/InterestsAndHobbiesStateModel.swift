@@ -20,7 +20,7 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
     private let interestLibraryService = InterestLibraryService.shared
     private let studentInterestService = StudentInterestService.shared
     private let studentService = StudentService()
-    private let tmiPlanService = TMIPlanService()
+    private let tmiPlanService = TMIPlanService.shared
 
     // MARK: - Fetch Guard
     private var isFetching = false

@@ -142,8 +142,10 @@ struct TMIPlanListView: View {
         }
         .sheet(item: $selectedPlanForStudents) { plan in
             NavigationStack {
-                if let student = plan.students.first, plan.students.count == 1 {
-                    StudentDetailView(student: student)
+                if let student = plan.students.first,
+                   let studentId = student.id,
+                   plan.students.count == 1 {
+                    StudentDetailView(studentId: studentId)
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {
                                 Button("Close") {
@@ -153,11 +155,13 @@ struct TMIPlanListView: View {
                         }
                 } else {
                     List(plan.students) { student in
-                        NavigationLink(destination: StudentDetailView(student: student)) {
-                            HStack {
-                                TMIAvatar(initials: student.initials, color: .blue, size: 32)
-                                Text(student.name)
-                                    .font(.tmiBody)
+                        if let studentId = student.id {
+                            NavigationLink(destination: StudentDetailView(studentId: studentId)) {
+                                HStack {
+                                    TMIAvatar(initials: student.initials, color: .blue, size: 32)
+                                    Text(student.name)
+                                        .font(.tmiBody)
+                                }
                             }
                         }
                     }

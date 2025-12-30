@@ -13,8 +13,12 @@ import Observation
 /// Service for managing TMI Plan data operations with Firestore
 @Observable
 class TMIPlanService {
+    static let shared = TMIPlanService()
+
     private let db = Firestore.firestore()
-    
+
+    private init() {}
+
     /// Get the user-scoped TMI plans collection
     private var userPlansCollection: CollectionReference? {
         guard let uid = Auth.auth().currentUser?.uid else {
@@ -919,6 +923,29 @@ class TMIPlanService {
         } catch {
             print("[TMIPlanService] Error fetching TMI plans for student: \(error)")
             throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
+        }
+    }
+
+    /// Update plan with survey snapshot data
+    func updateSurveySnapshot(planId: String, surveyId: String, interestIds: [String]) async throws {
+        guard let collection = userPlansCollection else {
+            print("[TMIPlanService] Error: No user logged in, cannot update plan snapshot")
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+
+        let updates: [String: Any] = [
+            "latestInterestSurveyId": surveyId,
+            "interestIdsSnapshot": interestIds,
+            "snapshotUpdatedAt": Timestamp(date: Date()),
+            "lastUpdated": Timestamp(date: Date())
+        ]
+
+        do {
+            try await collection.document(planId).updateData(updates)
+            print("[TMIPlanService] Updated plan \(planId) with survey snapshot")
+        } catch {
+            print("[TMIPlanService] Error updating plan snapshot: \(error)")
+            throw TMIPlanServiceError.updateFailed(error.localizedDescription)
         }
     }
 }

@@ -256,7 +256,7 @@ final class StudentContextStateModel {
             // Fetch plans
             group.addTask { @MainActor in
                 do {
-                    let planService = TMIPlanService()
+                    let planService = TMIPlanService.shared
                     let allPlans = try await planService.fetchPlans()
                     
                     // Filter to plans containing this student

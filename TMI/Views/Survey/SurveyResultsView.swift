@@ -11,6 +11,7 @@ struct SurveyResultsView: View {
     let studentId: String
     let responses: [String: SurveyResponse.SurveyAnswerValue]
     let surveyDuration: TimeInterval
+    var context: SurveyContext = .studentDetail
     var onDismiss: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
@@ -404,6 +405,15 @@ struct SurveyResultsView: View {
                     duration: surveyDuration
                 )
 
+                // Update plan snapshot if launched from plan context
+                if case .planDetail(let planId) = context {
+                    try await updatePlanSnapshot(
+                        planId: planId,
+                        surveyId: surveyResponse.id.uuidString,
+                        interestIds: surveyResponse.topInterests
+                    )
+                }
+
                 // Get career matches
                 let matches = CareerMatchingService.shared.matchCareers(
                     from: surveyResponse.interestClusters,
@@ -450,6 +460,17 @@ struct SurveyResultsView: View {
         } else {
             return "\(seconds)s"
         }
+    }
+
+    /// Update TMI Plan with survey snapshot data
+    private func updatePlanSnapshot(planId: String, surveyId: String, interestIds: [String]) async throws {
+        let service = TMIPlanService.shared
+        try await service.updateSurveySnapshot(
+            planId: planId,
+            surveyId: surveyId,
+            interestIds: interestIds
+        )
+        print("[DATA] Updated plan \(planId) with survey snapshot: \(surveyId)")
     }
 }
 

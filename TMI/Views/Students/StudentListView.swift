@@ -186,30 +186,32 @@ struct StudentListView: View {
     private var studentList: some View {
         List {
             ForEach(filteredStudents) { student in
-                NavigationLink(destination: StudentDetailView(student: student)) {
-                    studentRow(student)
-                }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 6, leading: TMISpacing.screenPadding, bottom: 6, trailing: TMISpacing.screenPadding))
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    // Delete action
-                    Button(role: .destructive) {
-                        studentToDelete = student
-                        showingDeleteConfirmation = true
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                if let studentId = student.id {
+                    NavigationLink(destination: StudentDetailView(studentId: studentId)) {
+                        studentRow(student)
                     }
-                }
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    // Create Plan action
-                    Button {
-                        studentForNewPlan = student
-                        TMIHaptics.lightImpact()
-                    } label: {
-                        Label("Create Plan", systemImage: "doc.badge.plus")
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 6, leading: TMISpacing.screenPadding, bottom: 6, trailing: TMISpacing.screenPadding))
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        // Delete action
+                        Button(role: .destructive) {
+                            studentToDelete = student
+                            showingDeleteConfirmation = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
-                    .tint(.tmiSuccess)
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        // Create Plan action
+                        Button {
+                            studentForNewPlan = student
+                            TMIHaptics.lightImpact()
+                        } label: {
+                            Label("Create Plan", systemImage: "doc.badge.plus")
+                        }
+                        .tint(.tmiSuccess)
+                    }
                 }
             }
         }
@@ -373,8 +375,10 @@ struct StudentListView: View {
 
     private func quickActionsMenu(for student: Student) -> some View {
         Menu {
-            NavigationLink(destination: StudentDetailView(student: student)) {
-                Label("View Details", systemImage: "person.circle")
+            if let studentId = student.id {
+                NavigationLink(destination: StudentDetailView(studentId: studentId)) {
+                    Label("View Details", systemImage: "person.circle")
+                }
             }
 
             Button {

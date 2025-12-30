@@ -5,9 +5,14 @@
 //  View for conducting an interest survey within a TMI Plan
 //  Uses global interest library and student interest edges
 //
+//  ⚠️ DEPRECATED: This view is deprecated in favor of StudentSurveyFlow
+//  Migration: Use StudentSurveyFlow with context: .planDetail(planId:) instead
+//  StudentSurveyFlow provides a unified survey experience with better data persistence
+//
 
 import SwiftUI
 
+@available(*, deprecated, message: "Use StudentSurveyFlow with context: .planDetail(planId:) instead")
 struct InterestSurveyView: View {
     let plan: TMIPlan
     let studentId: String  // Required for saving student interest edges

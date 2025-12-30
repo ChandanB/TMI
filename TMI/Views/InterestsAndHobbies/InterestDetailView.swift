@@ -245,12 +245,14 @@ struct InterestDetailView: View {
     private func studentsContent(_ students: [Student]) -> some View {
         VStack(spacing: 10) {
             ForEach(Array(students.prefix(3))) { student in
-                NavigationLink {
-                    StudentDetailView(student: student)
-                } label: {
-                    StudentRowView(student: student, color: interest.color)
+                if let studentId = student.id {
+                    NavigationLink {
+                        StudentDetailView(studentId: studentId)
+                    } label: {
+                        StudentRowView(student: student, color: interest.color)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .buttonStyle(PlainButtonStyle())
             }
 
             if students.count > 3 {

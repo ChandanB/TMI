@@ -75,7 +75,7 @@ extension EnvironmentValues {
 final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError> {
   // MARK: - Dependencies
   private let studentService = StudentService()
-  private let tmiPlanService = TMIPlanService()
+  private let tmiPlanService = TMIPlanService.shared
 
   // MARK: - Cancellables
   private var cancellables = Set<AnyCancellable>()

@@ -184,7 +184,7 @@ actor AppBootstrapService {
     
     private func primePlanCache() async {
         do {
-            let service = TMIPlanService()
+            let service = TMIPlanService.shared
             let plans = try await service.fetchPlans()
             
             // Cache in the state model or local store
