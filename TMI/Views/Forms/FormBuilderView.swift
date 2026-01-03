@@ -47,7 +47,7 @@ struct FormBuilderView: View {
                   .font(.title.bold())
                   .foregroundColor(.white)
                 
-                Text("The drag-and-drop form builder is currently under development. For now, you can use our pre-built templates from the Forms & Surveys library.")
+                Text("The drag-and-drop form builder is currently under development. For now, you can use our pre-built templates from the Forms library.")
                   .font(.body)
                   .foregroundColor(.white.opacity(0.8))
                   .multilineTextAlignment(.center)

@@ -389,10 +389,29 @@ struct StudentListView: View {
             }
 
             Button {
-                // Send interest survey
-                // In a real app, this would trigger an email or notification
-                print("Sending survey to \(student.name)")
-                TMIHaptics.lightImpact()
+                Task {
+                    do {
+                        let result = try await SurveyDeliveryService.shared.sendSurvey(
+                            to: student,
+                            deliveryMethod: .link  // Use .email when guardian emails are available
+                        )
+                        print("[StudentList] \(result.message)")
+                        TMIHaptics.success()
+
+                        // Show success feedback
+                        await MainActor.run {
+                            // You could show a success toast/alert here
+                        }
+                    } catch {
+                        print("[StudentList] Survey send failed: \(error.localizedDescription)")
+                        TMIHaptics.error()
+
+                        // Show error feedback
+                        await MainActor.run {
+                            // You could show an error alert here
+                        }
+                    }
+                }
             } label: {
                 Label("Send Survey", systemImage: "envelope")
             }

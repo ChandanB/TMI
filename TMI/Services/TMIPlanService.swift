@@ -168,6 +168,10 @@ class TMIPlanService {
                     let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
                     let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
                     let createdBy = data["createdBy"] as? String ?? ""
+                    let latestInterestSurveyId = data["latestInterestSurveyId"] as? String
+                    let interestIdsSnapshot = data["interestIdsSnapshot"] as? [String]
+                    let snapshotUpdatedAt = (data["snapshotUpdatedAt"] as? Double).map(Date.init(timeIntervalSince1970:))
+                    
                     let plan = TMIPlan(
                         id: document.documentID,
                         title: title,
@@ -175,7 +179,7 @@ class TMIPlanService {
                         students: students,
                         model: model,
                         interests: interests,
-                                startDate: startDate,
+                        startDate: startDate,
                         endDate: endDate,
                         creationDate: creationDate,
                         lastUpdated: lastUpdated,
@@ -185,7 +189,10 @@ class TMIPlanService {
                         strategies: data["strategies"] as? [String],
                         progressTracking: nil,
                         createdBy: createdBy,
-                        resources: resources
+                        resources: resources,
+                        latestInterestSurveyId: latestInterestSurveyId,
+                        interestIdsSnapshot: interestIdsSnapshot,
+                        snapshotUpdatedAt: snapshotUpdatedAt
                     )
                     
                     print("[TMIPlanService] Successfully reconstructed plan: \(plan.model.rawValue)")
@@ -338,6 +345,9 @@ class TMIPlanService {
             let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
             let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
             let createdBy = data["createdBy"] as? String ?? ""
+            let latestInterestSurveyId = data["latestInterestSurveyId"] as? String
+            let interestIdsSnapshot = data["interestIdsSnapshot"] as? [String]
+            let snapshotUpdatedAt = (data["snapshotUpdatedAt"] as? Double).map(Date.init(timeIntervalSince1970:))
 
             let plan = TMIPlan(
                 id: planId,
@@ -356,7 +366,10 @@ class TMIPlanService {
                 strategies: data["strategies"] as? [String],
                 progressTracking: nil,
                 createdBy: createdBy,
-                resources: resources
+                resources: resources,
+                latestInterestSurveyId: latestInterestSurveyId,
+                interestIdsSnapshot: interestIdsSnapshot,
+                snapshotUpdatedAt: snapshotUpdatedAt
             )
 
             print("[TMIPlanService] Successfully fetched plan: \(plan.model.rawValue)")
@@ -510,6 +523,9 @@ class TMIPlanService {
             let startDate = (docData["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
             let endDate = (docData["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
             let createdBy = docData["createdBy"] as? String ?? ""
+            let latestInterestSurveyId = docData["latestInterestSurveyId"] as? String
+            let interestIdsSnapshot = docData["interestIdsSnapshot"] as? [String]
+            let snapshotUpdatedAt = (docData["snapshotUpdatedAt"] as? Double).map(Date.init(timeIntervalSince1970:))
             
             let savedPlan = TMIPlan(
                 id: document.documentID,
@@ -528,7 +544,10 @@ class TMIPlanService {
                 strategies: docData["strategies"] as? [String],
                 progressTracking: nil,
                 createdBy: createdBy,
-                resources: resources
+                resources: resources,
+                latestInterestSurveyId: latestInterestSurveyId,
+                interestIdsSnapshot: interestIdsSnapshot,
+                snapshotUpdatedAt: snapshotUpdatedAt
             )
             
             return savedPlan
@@ -726,6 +745,10 @@ class TMIPlanService {
                 let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
                 let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
                 let createdBy = data["createdBy"] as? String ?? ""
+                let latestInterestSurveyId = data["latestInterestSurveyId"] as? String
+                let interestIdsSnapshot = data["interestIdsSnapshot"] as? [String]
+                let snapshotUpdatedAt = (data["snapshotUpdatedAt"] as? Double).map(Date.init(timeIntervalSince1970:))
+
                 return TMIPlan(
                     id: document.documentID,
                     title: title,
@@ -743,7 +766,10 @@ class TMIPlanService {
                     strategies: data["strategies"] as? [String],
                     progressTracking: nil,
                     createdBy: createdBy,
-                    resources: resources
+                    resources: resources,
+                    latestInterestSurveyId: latestInterestSurveyId,
+                    interestIdsSnapshot: interestIdsSnapshot,
+                    snapshotUpdatedAt: snapshotUpdatedAt
                 )
             } else {
                 return nil
@@ -756,170 +782,21 @@ class TMIPlanService {
     
     /// Get plans for a specific student
     func getPlansForStudent(_ studentId: String) async throws -> [TMIPlan] {
-        guard let collection = userPlansCollection else {
+        guard userPlansCollection != nil else {
             throw TMIPlanServiceError.userNotAuthenticated
         }
-        
+
         do {
             print("[TMIPlanService] Fetching TMI plans for student: \(studentId)")
-            let querySnapshot = try await collection
-                .whereField("students", arrayContains: ["id": studentId])
-                .getDocuments()
-            
-            let plans = querySnapshot.documents.compactMap { document -> TMIPlan? in
-                print("[TMIPlanService] Processing document: \(document.documentID)")
-                let data = document.data()
-                
-                // Manual reconstruction of TMIPlan from Firestore data
-                guard let modelRaw = data["model"] as? String,
-                          let model = TMIPlanModel(rawValue: modelRaw),
-                          let progress = data["progress"] as? Double,
-                          let notes = data["notes"] as? String,
-                          let creationTimestamp = data["creationDate"] as? Double,
-                          let lastUpdatedTimestamp = data["lastUpdated"] as? Double else {
-                        print("[TMIPlanService] Missing required fields in document \(document.documentID)")
-                        return nil
-                    }
-                    
-                    let creationDate = Date(timeIntervalSince1970: creationTimestamp)
-                    let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
-                    
-                    // Reconstruct students array from simplified data
-                    let students: [Student]
-                    if let studentsData = data["students"] as? [[String: Any]] {
-                        students = studentsData.map { studentInfo in
-                            Student(
-                                id: studentInfo["id"] as? String,
-                                name: studentInfo["name"] as? String ?? "Unknown",
-                                grade: studentInfo["grade"] as? String ?? "",
-                                school: "",
-                                dateOfBirth: Date()
-                            )
-                        }
-                    } else {
-                        print("[TMIPlanService] Missing students data in document \(document.documentID)")
-                        return nil
-                    }
-                    
-                    // Reconstruct interests from full objects
-                    let interests: [Interest]
-                    if let interestsData = data["interests"] as? [[String: Any]] {
-                        interests = interestsData.compactMap { interestData in
-                            Interest.fromFirestore(id: interestData["id"] as? String ?? "", data: interestData)
-                        }
-                    } else {
-                        interests = []
-                    }
-                    
-                    // Note: Hobbies are now included in interests
-                    
-                    // Reconstruct goals from array data
-                    let goals: [Goal]
-                    if let goalsData = data["goals"] as? [[String: Any]] {
-                        goals = goalsData.compactMap { goalData in
-                            guard let idString = goalData["id"] as? String,
-                                  let id = UUID(uuidString: idString),
-                                  let description = goalData["description"] as? String,
-                                  let statusString = goalData["status"] as? String,
-                                  let status = GoalStatus(rawValue: statusString),
-                                  let progress = goalData["progress"] as? Double else {
-                                return nil
-                            }
-                            
-                            let notes = goalData["notes"] as? String
-                            let dueDate: Date?
-                            if let dueDateTimestamp = goalData["dueDate"] as? Double {
-                                dueDate = Date(timeIntervalSince1970: dueDateTimestamp)
-                            } else {
-                                dueDate = nil
-                            }
-                            
-                            return Goal(
-                                id: id,
-                                description: description,
-                                dueDate: dueDate, status: status,
-                                progress: progress,
-                                notes: notes
-                            )
-                        }
-                    } else {
-                        goals = []
-                    }
 
-                    // Reconstruct resources
-                    let resources: [Resource]
-                    if let resourcesData = data["resources"] as? [[String: Any]] {
-                        resources = resourcesData.compactMap { resourceData in
-                            guard let title = resourceData["title"] as? String,
-                                  let description = resourceData["description"] as? String,
-                                  let categoryRaw = resourceData["category"] as? String,
-                                  let category = Resource.ResourceCategory(rawValue: categoryRaw),
-                                  let url = resourceData["url"] as? String,
-                                  let createdAtTimestamp = resourceData["createdAt"] as? Double,
-                                  let updatedAtTimestamp = resourceData["updatedAt"] as? Double else {
-                                return nil
-                            }
-                            
-                            let tags = resourceData["tags"] as? [String] ?? []
-                            let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
-                            let isFeatured = resourceData["isFeatured"] as? Bool ?? false
-                            let thumbnail = resourceData["thumbnail"] as? String
-                            let scopeRaw = resourceData["scope"] as? String
-                            let scope = scopeRaw.flatMap { Resource.ResourceScope(rawValue: $0) }
-                            let districtId = resourceData["districtId"] as? String
-                            let ownerUid = resourceData["ownerUid"] as? String
-
-                            return Resource(
-                                id: resourceData["id"] as? String,
-                                title: title,
-                                description: description,
-                                category: category,
-                                url: url,
-                                createdAt: Date(timeIntervalSince1970: createdAtTimestamp),
-                                updatedAt: Date(timeIntervalSince1970: updatedAtTimestamp),
-                                tags: tags,
-                                recommendedFor: recommendedFor,
-                                isFeatured: isFeatured,
-                                thumbnail: thumbnail,
-                                scope: scope,
-                                districtId: districtId,
-                                ownerUid: ownerUid
-                            )
-                        }
-                    } else {
-                        resources = []
-                    }
-                    
-                    let title = data["title"] as? String ?? ""
-                    let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
-                    let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
-                    let createdBy = data["createdBy"] as? String ?? ""
-                    let plan = TMIPlan(
-                        id: document.documentID,
-                        title: title,
-                        description: data["description"] as? String,
-                        students: students,
-                        model: model,
-                        interests: interests,
-                                startDate: startDate,
-                        endDate: endDate,
-                        creationDate: creationDate,
-                        lastUpdated: lastUpdated,
-                        goals: goals,
-                        progress: progress,
-                        notes: notes,
-                        strategies: data["strategies"] as? [String],
-                        progressTracking: nil,
-                        createdBy: createdBy,
-                        resources: resources
-                    )
-                    
-                    print("[TMIPlanService] Successfully reconstructed plan: \(plan.model.rawValue)")
-                    return plan
+            // Fetch all plans and filter locally (arrayContains doesn't work with map elements)
+            let allPlans = try await fetchPlans()
+            let filteredPlans = allPlans.filter { plan in
+                plan.students.contains(where: { $0.id == studentId })
             }
-            
-            print("[TMIPlanService] Successfully fetched \(plans.count) TMI plans for student")
-            return plans
+
+            print("[TMIPlanService] Successfully fetched \(filteredPlans.count) TMI plans for student")
+            return filteredPlans
         } catch {
             print("[TMIPlanService] Error fetching TMI plans for student: \(error)")
             throw TMIPlanServiceError.fetchFailed(error.localizedDescription)

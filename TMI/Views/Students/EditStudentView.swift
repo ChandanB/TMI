@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import FirebaseAuth
 
 struct EditStudentView: View {
     let student: Student
@@ -608,9 +609,10 @@ struct EditStudentView: View {
                 var updatedNotes = student.notes ?? []
                 let trimmedNoteContent = noteContent.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmedNoteContent.isEmpty {
+                    let authorName = Auth.auth().currentUser?.displayName ?? Auth.auth().currentUser?.email ?? "Educator"
                     let newNote = StudentNote(
                         date: Date(),
-                        author: "Educator", // TODO: Get from current user
+                        author: authorName,
                         content: trimmedNoteContent,
                         category: noteCategory
                     )

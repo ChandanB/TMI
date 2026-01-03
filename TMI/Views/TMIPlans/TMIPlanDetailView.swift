@@ -35,6 +35,19 @@ struct TMIPlanDetailView: View {
     @State private var scheduledMeetings: [Meeting] = []
     @State private var isLoadingMeetings = false
 
+    // Snapshot interests (Bug Fix #5)
+    @State private var snapshotInterests: [Interest] = []
+    @State private var isLoadingSnapshotInterests = false
+
+    // All Meetings View
+    @State private var showingAllMeetings = false
+
+    // PDF Export
+    @State private var isExporting = false
+    @State private var exportedPDFURL: URL?
+    @State private var showingShareSheet = false
+    private let exportService = PlanExportService()
+
     init(plan: TMIPlan) {
         self.initialPlan = plan
         _plan = State(initialValue: plan)
@@ -94,9 +107,14 @@ struct TMIPlanDetailView: View {
                         Label("Edit Plan", systemImage: "pencil")
                     }
 
-                    Button(action: { /* Export action */ }) {
-                        Label("Export Plan", systemImage: "square.and.arrow.up")
+                    Button(action: { exportPlanToPDF() }) {
+                        if isExporting {
+                            Label("Exporting...", systemImage: "arrow.down.doc")
+                        } else {
+                            Label("Export Plan", systemImage: "square.and.arrow.up")
+                        }
                     }
+                    .disabled(isExporting)
 
                     Divider()
 
@@ -165,7 +183,13 @@ struct TMIPlanDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingCompleteSurvey) {
+        .sheet(isPresented: $showingCompleteSurvey, onDismiss: {
+            // Refresh plan and interests after survey completion
+            Task {
+                await refreshPlan()
+                await loadSnapshotInterests()
+            }
+        }) {
             NavigationStack {
                 StudentSurveyFlow(
                     studentId: plan.primaryStudent?.id ?? "",
@@ -195,12 +219,28 @@ struct TMIPlanDetailView: View {
                 )
             }
         }
+        .sheet(isPresented: $showingAllMeetings) {
+            NavigationStack {
+                AllMeetingsView(
+                    meetings: scheduledMeetings,
+                    title: "All Meetings - \(plan.title)",
+                    context: .plan(planId: plan.id ?? "")
+                )
+            }
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            if let pdfURL = exportedPDFURL {
+                ActivityShareSheet(activityItems: [pdfURL])
+            }
+        }
         .refreshable {
             await refreshPlan()
             await loadMeetings()
+            await loadSnapshotInterests()
         }
         .task {
             await loadMeetings()
+            await loadSnapshotInterests()
         }
         .preferredColorScheme(.dark)
     }
@@ -370,7 +410,43 @@ struct TMIPlanDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            if plan.interests.isEmpty {
+            if isLoadingSnapshotInterests {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(.tmiPrimary)
+                    Text("Loading interests...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                }
+                .padding(TMISpacing.lg)
+            } else if !plan.interests.isEmpty {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: TMISpacing.sm) {
+                    ForEach(plan.interests) { interest in
+                        InterestCard(interest: interest)
+                    }
+                }
+            } else if !snapshotInterests.isEmpty {
+                // Display interests from snapshot when plan.interests is empty
+                VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 12))
+                            .foregroundColor(.tmiWarning)
+                        Text("From latest survey")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.tmiWarning.opacity(0.9))
+                    }
+                    .padding(.bottom, TMISpacing.xs)
+
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: TMISpacing.sm) {
+                        ForEach(snapshotInterests) { interest in
+                            InterestCard(interest: interest)
+                        }
+                    }
+                }
+            } else {
                 VStack(spacing: TMISpacing.md) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 32))
@@ -404,12 +480,6 @@ struct TMIPlanDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(TMISpacing.xl)
-            } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: TMISpacing.sm) {
-                    ForEach(plan.interests) { interest in
-                        InterestCard(interest: interest)
-                    }
-                }
             }
         }
         .padding(TMISpacing.lg)
@@ -748,7 +818,7 @@ struct TMIPlanDetailView: View {
 
                     if scheduledMeetings.count > 5 {
                         Button(action: {
-                            // TODO: Show all meetings view
+                            showingAllMeetings = true
                         }) {
                             HStack {
                                 Text("View all \(scheduledMeetings.count) meetings")
@@ -956,6 +1026,25 @@ struct TMIPlanDetailView: View {
         }
     }
 
+    private func exportPlanToPDF() {
+        Task {
+            isExporting = true
+            defer { isExporting = false }
+
+            do {
+                let pdfURL = try await exportService.exportPlanToPDF(plan)
+                await MainActor.run {
+                    exportedPDFURL = pdfURL
+                    showingShareSheet = true
+                }
+                print("[TMIPlanDetail] Exported plan to PDF: \(pdfURL.path)")
+            } catch {
+                print("[TMIPlanDetail] Error exporting plan: \(error)")
+                // TODO: Show error alert to user
+            }
+        }
+    }
+
     @MainActor
     private func addGoalToPlan(_ newGoal: Goal) async {
         do {
@@ -1090,6 +1179,34 @@ struct TMIPlanDetailView: View {
         } catch {
             print("[TMIPlanDetail] Error loading meetings: \(error)")
             scheduledMeetings = []
+        }
+    }
+
+    @MainActor
+    private func loadSnapshotInterests() async {
+        // Only load if plan.interests is empty but we have snapshot IDs
+        guard plan.interests.isEmpty,
+              let snapshotIds = plan.interestIdsSnapshot,
+              !snapshotIds.isEmpty else {
+            snapshotInterests = []
+            return
+        }
+
+        isLoadingSnapshotInterests = true
+        defer { isLoadingSnapshotInterests = false }
+
+        do {
+            var interests: [Interest] = []
+            for interestId in snapshotIds {
+                if let interest = try await InterestLibraryService.shared.fetchInterest(id: interestId) {
+                    interests.append(interest)
+                }
+            }
+            snapshotInterests = interests
+            print("[TMIPlanDetail] Loaded \(interests.count) interests from snapshot for plan")
+        } catch {
+            print("[TMIPlanDetail] Error loading snapshot interests: \(error)")
+            snapshotInterests = []
         }
     }
 
@@ -1630,7 +1747,18 @@ extension TMIPlanModel {
 
 // MARK: - Supporting Views
 
+struct ActivityShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
 
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let activityVC = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        return activityVC
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No updates needed
+    }
+}
 
 // MARK: - Preview
 
@@ -1645,6 +1773,7 @@ extension TMIPlanModel {
 
 
 // MARK: - All Resources View
+
 
 
 

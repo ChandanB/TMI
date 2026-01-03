@@ -73,7 +73,7 @@ struct MainTabView: View {
             case .districtDashboard: return "District"
             case .students: return "Students"
             case .tmiPlans: return "TMI Plans"
-            case .forms: return "Forms & Surveys"
+            case .forms: return "Forms"
             case .careerExplorer: return "Career Explorer"
             case .interests: return "Interests & Hobbies"
             case .resources: return "Resources"

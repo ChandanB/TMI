@@ -91,7 +91,7 @@ struct Meeting: Codable, Identifiable, Hashable {
         }
     }
 
-    enum MeetingStatus: String, Codable {
+    enum MeetingStatus: String, Codable, CaseIterable {
         case scheduled = "Scheduled"
         case confirmed = "Confirmed"
         case completed = "Completed"
@@ -358,3 +358,4 @@ extension Meeting {
         )
     }
 }
+

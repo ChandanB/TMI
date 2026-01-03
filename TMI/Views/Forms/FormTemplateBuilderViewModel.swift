@@ -11,6 +11,9 @@ import Observation
 
 @Observable
 class FormTemplateBuilderViewModel {
+    // Service
+    private let templateService = FormTemplateService()
+
     var formTemplate: FormTemplate = FormTemplate(
         id: UUID().uuidString,
         name: "",
@@ -20,7 +23,7 @@ class FormTemplateBuilderViewModel {
         updatedAt: Date(),
         isActive: true
     )
-    
+
     var isEditing: Bool = false
     var expandedSectionIDs: Set<String> = []
     var currentDraggedFieldIndex: Int?
@@ -156,24 +159,28 @@ class FormTemplateBuilderViewModel {
     func loadTemplate(withId id: String)  {
         Task {
             do {
-                let loadedTemplate: FormTemplate = try await FIREBASE_MANAGER.fetchDocument(inCollection: .formTemplates, withId: id)
-                formTemplate = loadedTemplate
+                formTemplate = try await templateService.fetchTemplate(id: id)
+                print("[FormTemplateBuilderViewModel] Loaded template: \(formTemplate.name)")
             } catch {
-                print("Error loading template: \(error)")
+                print("[FormTemplateBuilderViewModel] Error loading template: \(error)")
             }
         }
     }
-    
+
     func saveTemplate()  {
         Task {
             do {
                 if formTemplate.id == nil {
-                    try await FIREBASE_MANAGER.createDocument(inCollection: .formTemplates, document: formTemplate)
+                    // Create new template
+                    formTemplate = try await templateService.createTemplate(formTemplate)
+                    print("[FormTemplateBuilderViewModel] Created template: \(formTemplate.name)")
                 } else {
-                    try await FIREBASE_MANAGER.updateDocument(inCollection: .formTemplates, document: formTemplate)
+                    // Update existing template
+                    try await templateService.updateTemplate(formTemplate)
+                    print("[FormTemplateBuilderViewModel] Updated template: \(formTemplate.name)")
                 }
             } catch {
-                print("Error saving template: \(error)")
+                print("[FormTemplateBuilderViewModel] Error saving template: \(error)")
             }
         }
     }

@@ -76,7 +76,7 @@ struct FormsAndSurveysView: View {
         }
       }
     }
-    .navigationTitle("Forms & Surveys")
+    .navigationTitle("Forms")
     .foregroundColor(.white)
     .navigationBarTitleDisplayMode(.large)
     .toolbarBackground(.hidden, for: .navigationBar)

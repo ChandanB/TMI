@@ -63,7 +63,17 @@ final class CareerExplorerStateModel: BaseStateModel<CareerExplorerData, Identif
         get { ui.get("showPersonalizedSection") ?? false }
         set { ui.set("showPersonalizedSection", value: newValue) }
     }
-    
+
+    var salaryFilter: ClosedRange<Double> {
+        get { ui.get("salaryFilter") ?? 30000...150000 }
+        set { ui.set("salaryFilter", value: newValue) }
+    }
+
+    var selectedSkills: Set<String> {
+        get { ui.get("selectedSkills") ?? [] }
+        set { ui.set("selectedSkills", value: newValue) }
+    }
+
     // MARK: - Initialization
     
     override init() {
@@ -74,7 +84,9 @@ final class CareerExplorerStateModel: BaseStateModel<CareerExplorerData, Identif
         ui.set("isSearching", value: false)
         ui.set("hasSearched", value: false)
         ui.set("showPersonalizedSection", value: false)
-        
+        ui.set("salaryFilter", value: 30000...150000)
+        ui.set("selectedSkills", value: Set<String>())
+
         // Initial empty state
         Task { @MainActor in
             self.updateState(.loaded(CareerExplorerData()))
@@ -203,6 +215,41 @@ final class CareerExplorerStateModel: BaseStateModel<CareerExplorerData, Identif
     var personalizedRecommendations: [Career] {
         guard case .loaded(let data) = state else { return [] }
         return data.personalizedRecommendations
+    }
+
+    var careers: [Career] {
+        guard case .loaded(let data) = state else { return [] }
+        return data.careers
+    }
+
+    var filteredCareers: [Career] {
+        careers.filter { career in
+            let matchesSearch =
+                searchText.isEmpty || career.title.lowercased().contains(searchText.lowercased())
+                || career.description.lowercased().contains(searchText.lowercased())
+                || career.skills.contains { $0.lowercased().contains(searchText.lowercased()) }
+
+            let matchesField = selectedField == nil || career.field == selectedField
+
+            let matchesSalary = career.salaryRange.overlaps(salaryFilter)
+
+            let matchesSkills =
+                selectedSkills.isEmpty || !selectedSkills.isDisjoint(with: Set(career.skills))
+
+            return matchesSearch && matchesField && matchesSalary && matchesSkills
+        }
+    }
+
+    var hasActiveFilters: Bool {
+        selectedField != nil || !selectedSkills.isEmpty || salaryFilter.lowerBound > 30000 || salaryFilter.upperBound < 150000
+    }
+
+    var activeFiltersCount: Int {
+        var count = 0
+        if selectedField != nil { count += 1 }
+        if !selectedSkills.isEmpty { count += 1 }
+        if salaryFilter.lowerBound > 30000 || salaryFilter.upperBound < 150000 { count += 1 }
+        return count
     }
 }
 

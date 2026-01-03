@@ -332,13 +332,16 @@ class StudentService {
             let date = Date(timeIntervalSince1970: dateTimestamp)
             return StudentNote(id: id, date: date, author: author, content: content, category: category)
         }
-        
-        // Create student with all parsed data with school: ""
+
+        // Extract school from Firestore data
+        let school = data["school"] as? String ?? ""
+
+        // Create student with all parsed data
         return Student(
             id: document.documentID,
             name: name,
             grade: grade,
-            school: "",
+            school: school,
             dateOfBirth: dateOfBirth,
             studentID: studentID,
             photoURL: photoURL,
@@ -349,7 +352,7 @@ class StudentService {
             lastInteractionDate: lastInteractionDate
         )
     }
-    
+
     private func parseStudent(from document: DocumentSnapshot) throws -> Student {
         let data = document.data() ?? [:]
         print("[StudentService] Parsing document \(document.documentID)...")
@@ -441,12 +444,15 @@ class StudentService {
             return StudentNote(id: id, date: date, author: author, content: content, category: category)
         }
         
-        // Create student with all parsed data with school: ""
+        // Extract school from Firestore data
+        let school = data["school"] as? String ?? ""
+
+        // Create student with all parsed data
         return Student(
             id: document.documentID,
             name: name,
             grade: grade,
-            school: "",
+            school: school,
             dateOfBirth: dateOfBirth,
             studentID: studentID,
             photoURL: photoURL,

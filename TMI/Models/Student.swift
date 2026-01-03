@@ -19,6 +19,8 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
     var photoURL: URL?
     
     // MARK: - TMI Related Properties
+    // Note: This property is currently unused for persistence.
+    // TMI Plans are stored in a separate collection and managed via TMIPlanService.
     let tmiPlans: [TMIPlan]?
     var surveyResults: [SurveyResult]?
 

@@ -230,7 +230,7 @@ struct PremiumSidebarList: View {
     case .tmiPlans: return "TMI Plans"
     case .dashboard: return "Dashboard"
     case .districtDashboard: return "District"
-    case .forms: return "Forms & Surveys"
+    case .forms: return "Forms"
     case .careerExplorer: return "Career Explorer"
     case .interests: return "Interests & Hobbies"
     case .resources: return "Resources"

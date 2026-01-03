@@ -65,19 +65,22 @@ struct StudentDetailView: View {
             // Start listening for real-time student updates
             stateModel.startListening()
 
-            // Set shared student context when student loads
-            if let student = stateModel.student {
-                await studentContext.setActiveStudent(
-                    studentId,
-                    student: student,
-                    scope: .staff,
-                    prefetchEdges: true
-                )
-            }
-
             await planStateModel.fetch()
             await loadMeetings()
             await loadStudentInterests()
+        }
+        .onChange(of: stateModel.student?.id) { _, newStudentId in
+            // Set shared student context when student loads
+            if let student = stateModel.student, newStudentId != nil {
+                Task {
+                    await studentContext.setActiveStudent(
+                        studentId,
+                        student: student,
+                        scope: .staff,
+                        prefetchEdges: true
+                    )
+                }
+            }
         }
         .onDisappear {
             // Stop listening when view disappears
@@ -139,6 +142,28 @@ struct StudentDetailView: View {
         } message: {
             if let student = stateModel.student {
                 Text("This will allow \(student.name) to take the interest survey again. Current survey results will be replaced, but manually added interests will be preserved.")
+            }
+        }
+
+        // MARK: - Interests Section Sheet: showingSurvey replaced with corrected labeled parameters
+        .sheet(isPresented: $showingSurvey, onDismiss: {
+            // Refresh interests after survey completion
+            Task {
+                await loadStudentInterests()
+            }
+        }) {
+            if let student = stateModel.student, let studentId = student.id {
+                NavigationStack {
+                    StudentSurveyFlow(studentId: studentId)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") {
+                                    showingSurvey = false
+                                }
+                                .foregroundColor(.tmiPrimary)
+                            }
+                        }
+                }
             }
         }
     }
@@ -461,22 +486,6 @@ struct StudentDetailView: View {
                 }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
-            }
-        }
-        .sheet(isPresented: $showingSurvey) {
-            if let student = stateModel.student, let studentId = student.id {
-                NavigationStack {
-                    StudentSurveyFlow(studentId: studentId)
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Done") {
-                                    showingSurvey = false
-                                }
-                                .foregroundColor(.tmiPrimary)
-                            }
-                        }
-                }
-                // No need to manually refresh - listener will update automatically
             }
         }
     }
@@ -1017,10 +1026,34 @@ struct StudentDetailView: View {
     }
 
     private func retakeSurvey() {
-        // Clear survey results but keep manually added interests
-        // For now, we'll just trigger the survey flow again
-        // In a full implementation, we would mark which interests came from survey vs manual
-        showingSurvey = true
+        Task {
+            do {
+                guard let student = stateModel.student, let studentId = student.id else { return }
+
+                // Clear survey-generated interests from edge collection
+                // This preserves manually added interests (source != .survey)
+                try await StudentInterestService.shared.clearSurveyInterests(studentId: studentId)
+
+                // Archive the old survey response in Firestore
+                try await SurveyService.shared.archiveLatestSurvey(studentId: studentId)
+
+                print("[StudentDetail] Survey data cleared, preserving manual interests")
+
+                // Now show the survey
+                await MainActor.run {
+                    showingSurvey = true
+                }
+
+                // Refresh interests after clearing
+                await loadStudentInterests()
+            } catch {
+                print("[StudentDetail] Error clearing survey data: \(error.localizedDescription)")
+                // Show survey anyway
+                await MainActor.run {
+                    showingSurvey = true
+                }
+            }
+        }
     }
 
     // MARK: - Student Interest Loading (Phase 2)

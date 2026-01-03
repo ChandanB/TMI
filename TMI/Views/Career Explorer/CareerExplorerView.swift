@@ -13,11 +13,7 @@ struct CareerExplorerView: View {
   @State private var showingSuggestions = false
   @State private var showingStudentPicker = false
   @State private var showingInsightsSheet = false // UI only state
-  
-  // Legacy filter state simulation for UI compatibility
-  @State private var salaryFilter: ClosedRange<Double> = 30000...150000
-  @State private var selectedSkills: Set<String> = []
-  
+
   // Legacy animation states (mapped to new ones or kept if needed)
   @State private var searchAppeared = false
   @State private var filtersAppeared = false
@@ -66,17 +62,28 @@ struct CareerExplorerView: View {
   private var careerService: CareerService { CareerService.shared } 
   
   // Legacy/Compatibility stubs
-  private var careers: [Career] { [] } 
+  private var careers: [Career] { stateModel.careers }
+  private var filteredCareers: [Career] { stateModel.filteredCareers }
   private var selectedField: String? { stateModel.selectedField }
-  private var careerStatistics: CareerStatistics? { nil } 
+  private var salaryFilter: ClosedRange<Double> {
+    get { stateModel.salaryFilter }
+    nonmutating set { stateModel.salaryFilter = newValue }
+  }
+  private var selectedSkills: Set<String> {
+    get { stateModel.selectedSkills }
+    nonmutating set { stateModel.selectedSkills = newValue }
+  }
+  private var careerStatistics: CareerStatistics? { nil }
   private var isLoading: Bool { stateModel.isLoading }
   private var error: Error? { stateModel.errorMessage.map { NSError(domain: "TMI", code: 0, userInfo: [NSLocalizedDescriptionKey: $0]) } }
   private var showPersonalizedSection: Bool { stateModel.showPersonalizedSection }
   private var showTrendingSection: Bool { true }
-  private var isFilterSheetPresented: Bool { 
-    get { false } 
-    nonmutating set {} 
+  private var isFilterSheetPresented: Bool {
+    get { false }
+    nonmutating set {}
   }
+  private var hasActiveFilters: Bool { stateModel.hasActiveFilters }
+  private var activeFiltersCount: Int { stateModel.activeFiltersCount }
 
   // Get all unique skills across careers
   private var allSkills: [String] {
@@ -994,41 +1001,6 @@ struct CareerExplorerView: View {
     }
     .frame(maxWidth: .infinity)
     .padding(.vertical, 60)
-  }
-
-  // MARK: - Filtered Careers
-
-  private var filteredCareers: [Career] {
-    careers.filter { career in
-      let matchesSearch =
-        searchText.isEmpty || career.title.lowercased().contains(searchText.lowercased())
-        || career.description.lowercased().contains(searchText.lowercased())
-        || career.skills.contains { $0.lowercased().contains(searchText.lowercased()) }
-
-      let matchesField = selectedField == nil || career.field == selectedField
-
-      let matchesSalary = career.salaryRange.overlaps(salaryFilter)
-
-      let matchesSkills =
-        selectedSkills.isEmpty || !selectedSkills.isDisjoint(with: Set(career.skills))
-
-      return matchesSearch && matchesField && matchesSalary && matchesSkills
-    }
-  }
-
-  // MARK: - Filter State (legacy compatibility)
-
-  private var hasActiveFilters: Bool {
-    selectedField != nil || !selectedSkills.isEmpty || salaryFilter.lowerBound > 30000
-      || salaryFilter.upperBound < 150000
-  }
-
-  private var activeFiltersCount: Int {
-    var count = 0
-    if selectedField != nil { count += 1 }
-    if !selectedSkills.isEmpty { count += 1 }
-    if salaryFilter.lowerBound > 30000 || salaryFilter.upperBound < 150000 { count += 1 }
-    return count
   }
 
   // MARK: - Helper Functions

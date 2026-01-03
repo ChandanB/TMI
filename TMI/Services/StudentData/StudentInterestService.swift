@@ -270,6 +270,32 @@ final class StudentInterestService {
         }
     }
 
+    /// Clear all survey-generated interests while preserving manually added ones
+    func clearSurveyInterests(studentId: String) async throws {
+        guard !studentId.isEmpty else {
+            throw StudentInterestError.invalidStudentId
+        }
+
+        print("[StudentInterestService] Clearing survey interests for student \(studentId)")
+
+        do {
+            // Query for survey-generated interests only
+            let snapshot = try await studentInterestsCollection(for: studentId)
+                .whereField("source", isEqualTo: StudentInterest.StudentInterestSource.survey.rawValue)
+                .getDocuments()
+
+            // Delete each survey interest
+            for document in snapshot.documents {
+                try await document.reference.delete()
+            }
+
+            print("[StudentInterestService] Cleared \(snapshot.documents.count) survey-generated interests")
+        } catch {
+            print("[StudentInterestService] Error clearing survey interests: \(error.localizedDescription)")
+            throw StudentInterestError.deleteFailed(error.localizedDescription)
+        }
+    }
+
     // MARK: - Helper Methods
 
     /// Save or update a student interest edge

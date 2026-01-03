@@ -405,6 +405,17 @@ struct SurveyResultsView: View {
                     duration: surveyDuration
                 )
 
+                // Save interests to edge collection (critical for TMI Plan creation)
+                // Convert topInterests to [interestId: level] format
+                var interestResults: [String: Int] = [:]
+                for interestId in surveyResponse.topInterests {
+                    interestResults[interestId] = 3  // Default affinity level
+                }
+                try await StudentInterestService.shared.saveSurveyResults(
+                    studentId: studentId,
+                    results: interestResults
+                )
+
                 // Update plan snapshot if launched from plan context
                 if case .planDetail(let planId) = context {
                     try await updatePlanSnapshot(
@@ -430,7 +441,7 @@ struct SurveyResultsView: View {
                     isSaving = false
                 }
 
-                print("[DATA] Survey saved and careers matched for student: \(studentId)")
+                print("[DATA] Survey saved to both survey service and edge collection for student: \(studentId)")
 
             } catch {
                 await MainActor.run {

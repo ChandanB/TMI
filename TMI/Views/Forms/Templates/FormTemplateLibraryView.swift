@@ -12,6 +12,7 @@ struct FormTemplateLibraryView: View {
   @State private var viewModel = FormTemplateLibraryViewModel()
   @State private var showingImportPicker = false
   @State private var showingTemplateDetail = false
+  @State private var showingTemplateEditor = false
   @Environment(\.authStateModel) private var authStateModel
 
   var body: some View {
@@ -210,6 +211,17 @@ struct FormTemplateLibraryView: View {
         FormTemplateDetailView(template: template)
       }
     }
+    .sheet(isPresented: $showingTemplateEditor) {
+      NavigationStack {
+        FormTemplateEditorView()
+      }
+      .onDisappear {
+        // Refresh templates after creation
+        Task {
+          await viewModel.refreshTemplates(districtId: authStateModel.currentUser?.districtId)
+        }
+      }
+    }
   }
 
   // MARK: - Empty State
@@ -253,7 +265,7 @@ struct FormTemplateLibraryView: View {
         }
 
         Button {
-          // Navigate to create template view
+          showingTemplateEditor = true
         } label: {
           Label("Create New", systemImage: "plus.circle")
         }

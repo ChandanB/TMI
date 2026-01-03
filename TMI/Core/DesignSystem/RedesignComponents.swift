@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import SDWebImageSwiftUI
 
 // MARK: - List Row
 
@@ -272,29 +273,54 @@ struct TMIFAB: View {
 
 struct TMIAvatar: View {
     let initials: String
+    var photoURL: String?
     var color: Color
     var size: CGFloat
 
     init(
         initials: String,
+        photoURL: String? = nil,
         color: Color = .tmiPrimary,
         size: CGFloat = TMISizing.avatarSm
     ) {
         self.initials = initials
+        self.photoURL = photoURL
         self.color = color
         self.size = size
     }
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(color.opacity(0.2))
+        Group {
+            if let photoURLString = photoURL, let url = URL(string: photoURLString) {
+                // Use async image loading with SDWebImage
+                WebImage(url: url) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    ZStack {
+                        Circle()
+                            .fill(color.opacity(0.2))
+                        ProgressView()
+                            .tint(color)
+                    }
+                }
+                .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                // Show initials fallback
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.2))
 
-            Text(initials)
-                .font(.system(size: size * 0.4, weight: .semibold))
-                .foregroundColor(color)
+                    Text(initials)
+                        .font(.system(size: size * 0.4, weight: .semibold))
+                        .foregroundColor(color)
+                }
+                .frame(width: size, height: size)
+            }
         }
-        .frame(width: size, height: size)
     }
 }
 

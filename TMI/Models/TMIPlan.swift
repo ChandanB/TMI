@@ -229,6 +229,17 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
       ]
     }
 
+    // Phase 1A: Survey snapshot fields
+    if let latestInterestSurveyId = latestInterestSurveyId {
+      data["latestInterestSurveyId"] = latestInterestSurveyId
+    }
+    if let interestIdsSnapshot = interestIdsSnapshot {
+      data["interestIdsSnapshot"] = interestIdsSnapshot
+    }
+    if let snapshotUpdatedAt = snapshotUpdatedAt {
+      data["snapshotUpdatedAt"] = snapshotUpdatedAt.timeIntervalSince1970
+    }
+
     return data
   }
 }

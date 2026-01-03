@@ -581,6 +581,53 @@ final class SurveyService: @unchecked Sendable {
       }
     }
   }
+
+  /// Archive the latest survey for a student (for retake functionality)
+  func archiveLatestSurvey(studentId: String) async throws {
+    guard let currentUser = Auth.auth().currentUser else {
+      throw SurveyServiceError.userNotAuthenticated
+    }
+
+    print("[SurveyService] Archiving latest survey for student \(studentId)")
+
+    do {
+      // Get the student's latest survey
+      let surveyRef = firestore
+        .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
+        .collection(FirestoreCollection.students.rawValue).document(studentId)
+        .collection("interestSurveys")
+        .order(by: "completedAt", descending: true)
+        .limit(to: 1)
+
+      let snapshot = try await surveyRef.getDocuments()
+
+      guard let latestSurvey = snapshot.documents.first else {
+        print("[SurveyService] No survey found to archive")
+        return
+      }
+
+      // Mark as archived by updating status
+      try await latestSurvey.reference.updateData([
+        "archived": true,
+        "archivedAt": Timestamp(date: Date())
+      ])
+
+      // Clear the student's latestSurveyId field
+      let studentRef = firestore
+        .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
+        .collection(FirestoreCollection.students.rawValue).document(studentId)
+
+      try await studentRef.updateData([
+        "latestSurveyId": FieldValue.delete(),
+        "lastSurveyDate": FieldValue.delete()
+      ])
+
+      print("[SurveyService] Successfully archived survey \(latestSurvey.documentID)")
+    } catch {
+      print("[SurveyService] Error archiving survey: \(error.localizedDescription)")
+      throw SurveyServiceError.deleteFailed(error.localizedDescription)
+    }
+  }
 }
 
 // MARK: - Survey Analytics Model

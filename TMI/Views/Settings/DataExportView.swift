@@ -53,7 +53,7 @@ struct DataExportView: View {
         case interests = "Interests"
         case hobbies = "Hobbies"
         case resources = "Resources"
-        case forms = "Forms & Surveys"
+        case forms = "Forms"
         
         var id: String { rawValue }
         var description: String {

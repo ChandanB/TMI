@@ -8,15 +8,48 @@ struct StudentCard: View {
   var body: some View {
     TMIGlassCard(style: .default) {
       VStack(spacing: 10) {
-        // Avatar Image
-        if let avatarImage = studentAvatar {
-          avatarImage
-            .resizable()
-            .scaledToFill()
-            .frame(width: 80, height: 80)
-            .clipShape(Circle())
-            .overlay(Circle().stroke(Color.tmiPrimary, lineWidth: 2))
-            .shadow(radius: 3)
+        // Avatar Image with async loading
+        if let photoURL = student.photoURL {
+          AsyncImage(url: photoURL) { phase in
+            switch phase {
+            case .empty:
+              ZStack {
+                Circle()
+                  .fill(Color.tmiSecondary.opacity(0.3))
+                ProgressView()
+                  .tint(.white)
+              }
+              .frame(width: 80, height: 80)
+            case .success(let image):
+              image
+                .resizable()
+                .scaledToFill()
+                .frame(width: 80, height: 80)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.tmiPrimary, lineWidth: 2))
+                .shadow(radius: 3)
+                .transition(.opacity)
+            case .failure:
+              Text(studentInitials)
+                .font(.system(size: 32, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 80, height: 80)
+                .background(
+                  LinearGradient(
+                    colors: [Color.tmiSecondary, Color.tmiSecondary.opacity(0.8)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                  )
+                )
+                .clipShape(Circle())
+                .overlay(
+                  Circle()
+                    .stroke(Color.white.opacity(0.2), lineWidth: 2)
+                )
+            @unknown default:
+              EmptyView()
+            }
+          }
         } else {
           Text(studentInitials)
             .font(.system(size: 32, weight: .bold))
@@ -54,19 +87,6 @@ struct StudentCard: View {
     }
   }
 
-  // Helper to retrieve student's avatar image
-  private var studentAvatar: Image? {
-    // Check if student has photo URL
-    if student.photoURL != nil {
-      // In a real implementation, you would use AsyncImage or SDWebImageSwiftUI
-      // For now, return nil to show that avatar loading is being handled
-      // TODO: Implement AsyncImage loading from photoURL
-      return nil
-    }
-    // No image data available, return nil to use initials
-    return nil
-  }
-  
   // Generate initials from student name
   private var studentInitials: String {
     let components = student.name.components(separatedBy: " ")

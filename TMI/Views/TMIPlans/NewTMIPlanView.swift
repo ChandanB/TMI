@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import FirebaseAuth
 
 struct NewTMIPlanView: View {
     @Environment(\.dismiss) private var dismiss
@@ -43,7 +44,8 @@ struct NewTMIPlanView: View {
 
     var isValid: Bool {
         selectedModel != nil &&
-        !planTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !planTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        student.id != nil
     }
 
     var body: some View {
@@ -463,7 +465,13 @@ struct NewTMIPlanView: View {
                     goals: [],
                     progress: 0.0,
                     notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
-                    createdBy: "current_user" // TODO: Get from auth
+                    createdBy: Auth.auth().currentUser?.uid ?? "",
+                    latestInterestSurveyId: student.surveyResults?
+                        .filter { $0.isComplete && $0.surveyName.contains("Interest") }
+                        .sorted { $0.date > $1.date }
+                        .first?.id,
+                    interestIdsSnapshot: interests.compactMap { $0.id },
+                    snapshotUpdatedAt: Date()
                 )
 
                 try await tmiPlanService.addPlan(plan)
