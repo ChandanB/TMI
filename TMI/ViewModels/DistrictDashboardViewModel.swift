@@ -47,21 +47,29 @@ class DistrictDashboardViewModel {
       let district = try await districtService.fetchDistrict(id: districtId)
       self.districtName = district.name
 
-      // Fetch metrics
-      loadingMessage = "Computing metrics..."
-      metrics = try await analyticsService.computeMetrics(for: districtId, filter: filter)
+      let dateRange = filter.dateRange.map { $0.startDate...$0.endDate }
 
-      // Fetch school metrics
-      loadingMessage = "Analyzing schools..."
-      schoolMetrics = try await analyticsService.computeSchoolMetrics(for: districtId)
+      if let analytics = try await analyticsService.fetchAnalytics(districtId: districtId, dateRange: dateRange) {
+        metrics = analytics.metrics
+        schoolMetrics = Array(analytics.schoolMetrics.values)
+        insights = analytics.topInsights
+      } else {
+        // Fetch metrics
+        loadingMessage = "Computing metrics..."
+        metrics = try await analyticsService.computeMetrics(for: districtId, filter: filter)
+
+        // Fetch school metrics
+        loadingMessage = "Analyzing schools..."
+        schoolMetrics = try await analyticsService.computeSchoolMetrics(for: districtId)
+
+        // Generate insights
+        loadingMessage = "Generating insights..."
+        insights = await analyticsService.generateInsights(for: metrics, schoolMetrics: schoolMetrics)
+      }
 
       // Fetch students needing attention
       loadingMessage = "Checking student alerts..."
       studentsNeedingAttention = try await analyticsService.fetchStudentsNeedingAttention(for: districtId, limit: 20)
-
-      // Generate insights
-      loadingMessage = "Generating insights..."
-      insights = await analyticsService.generateInsights(for: metrics, schoolMetrics: schoolMetrics)
 
       print("[DistrictDashboardViewModel] Dashboard loaded successfully")
     } catch {

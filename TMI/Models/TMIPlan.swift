@@ -76,6 +76,8 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
   var approvalStatus: PlanApprovalStatus
   var approvalHistory: [ApprovalHistoryEntry]
   var submittedForApprovalAt: Date?
+  var submittedBy: String? // User who submitted for approval
+  var currentApprovers: [String]? // UIDs of users awaiting their approval
   var approvedBy: String?
   var approvedAt: Date?
   var rejectionReason: String?
@@ -97,8 +99,8 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     lastUpdated: Date, goals: [Goal], progress: Double, notes: String, strategies: [String]? = nil,
     progressTracking: [ProgressEntry]? = nil, createdBy: String, resources: [Resource] = [],
     approvalStatus: PlanApprovalStatus = .draft, approvalHistory: [ApprovalHistoryEntry] = [],
-    submittedForApprovalAt: Date? = nil, approvedBy: String? = nil, approvedAt: Date? = nil,
-    rejectionReason: String? = nil,
+    submittedForApprovalAt: Date? = nil, submittedBy: String? = nil, currentApprovers: [String]? = nil,
+    approvedBy: String? = nil, approvedAt: Date? = nil, rejectionReason: String? = nil,
     districtId: String? = nil, assignedCounselorId: String? = nil,
     latestInterestSurveyId: String? = nil, interestIdsSnapshot: [String]? = nil, snapshotUpdatedAt: Date? = nil
   ) {
@@ -122,6 +124,8 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     self.approvalStatus = approvalStatus
     self.approvalHistory = approvalHistory
     self.submittedForApprovalAt = submittedForApprovalAt
+    self.submittedBy = submittedBy
+    self.currentApprovers = currentApprovers
     self.approvedBy = approvedBy
     self.approvedAt = approvedAt
     self.rejectionReason = rejectionReason
@@ -194,6 +198,12 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
 
     if let submittedAt = submittedForApprovalAt {
       data["submittedForApprovalAt"] = submittedAt.timeIntervalSince1970
+    }
+    if let submittedBy = submittedBy {
+      data["submittedBy"] = submittedBy
+    }
+    if let currentApprovers = currentApprovers {
+      data["currentApprovers"] = currentApprovers
     }
     if let approvedBy = approvedBy {
       data["approvedBy"] = approvedBy

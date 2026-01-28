@@ -52,7 +52,6 @@ final class ResourceAssignmentService {
             "resourceId": assignment.resourceId,
             "assignedBy": assignment.assignedBy,
             "assignedAt": Timestamp(date: assignment.assignedAt),
-            "planId": assignment.planId as Any,
             "resourceTitle": assignment.resourceTitle,
             "resourceCategory": assignment.resourceCategory,
             "resourceURL": assignment.resourceURL,
@@ -76,6 +75,9 @@ final class ResourceAssignmentService {
         }
         if let notes = assignment.notes {
             data["notes"] = notes
+        }
+        if let planId = assignment.planId {
+            data["planId"] = planId
         }
         if let metrics = assignment.engagementMetrics {
             data["engagementMetrics"] = encodeEngagementMetrics(metrics)
