@@ -80,6 +80,16 @@ service cloud.firestore {
         allow read, write: if request.auth.uid == userId;
       }
 
+      // Resource assignments (user-scoped)
+      match /resourceAssignments/{assignmentId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+
+      // In-app notifications (user-scoped)
+      match /notifications/{notificationId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+
       // Interests and hobbies
       match /interests/{interestId} {
         allow read, write: if request.auth.uid == userId;
@@ -215,28 +225,100 @@ service cloud.firestore {
       );
     }
 
-    // Student Interest Edges (Phase 2: Student Data)
-    match /students/{studentId}/studentInterests/{interestId} {
-      // Educators can read their students' interests
-      allow read: if isAuthenticated();
-      // Only authorized users can write student data
-      allow write: if isAuthenticated();
+    // Phase 1: District-Scoped Students Collection
+    // This is the canonical location for student data (replacing user-scoped /users/{uid}/students)
+    match /students/{studentId} {
+      // Helper function: Check if user is assigned to this student
+      function isAssignedToStudent() {
+        return resource.data.get('assignedCounselorId', '') == request.auth.uid ||
+               resource.data.get('primaryTeacherId', '') == request.auth.uid ||
+               resource.data.get('createdBy', '') == request.auth.uid;
+      }
+      
+      // Helper function: Check if user is in same district as student
+      function isStudentInUserDistrict() {
+        return resource.data.get('districtId', '') == getUserDistrictId();
+      }
+      
+      // Read: Staff can read students in their district
+      allow read: if isAuthenticated() && (
+        isStudentInUserDistrict() ||
+        isAssignedToStudent() ||
+        isDistrictAdmin()
+      );
+      
+      // Create: Staff can create students in their district
+      allow create: if isAuthenticated() && (
+        request.resource.data.get('districtId', '') == getUserDistrictId() ||
+        isDistrictAdmin()
+      );
+      
+      // Update: Assigned staff or district admins can update
+      allow update: if isAuthenticated() && (
+        isAssignedToStudent() ||
+        (isDistrictAdmin() && isStudentInUserDistrict())
+      );
+      
+      // Delete: Only district admins can delete students
+      allow delete: if isAuthenticated() && isDistrictAdmin() && isStudentInUserDistrict();
+      
+      // Student Interest Edges (sub-collection)
+      match /studentInterests/{interestId} {
+        // Educators can read their students' interests
+        allow read: if isAuthenticated();
+        // Only authorized users can write student data
+        allow write: if isAuthenticated();
+      }
+      
+      // Student Career State (sub-collection)
+      match /careerState/{careerId} {
+        // Educators can read their students' career state
+        allow read: if isAuthenticated();
+        // Only authorized users can write student data
+        allow write: if isAuthenticated();
+      }
     }
 
-    // Student Career State (Phase 3: Career Tracking)
-    match /students/{studentId}/careerState/{careerId} {
-      // Educators can read their students' career state
-      allow read: if isAuthenticated();
-      // Only authorized users can write student data
-      allow write: if isAuthenticated();
-    }
-
-    // TMI Plans Collection (Phase 4: Plan Resources)
+    // TMI Plans Collection (Phase 1: District-Scoped)
     match /plans/{planId} {
-      // Educators can read/write their plans
-      allow read, write: if isAuthenticated();
+      // Helper function: Check if user is assigned to this plan
+      function isAssignedToPlan() {
+        return resource.data.get('assignedCounselorId', '') == request.auth.uid ||
+               resource.data.get('createdBy', '') == request.auth.uid ||
+               resource.data.get('approvedBy', '') == request.auth.uid;
+      }
+      
+      // Helper function: Check if plan is in user's district
+      function isPlanInUserDistrict() {
+        return resource.data.get('districtId', '') == getUserDistrictId();
+      }
+      
+      // Read: Staff can read plans in their district or assigned to them
+      allow read: if isAuthenticated() && (
+        isPlanInUserDistrict() ||
+        isAssignedToPlan() ||
+        isDistrictAdmin()
+      );
+      
+      // Create: Staff can create plans in their district
+      allow create: if isAuthenticated() && (
+        request.resource.data.get('districtId', '') == getUserDistrictId() ||
+        isDistrictAdmin()
+      );
+      
+      // Update: Assigned staff or district admins can update
+      allow update: if isAuthenticated() && (
+        isAssignedToPlan() ||
+        (isDistrictAdmin() && isPlanInUserDistrict())
+      );
+      
+      // Delete: Only district admins or plan creator can delete
+      allow delete: if isAuthenticated() && (
+        resource.data.get('createdBy', '') == request.auth.uid ||
+        (isDistrictAdmin() && isPlanInUserDistrict())
+      );
 
-      // Plan Resource Links (Phase 4: Resources)
+      // Plan Resource Links (sub-collection)
       match /planResources/{resourceId} {
         // Educators can manage plan resources
         allow read, write: if isAuthenticated();

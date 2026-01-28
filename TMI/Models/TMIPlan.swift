@@ -80,6 +80,12 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
   var approvedAt: Date?
   var rejectionReason: String?
 
+  // Phase 1: District Scoping
+  /// District this plan belongs to (for district-scoped queries)
+  var districtId: String?
+  /// Counselor assigned to this plan (for caseload queries)
+  var assignedCounselorId: String?
+
   // Phase 1A: Survey snapshot fields for interest tracking
   var latestInterestSurveyId: String?
   var interestIdsSnapshot: [String]?
@@ -93,6 +99,7 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     approvalStatus: PlanApprovalStatus = .draft, approvalHistory: [ApprovalHistoryEntry] = [],
     submittedForApprovalAt: Date? = nil, approvedBy: String? = nil, approvedAt: Date? = nil,
     rejectionReason: String? = nil,
+    districtId: String? = nil, assignedCounselorId: String? = nil,
     latestInterestSurveyId: String? = nil, interestIdsSnapshot: [String]? = nil, snapshotUpdatedAt: Date? = nil
   ) {
     self.id = id
@@ -118,6 +125,8 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     self.approvedBy = approvedBy
     self.approvedAt = approvedAt
     self.rejectionReason = rejectionReason
+    self.districtId = districtId
+    self.assignedCounselorId = assignedCounselorId
     self.latestInterestSurveyId = latestInterestSurveyId
     self.interestIdsSnapshot = interestIdsSnapshot
     self.snapshotUpdatedAt = snapshotUpdatedAt
@@ -238,6 +247,14 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
     }
     if let snapshotUpdatedAt = snapshotUpdatedAt {
       data["snapshotUpdatedAt"] = snapshotUpdatedAt.timeIntervalSince1970
+    }
+
+    // Phase 1: District scoping
+    if let districtId = districtId {
+      data["districtId"] = districtId
+    }
+    if let assignedCounselorId = assignedCounselorId {
+      data["assignedCounselorId"] = assignedCounselorId
     }
 
     return data

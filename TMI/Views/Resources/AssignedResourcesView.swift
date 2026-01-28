@@ -532,6 +532,10 @@ private struct AssignmentDetailView: View {
         }
         .onAppear {
             notes = assignment.notes ?? ""
+            Task {
+                guard let id = assignment.id else { return }
+                try? await service.trackResourceView(assignmentId: id)
+            }
         }
     }
 

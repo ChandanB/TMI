@@ -336,6 +336,15 @@ class StudentService {
         // Extract school from Firestore data
         let school = data["school"] as? String ?? ""
 
+        // Phase 1: Extract district scoping and staff assignment fields
+        let districtId = data["districtId"] as? String
+        let schoolId = data["schoolId"] as? String
+        let assignedCounselorId = data["assignedCounselorId"] as? String
+        let primaryTeacherId = data["primaryTeacherId"] as? String
+        let createdBy = data["createdBy"] as? String
+        let createdAt = (data["createdAt"] as? Double).map { Date(timeIntervalSince1970: $0) }
+        let updatedAt = (data["updatedAt"] as? Double).map { Date(timeIntervalSince1970: $0) }
+
         // Create student with all parsed data
         return Student(
             id: document.documentID,
@@ -343,6 +352,13 @@ class StudentService {
             grade: grade,
             school: school,
             dateOfBirth: dateOfBirth,
+            districtId: districtId,
+            schoolId: schoolId,
+            assignedCounselorId: assignedCounselorId,
+            primaryTeacherId: primaryTeacherId,
+            createdBy: createdBy,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
             studentID: studentID,
             photoURL: photoURL,
             surveyResults: surveyResults,
@@ -447,6 +463,15 @@ class StudentService {
         // Extract school from Firestore data
         let school = data["school"] as? String ?? ""
 
+        // Phase 1: Extract district scoping and staff assignment fields
+        let districtId = data["districtId"] as? String
+        let schoolId = data["schoolId"] as? String
+        let assignedCounselorId = data["assignedCounselorId"] as? String
+        let primaryTeacherId = data["primaryTeacherId"] as? String
+        let createdBy = data["createdBy"] as? String
+        let createdAt = (data["createdAt"] as? Double).map { Date(timeIntervalSince1970: $0) }
+        let updatedAt = (data["updatedAt"] as? Double).map { Date(timeIntervalSince1970: $0) }
+
         // Create student with all parsed data
         return Student(
             id: document.documentID,
@@ -454,6 +479,13 @@ class StudentService {
             grade: grade,
             school: school,
             dateOfBirth: dateOfBirth,
+            districtId: districtId,
+            schoolId: schoolId,
+            assignedCounselorId: assignedCounselorId,
+            primaryTeacherId: primaryTeacherId,
+            createdBy: createdBy,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
             studentID: studentID,
             photoURL: photoURL,
             surveyResults: surveyResults,
@@ -462,6 +494,109 @@ class StudentService {
             notes: notes,
             lastInteractionDate: lastInteractionDate
         )
+    }
+
+    // MARK: - Phase 1: District-Scoped Queries
+    
+    /// Fetch all students in a district (for cross-staff access)
+    func fetchStudentsInDistrict(_ districtId: String) async throws -> [Student] {
+        print("[StudentService] Fetching students for district: \(districtId)")
+        
+        // Query global students collection filtered by districtId
+        let query = db.collection("students")
+            .whereField("districtId", isEqualTo: districtId)
+        
+        do {
+            let snapshot = try await withTimeout(seconds: 15) {
+                try await query.getDocuments()
+            }
+            
+            let students = try snapshot.documents.compactMap { document in
+                try parseStudent(from: document)
+            }
+            
+            print("[StudentService] Found \(students.count) students in district")
+            return students
+        } catch {
+            print("[StudentService] Error fetching district students: \(error)")
+            throw StudentServiceError.fetchFailed(error.localizedDescription)
+        }
+    }
+    
+    /// Fetch students assigned to a specific counselor (caseload)
+    func fetchStudentsForCounselor(_ counselorId: String) async throws -> [Student] {
+        print("[StudentService] Fetching caseload for counselor: \(counselorId)")
+        
+        let query = db.collection("students")
+            .whereField("assignedCounselorId", isEqualTo: counselorId)
+        
+        do {
+            let snapshot = try await withTimeout(seconds: 15) {
+                try await query.getDocuments()
+            }
+            
+            let students = try snapshot.documents.compactMap { document in
+                try parseStudent(from: document)
+            }
+            
+            print("[StudentService] Found \(students.count) students in caseload")
+            return students
+        } catch {
+            print("[StudentService] Error fetching counselor caseload: \(error)")
+            throw StudentServiceError.fetchFailed(error.localizedDescription)
+        }
+    }
+    
+    /// Fetch students assigned to a specific teacher
+    func fetchStudentsForTeacher(_ teacherId: String) async throws -> [Student] {
+        print("[StudentService] Fetching students for teacher: \(teacherId)")
+        
+        let query = db.collection("students")
+            .whereField("primaryTeacherId", isEqualTo: teacherId)
+        
+        do {
+            let snapshot = try await withTimeout(seconds: 15) {
+                try await query.getDocuments()
+            }
+            
+            let students = try snapshot.documents.compactMap { document in
+                try parseStudent(from: document)
+            }
+            
+            print("[StudentService] Found \(students.count) students for teacher")
+            return students
+        } catch {
+            print("[StudentService] Error fetching teacher students: \(error)")
+            throw StudentServiceError.fetchFailed(error.localizedDescription)
+        }
+    }
+    
+    /// Assign a counselor to a student
+    func assignCounselor(_ counselorId: String, to studentId: String) async throws {
+        print("[StudentService] Assigning counselor \(counselorId) to student \(studentId)")
+        
+        try await db.collection("students")
+            .document(studentId)
+            .updateData([
+                "assignedCounselorId": counselorId,
+                "updatedAt": Date().timeIntervalSince1970
+            ])
+        
+        print("[StudentService] Counselor assigned successfully")
+    }
+    
+    /// Assign a primary teacher to a student
+    func assignPrimaryTeacher(_ teacherId: String, to studentId: String) async throws {
+        print("[StudentService] Assigning teacher \(teacherId) to student \(studentId)")
+        
+        try await db.collection("students")
+            .document(studentId)
+            .updateData([
+                "primaryTeacherId": teacherId,
+                "updatedAt": Date().timeIntervalSince1970
+            ])
+        
+        print("[StudentService] Teacher assigned successfully")
     }
 }
 

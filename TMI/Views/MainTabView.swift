@@ -15,6 +15,7 @@ struct MainTabView: View {
     @Environment(\.authStateModel) private var authStateModel
     @Environment(\.studentContext) private var studentContext
     @Environment(\.deepLinkRouter) private var deepLinkRouter
+    @Environment(\.notificationService) private var notificationService
     
     // Student Mode
     @State private var studentModeSession = StudentModeSession()
@@ -156,7 +157,8 @@ struct MainTabView: View {
                                 }
                             }
                             
-                            ToolbarItem(placement: .navigationBarTrailing) {
+                            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                                NotificationBellButton()
                                 profileMenu
                             }
                         }
@@ -196,6 +198,11 @@ struct MainTabView: View {
             if !availableTabs.contains(selectedTab) {
                 selectedTab = defaultTab
             }
+            notificationService.startListening()
+            Task { try? await notificationService.fetchNotifications() }
+        }
+        .onDisappear {
+            notificationService.stopListening()
         }
         .onChange(of: selectedTab) { _, newTab in
             // Clear deep link when manually changing tabs
@@ -538,4 +545,3 @@ private struct QuickStatCard: View {
 #Preview("iPad") {
   MainTabView()
 }
-

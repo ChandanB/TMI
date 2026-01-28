@@ -18,6 +18,26 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
     let studentID: String?
     var photoURL: URL?
     
+    // MARK: - District Scoping (Phase 1)
+    /// District this student belongs to (for district-scoped queries)
+    var districtId: String?
+    /// Normalized school ID reference
+    var schoolId: String?
+    
+    // MARK: - Staff Assignment (Phase 1)
+    /// Primary counselor assigned to this student
+    var assignedCounselorId: String?
+    /// Primary teacher assigned to this student (e.g., homeroom teacher)
+    var primaryTeacherId: String?
+    /// User ID who created this student record
+    var createdBy: String?
+    
+    // MARK: - Timestamps
+    /// When the student record was created
+    var createdAt: Date?
+    /// When the student record was last updated
+    var updatedAt: Date?
+    
     // MARK: - TMI Related Properties
     // Note: This property is currently unused for persistence.
     // TMI Plans are stored in a separate collection and managed via TMIPlanService.
@@ -137,6 +157,13 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
          grade: String,
          school: String,
          dateOfBirth: Date,
+         districtId: String? = nil,
+         schoolId: String? = nil,
+         assignedCounselorId: String? = nil,
+         primaryTeacherId: String? = nil,
+         createdBy: String? = nil,
+         createdAt: Date? = nil,
+         updatedAt: Date? = nil,
          tmiPlans: [TMIPlan]? = nil,
          studentID: String? = nil,
          photoURL: URL? = nil,
@@ -151,6 +178,13 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
         self.grade = grade
         self.school = school
         self.dateOfBirth = dateOfBirth
+        self.districtId = districtId
+        self.schoolId = schoolId
+        self.assignedCounselorId = assignedCounselorId
+        self.primaryTeacherId = primaryTeacherId
+        self.createdBy = createdBy
+        self.createdAt = createdAt ?? Date()
+        self.updatedAt = updatedAt
         self.tmiPlans = tmiPlans
         self.studentID = studentID
         self.photoURL = photoURL
@@ -254,6 +288,37 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
             "school": school,
             "dateOfBirth": dateOfBirth.timeIntervalSince1970
         ]
+        
+        // District scoping (Phase 1)
+        if let districtId = districtId {
+            data["districtId"] = districtId
+        }
+        
+        if let schoolId = schoolId {
+            data["schoolId"] = schoolId
+        }
+        
+        // Staff assignment (Phase 1)
+        if let assignedCounselorId = assignedCounselorId {
+            data["assignedCounselorId"] = assignedCounselorId
+        }
+        
+        if let primaryTeacherId = primaryTeacherId {
+            data["primaryTeacherId"] = primaryTeacherId
+        }
+        
+        if let createdBy = createdBy {
+            data["createdBy"] = createdBy
+        }
+        
+        // Timestamps
+        if let createdAt = createdAt {
+            data["createdAt"] = createdAt.timeIntervalSince1970
+        }
+        
+        if let updatedAt = updatedAt {
+            data["updatedAt"] = updatedAt.timeIntervalSince1970
+        }
         
         // Optional properties
         if let studentID = studentID {

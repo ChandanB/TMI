@@ -17,6 +17,7 @@ struct ResourceAssignment: Codable, Identifiable, Sendable {
     let resourceId: String
     let assignedBy: String // User ID of counselor/teacher who assigned it
     let assignedAt: Date
+    let planId: String?
 
     // Resource details (denormalized for quick access)
     let resourceTitle: String
@@ -33,6 +34,7 @@ struct ResourceAssignment: Codable, Identifiable, Sendable {
     var viewedAt: Date?
     var completedAt: Date?
     var notes: String?
+    var engagementMetrics: EngagementMetrics?
 
     enum AssignmentStatus: String, Codable, CaseIterable, Sendable {
         case assigned = "assigned"
@@ -59,12 +61,49 @@ struct ResourceAssignment: Codable, Identifiable, Sendable {
         }
     }
 
+    struct EngagementMetrics: Codable, Sendable {
+        var viewCount: Int
+        var totalTimeSpent: TimeInterval
+        var lastViewedAt: Date?
+        var completionPercentage: Double
+        var interactionEvents: [InteractionEvent]
+
+        struct InteractionEvent: Codable, Sendable {
+            let timestamp: Date
+            let eventType: EventType
+            let duration: TimeInterval?
+
+            enum EventType: String, Codable, CaseIterable, Sendable {
+                case viewed
+                case started
+                case paused
+                case resumed
+                case completed
+            }
+        }
+
+        init(
+            viewCount: Int = 0,
+            totalTimeSpent: TimeInterval = 0,
+            lastViewedAt: Date? = nil,
+            completionPercentage: Double = 0,
+            interactionEvents: [InteractionEvent] = []
+        ) {
+            self.viewCount = viewCount
+            self.totalTimeSpent = totalTimeSpent
+            self.lastViewedAt = lastViewedAt
+            self.completionPercentage = completionPercentage
+            self.interactionEvents = interactionEvents
+        }
+    }
+
     init(
         id: String? = nil,
         studentId: String,
         resourceId: String,
         assignedBy: String,
         assignedAt: Date = Date(),
+        planId: String? = nil,
         resourceTitle: String,
         resourceCategory: String,
         resourceURL: String,
@@ -74,13 +113,15 @@ struct ResourceAssignment: Codable, Identifiable, Sendable {
         status: AssignmentStatus = .assigned,
         viewedAt: Date? = nil,
         completedAt: Date? = nil,
-        notes: String? = nil
+        notes: String? = nil,
+        engagementMetrics: EngagementMetrics? = nil
     ) {
         self.id = id
         self.studentId = studentId
         self.resourceId = resourceId
         self.assignedBy = assignedBy
         self.assignedAt = assignedAt
+        self.planId = planId
         self.resourceTitle = resourceTitle
         self.resourceCategory = resourceCategory
         self.resourceURL = resourceURL
@@ -91,6 +132,7 @@ struct ResourceAssignment: Codable, Identifiable, Sendable {
         self.viewedAt = viewedAt
         self.completedAt = completedAt
         self.notes = notes
+        self.engagementMetrics = engagementMetrics
     }
 }
 

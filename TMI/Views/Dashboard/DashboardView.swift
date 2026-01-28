@@ -29,6 +29,33 @@ struct DashboardData: Equatable, Sendable {
   
   // Next Best Action
   var nextBestAction: NextBestAction?
+  
+  // Role-specific data
+  var roleData: RoleSpecificData?
+}
+
+// MARK: - Role-Specific Data
+
+struct RoleSpecificData: Equatable, Sendable {
+  var role: UserRole
+  
+  // Counselor-specific
+  var caseloadCount: Int = 0
+  var pendingApprovals: Int = 0
+  var upcomingMeetings: Int = 0
+  var criticalAlerts: Int = 0
+  var caseloadStudentIds: [String] = []
+  
+  // Teacher-specific
+  var classroomStudentCount: Int = 0
+  var classroomPlansActive: Int = 0
+  var classroomSurveysPending: Int = 0
+  var classroomStudentIds: [String] = []
+  
+  // Admin-specific
+  var schoolWideStudents: Int = 0
+  var schoolWidePlans: Int = 0
+  var staffCount: Int = 0
 }
 
 // MARK: - Next Best Action
@@ -98,6 +125,11 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
 
   @MainActor
   override func fetch() async {
+    await fetchWithRole(nil) // Fetch without role-specific data by default
+  }
+  
+  @MainActor
+  func fetchWithRole(_ userRole: UserRole?) async {
     updateState(.loading)
 
     do {
@@ -135,6 +167,12 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       // Generate engagement data and recent activities
       let engagementData = generateEngagementData(from: students)
       let recentActivities = generateRecentActivities(from: students, plans: plans)
+      
+      // Generate role-specific data if role is provided
+      let roleData = userRole != nil ? generateRoleSpecificData(role: userRole!, students: students, plans: plans) : nil
+      
+      // Generate next best action based on role and data
+      let nextAction = generateNextBestAction(role: userRole, students: students, plans: plans, surveysCompleted: surveysCompleted)
 
       let dashboardData = DashboardData(
         engagementData: engagementData,
@@ -143,7 +181,9 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
         interestsIdentified: interestsIdentified,
         surveysCompleted: surveysCompleted,
         plansAligned: plansAligned,
-        recentActivities: recentActivities
+        recentActivities: recentActivities,
+        nextBestAction: nextAction,
+        roleData: roleData
       )
 
       updateState(.loaded(dashboardData))
@@ -151,6 +191,110 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       print("[DashboardStateModel] Error fetching dashboard data: \(error)")
       handleError(error, userFriendlyMessage: "Failed to load dashboard data")
     }
+  }
+  
+  // MARK: - Role-Specific Data Generation
+  
+  private func generateRoleSpecificData(role: UserRole, students: [Student], plans: [TMIPlan]) -> RoleSpecificData {
+    var roleData = RoleSpecificData(role: role)
+    
+    switch role {
+    case .counselor:
+      // Counselor sees their assigned caseload
+      roleData.caseloadCount = students.count // TODO: Filter by assigned counselor
+      roleData.pendingApprovals = plans.filter { $0.status == .pendingApproval }.count
+      roleData.upcomingMeetings = 0 // TODO: Fetch from meeting service
+      roleData.criticalAlerts = students.filter { $0.engagementScore < 0.3 }.count
+      roleData.caseloadStudentIds = students.compactMap { $0.id }
+      
+    case .teacher:
+      // Teacher sees their classroom
+      roleData.classroomStudentCount = students.count // TODO: Filter by classroom/teacher
+      roleData.classroomPlansActive = plans.filter { $0.status == .inProgress }.count
+      roleData.classroomSurveysPending = students.filter { $0.surveyResults?.isEmpty ?? true }.count
+      roleData.classroomStudentIds = students.compactMap { $0.id }
+      
+    case .administrator, .admin, .superintendent, .districtAdmin:
+      // Admin sees school/district-wide
+      roleData.schoolWideStudents = students.count
+      roleData.schoolWidePlans = plans.count
+      roleData.staffCount = 0 // TODO: Fetch staff count
+      
+    case .socialWorker:
+      // Social worker sees referred students with behavioral plans
+      roleData.caseloadCount = students.count
+      roleData.criticalAlerts = students.filter { $0.engagementScore < 0.3 }.count
+      
+    default:
+      break
+    }
+    
+    return roleData
+  }
+  
+  // MARK: - Next Best Action Generation
+  
+  private func generateNextBestAction(role: UserRole?, students: [Student], plans: [TMIPlan], surveysCompleted: Int) -> NextBestAction? {
+    // Priority order for action suggestions
+    
+    // 1. Check for pending approvals (highest priority for counselors/admins)
+    let pendingPlans = plans.filter { $0.status == .pendingApproval }
+    if !pendingPlans.isEmpty && (role == .counselor || role == .administrator || role == .admin) {
+      return NextBestAction(
+        id: "pending_approval",
+        type: .pendingApproval,
+        title: "Plans Awaiting Approval",
+        description: "\(pendingPlans.count) plan\(pendingPlans.count == 1 ? "" : "s") need your review",
+        priority: .urgent,
+        targetStudentId: nil,
+        targetPlanId: pendingPlans.first?.id
+      )
+    }
+    
+    // 2. Check for students with low engagement (critical)
+    let lowEngagementStudents = students.filter { $0.engagementScore < 0.3 }
+    if let firstStudent = lowEngagementStudents.first {
+      return NextBestAction(
+        id: "check_progress_\(firstStudent.id ?? "")",
+        type: .checkProgress,
+        title: "Student Needs Attention",
+        description: "\(firstStudent.name) has low engagement - consider reaching out",
+        priority: .high,
+        targetStudentId: firstStudent.id,
+        targetPlanId: nil
+      )
+    }
+    
+    // 3. Check for students without plans (medium priority)
+    let studentsWithPlanIds = Set(plans.flatMap { $0.students.compactMap { $0.id } })
+    let studentsWithoutPlans = students.filter { !studentsWithPlanIds.contains($0.id ?? "") && !($0.surveyResults?.isEmpty ?? true) }
+    if let firstStudent = studentsWithoutPlans.first {
+      return NextBestAction(
+        id: "create_plan_\(firstStudent.id ?? "")",
+        type: .createPlan,
+        title: "Create TMI Plan",
+        description: "\(firstStudent.name) completed survey but has no plan",
+        priority: .medium,
+        targetStudentId: firstStudent.id,
+        targetPlanId: nil
+      )
+    }
+    
+    // 4. Check for students without surveys (low priority for teachers)
+    let studentsWithoutSurveys = students.filter { $0.surveyResults?.isEmpty ?? true }
+    if let firstStudent = studentsWithoutSurveys.first, (role == .teacher || role == .counselor) {
+      return NextBestAction(
+        id: "add_interests_\(firstStudent.id ?? "")",
+        type: .addInterests,
+        title: "Survey Pending",
+        description: "\(firstStudent.name) hasn't completed their interest survey",
+        priority: .low,
+        targetStudentId: firstStudent.id,
+        targetPlanId: nil
+      )
+    }
+    
+    return nil
   }
   
   private func generateEngagementData(from students: [Student]) -> [EngagementData] {
@@ -401,6 +545,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
 // TODO: Add `HelpTooltipButton` to other sections (Hero Card, Student Engagement, Insights, etc.) as needed.
 struct DashboardView: View {
     @Environment(\.dashboardStateModel) var stateModel
+    @Environment(\.authStateModel) private var authStateModel
     @State private var studentStateModel = StudentListStateModel()
     @State private var selectedTimeFrame: TimeFrame = .week
     @State private var showingAllActivities = false
@@ -426,11 +571,13 @@ struct DashboardView: View {
             }
         }
         .task {
-            await stateModel.fetch()
+            let userRole = authStateModel.currentUser?.role
+            await stateModel.fetchWithRole(userRole)
             await studentStateModel.fetch()
         }
         .refreshable {
-            await stateModel.refresh()
+            let userRole = authStateModel.currentUser?.role
+            await stateModel.fetchWithRole(userRole)
             await studentStateModel.fetch()
         }
         .sheet(isPresented: $showingAddStudent) {
@@ -508,6 +655,18 @@ struct DashboardView: View {
                     onNavigateToStudents: { navigateToStudents = true },
                     onNavigateToPlans: { navigateToPlans = true }
                 )
+                
+                // Next Best Action Card
+                if let nextAction = data.nextBestAction {
+                    NextBestActionCard(action: nextAction) {
+                        handleNextAction(nextAction)
+                    }
+                }
+                
+                // Role-Specific Summary Section
+                if let roleData = data.roleData {
+                    roleSpecificSection(roleData)
+                }
                 
                 // Actionable Lists Section
                 if studentsNeedingAttention(data) != nil || (data.totalStudents - data.surveysCompleted) > 0 {
@@ -704,6 +863,216 @@ struct DashboardView: View {
         // Count students with engagement < 0.4 (needs support level)
         let needsSupport = studentStateModel.students.filter { $0.engagementScore < 0.4 }.count
         return needsSupport > 0 ? needsSupport : nil
+    }
+    
+    // MARK: - Role-Specific Section
+    
+    @ViewBuilder
+    private func roleSpecificSection(_ roleData: RoleSpecificData) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack {
+                Text(roleData.role.displayName + " Overview")
+                    .font(.tmiTitle3)
+                    .foregroundColor(.tmiTextPrimary)
+                Spacer()
+            }
+            
+            switch roleData.role {
+            case .counselor, .socialWorker:
+                counselorSummaryCard(roleData)
+            case .teacher:
+                teacherSummaryCard(roleData)
+            case .administrator, .admin, .superintendent, .districtAdmin:
+                adminSummaryCard(roleData)
+            default:
+                EmptyView()
+            }
+        }
+        .tmiCard()
+    }
+    
+    private func counselorSummaryCard(_ data: RoleSpecificData) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: TMISpacing.md) {
+            RoleSummaryItem(
+                icon: "person.2.fill",
+                value: "\(data.caseloadCount)",
+                label: "Caseload",
+                color: .tmiPrimary
+            )
+            RoleSummaryItem(
+                icon: "clock.badge.exclamationmark.fill",
+                value: "\(data.pendingApprovals)",
+                label: "Pending",
+                color: data.pendingApprovals > 0 ? .orange : .gray
+            )
+            RoleSummaryItem(
+                icon: "calendar.badge.clock",
+                value: "\(data.upcomingMeetings)",
+                label: "Meetings",
+                color: .blue
+            )
+            RoleSummaryItem(
+                icon: "exclamationmark.triangle.fill",
+                value: "\(data.criticalAlerts)",
+                label: "Alerts",
+                color: data.criticalAlerts > 0 ? .red : .green
+            )
+        }
+    }
+    
+    private func teacherSummaryCard(_ data: RoleSpecificData) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: TMISpacing.md) {
+            RoleSummaryItem(
+                icon: "studentdesk",
+                value: "\(data.classroomStudentCount)",
+                label: "Students",
+                color: .tmiPrimary
+            )
+            RoleSummaryItem(
+                icon: "doc.text.fill",
+                value: "\(data.classroomPlansActive)",
+                label: "Active Plans",
+                color: .blue
+            )
+            RoleSummaryItem(
+                icon: "list.clipboard.fill",
+                value: "\(data.classroomSurveysPending)",
+                label: "Surveys Pending",
+                color: data.classroomSurveysPending > 0 ? .orange : .green
+            )
+        }
+    }
+    
+    private func adminSummaryCard(_ data: RoleSpecificData) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: TMISpacing.md) {
+            RoleSummaryItem(
+                icon: "building.2.fill",
+                value: "\(data.schoolWideStudents)",
+                label: "Students",
+                color: .tmiPrimary
+            )
+            RoleSummaryItem(
+                icon: "doc.text.fill",
+                value: "\(data.schoolWidePlans)",
+                label: "Plans",
+                color: .blue
+            )
+            RoleSummaryItem(
+                icon: "person.3.fill",
+                value: "\(data.staffCount)",
+                label: "Staff",
+                color: .purple
+            )
+        }
+    }
+    
+    // MARK: - Next Action Handler
+    
+    private func handleNextAction(_ action: NextBestAction) {
+        switch action.type {
+        case .createPlan, .reviewPlan, .pendingApproval:
+            navigateToPlans = true
+        case .scheduleMeeting, .completeNotes, .addInterests, .checkProgress:
+            navigateToStudents = true
+        }
+    }
+}
+
+// MARK: - Next Best Action Card
+
+struct NextBestActionCard: View {
+    let action: NextBestAction
+    let onAction: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            HStack {
+                Circle()
+                    .fill(priorityColor.opacity(0.15))
+                    .frame(width: 40, height: 40)
+                    .overlay(
+                        Image(systemName: actionIcon)
+                            .foregroundColor(priorityColor)
+                            .font(.system(size: 16, weight: .medium))
+                    )
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Next Step")
+                        .font(.tmiCaption)
+                        .foregroundColor(.tmiTextSecondary)
+                    Text(action.title)
+                        .font(.tmiHeadline)
+                        .foregroundColor(.tmiTextPrimary)
+                }
+                
+                Spacer()
+                
+                Button(action: onAction) {
+                    Text("Go")
+                        .font(.tmiCaption.weight(.semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, TMISpacing.md)
+                        .padding(.vertical, TMISpacing.xs)
+                        .background(priorityColor)
+                        .cornerRadius(TMICornerRadius.sm)
+                }
+            }
+            
+            Text(action.description)
+                .font(.tmiCaption)
+                .foregroundColor(.tmiTextSecondary)
+        }
+        .tmiCard()
+    }
+    
+    private var priorityColor: Color {
+        switch action.priority {
+        case .urgent: return .red
+        case .high: return .orange
+        case .medium: return .blue
+        case .low: return .gray
+        }
+    }
+    
+    private var actionIcon: String {
+        switch action.type {
+        case .createPlan: return "plus.rectangle.fill"
+        case .reviewPlan: return "doc.text.magnifyingglass"
+        case .scheduleMeeting: return "calendar.badge.plus"
+        case .completeNotes: return "note.text.badge.plus"
+        case .addInterests: return "heart.text.square.fill"
+        case .checkProgress: return "chart.line.uptrend.xyaxis"
+        case .pendingApproval: return "checkmark.circle.badge.questionmark"
+        }
+    }
+}
+
+// MARK: - Role Summary Item
+
+struct RoleSummaryItem: View {
+    let icon: String
+    let value: String
+    let label: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: TMISpacing.xs) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundColor(color)
+            
+            Text(value)
+                .font(.tmiTitle2)
+                .foregroundColor(.tmiTextPrimary)
+            
+            Text(label)
+                .font(.tmiCaption)
+                .foregroundColor(.tmiTextSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, TMISpacing.sm)
+        .background(color.opacity(0.05))
+        .cornerRadius(TMICornerRadius.sm)
     }
 }
 

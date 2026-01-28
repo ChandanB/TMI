@@ -236,7 +236,6 @@ struct CareerPathDetailView: View {
         defer { isCreatingPlan = false }
 
         do {
-            // Get Firestore and Auth
             guard let userId = Auth.auth().currentUser?.uid else {
                 errorMessage = "You must be signed in to create a plan"
                 showingError = true
@@ -244,9 +243,12 @@ struct CareerPathDetailView: View {
                 return
             }
 
+            // Get user's district ID for district-scoped plan
             let db = Firestore.firestore()
+            let userDoc = try await db.collection("users").document(userId).getDocument()
+            let districtId = userDoc.data()?["districtId"] as? String
 
-            // Try to fetch the student, but don't fail if not found
+            // Try to fetch the student
             print("[CareerPlan] Attempting to fetch student with ID: \(studentId)")
             var students: [Student] = []
 
@@ -263,14 +265,14 @@ struct CareerPathDetailView: View {
                 print("[CareerPlan] ⚠️ Student not found, creating plan without student")
             }
 
-            // Create TMI Plan from career
+            // Create TMI Plan from career with Phase 1 fields
             let now = Date()
             let newPlan = TMIPlan(
                 title: "\(career.title) Career Plan",
                 description: "Career exploration plan for \(career.title)",
                 students: students,
                 model: career.pathway.tmiModules.first ?? .chaseYourSpace,
-                interests: [], // Will be populated from survey if available
+                interests: [],
                 startDate: now,
                 endDate: nil,
                 creationDate: now,
@@ -279,23 +281,27 @@ struct CareerPathDetailView: View {
                 progress: 0.0,
                 notes: "",
                 strategies: createStrategiesFromCareer(),
-                createdBy: userId
+                createdBy: userId,
+                resources: [],
+                districtId: districtId,
+                assignedCounselorId: userId // Creator is initially assigned
             )
 
-            // Save to Firestore
-            print("[CareerPlan] Saving plan to Firestore...")
-            let planRef = db.collection("users")
-                .document(userId)
-                .collection("tmiPlans")
-                .document()
-
-            print("[CareerPlan] Firestore path: users/\(userId)/tmiPlans/\(planRef.documentID)")
-            print("[CareerPlan] Plan data: title=\(newPlan.title), model=\(newPlan.model.rawValue), students=\(newPlan.students.count), goals=\(newPlan.goals.count)")
-
-            try planRef.setData(from: newPlan)
-
-            print("[CareerPlan] ✅ Successfully saved to Firestore with ID: \(planRef.documentID)")
-            print("[CareerPlan] Navigate to TMI Plans tab to view your new plan!")
+            // Save via TMIPlanService (handles both user-scoped for backwards compatibility)
+            print("[CareerPlan] Saving plan via TMIPlanService...")
+            let savedPlan = try await TMIPlanService.shared.addPlan(newPlan)
+            
+            print("[CareerPlan] ✅ Successfully saved plan with ID: \(savedPlan.id ?? "unknown")")
+            
+            // Save student's career interest state
+            try await StudentCareerService.shared.addCareer(
+                studentId: studentId,
+                careerId: career.id ?? career.title.lowercased().replacingOccurrences(of: " ", with: "_"),
+                status: .exploring,
+                progress: 0.0,
+                isFavorite: true
+            )
+            print("[CareerPlan] ✅ Saved student career state for \(career.title)")
 
             // Notify other views that a new plan was created
             NotificationCenter.default.post(name: NSNotification.Name("TMIPlanCreated"), object: nil)

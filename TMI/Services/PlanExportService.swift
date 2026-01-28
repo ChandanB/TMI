@@ -328,6 +328,466 @@ class PlanExportService {
 
         return lines.joined(separator: "\n")
     }
+    
+    // MARK: - MTSS Export
+    
+    /// Export a TMI plan in MTSS (Multi-Tiered System of Supports) format
+    /// This format is designed for district compliance and intervention documentation
+    func exportPlanToMTSS(_ plan: TMIPlan) async throws -> URL {
+        let mtssContent = generateMTSSContent(for: plan)
+        
+        let fileName = "MTSS_\(plan.primaryStudent?.name.replacingOccurrences(of: " ", with: "_") ?? "Student")_\(Date().formatted(date: .numeric, time: .omitted)).txt"
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL = tempDir.appendingPathComponent(fileName)
+        
+        try mtssContent.write(to: fileURL, atomically: true, encoding: .utf8)
+        print("[PlanExportService] Exported MTSS document: \(fileURL.path)")
+        
+        return fileURL
+    }
+    
+    /// Generate MTSS-compliant content for documentation
+    private func generateMTSSContent(for plan: TMIPlan) -> String {
+        var lines: [String] = []
+        let divider = String(repeating: "─", count: 70)
+        let headerDivider = String(repeating: "═", count: 70)
+        
+        // Header
+        lines.append(headerDivider)
+        lines.append("MULTI-TIERED SYSTEM OF SUPPORTS (MTSS)")
+        lines.append("INTERVENTION PLAN DOCUMENTATION")
+        lines.append(headerDivider)
+        lines.append("")
+        
+        // Student Information Section
+        lines.append("┌" + String(repeating: "─", count: 68) + "┐")
+        lines.append("│ SECTION 1: STUDENT INFORMATION" + String(repeating: " ", count: 37) + "│")
+        lines.append("└" + String(repeating: "─", count: 68) + "┘")
+        lines.append("")
+        
+        if let student = plan.primaryStudent {
+            lines.append("Student Name:     \(student.name)")
+            lines.append("Grade Level:      \(student.grade)")
+            if !student.pronouns.isEmpty {
+                lines.append("Pronouns:         \(student.pronouns)")
+            }
+            if let school = student.school {
+                lines.append("School:           \(school)")
+            }
+        } else {
+            lines.append("Student Name:     [Not specified]")
+        }
+        
+        lines.append("Plan Created:     \(plan.creationDate.formatted(date: .long, time: .omitted))")
+        lines.append("Last Updated:     \(plan.lastUpdated.formatted(date: .long, time: .omitted))")
+        lines.append("Plan Status:      \(plan.approvalStatus.displayName)")
+        lines.append("")
+        
+        // Tier Classification Section
+        lines.append(divider)
+        lines.append("┌" + String(repeating: "─", count: 68) + "┐")
+        lines.append("│ SECTION 2: TIER CLASSIFICATION & INTERVENTION MODEL" + String(repeating: " ", count: 16) + "│")
+        lines.append("└" + String(repeating: "─", count: 68) + "┘")
+        lines.append("")
+        
+        // Map TMI Model to MTSS Tier
+        let (tier, tierDescription) = mapModelToMTSSTier(plan.model)
+        lines.append("MTSS Tier:        \(tier)")
+        lines.append("TMI Model:        \(plan.model.rawValue)")
+        lines.append("")
+        lines.append("Tier Description:")
+        lines.append("  \(tierDescription)")
+        lines.append("")
+        
+        lines.append("Intervention Model Description:")
+        lines.append("  \(plan.model.description)")
+        lines.append("")
+        
+        // Area of Concern Section
+        lines.append(divider)
+        lines.append("┌" + String(repeating: "─", count: 68) + "┐")
+        lines.append("│ SECTION 3: AREA OF CONCERN & BASELINE DATA" + String(repeating: " ", count: 24) + "│")
+        lines.append("└" + String(repeating: "─", count: 68) + "┘")
+        lines.append("")
+        
+        lines.append("Primary Concern Area: \(concernAreaFor(plan.model))")
+        lines.append("")
+        
+        if let description = plan.description, !description.isEmpty {
+            lines.append("Problem Statement:")
+            lines.append("  \(description)")
+            lines.append("")
+        }
+        
+        // Baseline from interests/profile
+        lines.append("Student Profile Indicators:")
+        if !plan.interests.isEmpty {
+            lines.append("  Identified Interests: \(plan.interests.map { $0.name }.joined(separator: ", "))")
+        } else {
+            lines.append("  Identified Interests: [Interest survey not completed]")
+        }
+        lines.append("")
+        
+        lines.append("Current Progress Level: \(plan.progressPercentage)%")
+        lines.append("")
+        
+        // Intervention Strategies Section
+        lines.append(divider)
+        lines.append("┌" + String(repeating: "─", count: 68) + "┐")
+        lines.append("│ SECTION 4: INTERVENTION STRATEGIES" + String(repeating: " ", count: 32) + "│")
+        lines.append("└" + String(repeating: "─", count: 68) + "┘")
+        lines.append("")
+        
+        lines.append("Evidence-Based Strategies:")
+        let modelStrategies = getModelStrategies(for: plan.model)
+        for (index, strategy) in modelStrategies.enumerated() {
+            lines.append("  \(index + 1). \(strategy)")
+        }
+        lines.append("")
+        
+        if let strategies = plan.strategies, !strategies.isEmpty {
+            lines.append("Customized Strategies for This Student:")
+            for (index, strategy) in strategies.enumerated() {
+                lines.append("  \(index + 1). \(strategy)")
+            }
+            lines.append("")
+        }
+        
+        lines.append("Intervention Frequency: [To be determined by educator]")
+        lines.append("Intervention Duration:  [To be determined by educator]")
+        lines.append("Person Responsible:     \(plan.createdBy)")
+        lines.append("")
+        
+        // Goals & Progress Monitoring Section
+        lines.append(divider)
+        lines.append("┌" + String(repeating: "─", count: 68) + "┐")
+        lines.append("│ SECTION 5: GOALS & PROGRESS MONITORING" + String(repeating: " ", count: 28) + "│")
+        lines.append("└" + String(repeating: "─", count: 68) + "┘")
+        lines.append("")
+        
+        if plan.goals.isEmpty {
+            lines.append("Goals: [No goals set - add goals to track progress]")
+        } else {
+            lines.append("SMART Goals:")
+            for (index, goal) in plan.goals.enumerated() {
+                lines.append("")
+                lines.append("Goal \(index + 1):")
+                lines.append("  Description:  \(goal.description)")
+                lines.append("  Status:       \(goal.status.rawValue)")
+                lines.append("  Progress:     \(Int(goal.progress * 100))%")
+                if let dueDate = goal.dueDate {
+                    lines.append("  Target Date:  \(dueDate.formatted(date: .abbreviated, time: .omitted))")
+                }
+                if let notes = goal.notes, !notes.isEmpty {
+                    lines.append("  Notes:        \(notes)")
+                }
+            }
+        }
+        lines.append("")
+        
+        lines.append("Progress Monitoring Schedule:")
+        lines.append("  □ Weekly check-in with student")
+        lines.append("  □ Bi-weekly data collection")
+        lines.append("  □ Monthly progress review meeting")
+        lines.append("")
+        
+        // Decision Rules Section
+        lines.append(divider)
+        lines.append("┌" + String(repeating: "─", count: 68) + "┐")
+        lines.append("│ SECTION 6: DECISION RULES" + String(repeating: " ", count: 42) + "│")
+        lines.append("└" + String(repeating: "─", count: 68) + "┘")
+        lines.append("")
+        
+        lines.append("Response to Intervention Criteria:")
+        lines.append("")
+        lines.append("  ✓ POSITIVE RESPONSE (Continue/Fade):")
+        lines.append("    - Goal progress ≥ 75% within expected timeframe")
+        lines.append("    - Consistent engagement with intervention activities")
+        lines.append("    - Student demonstrates skill generalization")
+        lines.append("")
+        lines.append("  ⚠ QUESTIONABLE RESPONSE (Intensify/Modify):")
+        lines.append("    - Goal progress 50-74% with inconsistent gains")
+        lines.append("    - Sporadic engagement requiring additional support")
+        lines.append("    - Review and modify intervention strategies")
+        lines.append("")
+        lines.append("  ✗ POOR RESPONSE (Refer/Intensify Tier):")
+        lines.append("    - Goal progress < 50% after 6-8 weeks")
+        lines.append("    - Limited response to current intervention tier")
+        lines.append("    - Consider referral to next tier or specialist")
+        lines.append("")
+        
+        // Collaboration & Approval Section
+        lines.append(divider)
+        lines.append("┌" + String(repeating: "─", count: 68) + "┐")
+        lines.append("│ SECTION 7: COLLABORATION & APPROVAL" + String(repeating: " ", count: 31) + "│")
+        lines.append("└" + String(repeating: "─", count: 68) + "┘")
+        lines.append("")
+        
+        if !plan.approvalHistory.isEmpty {
+            lines.append("Approval History:")
+            for entry in plan.approvalHistory {
+                lines.append("  • \(entry.action.displayName) on \(entry.timestamp.formatted(date: .abbreviated, time: .shortened))")
+                if let comment = entry.comment, !comment.isEmpty {
+                    lines.append("    Comment: \"\(comment)\"")
+                }
+            }
+            lines.append("")
+        }
+        
+        if !plan.notes.isEmpty {
+            lines.append("Team Collaboration Notes:")
+            lines.append("  \(plan.notes)")
+            lines.append("")
+        }
+        
+        lines.append("Required Signatures:")
+        lines.append("")
+        lines.append("  Educator: ______________________ Date: __________")
+        lines.append("")
+        lines.append("  Counselor: _____________________ Date: __________")
+        lines.append("")
+        lines.append("  Administrator: _________________ Date: __________")
+        lines.append("")
+        lines.append("  Parent/Guardian: _______________ Date: __________")
+        lines.append("")
+        
+        // Footer
+        lines.append(headerDivider)
+        lines.append("Generated by TMI App - PathFinder | \(Date().formatted())")
+        lines.append("This document is intended for MTSS documentation and compliance purposes.")
+        lines.append(headerDivider)
+        
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: - IEP Contribution Export
+
+    /// Export a TMI plan in IEP contribution format
+    func exportPlanToIEPContribution(_ plan: TMIPlan) async throws -> URL {
+        let iepContent = generateIEPContent(for: plan)
+
+        let fileName = "IEP_\(plan.primaryStudent?.name.replacingOccurrences(of: " ", with: "_") ?? "Student")_\(Date().formatted(date: .numeric, time: .omitted)).txt"
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL = tempDir.appendingPathComponent(fileName)
+
+        try iepContent.write(to: fileURL, atomically: true, encoding: .utf8)
+        print("[PlanExportService] Exported IEP contribution: \(fileURL.path)")
+
+        return fileURL
+    }
+
+    /// Generate IEP-compliant contribution content
+    private func generateIEPContent(for plan: TMIPlan) -> String {
+        var lines: [String] = []
+        let divider = String(repeating: "─", count: 70)
+        let headerDivider = String(repeating: "═", count: 70)
+
+        lines.append(headerDivider)
+        lines.append("INDIVIDUALIZED EDUCATION PROGRAM (IEP)")
+        lines.append("SUPPORTING DOCUMENTATION - TMI CONTRIBUTION")
+        lines.append(headerDivider)
+        lines.append("")
+
+        // Student Information
+        lines.append("SECTION 1: STUDENT INFORMATION")
+        lines.append(divider)
+        if let student = plan.primaryStudent {
+            lines.append("Student Name:     \(student.name)")
+            lines.append("Grade Level:      \(student.grade)")
+            if let school = student.school.isEmpty ? nil : student.school {
+                lines.append("School:           \(school)")
+            }
+        } else {
+            lines.append("Student Name:     [Not specified]")
+        }
+        lines.append("Plan Created:     \(plan.creationDate.formatted(date: .long, time: .omitted))")
+        lines.append("Last Updated:     \(plan.lastUpdated.formatted(date: .long, time: .omitted))")
+        lines.append("")
+
+        // Present Levels of Performance
+        lines.append("SECTION 2: PRESENT LEVELS OF ACADEMIC & FUNCTIONAL PERFORMANCE")
+        lines.append(divider)
+        if let description = plan.description, !description.isEmpty {
+            lines.append("Summary:")
+            lines.append("  \(description)")
+        } else {
+            lines.append("Summary: [No narrative summary provided]")
+        }
+        lines.append("")
+        lines.append("Interests & Strengths:")
+        if plan.interests.isEmpty {
+            lines.append("  [No interests captured]")
+        } else {
+            lines.append("  \(plan.interests.map { $0.name }.joined(separator: \", \"))")
+        }
+        lines.append("")
+
+        // Measurable Annual Goals
+        lines.append("SECTION 3: MEASURABLE ANNUAL GOALS")
+        lines.append(divider)
+        if plan.goals.isEmpty {
+            lines.append("Goals: [No goals set - add measurable goals to align with IEP]")
+        } else {
+            for (index, goal) in plan.goals.enumerated() {
+                lines.append("Goal \(index + 1): \(goal.description)")
+                lines.append("  Status: \(goal.status.rawValue)")
+                lines.append("  Progress: \(Int(goal.progress * 100))%")
+                if let dueDate = goal.dueDate {
+                    lines.append("  Target Date: \(dueDate.formatted(date: .abbreviated, time: .omitted))")
+                }
+                if let notes = goal.notes, !notes.isEmpty {
+                    lines.append("  Notes: \(notes)")
+                }
+                lines.append("")
+            }
+        }
+
+        // Services and Supports
+        lines.append("SECTION 4: SERVICES, ACCOMMODATIONS, AND SUPPORTS")
+        lines.append(divider)
+        lines.append("Intervention Model: \(plan.model.rawValue)")
+        lines.append("Model Description: \(plan.model.description)")
+        lines.append("")
+
+        if let strategies = plan.strategies, !strategies.isEmpty {
+            lines.append("Instructional/Behavioral Strategies:")
+            for strategy in strategies {
+                lines.append("  • \(strategy)")
+            }
+        } else {
+            lines.append("Instructional/Behavioral Strategies: [Not specified]")
+        }
+        lines.append("")
+
+        if !plan.resources.isEmpty {
+            lines.append("Supplementary Resources:")
+            for resource in plan.resources {
+                lines.append("  • \(resource.title) (\(resource.category.rawValue))")
+            }
+            lines.append("")
+        }
+
+        // Progress Monitoring
+        lines.append("SECTION 5: PROGRESS MONITORING")
+        lines.append(divider)
+        lines.append("Progress Monitoring Schedule:")
+        lines.append("  • Weekly student check-ins")
+        lines.append("  • Bi-weekly goal review")
+        lines.append("  • Monthly team review")
+        lines.append("")
+        lines.append("Current Progress Summary:")
+        lines.append("  Overall Progress: \(plan.progressPercentage)%")
+        lines.append("  Approval Status: \(plan.approvalStatus.displayName)")
+        lines.append("")
+
+        // Team Notes
+        lines.append("SECTION 6: TEAM NOTES & RECOMMENDATIONS")
+        lines.append(divider)
+        if plan.notes.isEmpty {
+            lines.append("Notes: [No team notes captured]")
+        } else {
+            lines.append("Notes:")
+            lines.append("  \(plan.notes)")
+        }
+        lines.append("")
+
+        lines.append(headerDivider)
+        lines.append("Generated by TMI App - PathFinder | \(Date().formatted())")
+        lines.append("This document is intended to support IEP documentation.")
+        lines.append(headerDivider)
+
+        return lines.joined(separator: "\n")
+    }
+    
+    /// Map TMI intervention model to MTSS tier classification
+    private func mapModelToMTSSTier(_ model: TMIPlanModel) -> (tier: String, description: String) {
+        switch model {
+        case .alignYourMind:
+            return ("Tier 2 - Targeted Intervention", 
+                    "Targeted social-emotional support for students needing more than universal instruction")
+        case .chaseYourSpace:
+            return ("Tier 1/2 - Universal/Targeted", 
+                    "Self-regulation and identity exploration appropriate for all students with targeted deepening")
+        case .meekToProtector:
+            return ("Tier 2 - Targeted Intervention", 
+                    "Building confidence and leadership skills for students who need encouragement")
+        case .acknowledgeInterests:
+            return ("Tier 1 - Universal Instruction", 
+                    "Interest exploration and engagement strategies for all students")
+        case .directAndCorrect:
+            return ("Tier 2/3 - Targeted/Intensive", 
+                    "Behavioral intervention requiring individualized support and coping skills")
+        case .bullyToBoss:
+            return ("Tier 3 - Intensive Intervention", 
+                    "Intensive behavior modification and leadership redirection for high-needs students")
+        }
+    }
+    
+    /// Get evidence-based strategies for each model
+    private func getModelStrategies(for model: TMIPlanModel) -> [String] {
+        switch model {
+        case .alignYourMind:
+            return [
+                "Mindfulness and grounding exercises",
+                "Cognitive reframing techniques",
+                "Emotional regulation skill-building",
+                "Weekly reflection journaling"
+            ]
+        case .chaseYourSpace:
+            return [
+                "Career pathway mapping",
+                "Personal goal visualization",
+                "Self-advocacy role-playing",
+                "Professional mentor connections"
+            ]
+        case .meekToProtector:
+            return [
+                "Strength identification exercises",
+                "Progressive leadership opportunities",
+                "Peer mentoring connections",
+                "Confidence-building challenges"
+            ]
+        case .acknowledgeInterests:
+            return [
+                "Interest inventory exploration",
+                "Hobby-based learning connections",
+                "Passion project development",
+                "Career-interest alignment activities"
+            ]
+        case .directAndCorrect:
+            return [
+                "Coping skills development",
+                "Scenario-based learning",
+                "Social worker collaboration",
+                "Interest-connected behavior redirection"
+            ]
+        case .bullyToBoss:
+            return [
+                "Leadership role identification",
+                "Positive influence training",
+                "Interest-driven mentorship",
+                "Conflict resolution skill-building"
+            ]
+        }
+    }
+    
+    /// Get the primary concern area for MTSS documentation
+    private func concernAreaFor(_ model: TMIPlanModel) -> String {
+        switch model {
+        case .alignYourMind:
+            return "Focus & Self-Regulation"
+        case .chaseYourSpace:
+            return "Career & Academic Direction"
+        case .meekToProtector:
+            return "Confidence & Self-Advocacy"
+        case .acknowledgeInterests:
+            return "Engagement & Motivation"
+        case .directAndCorrect:
+            return "Behavioral Regulation"
+        case .bullyToBoss:
+            return "Social-Emotional & Leadership"
+        }
+    }
 
     // MARK: - Bulk Export
 

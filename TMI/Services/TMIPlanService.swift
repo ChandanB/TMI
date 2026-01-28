@@ -825,6 +825,176 @@ class TMIPlanService {
             throw TMIPlanServiceError.updateFailed(error.localizedDescription)
         }
     }
+
+    // MARK: - Phase 1: District-Scoped Queries
+    
+    /// Fetch all plans in a district (for cross-staff access)
+    func fetchPlansInDistrict(_ districtId: String) async throws -> [TMIPlan] {
+        print("[TMIPlanService] Fetching plans for district: \(districtId)")
+        
+        let query = db.collection("plans")
+            .whereField("districtId", isEqualTo: districtId)
+        
+        do {
+            let snapshot = try await query.getDocuments()
+            
+            // Use simple parsing for district-scoped plans
+            let plans = snapshot.documents.compactMap { document -> TMIPlan? in
+                let data = document.data()
+                
+                guard let modelRaw = data["model"] as? String,
+                      let model = TMIPlanModel(rawValue: modelRaw),
+                      let progress = data["progress"] as? Double,
+                      let notes = data["notes"] as? String,
+                      let creationTimestamp = data["creationDate"] as? Double,
+                      let lastUpdatedTimestamp = data["lastUpdated"] as? Double else {
+                    return nil
+                }
+                
+                let creationDate = Date(timeIntervalSince1970: creationTimestamp)
+                let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
+                
+                // Reconstruct students
+                let students: [Student]
+                if let studentsData = data["students"] as? [[String: Any]] {
+                    students = studentsData.map { studentInfo in
+                        Student(
+                            id: studentInfo["id"] as? String,
+                            name: studentInfo["name"] as? String ?? "Unknown",
+                            grade: studentInfo["grade"] as? String ?? "",
+                            school: "",
+                            dateOfBirth: Date()
+                        )
+                    }
+                } else {
+                    students = []
+                }
+                
+                let title = data["title"] as? String ?? ""
+                let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
+                let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
+                let createdBy = data["createdBy"] as? String ?? ""
+                let districtId = data["districtId"] as? String
+                let assignedCounselorId = data["assignedCounselorId"] as? String
+                
+                return TMIPlan(
+                    id: document.documentID,
+                    title: title,
+                    description: data["description"] as? String,
+                    students: students,
+                    model: model,
+                    interests: [],
+                    startDate: startDate,
+                    endDate: endDate,
+                    creationDate: creationDate,
+                    lastUpdated: lastUpdated,
+                    goals: [],
+                    progress: progress,
+                    notes: notes,
+                    createdBy: createdBy,
+                    resources: [],
+                    districtId: districtId,
+                    assignedCounselorId: assignedCounselorId
+                )
+            }
+            
+            print("[TMIPlanService] Found \(plans.count) plans in district")
+            return plans
+        } catch {
+            print("[TMIPlanService] Error fetching district plans: \(error)")
+            throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
+        }
+    }
+    
+    /// Fetch plans assigned to a specific counselor (caseload)
+    func fetchPlansForCounselor(_ counselorId: String) async throws -> [TMIPlan] {
+        print("[TMIPlanService] Fetching plans for counselor: \(counselorId)")
+        
+        let query = db.collection("plans")
+            .whereField("assignedCounselorId", isEqualTo: counselorId)
+        
+        do {
+            let snapshot = try await query.getDocuments()
+            
+            let plans = snapshot.documents.compactMap { document -> TMIPlan? in
+                let data = document.data()
+                
+                guard let modelRaw = data["model"] as? String,
+                      let model = TMIPlanModel(rawValue: modelRaw),
+                      let progress = data["progress"] as? Double,
+                      let notes = data["notes"] as? String,
+                      let creationTimestamp = data["creationDate"] as? Double,
+                      let lastUpdatedTimestamp = data["lastUpdated"] as? Double else {
+                    return nil
+                }
+                
+                let creationDate = Date(timeIntervalSince1970: creationTimestamp)
+                let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
+                
+                let students: [Student]
+                if let studentsData = data["students"] as? [[String: Any]] {
+                    students = studentsData.map { studentInfo in
+                        Student(
+                            id: studentInfo["id"] as? String,
+                            name: studentInfo["name"] as? String ?? "Unknown",
+                            grade: studentInfo["grade"] as? String ?? "",
+                            school: "",
+                            dateOfBirth: Date()
+                        )
+                    }
+                } else {
+                    students = []
+                }
+                
+                let title = data["title"] as? String ?? ""
+                let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
+                let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
+                let createdBy = data["createdBy"] as? String ?? ""
+                let districtId = data["districtId"] as? String
+                let assignedCounselorId = data["assignedCounselorId"] as? String
+                
+                return TMIPlan(
+                    id: document.documentID,
+                    title: title,
+                    description: data["description"] as? String,
+                    students: students,
+                    model: model,
+                    interests: [],
+                    startDate: startDate,
+                    endDate: endDate,
+                    creationDate: creationDate,
+                    lastUpdated: lastUpdated,
+                    goals: [],
+                    progress: progress,
+                    notes: notes,
+                    createdBy: createdBy,
+                    resources: [],
+                    districtId: districtId,
+                    assignedCounselorId: assignedCounselorId
+                )
+            }
+            
+            print("[TMIPlanService] Found \(plans.count) plans for counselor")
+            return plans
+        } catch {
+            print("[TMIPlanService] Error fetching counselor plans: \(error)")
+            throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
+        }
+    }
+    
+    /// Assign a counselor to a plan
+    func assignCounselor(_ counselorId: String, to planId: String) async throws {
+        print("[TMIPlanService] Assigning counselor \(counselorId) to plan \(planId)")
+        
+        try await db.collection("plans")
+            .document(planId)
+            .updateData([
+                "assignedCounselorId": counselorId,
+                "lastUpdated": Date().timeIntervalSince1970
+            ])
+        
+        print("[TMIPlanService] Counselor assigned successfully")
+    }
 }
 
 // MARK: - Error Types

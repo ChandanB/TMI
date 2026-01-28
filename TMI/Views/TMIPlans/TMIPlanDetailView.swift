@@ -111,8 +111,18 @@ struct TMIPlanDetailView: View {
                         if isExporting {
                             Label("Exporting...", systemImage: "arrow.down.doc")
                         } else {
-                            Label("Export Plan", systemImage: "square.and.arrow.up")
+                            Label("Export PDF", systemImage: "doc.fill")
                         }
+                    }
+                    .disabled(isExporting)
+                    
+                    Button(action: { exportPlanToMTSS() }) {
+                        Label("Export MTSS Report", systemImage: "doc.text.fill")
+                    }
+                    .disabled(isExporting)
+
+                    Button(action: { exportPlanToIEP() }) {
+                        Label("Export IEP Contribution", systemImage: "doc.text.magnifyingglass")
                     }
                     .disabled(isExporting)
 
@@ -1044,6 +1054,42 @@ struct TMIPlanDetailView: View {
             }
         }
     }
+    
+    private func exportPlanToMTSS() {
+        Task {
+            isExporting = true
+            defer { isExporting = false }
+
+            do {
+                let mtssURL = try await exportService.exportPlanToMTSS(plan)
+                await MainActor.run {
+                    exportedPDFURL = mtssURL
+                    showingShareSheet = true
+                }
+                print("[TMIPlanDetail] Exported MTSS report: \(mtssURL.path)")
+            } catch {
+                print("[TMIPlanDetail] Error exporting MTSS report: \(error)")
+            }
+        }
+    }
+
+    private func exportPlanToIEP() {
+        Task {
+            isExporting = true
+            defer { isExporting = false }
+
+            do {
+                let iepURL = try await exportService.exportPlanToIEPContribution(plan)
+                await MainActor.run {
+                    exportedPDFURL = iepURL
+                    showingShareSheet = true
+                }
+                print("[TMIPlanDetail] Exported IEP contribution: \(iepURL.path)")
+            } catch {
+                print("[TMIPlanDetail] Error exporting IEP contribution: \(error)")
+            }
+        }
+    }
 
     @MainActor
     private func addGoalToPlan(_ newGoal: Goal) async {
@@ -1773,7 +1819,6 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
 
 
 // MARK: - All Resources View
-
 
 
 
