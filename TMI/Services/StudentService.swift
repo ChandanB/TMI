@@ -10,6 +10,8 @@ import FirebaseFirestore
 import Foundation
 import Observation
 
+// MARK: - RBAC Integration
+
 /// Service for managing student data operations with Firestore
 @Observable
 class StudentService {
@@ -63,9 +65,24 @@ class StudentService {
         guard let collection = userStudentsCollection else {
             throw StudentServiceError.userNotAuthenticated
         }
-        
+
+        // RBAC Check: Verify user has permission to create students
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw StudentServiceError.userNotAuthenticated
+        }
+
+        // Fetch current user to check permissions
+        let userDoc = try await db.collection("users").document(uid).getDocument()
+        guard let userData = userDoc.data(),
+              let tmiUser = try? userDoc.data(as: TMIUser.self) else {
+            throw StudentServiceError.userNotAuthenticated
+        }
+
+        // Check RBAC permission
+        try RBACService.shared.requirePermission(.createStudent, user: tmiUser)
+
         do {
-            print("[StudentService] Adding student: \(student.name)")
+            print("[StudentService] Adding student: \(student.name) (user: \(tmiUser.role.rawValue))")
             
             // Convert student to Firestore data (without ID)
             let data = student.toFirestoreData()
@@ -99,8 +116,20 @@ class StudentService {
             throw StudentServiceError.userNotAuthenticated
         }
 
+        // RBAC Check: Verify user has permission to edit students
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw StudentServiceError.userNotAuthenticated
+        }
+
+        let userDoc = try await db.collection("users").document(uid).getDocument()
+        guard let tmiUser = try? userDoc.data(as: TMIUser.self) else {
+            throw StudentServiceError.userNotAuthenticated
+        }
+
+        try RBACService.shared.requirePermission(.editStudent, user: tmiUser)
+
         do {
-            print("[StudentService] Updating student: \(student.name)")
+            print("[StudentService] Updating student: \(student.name) (user: \(tmiUser.role.rawValue))")
 
             let data = student.toFirestoreData()
             try await withTimeout(seconds: 10) {
@@ -163,11 +192,23 @@ class StudentService {
         guard let studentId = student.id else {
             throw StudentServiceError.invalidStudentId
         }
-        
+
         guard let collection = userStudentsCollection else {
             throw StudentServiceError.userNotAuthenticated
         }
-        
+
+        // RBAC Check: Verify user has permission to delete students
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw StudentServiceError.userNotAuthenticated
+        }
+
+        let userDoc = try await db.collection("users").document(uid).getDocument()
+        guard let tmiUser = try? userDoc.data(as: TMIUser.self) else {
+            throw StudentServiceError.userNotAuthenticated
+        }
+
+        try RBACService.shared.requirePermission(.deleteStudent, user: tmiUser)
+
         do {
             print("[StudentService] Deleting student: \(student.name)")
             try await withTimeout(seconds: 10) {

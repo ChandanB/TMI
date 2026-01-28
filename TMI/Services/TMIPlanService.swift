@@ -385,9 +385,21 @@ class TMIPlanService {
         guard let collection = userPlansCollection else {
             throw TMIPlanServiceError.userNotAuthenticated
         }
-        
+
+        // RBAC Check: Verify user has permission to create plans
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+
+        let userDoc = try await db.collection("users").document(uid).getDocument()
+        guard let tmiUser = try? userDoc.data(as: TMIUser.self) else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+
+        try RBACService.shared.requirePermission(.createPlan, user: tmiUser)
+
         do {
-            print("[TMIPlanService] Adding TMI plan: \(plan.model.rawValue)")
+            print("[TMIPlanService] Adding TMI plan: \(plan.model.rawValue) (user: \(tmiUser.role.rawValue))")
             
             // Convert plan to Firestore data (without ID)
             let data = plan.toFirestoreData()
@@ -562,13 +574,25 @@ class TMIPlanService {
         guard let planId = plan.id else {
             throw TMIPlanServiceError.invalidPlanId
         }
-        
+
         guard let collection = userPlansCollection else {
             throw TMIPlanServiceError.userNotAuthenticated
         }
-        
+
+        // RBAC Check: Verify user has permission to edit plans
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+
+        let userDoc = try await db.collection("users").document(uid).getDocument()
+        guard let tmiUser = try? userDoc.data(as: TMIUser.self) else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+
+        try RBACService.shared.requirePermission(.editPlan, user: tmiUser)
+
         do {
-            print("[TMIPlanService] Updating TMI plan: \(plan.model.rawValue)")
+            print("[TMIPlanService] Updating TMI plan: \(plan.model.rawValue) (user: \(tmiUser.role.rawValue))")
             
             var updatedPlan = plan
             updatedPlan.lastUpdated = Date() // Update the lastUpdated timestamp
@@ -586,6 +610,26 @@ class TMIPlanService {
     
     /// Delete a TMI plan from Firestore
     func deletePlan(_ plan: TMIPlan) async throws {
+        guard let planId = plan.id else {
+            throw TMIPlanServiceError.invalidPlanId
+        }
+
+        guard let collection = userPlansCollection else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+
+        // RBAC Check: Verify user has permission to delete plans
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+
+        let userDoc = try await db.collection("users").document(uid).getDocument()
+        guard let tmiUser = try? userDoc.data(as: TMIUser.self) else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+
+        try RBACService.shared.requirePermission(.deletePlan, user: tmiUser)
+
         guard let planId = plan.id else {
             throw TMIPlanServiceError.invalidPlanId
         }
