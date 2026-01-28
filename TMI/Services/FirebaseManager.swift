@@ -131,7 +131,7 @@ extension FirebaseManager {
     #endif
   }
 
-  nonisolated(nonsending) func signUp(withEmail email: String, password: String) async throws -> String {
+  nonisolated(nonsending) func signUp(withEmail email: String, password: String, role: String = "teacher") async throws -> String {
     do {
       let authResult = try await auth.createUser(withEmail: email, password: password)
       let uid = authResult.user.uid
@@ -141,7 +141,7 @@ extension FirebaseManager {
         "uid": uid,
         "email": email,
         "createdAt": FieldValue.serverTimestamp(),
-        "role": "teacher",  // Default role for MVP - educator
+        "role": role,  // Role provided by caller (default teacher for backward compatibility)
       ]
 
       try await firestore.collection("users").document(uid).setData(userData)
