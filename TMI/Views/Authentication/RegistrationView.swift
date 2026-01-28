@@ -315,28 +315,24 @@ struct RegistrationView: View {
 
     Task {
       do {
-        // Use the AuthStateModel for registration
-        authStateModel.updateEmail(email)
-        authStateModel.updatePassword(password)
+        // Split full name into first and last
+        let nameParts = displayName.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ")
+        let firstName = String(nameParts.first ?? "")
+        let lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
 
-        // Create Firebase Auth account
-        let authService = FirebaseTMIAuthService()
-        let firebaseUser = try await authService.signUp(email: email, password: password)
-
-        // Create TMIUser document in Firestore with selected role
-        let tmiUser = TMIUser(
-          userID: firebaseUser.uid,
-          displayName: displayName,
+        // Use AuthenticationService for unified registration
+        let tmiUser = try await AuthenticationService.shared.signUp(
           email: email,
-          isEmailVerified: firebaseUser.isEmailVerified,
+          password: password,
+          firstName: firstName,
+          lastName: lastName,
           role: selectedRole,
-          createdAt: Date(),
-          lastLoginAt: Date(),
-          isActive: true
+          institutionCode: nil, // RegistrationView doesn't collect institution code
+          districtId: nil
         )
 
-        // Save to Firestore
-        try await createTMIUserDocument(tmiUser)
+        // Force AuthStateModel to reload and fetch the TMIUser from Firestore
+        await authStateModel.fetch()
 
         // The AuthStateModel will automatically load the user after auth
         // Just dismiss and let the natural flow happen
@@ -351,12 +347,6 @@ struct RegistrationView: View {
         }
       }
     }
-  }
-
-  private func createTMIUserDocument(_ user: TMIUser) async throws {
-    let firestore = FirebaseManager.shared.firestore
-    let userRef = firestore.collection("users").document(user.userID)
-    try userRef.setData(from: user)
   }
 
   private func isValidEmail(_ email: String) -> Bool {

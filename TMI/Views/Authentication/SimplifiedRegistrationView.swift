@@ -201,26 +201,21 @@ struct SimplifiedRegistrationView: View {
 
         Task {
             do {
-                // Create Firebase Auth account
-                let authService = FirebaseTMIAuthService()
-                let firebaseUser = try await authService.signUp(email: email, password: password)
+                // Split full name into first and last
+                let nameParts = displayName.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ")
+                let firstName = String(nameParts.first ?? "")
+                let lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
 
-                // Create TMIUser document with selected account type
-                let tmiUser = TMIUser(
-                    userID: firebaseUser.uid,
-                    displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+                // Use AuthenticationService for unified registration
+                let tmiUser = try await AuthenticationService.shared.signUp(
                     email: email,
-                    isEmailVerified: firebaseUser.isEmailVerified,
+                    password: password,
+                    firstName: firstName,
+                    lastName: lastName,
                     role: selectedAccountType.userRole,
-                    createdAt: Date(),
-                    lastLoginAt: Date(),
-                    isActive: true
+                    institutionCode: nil, // SimplifiedRegistrationView doesn't collect institution code
+                    districtId: nil
                 )
-
-                // Save to Firestore
-                let firestore = FirebaseManager.shared.firestore
-                let userRef = firestore.collection("users").document(tmiUser.userID)
-                try userRef.setData(from: tmiUser)
 
                 // Force AuthStateModel to reload and fetch the TMIUser from Firestore
                 await authStateModel.fetch()
