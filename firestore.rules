@@ -264,18 +264,32 @@ service cloud.firestore {
       
       // Student Interest Edges (sub-collection)
       match /studentInterests/{interestId} {
-        // Educators can read their students' interests
-        allow read: if isAuthenticated();
-        // Only authorized users can write student data
-        allow write: if isAuthenticated();
+        // Must be assigned to parent student OR in same district OR district admin
+        allow read: if isAuthenticated() && (
+          isAssignedToStudent() ||
+          isStudentInUserDistrict() ||
+          isDistrictAdmin()
+        );
+        // Only assigned staff or district admins can write
+        allow write: if isAuthenticated() && (
+          isAssignedToStudent() ||
+          isDistrictAdmin()
+        );
       }
-      
+
       // Student Career State (sub-collection)
       match /careerState/{careerId} {
-        // Educators can read their students' career state
-        allow read: if isAuthenticated();
-        // Only authorized users can write student data
-        allow write: if isAuthenticated();
+        // Must be assigned to parent student OR in same district OR district admin
+        allow read: if isAuthenticated() && (
+          isAssignedToStudent() ||
+          isStudentInUserDistrict() ||
+          isDistrictAdmin()
+        );
+        // Only assigned staff or district admins can write
+        allow write: if isAuthenticated() && (
+          isAssignedToStudent() ||
+          isDistrictAdmin()
+        );
       }
     }
 
@@ -320,8 +334,17 @@ service cloud.firestore {
 
       // Plan Resource Links (sub-collection)
       match /planResources/{resourceId} {
-        // Educators can manage plan resources
-        allow read, write: if isAuthenticated();
+        // Must be assigned to parent plan OR in same district OR district admin
+        allow read: if isAuthenticated() && (
+          isAssignedToPlan() ||
+          isPlanInUserDistrict() ||
+          isDistrictAdmin()
+        );
+        // Only assigned staff or district admins can write
+        allow write: if isAuthenticated() && (
+          isAssignedToPlan() ||
+          (isDistrictAdmin() && isPlanInUserDistrict())
+        );
       }
     }
   }
