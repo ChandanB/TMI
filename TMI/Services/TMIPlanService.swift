@@ -1039,6 +1039,129 @@ class TMIPlanService {
         
         print("[TMIPlanService] Counselor assigned successfully")
     }
+
+    // MARK: - Plan Inputs & Evidence
+
+    private func planInputsCollection(planId: String) -> CollectionReference {
+        db.collection(FirestorePaths.planInputs(planId: planId))
+    }
+
+    private func planEvidenceCollection(planId: String) -> CollectionReference {
+        db.collection(FirestorePaths.planEvidence(planId: planId))
+    }
+
+    func fetchPlanInputs(planId: String) async throws -> [PlanInputField] {
+        let snapshot = try await planInputsCollection(planId: planId)
+            .order(by: "updatedAt", descending: true)
+            .getDocuments()
+
+        return snapshot.documents.compactMap { document in
+            try? document.data(as: PlanInputField.self)
+        }
+    }
+
+    func savePlanInputs(planId: String, fields: [PlanInputField]) async throws {
+        guard !fields.isEmpty else { return }
+        let batch = db.batch()
+        let now = Date()
+        let userId = Auth.auth().currentUser?.uid
+
+        for field in fields {
+            let docRef: DocumentReference
+            if let id = field.id {
+                docRef = planInputsCollection(planId: planId).document(id)
+            } else {
+                docRef = planInputsCollection(planId: planId).document()
+            }
+
+            var updated = field
+            updated.planId = planId
+            updated.updatedAt = now
+            updated.updatedBy = userId
+
+            if updated.createdAt > now {
+                updated.createdAt = now
+            }
+
+            let data = try Firestore.Encoder().encode(updated)
+            batch.setData(data, forDocument: docRef, merge: true)
+        }
+
+        try await batch.commit()
+    }
+
+    func upsertPlanInput(planId: String, field: PlanInputField) async throws -> PlanInputField {
+        let now = Date()
+        let userId = Auth.auth().currentUser?.uid
+        let docRef: DocumentReference
+
+        if let id = field.id {
+            docRef = planInputsCollection(planId: planId).document(id)
+        } else {
+            docRef = planInputsCollection(planId: planId).document()
+        }
+
+        var updated = field
+        updated.planId = planId
+        updated.updatedAt = now
+        updated.updatedBy = userId
+        if updated.createdAt > now {
+            updated.createdAt = now
+        }
+
+        let data = try Firestore.Encoder().encode(updated)
+        try await docRef.setData(data, merge: true)
+
+        var returned = updated
+        returned.id = docRef.documentID
+        return returned
+    }
+
+    func fetchPlanEvidence(planId: String) async throws -> [PlanEvidenceEntry] {
+        let snapshot = try await planEvidenceCollection(planId: planId)
+            .order(by: "createdAt", descending: true)
+            .getDocuments()
+
+        return snapshot.documents.compactMap { document in
+            try? document.data(as: PlanEvidenceEntry.self)
+        }
+    }
+
+    func addPlanEvidence(planId: String, entry: PlanEvidenceEntry) async throws -> PlanEvidenceEntry {
+        let now = Date()
+        let userId = Auth.auth().currentUser?.uid
+        let docRef = planEvidenceCollection(planId: planId).document()
+
+        var updated = entry
+        updated.planId = planId
+        updated.createdAt = now
+        updated.createdBy = userId
+
+        let data = try Firestore.Encoder().encode(updated)
+        try await docRef.setData(data, merge: true)
+
+        var returned = updated
+        returned.id = docRef.documentID
+        return returned
+    }
+
+    func fetchPlanEvidence(forPlanIds planIds: [String]) async throws -> [PlanEvidenceEntry] {
+        guard !planIds.isEmpty else { return [] }
+
+        var collected: [PlanEvidenceEntry] = []
+        try await withThrowingTaskGroup(of: [PlanEvidenceEntry].self) { group in
+            for planId in planIds {
+                group.addTask {
+                    try await self.fetchPlanEvidence(planId: planId)
+                }
+            }
+
+            for try await entries in group {
+                collected.append(contentsOf: entries)
+            }
+        }
+        return collected
+    }
 }
 
 // MARK: - Error Types
@@ -1068,4 +1191,3 @@ enum TMIPlanServiceError: Error, LocalizedError {
         }
     }
 }
-

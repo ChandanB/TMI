@@ -12,6 +12,7 @@ import PDFKit
 
 /// Service for exporting TMI plans to various formats
 class PlanExportService {
+    private let planService = TMIPlanService.shared
 
     // MARK: - PDF Export
 
@@ -31,6 +32,10 @@ class PlanExportService {
 
     /// Generate PDF data for a plan
     private func generatePDFData(for plan: TMIPlan) async throws -> Data {
+        let inputs = await fetchPlanInputsForExport(plan)
+        let evidenceEntries = await fetchPlanEvidenceForExport(plan)
+        let evidenceSummary = summarizeEvidence(evidenceEntries)
+
         let pdfMetaData = [
             kCGPDFContextCreator: "TMI App",
             kCGPDFContextAuthor: plan.createdBy,
@@ -97,6 +102,65 @@ class PlanExportService {
                 let descSize = descString.boundingRect(with: CGSize(width: contentWidth, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: bodyAttributes, context: nil)
                 descString.draw(in: CGRect(x: margin, y: yPosition, width: contentWidth, height: descSize.height), withAttributes: bodyAttributes)
                 yPosition += descSize.height + 20
+            }
+
+            if !inputs.isEmpty {
+                checkPageBreak(requiredSpace: 60)
+
+                let sectionFont = UIFont.boldSystemFont(ofSize: 16)
+                let sectionAttributes: [NSAttributedString.Key: Any] = [.font: sectionFont]
+                "Plan Inputs".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: sectionAttributes)
+                yPosition += 25
+
+                let bodyFont = UIFont.systemFont(ofSize: 12)
+                let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
+
+                for input in inputs {
+                    checkPageBreak(requiredSpace: 20)
+                    let value = input.value.isEmpty ? "[Not provided]" : input.value
+                    let inputText = "\(input.label): \(value)" as NSString
+                    let inputRect = CGRect(x: margin + 10, y: yPosition, width: contentWidth - 20, height: 100)
+                    let inputSize = inputText.boundingRect(
+                        with: CGSize(width: contentWidth - 20, height: .greatestFiniteMagnitude),
+                        options: .usesLineFragmentOrigin,
+                        attributes: bodyAttributes,
+                        context: nil
+                    )
+                    inputText.draw(in: CGRect(x: margin + 10, y: yPosition, width: contentWidth - 20, height: inputSize.height), withAttributes: bodyAttributes)
+                    yPosition += inputSize.height + 8
+                }
+
+                yPosition += 10
+            }
+
+            if evidenceSummary.totalEntries > 0 {
+                checkPageBreak(requiredSpace: 60)
+
+                let sectionFont = UIFont.boldSystemFont(ofSize: 16)
+                let sectionAttributes: [NSAttributedString.Key: Any] = [.font: sectionFont]
+                "Evidence Summary".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: sectionAttributes)
+                yPosition += 25
+
+                let bodyFont = UIFont.systemFont(ofSize: 12)
+                let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
+
+                let summaryLines = [
+                    "Total entries: \(evidenceSummary.totalEntries)",
+                    "Checklist completions: \(evidenceSummary.checklistCompletions)",
+                    "Streak completions: \(evidenceSummary.streakCompletions)",
+                    "Incidents logged: \(evidenceSummary.incidentCount)",
+                    "Thought logs: \(evidenceSummary.thoughtLogCount)",
+                    "Ratings logged: \(evidenceSummary.ratingCount)",
+                    "Average rating: \(String(format: "%.1f", evidenceSummary.averageRating))"
+                ]
+
+                for line in summaryLines {
+                    checkPageBreak(requiredSpace: 18)
+                    (line as NSString).draw(at: CGPoint(x: margin + 10, y: yPosition), withAttributes: bodyAttributes)
+                    yPosition += 18
+                }
+
+                yPosition += 10
             }
 
             // Students
@@ -217,11 +281,51 @@ class PlanExportService {
         return data
     }
 
+    private struct EvidenceSummary {
+        let totalEntries: Int
+        let checklistCompletions: Int
+        let streakCompletions: Int
+        let incidentCount: Int
+        let thoughtLogCount: Int
+        let ratingCount: Int
+        let averageRating: Double
+    }
+
+    private func fetchPlanInputsForExport(_ plan: TMIPlan) async -> [PlanInputField] {
+        guard let planId = plan.id else { return [] }
+        return (try? await planService.fetchPlanInputs(planId: planId)) ?? []
+    }
+
+    private func fetchPlanEvidenceForExport(_ plan: TMIPlan) async -> [PlanEvidenceEntry] {
+        guard let planId = plan.id else { return [] }
+        return (try? await planService.fetchPlanEvidence(planId: planId)) ?? []
+    }
+
+    private func summarizeEvidence(_ entries: [PlanEvidenceEntry]) -> EvidenceSummary {
+        let checklistCompletions = entries.filter { $0.type == .checklist }.count
+        let streakCompletions = entries.filter { $0.type == .streak }.count
+        let incidentCount = entries.filter { $0.type == .incident }.count
+        let thoughtLogCount = entries.filter { $0.type == .thoughtLog }.count
+        let ratingEntries = entries.filter { $0.type == .rating }
+        let totalRating = ratingEntries.reduce(0.0) { $0 + ($1.numericValue ?? 0.0) }
+        let averageRating = ratingEntries.isEmpty ? 0.0 : totalRating / Double(ratingEntries.count)
+
+        return EvidenceSummary(
+            totalEntries: entries.count,
+            checklistCompletions: checklistCompletions,
+            streakCompletions: streakCompletions,
+            incidentCount: incidentCount,
+            thoughtLogCount: thoughtLogCount,
+            ratingCount: ratingEntries.count,
+            averageRating: averageRating
+        )
+    }
+
     // MARK: - Text Export
 
     /// Export a TMI plan to plain text
     func exportPlanToText(_ plan: TMIPlan) async throws -> URL {
-        let textContent = generateTextContent(for: plan)
+        let textContent = await generateTextContent(for: plan)
 
         let fileName = "\(plan.title.replacingOccurrences(of: " ", with: "_"))_\(Date().formatted(date: .numeric, time: .omitted)).txt"
         let tempDir = FileManager.default.temporaryDirectory
@@ -234,8 +338,10 @@ class PlanExportService {
     }
 
     /// Generate plain text content for a plan
-    private func generateTextContent(for plan: TMIPlan) -> String {
+    private func generateTextContent(for plan: TMIPlan) async -> String {
         var lines: [String] = []
+        let inputs = await fetchPlanInputsForExport(plan)
+        let evidenceSummary = summarizeEvidence(await fetchPlanEvidenceForExport(plan))
 
         // Header
         lines.append("TMI PLAN")
@@ -257,6 +363,27 @@ class PlanExportService {
         if let description = plan.description, !description.isEmpty {
             lines.append("DESCRIPTION:")
             lines.append(description)
+            lines.append("")
+        }
+
+        if !inputs.isEmpty {
+            lines.append("PLAN INPUTS:")
+            for input in inputs {
+                let value = input.value.isEmpty ? "[Not provided]" : input.value
+                lines.append("- \(input.label): \(value)")
+            }
+            lines.append("")
+        }
+
+        if evidenceSummary.totalEntries > 0 {
+            lines.append("EVIDENCE SUMMARY:")
+            lines.append("- Total entries: \(evidenceSummary.totalEntries)")
+            lines.append("- Checklist completions: \(evidenceSummary.checklistCompletions)")
+            lines.append("- Streak completions: \(evidenceSummary.streakCompletions)")
+            lines.append("- Incidents logged: \(evidenceSummary.incidentCount)")
+            lines.append("- Thought logs: \(evidenceSummary.thoughtLogCount)")
+            lines.append("- Ratings logged: \(evidenceSummary.ratingCount)")
+            lines.append("- Average rating: \(String(format: "%.1f", evidenceSummary.averageRating))")
             lines.append("")
         }
 
@@ -289,8 +416,7 @@ class PlanExportService {
         // Interests
         if !plan.interests.isEmpty {
             lines.append("INTERESTS & HOBBIES:")
-            let interestNames = plan.interests.map { $0.name }.joined(separator: ", ")
-            lines.append("  \(interestNames)")
+            lines.append("  \(plan.interests.map { $0.name }.joined(separator: ", "))")
             lines.append("")
         }
 
@@ -334,7 +460,7 @@ class PlanExportService {
     /// Export a TMI plan in MTSS (Multi-Tiered System of Supports) format
     /// This format is designed for district compliance and intervention documentation
     func exportPlanToMTSS(_ plan: TMIPlan) async throws -> URL {
-        let mtssContent = generateMTSSContent(for: plan)
+        let mtssContent = await generateMTSSContent(for: plan)
         
         let fileName = "MTSS_\(plan.primaryStudent?.name.replacingOccurrences(of: " ", with: "_") ?? "Student")_\(Date().formatted(date: .numeric, time: .omitted)).txt"
         let tempDir = FileManager.default.temporaryDirectory
@@ -347,10 +473,12 @@ class PlanExportService {
     }
     
     /// Generate MTSS-compliant content for documentation
-    private func generateMTSSContent(for plan: TMIPlan) -> String {
+    private func generateMTSSContent(for plan: TMIPlan) async -> String {
         var lines: [String] = []
         let divider = String(repeating: "─", count: 70)
         let headerDivider = String(repeating: "═", count: 70)
+        let evidenceSummary = summarizeEvidence(await fetchPlanEvidenceForExport(plan))
+        let inputs = await fetchPlanInputsForExport(plan)
         
         // Header
         lines.append(headerDivider)
@@ -368,11 +496,8 @@ class PlanExportService {
         if let student = plan.primaryStudent {
             lines.append("Student Name:     \(student.name)")
             lines.append("Grade Level:      \(student.grade)")
-            if !student.pronouns.isEmpty {
-                lines.append("Pronouns:         \(student.pronouns)")
-            }
-            if let school = student.school {
-                lines.append("School:           \(school)")
+            if !student.school.isEmpty {
+                lines.append("School:           \(student.school)")
             }
         } else {
             lines.append("Student Name:     [Not specified]")
@@ -416,6 +541,15 @@ class PlanExportService {
         if let description = plan.description, !description.isEmpty {
             lines.append("Problem Statement:")
             lines.append("  \(description)")
+            lines.append("")
+        }
+
+        if !inputs.isEmpty {
+            lines.append("Plan Inputs:")
+            for input in inputs {
+                let value = input.value.isEmpty ? "[Not provided]" : input.value
+                lines.append("  - \(input.label): \(value)")
+            }
             lines.append("")
         }
         
@@ -490,6 +624,18 @@ class PlanExportService {
         lines.append("  □ Bi-weekly data collection")
         lines.append("  □ Monthly progress review meeting")
         lines.append("")
+
+        if evidenceSummary.totalEntries > 0 {
+            lines.append("Evidence Summary:")
+            lines.append("  Total entries: \(evidenceSummary.totalEntries)")
+            lines.append("  Checklist completions: \(evidenceSummary.checklistCompletions)")
+            lines.append("  Streak completions: \(evidenceSummary.streakCompletions)")
+            lines.append("  Incidents logged: \(evidenceSummary.incidentCount)")
+            lines.append("  Thought logs: \(evidenceSummary.thoughtLogCount)")
+            lines.append("  Ratings logged: \(evidenceSummary.ratingCount)")
+            lines.append("  Average rating: \(String(format: "%.1f", evidenceSummary.averageRating))")
+            lines.append("")
+        }
         
         // Decision Rules Section
         lines.append(divider)
@@ -564,7 +710,7 @@ class PlanExportService {
 
     /// Export a TMI plan in IEP contribution format
     func exportPlanToIEPContribution(_ plan: TMIPlan) async throws -> URL {
-        let iepContent = generateIEPContent(for: plan)
+        let iepContent = await generateIEPContent(for: plan)
 
         let fileName = "IEP_\(plan.primaryStudent?.name.replacingOccurrences(of: " ", with: "_") ?? "Student")_\(Date().formatted(date: .numeric, time: .omitted)).txt"
         let tempDir = FileManager.default.temporaryDirectory
@@ -577,10 +723,12 @@ class PlanExportService {
     }
 
     /// Generate IEP-compliant contribution content
-    private func generateIEPContent(for plan: TMIPlan) -> String {
+    private func generateIEPContent(for plan: TMIPlan) async -> String {
         var lines: [String] = []
         let divider = String(repeating: "─", count: 70)
         let headerDivider = String(repeating: "═", count: 70)
+        let inputs = await fetchPlanInputsForExport(plan)
+        let evidenceSummary = summarizeEvidence(await fetchPlanEvidenceForExport(plan))
 
         lines.append(headerDivider)
         lines.append("INDIVIDUALIZED EDUCATION PROGRAM (IEP)")
@@ -618,7 +766,7 @@ class PlanExportService {
         if plan.interests.isEmpty {
             lines.append("  [No interests captured]")
         } else {
-            lines.append("  \(plan.interests.map { $0.name }.joined(separator: \", \"))")
+            lines.append("  \(plan.interests.map { $0.name }.joined(separator: ", "))")
         }
         lines.append("")
 
@@ -649,6 +797,18 @@ class PlanExportService {
         lines.append("Model Description: \(plan.model.description)")
         lines.append("")
 
+        if evidenceSummary.totalEntries > 0 {
+            lines.append("Evidence Summary:")
+            lines.append("  Total entries: \(evidenceSummary.totalEntries)")
+            lines.append("  Checklist completions: \(evidenceSummary.checklistCompletions)")
+            lines.append("  Streak completions: \(evidenceSummary.streakCompletions)")
+            lines.append("  Incidents logged: \(evidenceSummary.incidentCount)")
+            lines.append("  Thought logs: \(evidenceSummary.thoughtLogCount)")
+            lines.append("  Ratings logged: \(evidenceSummary.ratingCount)")
+            lines.append("  Average rating: \(String(format: "%.1f", evidenceSummary.averageRating))")
+            lines.append("")
+        }
+
         if let strategies = plan.strategies, !strategies.isEmpty {
             lines.append("Instructional/Behavioral Strategies:")
             for strategy in strategies {
@@ -658,6 +818,15 @@ class PlanExportService {
             lines.append("Instructional/Behavioral Strategies: [Not specified]")
         }
         lines.append("")
+
+        if !inputs.isEmpty {
+            lines.append("Plan Inputs:")
+            for input in inputs {
+                let value = input.value.isEmpty ? "[Not provided]" : input.value
+                lines.append("  - \(input.label): \(value)")
+            }
+            lines.append("")
+        }
 
         if !plan.resources.isEmpty {
             lines.append("Supplementary Resources:")
@@ -814,3 +983,4 @@ enum PlanExportError: Error, LocalizedError {
         }
     }
 }
+

@@ -39,7 +39,8 @@ final class ResourceService: @unchecked Sendable {
       .document(currentUser.uid)
       .collection(FirestoreCollection.resources.rawValue)
 
-    let docRef = try collection.addDocument(from: resourceToSave)
+    let data = try Firestore.Encoder().encode(resourceToSave)
+      let docRef = try await collection.addDocument(data: data)
     return docRef.documentID
   }
   
@@ -353,7 +354,8 @@ final class ResourceService: @unchecked Sendable {
       let resourceToSave = resource
       
       do {
-        let docRef = try collection.addDocument(from: resourceToSave)
+        let data = try Firestore.Encoder().encode(resourceToSave)
+          let docRef = try await collection.addDocument(data: data)
         resourceIDs.append(docRef.documentID)
       } catch {
         throw ResourceServiceError.saveFailed("Failed to save resource: \(error.localizedDescription)")

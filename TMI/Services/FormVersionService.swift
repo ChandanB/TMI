@@ -46,7 +46,8 @@ final class FormVersionService {
             .document(templateId)
             .collection("versions")
 
-        let docRef = try collection.addDocument(from: version)
+        let data = try Firestore.Encoder().encode(version)
+        let docRef = try await collection.addDocument(data: data)
 
         print("[FormVersionService] ✅ Created version \(newVersionNumber) for template \(templateId)")
 

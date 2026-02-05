@@ -131,16 +131,13 @@ final class PlanApprovalService {
         // Notify plan creator
         if let submittedBy = plan.submittedBy {
             do {
-                try await NotificationService.shared.sendNotification(
-                    to: submittedBy,
-                    type: .planApproved,
+                try await NotificationService.shared.createNotification(
+                    type: .planUpdate,
                     title: "Plan Approved",
                     message: "Your TMI plan '\(plan.title)' has been approved",
-                    metadata: [
-                        "planId": planId,
-                        "planTitle": plan.title,
-                        "approvedBy": uid
-                    ]
+                    actionUrl: "tmi://plans/\(planId)",
+                    targetId: planId,
+                    forUserId: submittedBy
                 )
             } catch {
                 print("[PlanApprovalService] ⚠️ Failed to notify plan creator: \(error)")
@@ -199,17 +196,13 @@ final class PlanApprovalService {
         // Notify plan creator
         if let submittedBy = plan.submittedBy {
             do {
-                try await NotificationService.shared.sendNotification(
-                    to: submittedBy,
-                    type: .planRejected,
+                try await NotificationService.shared.createNotification(
+                    type: .planUpdate,
                     title: "Plan Rejected",
                     message: "Your TMI plan '\(plan.title)' was rejected. Reason: \(reason)",
-                    metadata: [
-                        "planId": planId,
-                        "planTitle": plan.title,
-                        "rejectedBy": uid,
-                        "reason": reason
-                    ]
+                    actionUrl: "tmi://plans/\(planId)",
+                    targetId: planId,
+                    forUserId: submittedBy
                 )
             } catch {
                 print("[PlanApprovalService] ⚠️ Failed to notify plan creator: \(error)")
@@ -268,17 +261,13 @@ final class PlanApprovalService {
         // Notify plan creator
         if let submittedBy = plan.submittedBy {
             do {
-                try await NotificationService.shared.sendNotification(
-                    to: submittedBy,
-                    type: .planRejected, // Reuse rejected notification type
-                    title: "Changes Requested for Plan",
-                    message: "Changes have been requested for your TMI plan '\(plan.title)'. Please review the feedback and resubmit.",
-                    metadata: [
-                        "planId": planId,
-                        "planTitle": plan.title,
-                        "requestedBy": uid,
-                        "feedback": feedback
-                    ]
+                try await NotificationService.shared.createNotification(
+                    type: .planUpdate,
+                    title: "Changes Requested",
+                    message: "Changes have been requested for your TMI plan '\(plan.title)'. Feedback: \(feedback)",
+                    actionUrl: "tmi://plans/\(planId)",
+                    targetId: planId,
+                    forUserId: submittedBy
                 )
             } catch {
                 print("[PlanApprovalService] ⚠️ Failed to notify plan creator: \(error)")
@@ -338,17 +327,13 @@ final class PlanApprovalService {
         // Notify approvers of resubmission
         for approverUid in approvers {
             do {
-                try await NotificationService.shared.sendNotification(
-                    to: approverUid,
-                    type: .planApprovalRequest,
+                try await NotificationService.shared.createNotification(
+                    type: .planApproval,
                     title: "Plan Resubmitted for Approval",
                     message: "A TMI plan '\(plan.title)' has been revised and resubmitted for your approval",
-                    metadata: [
-                        "planId": planId,
-                        "planTitle": plan.title,
-                        "resubmittedBy": uid,
-                        "revisionNotes": revisionNotes ?? ""
-                    ]
+                    actionUrl: "tmi://plans/\(planId)",
+                    targetId: planId,
+                    forUserId: approverUid
                 )
             } catch {
                 print("[PlanApprovalService] ⚠️ Failed to notify approver \(approverUid): \(error)")
@@ -412,16 +397,13 @@ final class PlanApprovalService {
         if notifyApprovers {
             for approverUid in approvers {
                 do {
-                    try await NotificationService.shared.sendNotification(
-                        to: approverUid,
-                        type: .planApprovalRequest,
+                    try await NotificationService.shared.createNotification(
+                        type: .planApproval,
                         title: "Plan Approval Requested",
                         message: "A new TMI plan '\(plan.title)' requires your approval",
-                        metadata: [
-                            "planId": planId,
-                            "planTitle": plan.title,
-                            "submittedBy": uid
-                        ]
+                        actionUrl: "tmi://plans/\(planId)",
+                        targetId: planId,
+                        forUserId: approverUid
                     )
                 } catch {
                     print("[PlanApprovalService] ⚠️ Failed to notify approver \(approverUid): \(error)")

@@ -11,6 +11,7 @@ import UserNotifications
 import Observation
 import FirebaseFirestore
 import FirebaseAuth
+import SwiftUI
 
 // MARK: - In-App Notification Model
 
@@ -137,7 +138,9 @@ class NotificationService {
     }
     
     deinit {
-        listenerRegistration?.remove()
+        Task { @MainActor in
+            listenerRegistration?.remove()
+        }
     }
     
     // MARK: - Authorization
@@ -363,7 +366,7 @@ class NotificationService {
         
         preferences = newPreferences
         
-        try db.collection("users")
+        try await db.collection("users")
             .document(userId)
             .setData(["notificationPreferences": try Firestore.Encoder().encode(newPreferences)], merge: true)
     }

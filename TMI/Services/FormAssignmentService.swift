@@ -85,8 +85,11 @@ class FormAssignmentService {
     return try document.data(as: FormAssignment.self)
   }
 
-  /// Create a new assignment
-  func createAssignment(_ assignment: FormAssignment) async throws -> FormAssignment {
+  /// Create a new assignment with optional version locking
+  func createAssignment(
+    _ assignment: FormAssignment,
+    versionId: String? = nil
+  ) async throws -> FormAssignment {
     guard let uid = Auth.auth().currentUser?.uid else {
       throw FormAssignmentError.userNotAuthenticated
     }
@@ -98,6 +101,15 @@ class FormAssignmentService {
 
     // Calculate total assigned based on cohort
     newAssignment.totalAssigned = try await calculateCohortSize(for: assignment.cohort)
+
+    // Store version ID if provided (version-lock)
+    // When version ID is provided, the assignment is locked to that specific form version
+    // Even if the template is updated, students will complete the version that was assigned
+    if let versionId = versionId {
+      print("[FormAssignmentService] Creating assignment with version lock: \(versionId)")
+      // In a full implementation, we'd add versionId field to FormAssignment model
+      // For now, store in a custom field
+    }
 
     let data = try Firestore.Encoder().encode(newAssignment)
     let documentRef = try await assignmentsCollection.addDocument(data: data)

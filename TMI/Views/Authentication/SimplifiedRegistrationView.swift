@@ -9,25 +9,37 @@ import FirebaseAuth
 import SwiftUI
 
 enum AccountType: String, CaseIterable, Identifiable {
-    case staff = "Staff"
+    case teacher = "Teacher"
+    case counselor = "Counselor"
+    case administrator = "Administrator"
+    case socialWorker = "Social Worker"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .staff: return "person.2.fill"
+        case .teacher: return "person.fill"
+        case .counselor: return "brain.head.profile"
+        case .administrator: return "person.badge.key.fill"
+        case .socialWorker: return "heart.fill"
         }
     }
 
     var color: Color {
         switch self {
-        case .staff: return .tmiSecondary
+        case .teacher: return .blue
+        case .counselor: return .purple
+        case .administrator: return .orange
+        case .socialWorker: return .pink
         }
     }
 
     var userRole: UserRole {
         switch self {
-        case .staff: return .teacher
+        case .teacher: return .teacher
+        case .counselor: return .counselor
+        case .administrator: return .administrator
+        case .socialWorker: return .socialWorker
         }
     }
 }
@@ -37,7 +49,7 @@ struct SimplifiedRegistrationView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
-    @State private var selectedAccountType: AccountType = .staff
+    @State private var selectedAccountType: AccountType = .teacher
     @State private var isRegistering = false
     @State private var errorMessage: String?
 
@@ -207,7 +219,7 @@ struct SimplifiedRegistrationView: View {
                 let lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
 
                 // Use AuthenticationService for unified registration
-                let tmiUser = try await AuthenticationService.shared.signUp(
+                _ = try await AuthenticationService.shared.signUp(
                     email: email,
                     password: password,
                     firstName: firstName,

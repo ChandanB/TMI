@@ -222,7 +222,7 @@ struct PlanTemplateLibraryView: View {
                 .foregroundColor(.tmiTextTertiary)
             
             Text("No Matching Templates")
-                .font(.tmiHeadline)
+                .font(.tmiHeading2)
                 .foregroundColor(.tmiTextSecondary)
             
             Button("Clear Filters") {
@@ -265,7 +265,7 @@ struct PlanTemplateCard: View {
                 
                 // Title
                 Text(template.title)
-                    .font(.tmiHeadline)
+                    .font(.tmiHeading2)
                     .foregroundColor(.tmiTextPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -287,7 +287,7 @@ struct PlanTemplateCard: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.tmiPrimary)
-                        .cornerRadius(TMICornerRadius.xs)
+                        .cornerRadius(TMIRadius.xs)
                     
                     Spacer()
                     
@@ -298,8 +298,8 @@ struct PlanTemplateCard: View {
             }
             .padding(TMISpacing.md)
             .frame(minHeight: 160)
-            .background(Color.tmiCardBackground)
-            .cornerRadius(TMICornerRadius.md)
+            .background(Color.tmiBackground)
+            .cornerRadius(TMIRadius.md)
             .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.plain)
@@ -336,9 +336,9 @@ struct CategoryChip: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.tmiPrimary : Color.tmiCardBackground)
+            .background(isSelected ? Color.tmiPrimary : Color.tmiBackground)
             .foregroundColor(isSelected ? .white : .tmiTextPrimary)
-            .cornerRadius(TMICornerRadius.full)
+            .cornerRadius(TMIRadius.full)
         }
         .buttonStyle(.plain)
     }
@@ -357,9 +357,9 @@ struct ModelChip: View {
                 .font(.tmiCaption)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(isSelected ? Color.tmiSecondary : Color.tmiCardBackground)
+                .background(isSelected ? Color.tmiSecondary : Color.tmiBackground)
                 .foregroundColor(isSelected ? .white : .tmiTextPrimary)
-                .cornerRadius(TMICornerRadius.full)
+                .cornerRadius(TMIRadius.full)
         }
         .buttonStyle(.plain)
     }
@@ -446,7 +446,7 @@ struct PlanTemplateDetailSheet: View {
     private var goalsSection: some View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
             Text("Goals Included")
-                .font(.tmiHeadline)
+                .font(.tmiHeading2)
                 .foregroundColor(.tmiTextPrimary)
             
             ForEach(template.goalsTemplate) { goal in
@@ -473,7 +473,7 @@ struct PlanTemplateDetailSheet: View {
     private var strategiesSection: some View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
             Text("Suggested Strategies")
-                .font(.tmiHeadline)
+                .font(.tmiHeading2)
                 .foregroundColor(.tmiTextPrimary)
             
             ForEach(template.strategiesTemplate, id: \.self) { strategy in
@@ -517,8 +517,8 @@ struct MetadataItem: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(TMISpacing.sm)
-        .background(Color.tmiCardBackground)
-        .cornerRadius(TMICornerRadius.sm)
+        .background(Color.tmiBackground)
+        .cornerRadius(TMIRadius.sm)
     }
 }
 

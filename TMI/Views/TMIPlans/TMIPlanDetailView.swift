@@ -9,6 +9,9 @@
 
 import Charts
 import SwiftUI
+import FirebaseFirestore
+import FirebaseFirestoreCombineSwift
+import FirebaseAuth
 
 struct TMIPlanDetailView: View {
     let initialPlan: TMIPlan
@@ -48,6 +51,63 @@ struct TMIPlanDetailView: View {
     @State private var showingShareSheet = false
     private let exportService = PlanExportService()
 
+    // Plan-specific inputs
+    @State private var planInputs: [String: String] = [:]
+    @State private var planInputFields: [PlanInputField] = []
+
+    // Evidence trackers
+    @State private var setupChecklist: [ChecklistItem] = []
+    @State private var newSetupChecklistItem = ""
+    @State private var dailyResetChecklist: [ChecklistItem] = []
+    @State private var newDailyResetItem = ""
+
+    @State private var streakCount = 0
+    @State private var bestStreak = 0
+    @State private var lastStreakDate: Date?
+
+    @State private var questTasks: [ChecklistItem] = []
+    @State private var newQuestTask = ""
+
+    @State private var ratingEntries: [RatingEntry] = []
+    @State private var pendingRatingValues: [String: Double] = [:]
+    @State private var pendingRatingNotes: [String: String] = [:]
+
+    @State private var incidentLogs: [IncidentEntry] = []
+    @State private var newIncidentSummary = ""
+    @State private var newIncidentDetails = ""
+    @State private var newIncidentSeverity: Double = 3
+
+    @State private var thoughtLogs: [ThoughtLogEntry] = []
+    @State private var newThoughtTrigger = ""
+    @State private var newThought = ""
+    @State private var newThoughtReframe = ""
+    @State private var newThoughtAction = ""
+
+    @State private var reframeBank: [TextEntry] = []
+    @State private var newReframeText = ""
+
+    @State private var ifThenRules: [TextEntry] = []
+    @State private var newIfThenRule = ""
+
+    @State private var teacherTallyCount = 0
+
+    @State private var feedbackEntries: [FeedbackEntry] = []
+    @State private var newFeedbackFrom = ""
+    @State private var newFeedbackNote = ""
+
+    @State private var leadershipTasks: [ChecklistItem] = []
+    @State private var newLeadershipTask = ""
+
+    @State private var courageSteps: [ChecklistItem] = []
+    @State private var newCourageStep = ""
+
+    @State private var scripts: [TextEntry] = []
+    @State private var newScript = ""
+
+    @State private var allies: [AllyEntry] = []
+    @State private var newAllyName = ""
+    @State private var newAllyRole = ""
+
     init(plan: TMIPlan) {
         self.initialPlan = plan
         _plan = State(initialValue: plan)
@@ -63,23 +123,10 @@ struct TMIPlanDetailView: View {
                     // 1. Plan Overview - What is this plan about?
                     planOverviewSection
 
-                    // 2. Student Interests - What do they care about?
-                    studentInterestsSection
-
-                    // 3. Resources - What are they getting?
-                    resourcesSection
-
-                    // 4. Intervention Strategies - How do teachers help?
-                    interventionStrategiesSection
-
-                    // 5. Goals & Progress - What are we achieving?
-                    goalsAndProgressSection
-
-                    // 6. Scheduled Meetings - Check-ins and progress reviews
-                    scheduledMeetingsSection
-
-                    // 7. Collaboration Notes - Teacher/counselor communication
-                    collaborationNotesSection
+                    // 2. Plan-specific sections (driven by plan rules)
+                    ForEach(planSections, id: \.title) { section in
+                        planSectionView(for: section)
+                    }
 
                     Spacer(minLength: TMISpacing.xxl)
                 }
@@ -247,10 +294,14 @@ struct TMIPlanDetailView: View {
             await refreshPlan()
             await loadMeetings()
             await loadSnapshotInterests()
+            await loadPlanInputs()
+            await loadPlanEvidence()
         }
         .task {
             await loadMeetings()
             await loadSnapshotInterests()
+            await loadPlanInputs()
+            await loadPlanEvidence()
         }
         .preferredColorScheme(.dark)
     }
@@ -290,6 +341,10 @@ struct TMIPlanDetailView: View {
 
                 Spacer()
             }
+
+            TMIDivider()
+
+            planIdentitySection
 
             TMIDivider()
 
@@ -379,6 +434,1123 @@ struct TMIPlanDetailView: View {
                     lineWidth: 1
                 )
         )
+    }
+
+    // MARK: - Plan Sections (Rules-driven)
+
+    private var planSections: [PlanSection] {
+        plan.model.planRules.sections
+    }
+
+    private var firstSectionTitle: String {
+        planSections.first?.title ?? ""
+    }
+
+    private func planSectionView(for section: PlanSection) -> some View {
+        planSectionCard(section: section) {
+            sectionContent(for: section)
+        }
+    }
+
+    private func planSectionCard(
+        section: PlanSection,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(spacing: 8) {
+                Image(systemName: section.icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(modelColor)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(section.title)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                    Text(section.description)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+
+                Spacer()
+            }
+
+            content()
+        }
+        .padding(TMISpacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(Color.white.opacity(0.05))
+                .background(.ultraThinMaterial.opacity(0.3))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func sectionContent(for section: PlanSection) -> some View {
+        switch section.title {
+        case "Setup":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                if section.title == firstSectionTitle {
+                    uniqueFieldsForm
+                }
+                checklistEditor(
+                    title: "Space Setup Checklist",
+                    items: $setupChecklist,
+                    newItem: $newSetupChecklistItem,
+                    addButtonTitle: "Add setup item",
+                    evidenceType: .checklist,
+                    evidenceCategory: "Setup"
+                )
+            }
+        case "Daily Reset":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                checklistEditor(
+                    title: "Daily Reset Checklist",
+                    items: $dailyResetChecklist,
+                    newItem: $newDailyResetItem,
+                    addButtonTitle: "Add reset item",
+                    evidenceType: .checklist,
+                    evidenceCategory: "Daily Reset"
+                )
+                ratingInputSection(title: "Ready-to-work score")
+            }
+        case "Streaks":
+            streakTrackerSection
+        case "Notes":
+            notesSectionContent
+        case "Interest Map":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                if section.title == firstSectionTitle {
+                    uniqueFieldsForm
+                }
+                studentInterestsContent
+            }
+        case "Quests":
+            taskListSection(
+                title: "Quest Checklist",
+                items: $questTasks,
+                newItem: $newQuestTask,
+                addButtonTitle: "Add quest",
+                evidenceType: .quest,
+                evidenceCategory: "Quests"
+            )
+        case "Engagement":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                ratingTrendSection(title: "Engagement")
+                ratingInputSection(title: "Engagement")
+            }
+        case "Triggers":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                if section.title == firstSectionTitle {
+                    uniqueFieldsForm
+                }
+                incidentLogSection(title: "Trigger log")
+            }
+        case "Thought Logs":
+            thoughtLogSection
+        case "Reframes":
+            reframeBankSection
+        case "Trends":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                ratingTrendSection(title: "Stress")
+                ratingInputSection(title: "Stress")
+            }
+        case "Targets":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                if section.title == firstSectionTitle {
+                    uniqueFieldsForm
+                }
+                teacherTallySection(title: "Behavior tally")
+            }
+        case "Playbook":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                ifThenRulesSection
+                strategiesListSection
+            }
+        case "Check-ins":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                teacherTallySection(title: "Daily check-ins")
+                ratingInputSection(title: "Check-in rating")
+            }
+        case "Weekly Review":
+            goalsAndProgressContent
+        case "Repair":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                if section.title == firstSectionTitle {
+                    uniqueFieldsForm
+                }
+                incidentLogSection(title: "Repair log")
+            }
+        case "Leadership Tasks":
+            taskListSection(
+                title: "Leadership tasks",
+                items: $leadershipTasks,
+                newItem: $newLeadershipTask,
+                addButtonTitle: "Add leadership task",
+                evidenceType: .quest,
+                evidenceCategory: "Leadership"
+            )
+        case "Feedback":
+            feedbackSection
+        case "History":
+            incidentHistorySection
+        case "Courage Ladder":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                if section.title == firstSectionTitle {
+                    uniqueFieldsForm
+                }
+                taskListSection(
+                    title: "Courage steps",
+                    items: $courageSteps,
+                    newItem: $newCourageStep,
+                    addButtonTitle: "Add step",
+                    evidenceType: .quest,
+                    evidenceCategory: "Courage Ladder"
+                )
+                streakTrackerSection
+            }
+        case "Scripts":
+            scriptsSection
+        case "Allies":
+            alliesSection
+        case "Progress":
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                ratingTrendSection(title: "Confidence")
+                ratingInputSection(title: "Confidence")
+            }
+        default:
+            VStack(alignment: .leading, spacing: TMISpacing.md) {
+                if section.title == firstSectionTitle {
+                    uniqueFieldsForm
+                }
+                Text("Add updates and evidence for this section.")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        }
+    }
+
+    // MARK: - Plan Section Content
+
+    private var uniqueFieldsForm: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            Text("Plan Inputs")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white.opacity(0.8))
+                .textCase(.uppercase)
+                .tracking(0.5)
+
+            ForEach(plan.model.planRules.uniqueFields, id: \.self) { field in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(field)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.9))
+
+                    if shouldUseMultilineField(field) {
+                        TextEditor(text: bindingForInput(field))
+                            .frame(minHeight: 80)
+                            .padding(8)
+                            .background(Color.white.opacity(0.06))
+                            .cornerRadius(TMIRadius.sm)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                    } else {
+                        TextField("Enter response", text: bindingForInput(field))
+                            .textInputAutocapitalization(.sentences)
+                            .padding(10)
+                            .background(Color.white.opacity(0.06))
+                            .cornerRadius(TMIRadius.sm)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                    }
+                }
+            }
+
+            Button(action: {
+                savePlanInputs()
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "tray.and.arrow.down.fill")
+                    Text("Save Plan Inputs")
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(modelColor)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func checklistEditor(
+        title: String,
+        items: Binding<[ChecklistItem]>,
+        newItem: Binding<String>,
+        addButtonTitle: String,
+        evidenceType: PlanEvidenceKind = .checklist,
+        evidenceCategory: String? = nil
+    ) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+
+            if items.wrappedValue.isEmpty {
+                Text("No items yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+
+            ForEach(items) { item in
+                HStack(spacing: 8) {
+                    Button(action: {
+                        let wasComplete = item.isComplete.wrappedValue
+                        item.isComplete.wrappedValue.toggle()
+                        if !wasComplete && item.isComplete.wrappedValue {
+                            logPlanEvidence(
+                                type: evidenceType,
+                                title: item.title.wrappedValue,
+                                details: "Completed \(title)",
+                                numericValue: 1,
+                                category: evidenceCategory ?? title,
+                                metadata: nil
+                            )
+                        }
+                    }) {
+                        Image(systemName: item.isComplete.wrappedValue ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(item.isComplete.wrappedValue ? .tmiSuccess : .white.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+
+                    TextField("Item", text: item.title)
+                        .textInputAutocapitalization(.sentences)
+                        .foregroundColor(.white)
+
+                    Spacer()
+
+                    Button(action: {
+                        let itemId = item.wrappedValue.id
+                        items.wrappedValue.removeAll { $0.id == itemId }
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(8)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(TMIRadius.sm)
+            }
+
+            HStack(spacing: 8) {
+                TextField(addButtonTitle, text: newItem)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                Button(action: {
+                    let trimmed = newItem.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    items.wrappedValue.append(ChecklistItem(title: trimmed))
+                    newItem.wrappedValue = ""
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(modelColor)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func taskListSection(
+        title: String,
+        items: Binding<[ChecklistItem]>,
+        newItem: Binding<String>,
+        addButtonTitle: String,
+        evidenceType: PlanEvidenceKind = .quest,
+        evidenceCategory: String? = nil
+    ) -> some View {
+        checklistEditor(
+            title: title,
+            items: items,
+            newItem: newItem,
+            addButtonTitle: addButtonTitle,
+            evidenceType: evidenceType,
+            evidenceCategory: evidenceCategory ?? title
+        )
+    }
+
+    private var streakTrackerSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Current streak")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                    Text("\(streakCount) days")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Best streak")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                    Text("\(bestStreak) days")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                }
+
+                Spacer()
+            }
+
+            if let lastStreakDate {
+                Text("Last completed: \(formattedDate(lastStreakDate))")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+
+            HStack(spacing: 12) {
+                Button(action: {
+                    streakCount += 1
+                    bestStreak = max(bestStreak, streakCount)
+                    lastStreakDate = Date()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "flame.fill")
+                        Text("Mark Today Complete")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Capsule().fill(modelColor))
+                }
+                .buttonStyle(.plain)
+
+                Button(action: {
+                    streakCount = 0
+                }) {
+                    Text("Reset")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var notesSectionContent: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            if plan.notes.isEmpty {
+                Text("No notes yet. Add key observations for the team.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            } else {
+                Text(plan.notes)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+            }
+
+            Button(action: { showingEditSheet = true }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle")
+                    Text("Add Note")
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(modelColor)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var studentInterestsContent: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            if isLoadingSnapshotInterests {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(.tmiPrimary)
+                    Text("Loading interests...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                }
+                .padding(.vertical, TMISpacing.md)
+            } else if !plan.interests.isEmpty {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: TMISpacing.sm) {
+                    ForEach(plan.interests) { interest in
+                        InterestCard(interest: interest)
+                    }
+                }
+            } else if !snapshotInterests.isEmpty {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: TMISpacing.sm) {
+                    ForEach(snapshotInterests) { interest in
+                        InterestCard(interest: interest)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                    Text("No interests captured yet.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+
+                    Button(action: { showingCompleteSurvey = true }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.text.fill")
+                            Text("Complete Interest Survey")
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.tmiPrimary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Button(action: { showingAddInterest = true }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle")
+                    Text("Add Interest")
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.tmiPrimary)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func ratingInputSection(title: String) -> some View {
+        let valueBinding = Binding<Double>(
+            get: { pendingRatingValues[title] ?? 3 },
+            set: { pendingRatingValues[title] = $0 }
+        )
+        let noteBinding = Binding<String>(
+            get: { pendingRatingNotes[title] ?? "" },
+            set: { pendingRatingNotes[title] = $0 }
+        )
+
+        return VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+
+            HStack(spacing: 12) {
+                Slider(value: valueBinding, in: 1...5, step: 1)
+                    .tint(modelColor)
+
+                Text("\(Int(valueBinding.wrappedValue))/5")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 46)
+            }
+
+            TextField("Add quick note (optional)", text: noteBinding)
+                .textInputAutocapitalization(.sentences)
+                .padding(10)
+                .background(Color.white.opacity(0.06))
+                .cornerRadius(TMIRadius.sm)
+
+            Button(action: {
+                ratingEntries.append(
+                    RatingEntry(
+                        category: title,
+                        value: valueBinding.wrappedValue,
+                        date: Date(),
+                        note: noteBinding.wrappedValue
+                    )
+                )
+                logPlanEvidence(
+                    type: .rating,
+                    title: "\(title) rating",
+                    details: noteBinding.wrappedValue.isEmpty ? nil : noteBinding.wrappedValue,
+                    numericValue: valueBinding.wrappedValue,
+                    category: title,
+                    metadata: nil
+                )
+                pendingRatingNotes[title] = ""
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("Log Rating")
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(modelColor)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func ratingTrendSection(title: String) -> some View {
+        let entries = ratingEntries.filter { $0.category == title }
+
+        return VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+
+            if entries.isEmpty {
+                Text("No ratings logged yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            } else {
+                Chart(entries) { entry in
+                    LineMark(
+                        x: .value("Date", entry.date),
+                        y: .value("Rating", entry.value)
+                    )
+                    .foregroundStyle(modelColor)
+                    PointMark(
+                        x: .value("Date", entry.date),
+                        y: .value("Rating", entry.value)
+                    )
+                    .foregroundStyle(modelColor)
+                }
+                .frame(height: 140)
+            }
+        }
+    }
+
+    private func incidentLogSection(title: String) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+
+            if incidentLogs.isEmpty {
+                Text("No incidents logged yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            } else {
+                ForEach(incidentLogs) { entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(entry.summary)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                            Spacer()
+                            Text(formattedDate(entry.date))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        Text(entry.details)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        Text("Severity: \(entry.severity)/5")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.tmiWarning)
+                    }
+                    .padding(10)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(TMIRadius.sm)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                TextField("Incident summary", text: $newIncidentSummary)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                TextField("Details", text: $newIncidentDetails)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                HStack {
+                    Slider(value: $newIncidentSeverity, in: 1...5, step: 1)
+                        .tint(.tmiWarning)
+                    Text("\(Int(newIncidentSeverity))/5")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
+                        .frame(width: 40)
+                }
+
+                Button(action: {
+                    let summary = newIncidentSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !summary.isEmpty else { return }
+                    incidentLogs.insert(
+                        IncidentEntry(
+                            summary: summary,
+                            details: newIncidentDetails,
+                            severity: Int(newIncidentSeverity),
+                            date: Date()
+                        ),
+                        at: 0
+                    )
+                    logPlanEvidence(
+                        type: .incident,
+                        title: summary,
+                        details: newIncidentDetails.isEmpty ? nil : newIncidentDetails,
+                        numericValue: Double(Int(newIncidentSeverity)),
+                        category: title,
+                        metadata: nil
+                    )
+                    newIncidentSummary = ""
+                    newIncidentDetails = ""
+                    newIncidentSeverity = 3
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Log Incident")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.tmiWarning)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var thoughtLogSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            if thoughtLogs.isEmpty {
+                Text("No thought logs yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            } else {
+                ForEach(thoughtLogs) { entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.trigger)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.tmiWarning)
+                        Text(entry.thought)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                        Text("Reframe: \(entry.reframe)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        Text("Action: \(entry.action)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    .padding(10)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(TMIRadius.sm)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                TextField("Trigger", text: $newThoughtTrigger)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+                TextField("Negative thought", text: $newThought)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+                TextField("Reframe", text: $newThoughtReframe)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+                TextField("Replacement action", text: $newThoughtAction)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                Button(action: {
+                    let trigger = newThoughtTrigger.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trigger.isEmpty else { return }
+                    thoughtLogs.insert(
+                        ThoughtLogEntry(
+                            trigger: trigger,
+                            thought: newThought,
+                            reframe: newThoughtReframe,
+                            action: newThoughtAction,
+                            date: Date()
+                        ),
+                        at: 0
+                    )
+                    logPlanEvidence(
+                        type: .thoughtLog,
+                        title: trigger,
+                        details: newThought,
+                        numericValue: nil,
+                        category: "Thought Log",
+                        metadata: [
+                            "trigger": trigger,
+                            "thought": newThought,
+                            "reframe": newThoughtReframe,
+                            "action": newThoughtAction
+                        ]
+                    )
+                    newThoughtTrigger = ""
+                    newThought = ""
+                    newThoughtReframe = ""
+                    newThoughtAction = ""
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add Thought Log")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(modelColor)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var reframeBankSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            if reframeBank.isEmpty {
+                Text("No replacement thoughts added yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            } else {
+                ForEach(reframeBank) { entry in
+                    Text(entry.text)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(TMIRadius.sm)
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("Add replacement thought", text: $newReframeText)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                Button(action: {
+                    let trimmed = newReframeText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    reframeBank.append(TextEntry(text: trimmed))
+                    newReframeText = ""
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(modelColor)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func teacherTallySection(title: String) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+
+            HStack(spacing: 16) {
+                Button(action: { teacherTallyCount = max(0, teacherTallyCount - 1) }) {
+                    Image(systemName: "minus.circle.fill")
+                        .foregroundColor(.tmiWarning)
+                        .font(.system(size: 20))
+                }
+                .buttonStyle(.plain)
+
+                Text("\(teacherTallyCount)")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(.white)
+
+                Button(action: { teacherTallyCount += 1 }) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.tmiSuccess)
+                        .font(.system(size: 20))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var ifThenRulesSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            if ifThenRules.isEmpty {
+                Text("No If-Then rules added yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            } else {
+                ForEach(ifThenRules) { rule in
+                    Text(rule.text)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(TMIRadius.sm)
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("If X happens, then...", text: $newIfThenRule)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                Button(action: {
+                    let trimmed = newIfThenRule.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    ifThenRules.append(TextEntry(text: trimmed))
+                    newIfThenRule = ""
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(modelColor)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var strategiesListSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            Text("Coach scripts")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white.opacity(0.7))
+                .textCase(.uppercase)
+
+            ForEach(modelStrategies, id: \.self) { strategy in
+                StrategyRow(strategy: strategy, modelColor: modelColor)
+            }
+        }
+    }
+
+    private var goalsAndProgressContent: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack {
+                Text("Progress")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.8))
+                Spacer()
+                Text("\(plan.progressPercentage)%")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(modelColor)
+            }
+
+            if plan.goals.isEmpty {
+                Button(action: { showingAddGoal = true }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle")
+                        Text("Add First Goal")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(modelColor)
+                }
+                .buttonStyle(.plain)
+            } else {
+                VStack(spacing: TMISpacing.sm) {
+                    ForEach(plan.goals) { goal in
+                        Button(action: { selectedGoal = goal }) {
+                            GoalCard(goal: goal, modelColor: modelColor)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private var feedbackSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            if feedbackEntries.isEmpty {
+                Text("No feedback yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            } else {
+                ForEach(feedbackEntries) { entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(entry.from)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white)
+                            Spacer()
+                            Text(formattedDate(entry.date))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        Text(entry.note)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    .padding(10)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(TMIRadius.sm)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                TextField("From (peer/staff)", text: $newFeedbackFrom)
+                    .textInputAutocapitalization(.words)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                TextField("Feedback note", text: $newFeedbackNote)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                Button(action: {
+                    let from = newFeedbackFrom.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let note = newFeedbackNote.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !from.isEmpty, !note.isEmpty else { return }
+                    feedbackEntries.insert(FeedbackEntry(from: from, note: note, date: Date()), at: 0)
+                    logPlanEvidence(
+                        type: .feedback,
+                        title: from,
+                        details: note,
+                        numericValue: nil,
+                        category: "Feedback",
+                        metadata: nil
+                    )
+                    newFeedbackFrom = ""
+                    newFeedbackNote = ""
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add Feedback")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(modelColor)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var incidentHistorySection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            if incidentLogs.isEmpty {
+                Text("No history logged yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            } else {
+                ForEach(incidentLogs) { entry in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.summary)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white)
+                            Text(formattedDate(entry.date))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        Spacer()
+                        Text("S\(entry.severity)")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.tmiWarning)
+                            .padding(6)
+                            .background(Color.tmiWarning.opacity(0.2))
+                            .cornerRadius(TMIRadius.sm)
+                    }
+                    .padding(8)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(TMIRadius.sm)
+                }
+            }
+        }
+    }
+
+    private var scriptsSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            if scripts.isEmpty {
+                Text("No scripts added yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            } else {
+                ForEach(scripts) { script in
+                    Text(script.text)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(TMIRadius.sm)
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("Add assertive script", text: $newScript)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                Button(action: {
+                    let trimmed = newScript.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    scripts.append(TextEntry(text: trimmed))
+                    newScript = ""
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(modelColor)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var alliesSection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            if allies.isEmpty {
+                Text("No allies added yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            } else {
+                ForEach(allies) { ally in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(ally.name)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white)
+                            Text(ally.role)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                        Spacer()
+                    }
+                    .padding(8)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(TMIRadius.sm)
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("Ally name", text: $newAllyName)
+                    .textInputAutocapitalization(.words)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                TextField("Role", text: $newAllyRole)
+                    .textInputAutocapitalization(.words)
+                    .padding(10)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(TMIRadius.sm)
+
+                Button(action: {
+                    let name = newAllyName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let role = newAllyRole.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !name.isEmpty else { return }
+                    allies.append(AllyEntry(name: name, role: role))
+                    newAllyName = ""
+                    newAllyRole = ""
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(modelColor)
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     // MARK: - Student Interests Section
@@ -916,6 +2088,106 @@ struct TMIPlanDetailView: View {
         )
     }
 
+    // MARK: - Local Models
+
+    private struct ChecklistItem: Identifiable, Hashable {
+        let id: UUID
+        var title: String
+        var isComplete: Bool
+
+        init(id: UUID = UUID(), title: String, isComplete: Bool = false) {
+            self.id = id
+            self.title = title
+            self.isComplete = isComplete
+        }
+    }
+
+    private struct RatingEntry: Identifiable, Hashable {
+        let id: UUID
+        let category: String
+        let value: Double
+        let date: Date
+        let note: String?
+
+        init(id: UUID = UUID(), category: String, value: Double, date: Date, note: String? = nil) {
+            self.id = id
+            self.category = category
+            self.value = value
+            self.date = date
+            self.note = note
+        }
+    }
+
+    private struct IncidentEntry: Identifiable, Hashable {
+        let id: UUID
+        let summary: String
+        let details: String
+        let severity: Int
+        let date: Date
+
+        init(id: UUID = UUID(), summary: String, details: String, severity: Int, date: Date) {
+            self.id = id
+            self.summary = summary
+            self.details = details
+            self.severity = severity
+            self.date = date
+        }
+    }
+
+    private struct ThoughtLogEntry: Identifiable, Hashable {
+        let id: UUID
+        let trigger: String
+        let thought: String
+        let reframe: String
+        let action: String
+        let date: Date
+
+        init(id: UUID = UUID(), trigger: String, thought: String, reframe: String, action: String, date: Date) {
+            self.id = id
+            self.trigger = trigger
+            self.thought = thought
+            self.reframe = reframe
+            self.action = action
+            self.date = date
+        }
+    }
+
+    private struct TextEntry: Identifiable, Hashable {
+        let id: UUID
+        let text: String
+
+        init(id: UUID = UUID(), text: String) {
+            self.id = id
+            self.text = text
+        }
+    }
+
+    private struct FeedbackEntry: Identifiable, Hashable {
+        let id: UUID
+        let from: String
+        let note: String
+        let date: Date
+
+        init(id: UUID = UUID(), from: String, note: String, date: Date) {
+            self.id = id
+            self.from = from
+            self.note = note
+            self.date = date
+        }
+    }
+
+    private struct AllyEntry: Identifiable, Hashable {
+        let id: UUID
+        let name: String
+        let role: String
+
+        init(id: UUID = UUID(), name: String, role: String) {
+            self.id = id
+            self.name = name
+            self.role = role
+        }
+    }
+
     // MARK: - Helper Properties
 
     private var modelIcon: String {
@@ -927,6 +2199,100 @@ struct TMIPlanDetailView: View {
         case .bullyToBoss: return "person.fill.badge.plus"
         case .meekToProtector: return "shield.lefthalf.filled"
         }
+    }
+
+    private var planIdentitySection: some View {
+        let rules = plan.model.planRules
+
+        return VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .foregroundColor(.tmiSecondary)
+                Text("Plan Identity")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
+                    .textCase(.uppercase)
+            }
+
+            HStack(spacing: TMISpacing.md) {
+                identityPill(title: "Archetype", value: rules.archetype.rawValue)
+                identityPill(title: "Lever", value: rules.primaryLever.rawValue)
+            }
+
+            HStack(spacing: TMISpacing.md) {
+                identityPill(title: "Cadence", value: rules.cadence.rawValue)
+                identityPill(title: "Proof", value: rules.proofTypes.map { $0.rawValue }.joined(separator: ", "))
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Sections")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.7))
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
+                    ForEach(rules.sections, id: \.title) { section in
+                        HStack(spacing: 6) {
+                            Image(systemName: section.icon)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.tmiSecondary)
+                            Text(section.title)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.08))
+                        .cornerRadius(TMIRadius.sm)
+                    }
+                }
+            }
+        }
+        .padding(TMISpacing.md)
+        .background(Color.white.opacity(0.06))
+        .cornerRadius(TMIRadius.md)
+    }
+
+    private func identityPill(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.white.opacity(0.6))
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(TMISpacing.sm)
+        .background(Color.white.opacity(0.08))
+        .cornerRadius(TMIRadius.sm)
+    }
+
+    private func bindingForInput(_ key: String) -> Binding<String> {
+        Binding(
+            get: { planInputs[key] ?? "" },
+            set: { planInputs[key] = $0 }
+        )
+    }
+
+    private func shouldUseMultilineField(_ field: String) -> Bool {
+        let lowercased = field.lowercased()
+        return lowercased.contains("routine")
+            || lowercased.contains("definition")
+            || lowercased.contains("inventory")
+            || field.count > 32
+    }
+
+    private func inputKey(for label: String) -> String {
+        let allowed = CharacterSet.alphanumerics
+        let mapped = label.lowercased().map { char -> String in
+            guard let scalar = char.unicodeScalars.first else { return "_" }
+            return allowed.contains(scalar) ? String(char) : "_"
+        }
+        let joined = mapped.joined()
+        return joined
+            .replacingOccurrences(of: "__", with: "_")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
     }
 
     private var modelColor: Color {
@@ -1022,6 +2388,140 @@ struct TMIPlanDetailView: View {
     }
 
     // MARK: - Actions
+
+    private func loadPlanInputs() async {
+        guard let planId = plan.id else { return }
+        do {
+            let fields = try await TMIPlanService.shared.fetchPlanInputs(planId: planId)
+            await MainActor.run {
+                planInputFields = fields
+                planInputs = Dictionary(uniqueKeysWithValues: fields.map { ($0.label, $0.value) })
+            }
+        } catch {
+            print("[TMIPlanDetail] Failed to load plan inputs: \(error)")
+        }
+    }
+
+    private func savePlanInputs() {
+        guard let planId = plan.id else { return }
+        let existingByLabel: [String: PlanInputField] = Dictionary(uniqueKeysWithValues: planInputFields.map { ($0.label, $0) })
+        let now = Date()
+
+        let fieldsToSave = plan.model.planRules.uniqueFields.map { label -> PlanInputField in
+            let key = inputKey(for: label)
+            let value = planInputs[label] ?? ""
+            let existing = existingByLabel[label]
+            return PlanInputField(
+                id: existing?.id,
+                planId: planId,
+                key: key,
+                label: label,
+                value: value,
+                createdAt: existing?.createdAt ?? now,
+                updatedAt: now,
+                updatedBy: Auth.auth().currentUser?.uid
+            )
+        }
+
+        Task {
+            do {
+                try await TMIPlanService.shared.savePlanInputs(planId: planId, fields: fieldsToSave)
+                await MainActor.run {
+                    planInputFields = fieldsToSave
+                }
+            } catch {
+                print("[TMIPlanDetail] Failed to save plan inputs: \(error)")
+            }
+        }
+    }
+
+    private func loadPlanEvidence() async {
+        guard let planId = plan.id else { return }
+        do {
+            let entries = try await TMIPlanService.shared.fetchPlanEvidence(planId: planId)
+            await MainActor.run {
+                applyEvidenceEntries(entries)
+            }
+        } catch {
+            print("[TMIPlanDetail] Failed to load plan evidence: \(error)")
+        }
+    }
+
+    private func applyEvidenceEntries(_ entries: [PlanEvidenceEntry]) {
+        ratingEntries = entries.filter { $0.type == .rating }.map { entry in
+            RatingEntry(
+                category: entry.category ?? "Rating",
+                value: entry.numericValue ?? 0.0,
+                date: entry.createdAt,
+                note: entry.details
+            )
+        }
+
+        incidentLogs = entries.filter { $0.type == .incident }.map { entry in
+            IncidentEntry(
+                summary: entry.title,
+                details: entry.details ?? "",
+                severity: Int(entry.numericValue ?? 3),
+                date: entry.createdAt
+            )
+        }
+
+        thoughtLogs = entries.filter { $0.type == .thoughtLog }.map { entry in
+            ThoughtLogEntry(
+                trigger: entry.metadata?["trigger"] ?? entry.title,
+                thought: entry.metadata?["thought"] ?? entry.details ?? "",
+                reframe: entry.metadata?["reframe"] ?? "",
+                action: entry.metadata?["action"] ?? "",
+                date: entry.createdAt
+            )
+        }
+
+        feedbackEntries = entries.filter { $0.type == .feedback }.map { entry in
+            FeedbackEntry(
+                from: entry.title,
+                note: entry.details ?? "",
+                date: entry.createdAt
+            )
+        }
+
+        let streakEntries = entries.filter { $0.type == .streak }
+        if let latest = streakEntries.sorted(by: { $0.createdAt > $1.createdAt }).first {
+            streakCount = Int(latest.numericValue ?? Double(streakEntries.count))
+            lastStreakDate = latest.createdAt
+        }
+        let bestValue = streakEntries.compactMap { $0.numericValue }.max() ?? Double(streakEntries.count)
+        bestStreak = Int(bestValue)
+    }
+
+    private func logPlanEvidence(
+        type: PlanEvidenceKind,
+        title: String,
+        details: String?,
+        numericValue: Double?,
+        category: String?,
+        metadata: [String: String]?
+    ) {
+        guard let planId = plan.id else { return }
+        let entry = PlanEvidenceEntry(
+            planId: planId,
+            type: type,
+            category: category,
+            title: title,
+            details: details,
+            numericValue: numericValue,
+            createdAt: Date(),
+            createdBy: Auth.auth().currentUser?.uid,
+            metadata: metadata
+        )
+
+        Task {
+            do {
+                _ = try await TMIPlanService.shared.addPlanEvidence(planId: planId, entry: entry)
+            } catch {
+                print("[TMIPlanDetail] Failed to log evidence: \(error)")
+            }
+        }
+    }
 
     private func deletePlan() {
         Task {
@@ -1819,7 +3319,3 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
 
 
 // MARK: - All Resources View
-
-
-
-

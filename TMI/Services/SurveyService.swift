@@ -31,7 +31,8 @@ final class SurveyService: @unchecked Sendable {
         .document(currentUser.uid)
         .collection(FirestoreCollection.surveys.rawValue)
       
-      let docRef = try collection.addDocument(from: surveyToSave)
+      let data = try Firestore.Encoder().encode(surveyToSave)
+      let docRef = try await collection.addDocument(data: data)
       return docRef.documentID
     }
   }
@@ -52,7 +53,8 @@ final class SurveyService: @unchecked Sendable {
         .document(currentUser.uid)
         .collection(FirestoreCollection.surveys.rawValue)
       
-      let docRef = try collection.addDocument(from: surveyToSave)
+      let data = try Firestore.Encoder().encode(surveyToSave)
+      let docRef = try await collection.addDocument(data: data)
       return docRef.documentID
     }
   }
@@ -359,24 +361,31 @@ final class SurveyService: @unchecked Sendable {
         "latestSurveyId": surveyResponse.id.uuidString,
         "lastSurveyDate": Timestamp(date: surveyResponse.completedAt),
         "interestClusters": clusters.map { $0.toFirestoreData() },
-        "topInterests": topInterests,
-        "interests": interests.map { $0.toFirestoreData() }  // ← ADD ACTUAL INTERESTS
+        "topInterests": topInterests
+        // Interests are NOT written to student doc - they go to StudentInterestService edge collection
       ])
     }
 
     print("[SurveyService] ✅ Survey saved with \(interests.count) interests for student: \(studentId)")
 
-    // Synchronize interests to all TMI Plans for this student
-    Task {
-      do {
-        try await StudentInterestSynchronizer.shared.synchronizeInterests(
-          for: studentId,
-          newInterests: interests
-        )
-        print("[SurveyService] ✅ Synchronized interests to TMI Plans")
-      } catch {
-        print("[SurveyService] ⚠️ Failed to synchronize interests to plans: \(error.localizedDescription)")
-      }
+    // Phase 0.2: Synchronize interests to StudentInterestService edge collection
+    // This ensures interests are stored in the proper location (/students/{id}/studentInterests/)
+    do {
+      // Build results map: [interestId: level]
+      let results = Dictionary(uniqueKeysWithValues: interests.map { interest in
+        // Calculate level (1-5) from interest weight or use default
+        let level = 5 // Surveys don't have levels yet, default to high affinity
+        return (interest.id ?? UUID().uuidString, level)
+      })
+
+      try await StudentInterestService.shared.saveSurveyResults(
+        studentId: studentId,
+        results: results
+      )
+      print("[SurveyService] ✅ Synchronized \(interests.count) interests to edge collection")
+    } catch {
+      print("[SurveyService] ⚠️ Failed to synchronize interests: \(error)")
+      // Don't throw - survey is still saved, just interests sync failed
     }
 
     return surveyResponse
@@ -718,4 +727,3 @@ extension InterestCluster {
     ]
   }
 }
-

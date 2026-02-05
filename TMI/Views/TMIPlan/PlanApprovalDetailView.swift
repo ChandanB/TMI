@@ -362,8 +362,8 @@ struct PlanApprovalDetailView: View {
                 switch action {
                 case .approve:
                     try await approvalService.approvePlan(
-                        planId: plan.id!,
-                        comments: comment.isEmpty ? nil : comment
+                        plan: plan,
+                        comment: comment.isEmpty ? nil : comment
                     )
 
                 case .reject:
@@ -374,7 +374,7 @@ struct PlanApprovalDetailView: View {
                         return
                     }
                     try await approvalService.rejectPlan(
-                        planId: plan.id!,
+                        plan: plan,
                         reason: comment
                     )
 
@@ -385,8 +385,8 @@ struct PlanApprovalDetailView: View {
                         }
                         return
                     }
-                    try await approvalService.requestRevisions(
-                        planId: plan.id!,
+                    try await approvalService.requestChanges(
+                        plan: plan,
                         feedback: comment
                     )
                 }

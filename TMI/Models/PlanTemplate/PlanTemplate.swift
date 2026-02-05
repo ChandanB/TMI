@@ -7,88 +7,309 @@
 
 import Foundation
 @preconcurrency import FirebaseFirestore
+import FirebaseFirestoreCombineSwift
 
-// MARK: - Plan Template
 
-/// Template for creating TMI intervention plans with pre-defined activities and goals
-struct PlanTemplate: Codable, Identifiable, Sendable {
+/// A template for creating TMI Plans quickly
+struct PlanTemplate: Identifiable, Codable, Equatable, Sendable {
     @DocumentID var id: String?
-
-    // Template identification
-    let name: String
-    let model: TMIPlanModel
+    let title: String
     let description: String
-    let category: String // e.g., "Academic Support", "Behavioral", "Career Exploration"
-
-    // Structure
-    let recommendedDuration: Int // days
-    let activities: [ActivityTemplate]
-    let goalTemplates: [GoalTemplate]
-    let resourceCategories: [String] // Suggested resource types
-
-    // MTSS alignment
-    let tier: Int // MTSS tier 1, 2, or 3
-    let targetedInterventions: [String] // Specific areas this template addresses
-
-    // Metadata
+    let model: TMIPlanModel
+    let category: Category
+    let goalsTemplate: [GoalTemplate]
+    let strategiesTemplate: [String]
+    let suggestedDurationWeeks: Int
+    let targetGradeLevels: [String]?
+    let isPublic: Bool
+    let createdBy: String
+    let districtId: String?
     let createdAt: Date
-    let createdBy: String?
-    let isActive: Bool
-    let version: Int
-
-    // Usage tracking
+    let updatedAt: Date
     var usageCount: Int
-    var lastUsedAt: Date?
-
-    // District/School scope
-    var districtId: String?
-    var schoolId: String?
-    var isPublic: Bool // Available to all districts
-
+    var rating: Double?
+    
+    // MARK: - Categories
+    
+    enum Category: String, Codable, CaseIterable, Sendable {
+        case behavioral = "Behavioral"
+        case academic = "Academic"
+        case socialEmotional = "Social-Emotional"
+        case careerPrep = "Career Preparation"
+        case leadership = "Leadership"
+        case engagement = "Engagement"
+        case custom = "Custom"
+        
+        var icon: String {
+            switch self {
+            case .behavioral: return "hand.raised.fill"
+            case .academic: return "book.fill"
+            case .socialEmotional: return "heart.fill"
+            case .careerPrep: return "briefcase.fill"
+            case .leadership: return "person.badge.shield.checkmark.fill"
+            case .engagement: return "sparkles"
+            case .custom: return "square.grid.2x2"
+            }
+        }
+        
+        var color: String {
+            switch self {
+            case .behavioral: return "orange"
+            case .academic: return "blue"
+            case .socialEmotional: return "pink"
+            case .careerPrep: return "green"
+            case .leadership: return "purple"
+            case .engagement: return "yellow"
+            case .custom: return "gray"
+            }
+        }
+    }
+    
+    // MARK: - Goal Template
+    
+    struct GoalTemplate: Codable, Equatable, Sendable, Identifiable {
+        let id: String
+        let title: String
+        let description: String
+        
+        enum GoalStatus: String, Codable, CaseIterable, Sendable {
+            case notStarted
+            case inProgress
+            case completed
+        }
+        
+        let category: GoalStatus
+        
+        struct MilestoneTemplate: Codable, Equatable, Sendable, Identifiable {
+            let id: String
+            let title: String
+            let ordinal: Int
+        }
+        
+        let milestones: [MilestoneTemplate]
+        
+        init(
+            id: String = UUID().uuidString,
+            title: String,
+            description: String,
+            milestones: [MilestoneTemplate] = [],
+            category: GoalStatus = .notStarted
+        ) {
+            self.id = id
+            self.title = title
+            self.description = description
+            self.milestones = milestones
+            self.category = category
+        }
+    }
+    
+    // MARK: - Initializer
+    
     init(
         id: String? = nil,
-        name: String,
-        model: TMIPlanModel,
+        title: String,
         description: String,
-        category: String,
-        recommendedDuration: Int,
-        activities: [ActivityTemplate],
-        goalTemplates: [GoalTemplate],
-        resourceCategories: [String],
-        tier: Int = 2,
-        targetedInterventions: [String] = [],
-        createdAt: Date = Date(),
-        createdBy: String? = nil,
-        isActive: Bool = true,
-        version: Int = 1,
-        usageCount: Int = 0,
-        lastUsedAt: Date? = nil,
+        model: TMIPlanModel,
+        category: Category,
+        goalsTemplate: [GoalTemplate] = [],
+        strategiesTemplate: [String] = [],
+        suggestedDurationWeeks: Int = 12,
+        targetGradeLevels: [String]? = nil,
+        isPublic: Bool = false,
+        createdBy: String,
         districtId: String? = nil,
-        schoolId: String? = nil,
-        isPublic: Bool = false
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        usageCount: Int = 0,
+        rating: Double? = nil
     ) {
         self.id = id
-        self.name = name
-        self.model = model
+        self.title = title
         self.description = description
+        self.model = model
         self.category = category
-        self.recommendedDuration = recommendedDuration
-        self.activities = activities
-        self.goalTemplates = goalTemplates
-        self.resourceCategories = resourceCategories
-        self.tier = tier
-        self.targetedInterventions = targetedInterventions
-        self.createdAt = createdAt
-        self.createdBy = createdBy
-        self.isActive = isActive
-        self.version = version
-        self.usageCount = usageCount
-        self.lastUsedAt = lastUsedAt
-        self.districtId = districtId
-        self.schoolId = schoolId
+        self.goalsTemplate = goalsTemplate
+        self.strategiesTemplate = strategiesTemplate
+        self.suggestedDurationWeeks = suggestedDurationWeeks
+        self.targetGradeLevels = targetGradeLevels
         self.isPublic = isPublic
+        self.createdBy = createdBy
+        self.districtId = districtId
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.usageCount = usageCount
+        self.rating = rating
+    }
+    
+    // MARK: - Factory Methods for Built-in Templates
+    
+    static func behavioralIntervention() -> PlanTemplate {
+        PlanTemplate(
+            title: "Behavioral Intervention Plan",
+            description: "A structured approach to address and correct negative behaviors using positive reinforcement and interest-based redirection.",
+            model: .directAndCorrect,
+            category: .behavioral,
+            goalsTemplate: [
+                GoalTemplate(
+                    title: "Decrease Disruptive Behavior",
+                    description: "Reduce classroom disruptions by implementing coping strategies",
+                    milestones: [
+                        .init(id: UUID().uuidString, title: "Identify triggers", ordinal: 1),
+                        .init(id: UUID().uuidString, title: "Learn 3 coping strategies", ordinal: 2),
+                        .init(id: UUID().uuidString, title: "Practice in safe environment", ordinal: 3),
+                        .init(id: UUID().uuidString, title: "Apply in classroom", ordinal: 4)
+                    ]
+                ),
+                GoalTemplate(
+                    title: "Build Positive Relationships",
+                    description: "Develop positive peer interactions through interest-based activities",
+                    milestones: [
+                        .init(id: UUID().uuidString, title: "Join interest-based group", ordinal: 1),
+                        .init(id: UUID().uuidString, title: "Complete 3 collaborative activities", ordinal: 2),
+                        .init(id: UUID().uuidString, title: "Lead a peer activity", ordinal: 3)
+                    ]
+                )
+            ],
+            strategiesTemplate: [
+                "Weekly check-ins with counselor",
+                "Interest-based behavior redirection",
+                "Parent communication log",
+                "Positive reinforcement chart"
+            ],
+            suggestedDurationWeeks: 12,
+            targetGradeLevels: ["6", "7", "8", "9", "10"],
+            isPublic: true,
+            createdBy: "system"
+        )
+    }
+    
+    static func careerExploration() -> PlanTemplate {
+        PlanTemplate(
+            title: "Career Pathway Exploration",
+            description: "Help students explore career options aligned with their interests and develop a pathway to their goals.",
+            model: .chaseYourSpace,
+            category: .careerPrep,
+            goalsTemplate: [
+                GoalTemplate(
+                    title: "Career Discovery",
+                    description: "Explore careers matching identified interests",
+                    milestones: [
+                        .init(id: UUID().uuidString, title: "Complete career interest inventory", ordinal: 1),
+                        .init(id: UUID().uuidString, title: "Research 3 career options", ordinal: 2),
+                        .init(id: UUID().uuidString, title: "Interview a professional", ordinal: 3)
+                    ]
+                ),
+                GoalTemplate(
+                    title: "Educational Planning",
+                    description: "Create educational pathway aligned with career goals",
+                    milestones: [
+                        .init(id: UUID().uuidString, title: "Map required courses", ordinal: 1),
+                        .init(id: UUID().uuidString, title: "Identify extracurricular opportunities", ordinal: 2),
+                        .init(id: UUID().uuidString, title: "Create 4-year plan", ordinal: 3)
+                    ]
+                )
+            ],
+            strategiesTemplate: [
+                "Career mentor matching",
+                "Job shadowing opportunities",
+                "Skills assessment activities",
+                "Portfolio development"
+            ],
+            suggestedDurationWeeks: 8,
+            targetGradeLevels: ["8", "9", "10", "11", "12"],
+            isPublic: true,
+            createdBy: "system"
+        )
+    }
+    
+    static func confidenceBuilding() -> PlanTemplate {
+        PlanTemplate(
+            title: "Confidence & Self-Advocacy",
+            description: "Empower introverted or passive students to build confidence and develop self-advocacy skills.",
+            model: .meekToProtector,
+            category: .socialEmotional,
+            goalsTemplate: [
+                GoalTemplate(
+                    title: "Self-Awareness Development",
+                    description: "Identify personal strengths and areas for growth",
+                    milestones: [
+                        .init(id: UUID().uuidString, title: "Complete strengths assessment", ordinal: 1),
+                        .init(id: UUID().uuidString, title: "Create personal affirmation list", ordinal: 2),
+                        .init(id: UUID().uuidString, title: "Set 3 personal goals", ordinal: 3)
+                    ]
+                ),
+                GoalTemplate(
+                    title: "Communication Skills",
+                    description: "Develop assertive communication and self-advocacy",
+                    milestones: [
+                        .init(id: UUID().uuidString, title: "Practice with counselor", ordinal: 1),
+                        .init(id: UUID().uuidString, title: "Role-play scenarios", ordinal: 2),
+                        .init(id: UUID().uuidString, title: "Advocate in real situation", ordinal: 3)
+                    ]
+                )
+            ],
+            strategiesTemplate: [
+                "Weekly reflection journal",
+                "Peer mentoring pairing",
+                "Small group leadership opportunities",
+                "Progressive challenge activities"
+            ],
+            suggestedDurationWeeks: 10,
+            targetGradeLevels: ["5", "6", "7", "8"],
+            isPublic: true,
+            createdBy: "system"
+        )
+    }
+    
+    static func leadershipDevelopment() -> PlanTemplate {
+        PlanTemplate(
+            title: "From Challenge to Champion",
+            description: "Transform challenging behaviors into positive leadership through interest-driven mentorship.",
+            model: .bullyToBoss,
+            category: .leadership,
+            goalsTemplate: [
+                GoalTemplate(
+                    title: "Leadership Role Discovery",
+                    description: "Identify leadership qualities and positive outlets",
+                    milestones: [
+                        .init(id: UUID().uuidString, title: "Identify personal leadership style", ordinal: 1),
+                        .init(id: UUID().uuidString, title: "Study positive role models", ordinal: 2),
+                        .init(id: UUID().uuidString, title: "Take on small leadership role", ordinal: 3)
+                    ]
+                ),
+                GoalTemplate(
+                    title: "Conflict Resolution",
+                    description: "Learn constructive conflict resolution strategies",
+                    milestones: [
+                        .init(id: UUID().uuidString, title: "Learn conflict styles", ordinal: 1),
+                        .init(id: UUID().uuidString, title: "Practice mediation skills", ordinal: 2),
+                        .init(id: UUID().uuidString, title: "Resolve peer conflict positively", ordinal: 3)
+                    ]
+                )
+            ],
+            strategiesTemplate: [
+                "Peer mediation training",
+                "Interest-based leadership projects",
+                "Mentor pairing with community leader",
+                "Restorative practices circles"
+            ],
+            suggestedDurationWeeks: 16,
+            targetGradeLevels: ["6", "7", "8", "9", "10", "11"],
+            isPublic: true,
+            createdBy: "system"
+        )
+    }
+    
+    static var defaultTemplates: [PlanTemplate] {
+        [
+            behavioralIntervention(),
+            careerExploration(),
+            confidenceBuilding(),
+            leadershipDevelopment()
+        ]
     }
 }
+
 
 // MARK: - Activity Template
 
@@ -181,97 +402,6 @@ struct ActivityTemplate: Codable, Identifiable, Sendable {
         self.instructions = instructions
         self.requiredMaterials = requiredMaterials
         self.assessmentCriteria = assessmentCriteria
-    }
-}
-
-// MARK: - Goal Template
-
-/// Template for intervention goals
-struct GoalTemplate: Codable, Identifiable, Sendable {
-    let id: UUID
-    let title: String
-    let description: String
-    let category: GoalCategory
-    let measurableOutcome: String
-    let successCriteria: [String]
-    let timeframe: String // e.g., "2 weeks", "1 month"
-    let sequenceOrder: Int
-
-    enum GoalCategory: String, Codable, Sendable {
-        case academic = "academic"
-        case behavioral = "behavioral"
-        case social = "social"
-        case emotional = "emotional"
-        case career = "career"
-        case selfAdvocacy = "self_advocacy"
-        case engagement = "engagement"
-
-        var displayName: String {
-            switch self {
-            case .academic: return "Academic"
-            case .behavioral: return "Behavioral"
-            case .social: return "Social"
-            case .emotional: return "Emotional"
-            case .career: return "Career Exploration"
-            case .selfAdvocacy: return "Self-Advocacy"
-            case .engagement: return "Engagement"
-            }
-        }
-    }
-
-    init(
-        id: UUID = UUID(),
-        title: String,
-        description: String,
-        category: GoalCategory,
-        measurableOutcome: String,
-        successCriteria: [String],
-        timeframe: String,
-        sequenceOrder: Int
-    ) {
-        self.id = id
-        self.title = title
-        self.description = description
-        self.category = category
-        self.measurableOutcome = measurableOutcome
-        self.successCriteria = successCriteria
-        self.timeframe = timeframe
-        self.sequenceOrder = sequenceOrder
-    }
-
-    /// Convert template to concrete Goal
-    func toGoal() -> Goal {
-        return Goal(
-            id: UUID(),
-            title: title,
-            description: description,
-            category: category.rawValue,
-            targetDate: Date().addingTimeInterval(parsedTimeframe()),
-            isCompleted: false,
-            completedDate: nil,
-            progress: 0.0,
-            milestones: successCriteria.map { Milestone(description: $0, isCompleted: false) }
-        )
-    }
-
-    /// Parse timeframe string to seconds
-    private func parsedTimeframe() -> TimeInterval {
-        let components = timeframe.lowercased().split(separator: " ")
-        guard components.count == 2,
-              let value = Int(components[0]) else {
-            return 30 * 24 * 60 * 60 // Default to 30 days
-        }
-
-        let unit = String(components[1])
-        if unit.hasPrefix("week") {
-            return TimeInterval(value * 7 * 24 * 60 * 60)
-        } else if unit.hasPrefix("month") {
-            return TimeInterval(value * 30 * 24 * 60 * 60)
-        } else if unit.hasPrefix("day") {
-            return TimeInterval(value * 24 * 60 * 60)
-        }
-
-        return 30 * 24 * 60 * 60 // Default to 30 days
     }
 }
 
@@ -399,37 +529,3 @@ struct Milestone: Codable, Sendable {
     }
 }
 
-/// Goal model (if not already defined elsewhere)
-struct Goal: Codable, Identifiable, Sendable {
-    let id: UUID
-    let title: String
-    let description: String
-    let category: String
-    let targetDate: Date
-    var isCompleted: Bool
-    var completedDate: Date?
-    var progress: Double // 0.0 - 1.0
-    var milestones: [Milestone]
-
-    init(
-        id: UUID = UUID(),
-        title: String,
-        description: String,
-        category: String,
-        targetDate: Date,
-        isCompleted: Bool = false,
-        completedDate: Date? = nil,
-        progress: Double = 0.0,
-        milestones: [Milestone] = []
-    ) {
-        self.id = id
-        self.title = title
-        self.description = description
-        self.category = category
-        self.targetDate = targetDate
-        self.isCompleted = isCompleted
-        self.completedDate = completedDate
-        self.progress = progress
-        self.milestones = milestones
-    }
-}

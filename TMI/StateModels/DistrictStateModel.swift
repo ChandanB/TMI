@@ -215,7 +215,7 @@ final class DistrictStateModel: BaseStateModel<District, IdentifiableError> {
             throw DistrictStateError.invalidPlanId
         }
         
-        try await planApprovalService.approvePlan(planId: planId, comments: comments)
+        try await planApprovalService.approvePlan(plan: plan, comment: comments)
         
         // Remove from pending
         pendingApprovals.removeAll { $0.id == planId }
@@ -230,7 +230,7 @@ final class DistrictStateModel: BaseStateModel<District, IdentifiableError> {
             throw DistrictStateError.invalidPlanId
         }
         
-        try await planApprovalService.rejectPlan(planId: planId, reason: reason)
+        try await planApprovalService.rejectPlan(plan: plan, reason: reason)
         
         // Remove from pending
         pendingApprovals.removeAll { $0.id == planId }
@@ -245,7 +245,7 @@ final class DistrictStateModel: BaseStateModel<District, IdentifiableError> {
             throw DistrictStateError.invalidPlanId
         }
         
-        try await planApprovalService.requestRevisions(planId: planId, feedback: feedback)
+        try await planApprovalService.requestChanges(plan: plan, feedback: feedback)
         
         // Remove from pending (moves to revision status)
         pendingApprovals.removeAll { $0.id == planId }
@@ -330,4 +330,3 @@ extension EnvironmentValues {
         set { self[DistrictStateModelKey.self] = newValue }
     }
 }
-

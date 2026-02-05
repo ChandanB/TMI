@@ -202,7 +202,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     case .counselor:
       // Counselor sees their assigned caseload
       roleData.caseloadCount = students.count // TODO: Filter by assigned counselor
-      roleData.pendingApprovals = plans.filter { $0.status == .pendingApproval }.count
+      roleData.pendingApprovals = plans.filter { $0.approvalStatus == .pendingApproval }.count
       roleData.upcomingMeetings = 0 // TODO: Fetch from meeting service
       roleData.criticalAlerts = students.filter { $0.engagementScore < 0.3 }.count
       roleData.caseloadStudentIds = students.compactMap { $0.id }
@@ -210,7 +210,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     case .teacher:
       // Teacher sees their classroom
       roleData.classroomStudentCount = students.count // TODO: Filter by classroom/teacher
-      roleData.classroomPlansActive = plans.filter { $0.status == .inProgress }.count
+      roleData.classroomPlansActive = plans.filter { $0.approvalStatus == .approved }.count
       roleData.classroomSurveysPending = students.filter { $0.surveyResults?.isEmpty ?? true }.count
       roleData.classroomStudentIds = students.compactMap { $0.id }
       
@@ -238,7 +238,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     // Priority order for action suggestions
     
     // 1. Check for pending approvals (highest priority for counselors/admins)
-    let pendingPlans = plans.filter { $0.status == .pendingApproval }
+    let pendingPlans = plans.filter { $0.approvalStatus == .pendingApproval }
     if !pendingPlans.isEmpty && (role == .counselor || role == .administrator || role == .admin) {
       return NextBestAction(
         id: "pending_approval",
@@ -1001,7 +1001,7 @@ struct NextBestActionCard: View {
                         .font(.tmiCaption)
                         .foregroundColor(.tmiTextSecondary)
                     Text(action.title)
-                        .font(.tmiHeadline)
+                        .font(.tmiHeading2)
                         .foregroundColor(.tmiTextPrimary)
                 }
                 
@@ -1014,7 +1014,7 @@ struct NextBestActionCard: View {
                         .padding(.horizontal, TMISpacing.md)
                         .padding(.vertical, TMISpacing.xs)
                         .background(priorityColor)
-                        .cornerRadius(TMICornerRadius.sm)
+                        .cornerRadius(TMIRadius.sm)
                 }
             }
             
@@ -1072,7 +1072,7 @@ struct RoleSummaryItem: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, TMISpacing.sm)
         .background(color.opacity(0.05))
-        .cornerRadius(TMICornerRadius.sm)
+        .cornerRadius(TMIRadius.sm)
     }
 }
 
@@ -1093,5 +1093,3 @@ struct RoleSummaryItem: View {
 }
 
 // MARK: - Actionable Cards moved to Components/ActionableCards.swift
-
-

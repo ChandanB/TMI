@@ -142,6 +142,22 @@ enum FirestorePaths {
         return "plans/\(planId)/approvals/\(approvalId)"
     }
 
+    static func planInputs(planId: String) -> String {
+        return "plans/\(planId)/inputs"
+    }
+
+    static func planInput(planId: String, inputId: String) -> String {
+        return "plans/\(planId)/inputs/\(inputId)"
+    }
+
+    static func planEvidence(planId: String) -> String {
+        return "plans/\(planId)/evidence"
+    }
+
+    static func planEvidenceEntry(planId: String, evidenceId: String) -> String {
+        return "plans/\(planId)/evidence/\(evidenceId)"
+    }
+
     // MARK: - Global Collections
 
     static let interests = "interests"

@@ -256,12 +256,14 @@ struct CareerMatchExplanation: Codable, Sendable {
 
         // Education pathway
         switch educationLevel {
+        case .highSchool:
+            recommendations.append("Focus on completing high school requirements and explore introductory courses")
         case .certification, .vocational:
             recommendations.append("Research certification programs and vocational schools in your area")
-        case .associates:
-            recommendations.append("Explore 2-year associate degree programs at community colleges")
         case .bachelors:
             recommendations.append("Plan for a 4-year bachelor's degree program")
+        case .someCollege:
+            recommendations.append("Explore community college pathways or partial college coursework options")
         case .masters, .doctorate:
             recommendations.append("Consider graduate school pathways after completing undergraduate education")
         case .varies:
@@ -371,13 +373,11 @@ extension CareerMatchExplanation {
         case .highSchool:
             return "High school diploma or equivalent required"
         case .someCollege:
-            return "Some college coursework beneficial"
+            return "Some college coursework recommended"
         case .certification:
             return "Professional certification program required"
         case .vocational:
             return "Vocational or trade school training required"
-        case .associates:
-            return "2-year associate degree required"
         case .bachelors:
             return "4-year bachelor's degree required"
         case .masters:
@@ -392,10 +392,9 @@ extension CareerMatchExplanation {
     private static func getEstimatedYears(_ level: EducationLevel) -> Int? {
         switch level {
         case .highSchool: return 0
-        case .someCollege: return 1
+        case .someCollege: return 2
         case .certification: return 1
         case .vocational: return 2
-        case .associates: return 2
         case .bachelors: return 4
         case .masters: return 6
         case .doctorate: return 10
@@ -414,3 +413,4 @@ extension CareerMatchExplanation {
         }
     }
 }
+

@@ -35,8 +35,11 @@ class CareerMatchingService {
                     interestMatches.append(
                         CareerMatchExplanation.InterestMatch(
                             interestName: cluster.displayName,
+                            interestCategory: cluster.name,
+                            studentLevel: max(1, min(5, Int((cluster.weight * 5).rounded()))),
                             weight: cluster.weight,
-                            contribution: contribution
+                            contribution: contribution,
+                            isRequired: career.requiredInterests.contains(cluster.name)
                         )
                     )
                 }
@@ -53,20 +56,28 @@ class CareerMatchingService {
                 let similarity = calculateDreamJobSimilarity(dream: dream, careerTitle: career.title, careerDescription: career.description)
                 dreamJobScore = similarity * CareerMatchExplanation.dreamJobWeight
 
-                dreamJobMatch = CareerMatchExplanation.DreamJobMatch(
-                    dreamJob: dreamJob!,
+                let matchedKeywords = extractMatchedKeywords(
+                    dream: dream,
                     careerTitle: career.title,
+                    careerDescription: career.description
+                )
+                dreamJobMatch = CareerMatchExplanation.DreamJobMatch(
                     similarity: similarity,
-                    matchedKeywords: extractMatchedKeywords(dream: dream, careerTitle: career.title, careerDescription: career.description)
+                    matchedKeywords: matchedKeywords,
+                    contribution: dreamJobScore,
+                    explanation: matchedKeywords.isEmpty
+                        ? "General alignment with your stated dream job"
+                        : "Matched keywords: \(matchedKeywords.joined(separator: ", "))"
                 )
             }
 
             // Calculate education fit
             let educationScore = calculateEducationFit(educationLevel: career.educationLevel)
             let educationFit = CareerMatchExplanation.EducationFitScore(
-                requiredLevel: career.educationLevel,
-                description: educationDescription(for: career.educationLevel),
-                pathwaySuggestions: career.pathway.beginnerGoals.map { $0.title }
+                careerEducationLevel: career.educationLevel,
+                isAccessible: career.educationLevel == .highSchool || career.educationLevel == .varies,
+                pathwayDescription: educationDescription(for: career.educationLevel),
+                estimatedYears: estimatedEducationYears(for: career.educationLevel)
             )
 
             // Calculate salary expectation fit
@@ -75,10 +86,12 @@ class CareerMatchingService {
 
             if let salary = career.estimatedSalary {
                 salaryScore = CareerMatchExplanation.salaryWeight // Full points if salary data available
+                let averageSalary = Double(salary.min + salary.max) / 2.0
                 salaryFit = CareerMatchExplanation.SalaryFitScore(
                     range: salary,
+                    averageSalary: averageSalary,
                     growthPotential: determineGrowthPotential(for: career.category),
-                    industryOutlook: industryOutlook(for: career.category)
+                    explanation: industryOutlook(for: career.category)
                 )
             }
 
@@ -280,7 +293,7 @@ class CareerMatchingService {
         }
 
         // Education accessibility
-        if educationFit.requiredLevel == .highSchool || educationFit.requiredLevel == .varies {
+        if educationFit.careerEducationLevel == .highSchool || educationFit.careerEducationLevel == .varies {
             parts.append("This career has accessible entry requirements")
         }
 
@@ -357,6 +370,19 @@ class CareerMatchingService {
         }
 
         return modules
+    }
+
+    private func estimatedEducationYears(for level: EducationLevel) -> Int? {
+        switch level {
+        case .highSchool: return 0
+        case .someCollege: return 1
+        case .certification: return 1
+        case .vocational: return 2
+        case .bachelors: return 4
+        case .masters: return 6
+        case .doctorate: return 10
+        case .varies: return nil
+        }
     }
 }
 

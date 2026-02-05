@@ -144,6 +144,9 @@ final class DistrictAnalyticsService {
             ? 0.0
             : Double(completedPlans.count) / Double(filteredPlans.count)
 
+        let planIds = filteredPlans.compactMap { $0.id }
+        let evidenceMetrics = try await computeEvidenceMetrics(planIds: planIds)
+
         return DistrictMetrics(
             totalStudents: filteredStudents.count,
             activePlansCount: activePlans.count,
@@ -153,7 +156,14 @@ final class DistrictAnalyticsService {
             avgEngagementRate: averageEngagement,
             flaggedStudentsCount: flaggedStudents.count,
             totalSchools: schools,
-            totalStaff: staffCount
+            totalStaff: staffCount,
+            planEvidenceCount: evidenceMetrics.totalEntries,
+            incidentCount: evidenceMetrics.incidentCount,
+            thoughtLogCount: evidenceMetrics.thoughtLogCount,
+            ratingCount: evidenceMetrics.ratingCount,
+            averageRating: evidenceMetrics.averageRating,
+            checklistCompletions: evidenceMetrics.checklistCompletions,
+            streakCompletions: evidenceMetrics.streakCompletions
         )
     }
     
@@ -164,12 +174,13 @@ final class DistrictAnalyticsService {
         let students = try await studentService.fetchStudentsInDistrict(districtId)
         let plans = try await planService.fetchPlansInDistrict(districtId)
         let schools = try await DistrictService.shared.fetchSchools(for: districtId)
-        let schoolNameMap = Dictionary(uniqueKeysWithValues: schools.compactMap { school in
-            (school.id ?? school.schoolCode, school.name)
+        let schoolNameMap: [String: String] = Dictionary(uniqueKeysWithValues: schools.compactMap { school in
+            let key = school.id ?? school.schoolCode ?? "unknown"
+            return (key, school.name)
         })
 
         let studentsBySchool = Dictionary(grouping: students) { $0.schoolId ?? "unknown" }
-        let studentSchoolLookup = Dictionary(uniqueKeysWithValues: students.compactMap { student in
+        let studentSchoolLookup: [String: String] = Dictionary(uniqueKeysWithValues: students.compactMap { student in
             guard let id = student.id else { return nil }
             return (id, student.schoolId ?? "unknown")
         })
@@ -494,6 +505,55 @@ final class DistrictAnalyticsService {
 
         guard totalAssigned > 0 else { return 0.0 }
         return Double(totalSubmitted) / Double(totalAssigned)
+    }
+
+    private struct EvidenceMetrics {
+        let totalEntries: Int
+        let incidentCount: Int
+        let thoughtLogCount: Int
+        let ratingCount: Int
+        let averageRating: Double
+        let checklistCompletions: Int
+        let streakCompletions: Int
+    }
+
+    private func computeEvidenceMetrics(planIds: [String]) async throws -> EvidenceMetrics {
+        guard !planIds.isEmpty else {
+            return EvidenceMetrics(
+                totalEntries: 0,
+                incidentCount: 0,
+                thoughtLogCount: 0,
+                ratingCount: 0,
+                averageRating: 0.0,
+                checklistCompletions: 0,
+                streakCompletions: 0
+            )
+        }
+
+        let entries = try await planService.fetchPlanEvidence(forPlanIds: planIds)
+        let incidentCount = entries.filter { $0.type == .incident }.count
+        let thoughtLogCount = entries.filter { $0.type == .thoughtLog }.count
+        let ratingEntries = entries.filter { $0.type == .rating }
+        let checklistCompletions = entries.filter { $0.type == .checklist }.count
+        let streakCompletions = entries.filter { $0.type == .streak }.count
+
+        let averageRating: Double
+        if ratingEntries.isEmpty {
+            averageRating = 0.0
+        } else {
+            let total = ratingEntries.reduce(0.0) { $0 + ($1.numericValue ?? 0.0) }
+            averageRating = total / Double(ratingEntries.count)
+        }
+
+        return EvidenceMetrics(
+            totalEntries: entries.count,
+            incidentCount: incidentCount,
+            thoughtLogCount: thoughtLogCount,
+            ratingCount: ratingEntries.count,
+            averageRating: averageRating,
+            checklistCompletions: checklistCompletions,
+            streakCompletions: streakCompletions
+        )
     }
 }
 

@@ -296,7 +296,7 @@ struct CareerPathDetailView: View {
             // Save student's career interest state
             try await StudentCareerService.shared.addCareer(
                 studentId: studentId,
-                careerId: career.id ?? career.title.lowercased().replacingOccurrences(of: " ", with: "_"),
+                careerId: career.id.uuidString,
                 status: .exploring,
                 progress: 0.0,
                 isFavorite: true
@@ -358,3 +358,4 @@ struct CareerPathDetailView: View {
         }
     }
 }
+

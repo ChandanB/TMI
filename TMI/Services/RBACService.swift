@@ -175,8 +175,8 @@ final class RBACService {
 
         // Parents/guardians can access their children
         if user.role == .parent || user.role == .legalGuardian {
-            // Check if user is listed as parent/guardian for this student
-            return student.guardianEmail == user.email || student.parentEmail == user.email
+            // TODO: Wire guardian relationships when student contact fields are added
+            return false
         }
 
         // Staff assigned to student can access

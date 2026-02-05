@@ -38,6 +38,13 @@ class DistrictExportService {
     csvContent += "Form Completion Rate,\(metrics.formCompletionPercentage)\n"
     csvContent += "Avg Engagement Rate,\(metrics.engagementPercentage)\n"
     csvContent += "Flagged Students,\(metrics.flaggedStudentsCount)\n\n"
+    csvContent += "Plan Evidence Entries,\(metrics.planEvidenceCount)\n"
+    csvContent += "Incident Logs,\(metrics.incidentCount)\n"
+    csvContent += "Thought Logs,\(metrics.thoughtLogCount)\n"
+    csvContent += "Ratings Logged,\(metrics.ratingCount)\n"
+    csvContent += "Average Rating,\(metrics.averageRatingDisplay)\n"
+    csvContent += "Checklist Completions,\(metrics.checklistCompletions)\n"
+    csvContent += "Streak Completions,\(metrics.streakCompletions)\n\n"
 
     // School Breakdown
     csvContent += "School Breakdown\n"
@@ -147,7 +154,14 @@ class DistrictExportService {
         ("Plan Completion Rate", metrics.planCompletionPercentage),
         ("Form Completion Rate", metrics.formCompletionPercentage),
         ("Average Engagement", metrics.engagementPercentage),
-        ("Students Needing Attention", "\(metrics.flaggedStudentsCount)")
+        ("Students Needing Attention", "\(metrics.flaggedStudentsCount)"),
+        ("Plan Evidence Entries", "\(metrics.planEvidenceCount)"),
+        ("Incident Logs", "\(metrics.incidentCount)"),
+        ("Thought Logs", "\(metrics.thoughtLogCount)"),
+        ("Ratings Logged", "\(metrics.ratingCount)"),
+        ("Average Rating", metrics.averageRatingDisplay),
+        ("Checklist Completions", "\(metrics.checklistCompletions)"),
+        ("Streak Completions", "\(metrics.streakCompletions)")
       ]
 
       for (label, value) in metricsData {
@@ -267,7 +281,14 @@ class DistrictExportService {
         "planCompletionRate": metrics.planCompletionRate,
         "formCompletionRate": metrics.formCompletionRate,
         "avgEngagementRate": metrics.avgEngagementRate,
-        "flaggedStudentsCount": metrics.flaggedStudentsCount
+        "flaggedStudentsCount": metrics.flaggedStudentsCount,
+        "planEvidenceCount": metrics.planEvidenceCount,
+        "incidentCount": metrics.incidentCount,
+        "thoughtLogCount": metrics.thoughtLogCount,
+        "ratingCount": metrics.ratingCount,
+        "averageRating": metrics.averageRating,
+        "checklistCompletions": metrics.checklistCompletions,
+        "streakCompletions": metrics.streakCompletions
       ],
       "schools": schoolMetrics.map { school in
         [

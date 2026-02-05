@@ -16,6 +16,15 @@ actor PlanTemplateService {
     private let db = Firestore.firestore()
 
     private init() {}
+
+    // MARK: - Convenience Fetch
+
+    func fetchTemplates(districtId: String?) async throws -> [PlanTemplate] {
+        if let districtId {
+            return try await fetchDistrictTemplates(districtId: districtId)
+        }
+        return try await fetchAllTemplates()
+    }
     
     // MARK: - Template CRUD Operations
 
@@ -30,9 +39,9 @@ actor PlanTemplateService {
 
         // Save to Firestore
         let docRef = db.collection(FirestorePaths.planTemplates).document(newTemplate.id!)
-        try docRef.setData(from: newTemplate)
+        try await docRef.setData(from: newTemplate)
 
-        print("[PlanTemplateService] ✅ Created template: \(newTemplate.name)")
+        print("[PlanTemplateService] ✅ Created template: \(newTemplate.title)")
         return newTemplate
     }
 
@@ -48,11 +57,7 @@ actor PlanTemplateService {
 
     /// Fetch all active templates
     func fetchAllTemplates(includeInactive: Bool = false) async throws -> [PlanTemplate] {
-        var query = db.collection(FirestorePaths.planTemplates).order(by: "name")
-
-        if !includeInactive {
-            query = query.whereField("isActive", isEqualTo: true)
-        }
+        var query = db.collection(FirestorePaths.planTemplates).order(by: "title")
 
         let snapshot = try await query.getDocuments()
 
@@ -65,7 +70,6 @@ actor PlanTemplateService {
     func fetchTemplates(for model: TMIPlanModel) async throws -> [PlanTemplate] {
         let query = db.collection(FirestorePaths.planTemplates)
             .whereField("model", isEqualTo: model.rawValue)
-            .whereField("isActive", isEqualTo: true)
             .order(by: "usageCount", descending: true)
 
         let snapshot = try await query.getDocuments()
@@ -79,8 +83,7 @@ actor PlanTemplateService {
     func fetchDistrictTemplates(districtId: String) async throws -> [PlanTemplate] {
         let query = db.collection(FirestorePaths.planTemplates)
             .whereField("districtId", isEqualTo: districtId)
-            .whereField("isActive", isEqualTo: true)
-            .order(by: "name")
+            .order(by: "title")
 
         let snapshot = try await query.getDocuments()
 
@@ -93,7 +96,6 @@ actor PlanTemplateService {
     func fetchPublicTemplates() async throws -> [PlanTemplate] {
         let query = db.collection(FirestorePaths.planTemplates)
             .whereField("isPublic", isEqualTo: true)
-            .whereField("isActive", isEqualTo: true)
             .order(by: "usageCount", descending: true)
 
         let snapshot = try await query.getDocuments()
@@ -105,31 +107,16 @@ actor PlanTemplateService {
 
     /// Fetch templates by MTSS tier
     func fetchTemplates(tier: Int, districtId: String? = nil) async throws -> [PlanTemplate] {
-        var query = db.collection(FirestorePaths.planTemplates)
-            .whereField("tier", isEqualTo: tier)
-            .whereField("isActive", isEqualTo: true)
-
-        if let districtId = districtId {
-            // Fetch both district-specific and public templates
-            let districtQuery = query.whereField("districtId", isEqualTo: districtId)
-            let publicQuery = query.whereField("isPublic", isEqualTo: true)
-
-            let districtSnapshot = try await districtQuery.getDocuments()
-            let publicSnapshot = try await publicQuery.getDocuments()
-
-            let districtTemplates = try districtSnapshot.documents.compactMap { try $0.data(as: PlanTemplate.self) }
-            let publicTemplates = try publicSnapshot.documents.compactMap { try $0.data(as: PlanTemplate.self) }
-
-            return districtTemplates + publicTemplates
-        } else {
-            // Fetch all templates for the tier
-            let snapshot = try await query.getDocuments()
-            return try snapshot.documents.compactMap { try $0.data(as: PlanTemplate.self) }
+        // Tier is not represented in the current PlanTemplate model.
+        // Return all templates for now and let the caller filter by category/strategy.
+        if let districtId {
+            return try await fetchDistrictTemplates(districtId: districtId)
         }
+        return try await fetchAllTemplates()
     }
 
     /// Fetch templates by category
-    func fetchTemplates(category: String, districtId: String?) async throws -> [PlanTemplate] {
+    func fetchTemplates(category: PlanTemplate.Category, districtId: String? = nil) async throws -> [PlanTemplate] {
         let allTemplates = districtId != nil
             ? try await fetchDistrictTemplates(districtId: districtId!)
             : try await fetchAllTemplates()
@@ -144,9 +131,9 @@ actor PlanTemplateService {
         }
 
         let docRef = db.collection(FirestorePaths.planTemplates).document(templateId)
-        try docRef.setData(from: template, merge: true)
+        try await docRef.setData(from: template, merge: true)
 
-        print("[PlanTemplateService] ✅ Updated template: \(template.name)")
+        print("[PlanTemplateService] ✅ Updated template: \(template.title)")
     }
 
     /// Archive a template (soft delete)
@@ -154,7 +141,8 @@ actor PlanTemplateService {
         let docRef = db.collection(FirestorePaths.planTemplates).document(id)
 
         try await docRef.updateData([
-            "isActive": false
+            "isArchived": true,
+            "archivedAt": FieldValue.serverTimestamp()
         ])
 
         print("[PlanTemplateService] 🗄️ Archived template: \(id)")
@@ -196,52 +184,38 @@ actor PlanTemplateService {
 
         // Calculate end date
         let calendar = Calendar.current
-        let endDate = calendar.date(byAdding: .day, value: template.recommendedDuration, to: startDate) ?? startDate
+        let endDate = calendar.date(byAdding: .day, value: template.suggestedDurationWeeks * 7, to: startDate) ?? startDate
 
-        // Generate scheduled activities from template
-        var scheduledActivities: [InterventionActivity] = []
-
-        for activityTemplate in template.activities.sorted(by: { $0.sequenceOrder < $1.sequenceOrder }) {
-            let scheduledDate = activityTemplate.scheduleSuggestion.scheduledDate(
-                startDate: startDate,
-                occurrence: 1
-            )
-
-            let activity = InterventionActivity(
-                planId: "", // Will be set after plan creation
-                templateId: activityTemplate.id,
-                title: activityTemplate.title,
-                description: activityTemplate.description,
-                type: activityTemplate.type,
-                estimatedDuration: activityTemplate.estimatedDuration,
-                scheduledDate: scheduledDate,
-                status: .pending,
-                assignedTo: student.id ?? "",
-                instructions: activityTemplate.instructions,
-                requiredMaterials: activityTemplate.requiredMaterials,
-                assessmentCriteria: activityTemplate.assessmentCriteria
-            )
-
-            scheduledActivities.append(activity)
-        }
+        // No activity templates in current PlanTemplate model
+        let scheduledActivities: [InterventionActivity] = []
 
         // Generate goals from template
-        let goals = template.goalTemplates
-            .sorted(by: { $0.sequenceOrder < $1.sequenceOrder })
-            .map { $0.toGoal() }
+        let goals: [Goal] = template.goalsTemplate.map { goalTemplate in
+            Goal(
+                description: goalTemplate.title,
+                notes: goalTemplate.description
+            )
+        }
+
+        let createdBy = Auth.auth().currentUser?.uid ?? "system"
 
         // Create TMI plan
         let plan = TMIPlan(
             id: UUID().uuidString,
-            title: "\(template.name) - \(student.name)",
-            model: template.model,
+            title: "\(template.title) - \(student.name)",
+            description: template.description,
             students: [student],
-            goals: goals.map { $0.title }, // Convert to string array for compatibility
+            model: template.model,
+            interests: [],
             startDate: startDate,
             endDate: endDate,
-            status: "draft",
+            creationDate: Date(),
+            lastUpdated: Date(),
+            goals: goals,
+            progress: 0.0,
             notes: template.description,
-            tier: template.tier
+            strategies: template.strategiesTemplate,
+            createdBy: createdBy
         )
 
         // Track template usage
@@ -263,10 +237,10 @@ actor PlanTemplateService {
         let lowercasedQuery = query.lowercased()
 
         return allTemplates.filter { template in
-            template.name.lowercased().contains(lowercasedQuery) ||
+            template.title.lowercased().contains(lowercasedQuery) ||
             template.description.lowercased().contains(lowercasedQuery) ||
-            template.category.lowercased().contains(lowercasedQuery) ||
-            template.targetedInterventions.contains { $0.lowercased().contains(lowercasedQuery) }
+            template.category.rawValue.lowercased().contains(lowercasedQuery) ||
+            template.strategiesTemplate.contains { $0.lowercased().contains(lowercasedQuery) }
         }
     }
 
@@ -277,7 +251,7 @@ actor PlanTemplateService {
         let allTemplates = try await fetchAllTemplates()
 
         return allTemplates.filter { template in
-            !Set(template.targetedInterventions).intersection(Set(interventions)).isEmpty
+            !Set(template.strategiesTemplate).intersection(Set(interventions)).isEmpty
         }
     }
 }

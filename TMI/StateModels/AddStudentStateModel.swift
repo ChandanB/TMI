@@ -49,8 +49,8 @@ final class AddStudentStateModel {
             self.studentID = student.studentID ?? ""
             self.school = student.school
             self.dateOfBirth = student.dateOfBirth
-            self.interests = student.interests
-            // Note: Hobbies are now included in interests
+            self.interests = []
+            // Interests are loaded from edge collection via loadInterests()
         } else if let currentSchool = currentSchool {
             self.school = currentSchool
         }

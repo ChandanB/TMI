@@ -254,7 +254,7 @@ func observeStudentData(studentID: String) {
   * Form inputs  
   * UI controls  
   * Animation states  
-* Use `@Query` for Firestore data (if using FirebaseFirestoreSwift package):  
+* Use `@Query` for Firestore data (if using FirebaseFirestore package):  
   * Declarative data fetching  
   * Automatic UI updates
 

@@ -126,9 +126,8 @@ final class AuthenticationService {
             schoolId: verifiedSchoolId,
             verificationStatus: VerificationStatus(
                 isEmailVerified: false,
-                isInstitutionVerified: verifiedInstitutionID != nil,
                 isAgeVerified: ageVerificationStatus == .verified,
-                verificationDate: Date()
+                isInstitutionVerified: verifiedInstitutionID != nil
             ),
             consentRecords: [],
             parentalConsentStatus: parentalConsentStatus,
@@ -201,7 +200,7 @@ final class AuthenticationService {
         if age >= 13 {
             return .verified
         } else {
-            return .pending
+            return .required
         }
     }
 

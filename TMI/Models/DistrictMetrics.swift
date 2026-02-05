@@ -19,6 +19,32 @@ struct DistrictMetrics: Codable, Equatable, Sendable {
   var flaggedStudentsCount: Int
   var totalSchools: Int
   var totalStaff: Int
+  var planEvidenceCount: Int
+  var incidentCount: Int
+  var thoughtLogCount: Int
+  var ratingCount: Int
+  var averageRating: Double
+  var checklistCompletions: Int
+  var streakCompletions: Int
+
+  enum CodingKeys: String, CodingKey {
+    case totalStudents
+    case activePlansCount
+    case completedPlansCount
+    case planCompletionRate
+    case formCompletionRate
+    case avgEngagementRate
+    case flaggedStudentsCount
+    case totalSchools
+    case totalStaff
+    case planEvidenceCount
+    case incidentCount
+    case thoughtLogCount
+    case ratingCount
+    case averageRating
+    case checklistCompletions
+    case streakCompletions
+  }
 
   init(
     totalStudents: Int = 0,
@@ -29,7 +55,14 @@ struct DistrictMetrics: Codable, Equatable, Sendable {
     avgEngagementRate: Double = 0.0,
     flaggedStudentsCount: Int = 0,
     totalSchools: Int = 0,
-    totalStaff: Int = 0
+    totalStaff: Int = 0,
+    planEvidenceCount: Int = 0,
+    incidentCount: Int = 0,
+    thoughtLogCount: Int = 0,
+    ratingCount: Int = 0,
+    averageRating: Double = 0.0,
+    checklistCompletions: Int = 0,
+    streakCompletions: Int = 0
   ) {
     self.totalStudents = totalStudents
     self.activePlansCount = activePlansCount
@@ -40,6 +73,33 @@ struct DistrictMetrics: Codable, Equatable, Sendable {
     self.flaggedStudentsCount = flaggedStudentsCount
     self.totalSchools = totalSchools
     self.totalStaff = totalStaff
+    self.planEvidenceCount = planEvidenceCount
+    self.incidentCount = incidentCount
+    self.thoughtLogCount = thoughtLogCount
+    self.ratingCount = ratingCount
+    self.averageRating = averageRating
+    self.checklistCompletions = checklistCompletions
+    self.streakCompletions = streakCompletions
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    totalStudents = try container.decodeIfPresent(Int.self, forKey: .totalStudents) ?? 0
+    activePlansCount = try container.decodeIfPresent(Int.self, forKey: .activePlansCount) ?? 0
+    completedPlansCount = try container.decodeIfPresent(Int.self, forKey: .completedPlansCount) ?? 0
+    planCompletionRate = try container.decodeIfPresent(Double.self, forKey: .planCompletionRate) ?? 0.0
+    formCompletionRate = try container.decodeIfPresent(Double.self, forKey: .formCompletionRate) ?? 0.0
+    avgEngagementRate = try container.decodeIfPresent(Double.self, forKey: .avgEngagementRate) ?? 0.0
+    flaggedStudentsCount = try container.decodeIfPresent(Int.self, forKey: .flaggedStudentsCount) ?? 0
+    totalSchools = try container.decodeIfPresent(Int.self, forKey: .totalSchools) ?? 0
+    totalStaff = try container.decodeIfPresent(Int.self, forKey: .totalStaff) ?? 0
+    planEvidenceCount = try container.decodeIfPresent(Int.self, forKey: .planEvidenceCount) ?? 0
+    incidentCount = try container.decodeIfPresent(Int.self, forKey: .incidentCount) ?? 0
+    thoughtLogCount = try container.decodeIfPresent(Int.self, forKey: .thoughtLogCount) ?? 0
+    ratingCount = try container.decodeIfPresent(Int.self, forKey: .ratingCount) ?? 0
+    averageRating = try container.decodeIfPresent(Double.self, forKey: .averageRating) ?? 0.0
+    checklistCompletions = try container.decodeIfPresent(Int.self, forKey: .checklistCompletions) ?? 0
+    streakCompletions = try container.decodeIfPresent(Int.self, forKey: .streakCompletions) ?? 0
   }
 
   // Computed properties for display
@@ -53,6 +113,10 @@ struct DistrictMetrics: Codable, Equatable, Sendable {
 
   var engagementPercentage: String {
     String(format: "%.1f%%", avgEngagementRate * 100)
+  }
+
+  var averageRatingDisplay: String {
+    String(format: "%.1f", averageRating)
   }
 
   var totalPlansCount: Int {
@@ -175,7 +239,14 @@ extension DistrictMetrics {
     avgEngagementRate: 0.724,
     flaggedStudentsCount: 12,
     totalSchools: 3,
-    totalStaff: 178
+    totalStaff: 178,
+    planEvidenceCount: 1240,
+    incidentCount: 32,
+    thoughtLogCount: 48,
+    ratingCount: 380,
+    averageRating: 3.7,
+    checklistCompletions: 520,
+    streakCompletions: 210
   )
 }
 

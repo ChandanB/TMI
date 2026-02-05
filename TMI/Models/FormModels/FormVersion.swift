@@ -14,7 +14,7 @@ struct FormVersion: Codable, Identifiable, Sendable {
 
     // Version identification
     let templateId: String
-    let version: Int
+    var version: Int
     let versionLabel: String? // e.g., "v1.0", "Draft", "Final"
 
     // Template content snapshot

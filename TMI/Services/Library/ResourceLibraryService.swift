@@ -176,7 +176,8 @@ final class ResourceLibraryService {
                 updatedResource.id = id
             } else {
                 // Create new
-                let docRef = try globalCollection.addDocument(from: resource)
+                let data = try Firestore.Encoder().encode(resource)
+                let docRef = try await globalCollection.addDocument(data: data)
                 updatedResource.id = docRef.documentID
             }
 

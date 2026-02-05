@@ -66,7 +66,7 @@ struct NotificationCenterView: View {
                 .foregroundColor(.tmiTextTertiary)
             
             Text("No Notifications")
-                .font(.tmiHeadline)
+                .font(.tmiHeading2)
                 .foregroundColor(.tmiTextSecondary)
             
             Text("You're all caught up!")
@@ -235,10 +235,10 @@ struct NotificationSettingsView: View {
         .onAppear {
             preferences = notificationService.preferences
         }
-        .onChange(of: preferences) { _, newValue in
+        .onChange(of: preferences.inAppEnabled) { _, _ in
             Task {
                 isSaving = true
-                try? await notificationService.updatePreferences(newValue)
+                try? await notificationService.updatePreferences(preferences)
                 isSaving = false
             }
         }
