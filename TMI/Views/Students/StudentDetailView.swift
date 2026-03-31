@@ -89,11 +89,11 @@ struct StudentDetailView: View {
         .sheet(isPresented: $showingCreatePlan) {
             if let student = stateModel.student {
                 NavigationStack {
-                    NewTMIPlanView(student: student) {
+                    TMIPlanEditorView(preselectedStudent: student, onPlanCreated: {
                         Task {
                             await planStateModel.refresh()
                         }
-                    }
+                    })
                 }
             }
         }

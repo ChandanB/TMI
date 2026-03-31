@@ -187,12 +187,12 @@ struct TMIPlanDetailView: View {
         }
         .sheet(isPresented: $showingEditSheet) {
             NavigationStack {
-                EditTMIPlanView(plan: plan) { updatedPlan in
+                TMIPlanEditorView(existingPlan: plan, onSave: { updatedPlan in
                     plan = updatedPlan
                     Task {
                         await refreshPlan()
                     }
-                }
+                })
             }
         }
         .alert("Delete TMI Plan", isPresented: $showingDeleteAlert) {
@@ -3293,6 +3293,7 @@ extension TMIPlanModel {
 
 // MARK: - Supporting Views
 
+#if canImport(UIKit)
 struct ActivityShareSheet: UIViewControllerRepresentable {
     let activityItems: [Any]
 
@@ -3305,6 +3306,23 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
         // No updates needed
     }
 }
+#else
+struct ActivityShareSheet: View {
+    let activityItems: [Any]
+
+    var body: some View {
+        if let url = activityItems.first as? URL {
+            ShareLink(item: url) {
+                Label("Share Export", systemImage: "square.and.arrow.up")
+            }
+            .padding()
+        } else {
+            Text("Sharing is unavailable for this item.")
+                .padding()
+        }
+    }
+}
+#endif
 
 // MARK: - Preview
 

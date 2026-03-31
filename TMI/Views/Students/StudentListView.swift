@@ -237,7 +237,7 @@ struct StudentListView: View {
         }
         .sheet(item: $studentForNewPlan) { student in
             NavigationStack {
-                NewTMIPlanView(student: student)
+                TMIPlanEditorView(preselectedStudent: student)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Cancel") {
