@@ -158,7 +158,7 @@ struct QuickActionsGrid: View {
         }
         .sheet(isPresented: $showingAddStudent) {
             NavigationStack {
-                AddStudentView(onComplete: {
+                StudentProfileView(onComplete: {
                     showingAddStudent = false
                     // Refresh data after adding student
                     Task {

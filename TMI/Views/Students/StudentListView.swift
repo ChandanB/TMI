@@ -134,7 +134,7 @@ struct StudentListView: View {
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showingAddStudent) {
             NavigationStack {
-                AddStudentView {
+                StudentProfileView {
                     Task { await stateModel.fetch() }
                     showingAddStudent = false
                 }

@@ -595,7 +595,7 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $showingAddStudent) {
             NavigationStack {
-                AddStudentView(onComplete: {
+                StudentProfileView(onComplete: {
                     showingAddStudent = false
                     // Refresh dashboard and student data
                     Task {

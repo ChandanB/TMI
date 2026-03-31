@@ -100,7 +100,7 @@ struct StudentDetailView: View {
         .sheet(isPresented: $showingEditStudent) {
             if let student = stateModel.student {
                 NavigationStack {
-                    EditStudentView(student: student) { _ in
+                    StudentProfileView(existingStudent: student) {
                         // No need to manually refresh - listener will update automatically
                     }
                 }
