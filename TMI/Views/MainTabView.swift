@@ -26,72 +26,51 @@ struct MainTabView: View {
     @State private var showingWorkspacePanel = false
     
     // State models
-    @State private var interestsStateModel = InterestsAndHobbiesStateModel()
     @State private var meetingsStateModel = MeetingsStateModel()
     @State private var recommendationsStateModel = RecommendationsStateModel()
-    
+
     // Navigation paths per tab
     @State private var dashboardPath = NavigationPath()
     @State private var studentsPath = NavigationPath()
     @State private var plansPath = NavigationPath()
     
     enum Tab: String, CaseIterable, Identifiable {
-        case dashboard, districtDashboard, students, tmiPlans, forms, careerExplorer, interests, resources, settings
+        case dashboard, students, tmiPlans, settings
         var id: Self { self }
-        
+
         // Define which roles can access each tab
         var allowedRoles: Set<UserRole> {
             switch self {
             case .dashboard:
                 return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .superintendent, .districtAdmin]
-            case .districtDashboard:
-                return [.superintendent, .districtAdmin]
             case .students:
                 return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin]
             case .tmiPlans:
                 return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin]
-            case .forms:
-                return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin]
-            case .careerExplorer:
-                return [.teacher, .counselor, .administrator, .admin, .socialWorker, .student, .superintendent, .districtAdmin]
-            case .interests:
-                return [.teacher, .counselor, .administrator, .admin, .socialWorker, .student, .superintendent, .districtAdmin]
-            case .resources:
-                return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .superintendent, .districtAdmin]
             case .settings:
                 return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .student, .superintendent, .districtAdmin]
             }
         }
-        
+
         func isAccessible(for role: UserRole?) -> Bool {
             guard let role = role else { return false }
             return allowedRoles.contains(role)
         }
-        
+
         var label: String {
             switch self {
             case .dashboard: return "Dashboard"
-            case .districtDashboard: return "District"
             case .students: return "Students"
             case .tmiPlans: return "TMI Plans"
-            case .forms: return "Forms"
-            case .careerExplorer: return "Career Explorer"
-            case .interests: return "Interests & Hobbies"
-            case .resources: return "Resources"
             case .settings: return "Settings"
             }
         }
-        
+
         var icon: String {
             switch self {
             case .dashboard: return "chart.bar.fill"
-            case .districtDashboard: return "building.2.fill"
             case .students: return "person.3.fill"
             case .tmiPlans: return "doc.text.fill"
-            case .forms: return "list.clipboard.fill"
-            case .careerExplorer: return "briefcase.fill"
-            case .interests: return "heart.fill"
-            case .resources: return "books.vertical.fill"
             case .settings: return "gearshape.fill"
             }
         }
@@ -277,21 +256,10 @@ struct MainTabView: View {
         switch tab {
         case .dashboard:
             DashboardView()
-        case .districtDashboard:
-            DistrictDashboardView()
         case .students:
             StudentListView()
         case .tmiPlans:
             TMIPlanListView()
-        case .forms:
-            FormsAndSurveysView()
-        case .careerExplorer:
-            CareerExplorerView()
-        case .interests:
-            InterestsAndHobbiesView()
-                .environment(\.interestsStateModel, interestsStateModel)
-        case .resources:
-            ResourcesView()
         case .settings:
             SettingsView()
         }
