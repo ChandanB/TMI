@@ -18,7 +18,7 @@ struct PremiumGlassTabBar: View {
   let availableTabs: [MainTabView.Tab]
   @Namespace private var tabAnimation
 
-  // MVP shows only Students and TMI Plans tabs
+  // Tabs are provided by the current MVP navigation model.
   private var displayedTabs: [MainTabView.Tab] {
     return availableTabs
   }
@@ -112,6 +112,7 @@ struct PremiumGlassTabBar: View {
     case .students: return "Students"
     case .tmiPlans: return "Plans"
     case .dashboard: return "Dashboard"
+    case .district: return "District"
     }
   }
 
@@ -120,6 +121,7 @@ struct PremiumGlassTabBar: View {
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
     case .dashboard: return "chart.bar.fill"
+    case .district: return "building.2.fill"
     }
   }
 }
@@ -217,6 +219,7 @@ struct PremiumSidebarList: View {
     case .students: return "Students"
     case .tmiPlans: return "TMI Plans"
     case .dashboard: return "Dashboard"
+    case .district: return "District"
     }
   }
 
@@ -225,6 +228,7 @@ struct PremiumSidebarList: View {
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
     case .dashboard: return "chart.bar.fill"
+    case .district: return "building.2.fill"
     }
   }
 }
@@ -888,4 +892,3 @@ struct StatCard: View {
 //        .cornerRadius(12)
 //    }
 //}
-

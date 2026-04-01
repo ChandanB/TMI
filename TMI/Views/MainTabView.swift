@@ -35,24 +35,18 @@ struct MainTabView: View {
     @State private var plansPath = NavigationPath()
     
     enum Tab: String, CaseIterable, Identifiable {
-        case dashboard, students, tmiPlans
+        case dashboard, students, tmiPlans, district
         var id: Self { self }
 
-        // Define which roles can access each tab
-        var allowedRoles: Set<UserRole> {
-            switch self {
-            case .dashboard:
-                return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .superintendent, .districtAdmin]
-            case .students:
-                return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin]
-            case .tmiPlans:
-                return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin]
+        static func mvpTabs(for role: UserRole?) -> [Tab] {
+            switch role {
+            case .districtAdmin, .superintendent:
+                return [.dashboard, .students, .tmiPlans, .district]
+            case .teacher, .counselor, .administrator, .admin, .socialWorker:
+                return [.dashboard, .students, .tmiPlans]
+            default:
+                return [.dashboard]
             }
-        }
-
-        func isAccessible(for role: UserRole?) -> Bool {
-            guard let role = role else { return false }
-            return allowedRoles.contains(role)
         }
 
         var label: String {
@@ -60,6 +54,7 @@ struct MainTabView: View {
             case .dashboard: return "Dashboard"
             case .students: return "Students"
             case .tmiPlans: return "TMI Plans"
+            case .district: return "District"
             }
         }
 
@@ -68,14 +63,14 @@ struct MainTabView: View {
             case .dashboard: return "chart.bar.fill"
             case .students: return "person.3.fill"
             case .tmiPlans: return "doc.text.fill"
+            case .district: return "building.2.fill"
             }
         }
     }
     
-    // Computed property to get tabs accessible to current user
+    // Computed property to get tabs for the current MVP role
     var availableTabs: [Tab] {
-        let currentRole = authStateModel.currentUser?.role
-        return Tab.allCases.filter { $0.isAccessible(for: currentRole) }
+        Tab.mvpTabs(for: authStateModel.currentUser?.role)
     }
     
     // Default tab - use first available or dashboard
@@ -124,13 +119,13 @@ struct MainTabView: View {
                     destinationView(for: tab)
                         .navigationTitle(tab.label)
                         .toolbar {
-                            ToolbarItem(placement: .automatic) {
-                                if studentContext.hasActiveStudent {
-                                    workspaceButton
-                                }
-                            }
+//                            ToolbarItem(placement: .automatic) {
+//                                if studentContext.hasActiveStudent {
+//                                    workspaceButton
+//                                }
+//                            }
                             ToolbarItemGroup(placement: .automatic) {
-                                NotificationBellButton()
+//                                NotificationBellButton()
                                 profileMenu
                             }
                         }
@@ -251,6 +246,8 @@ struct MainTabView: View {
             StudentListView()
         case .tmiPlans:
             TMIPlanListView()
+        case .district:
+            DistrictDashboardView()
         }
     }
 }
