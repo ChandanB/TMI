@@ -181,55 +181,6 @@ struct StudentResourcesSection: View {
     }
 }
 
-// MARK: - ResourceRow
-
-struct ResourceRow: View {
-    let resource: Resource
-    let actionLabel: String
-    let actionSystemImage: String
-    let action: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            // Category icon
-            Image(systemName: resource.category.icon)
-                .font(.title3)
-                .foregroundStyle(resource.category.color)
-                .frame(width: 32, height: 32)
-                .background(resource.category.color.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            // Title + category
-            VStack(alignment: .leading, spacing: 2) {
-                Text(resource.title)
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(1)
-
-                Text(resource.category.rawValue.capitalized)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            // Action button
-            Button(action: action) {
-                Label(actionLabel, systemImage: actionSystemImage)
-                    .labelStyle(.iconOnly)
-                    .font(.title3)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(
-                actionLabel == "Remove" ? Color.red : Color.accentColor
-            )
-            .accessibilityLabel(Text("\(actionLabel) \(resource.title)"))
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-    }
-}
-
 // MARK: - Preview
 
 #Preview {

@@ -6,110 +6,6 @@
 import SwiftUI
 import FirebaseFirestore
 
-// MARK: - FlowLayout
-
-/// A custom Layout that wraps its children into rows like a flow/flexbox layout.
-/// Marked internal so it can be extracted to a shared file later.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let containerWidth = proposal.width ?? .infinity
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var totalHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentX + size.width > containerWidth, currentX > 0 {
-                currentY += rowHeight + spacing
-                totalHeight = currentY
-                currentX = 0
-                rowHeight = 0
-            }
-            currentX += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-        totalHeight += rowHeight
-        return CGSize(width: containerWidth, height: totalHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let containerWidth = bounds.width
-        var currentX: CGFloat = bounds.minX
-        var currentY: CGFloat = bounds.minY
-        var rowHeight: CGFloat = 0
-        var rowViews: [(subview: LayoutSubview, size: CGSize, x: CGFloat)] = []
-
-        func placeRow() {
-            for item in rowViews {
-                item.subview.place(at: CGPoint(x: item.x, y: currentY), proposal: ProposedViewSize(item.size))
-            }
-            rowViews.removeAll()
-        }
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentX + size.width > bounds.maxX, currentX > bounds.minX {
-                placeRow()
-                currentY += rowHeight + spacing
-                currentX = bounds.minX
-                rowHeight = 0
-            }
-            rowViews.append((subview: subview, size: size, x: currentX))
-            currentX += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-        placeRow()
-    }
-}
-
-// MARK: - InterestChip
-
-/// A capsule chip representing a single interest.
-/// `isSelected` controls whether the chip shows a remove (×) action or an add (+) action.
-/// Marked internal so it can be extracted to a shared file later.
-struct InterestChip: View {
-    let interest: Interest
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 4) {
-                if let primary = interest.primaryCategory {
-                    Image(systemName: primary.iconName)
-                        .font(.caption2)
-                }
-                Text(interest.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                Image(systemName: isSelected ? "xmark.circle.fill" : "plus.circle.fill")
-                    .font(.caption)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                isSelected
-                    ? Color.pink.opacity(0.15)
-                    : Color(.systemGray5)
-            )
-            .foregroundStyle(isSelected ? Color.pink : Color.primary)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(
-                        isSelected ? Color.pink.opacity(0.5) : Color.clear,
-                        lineWidth: 1
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.15), value: isSelected)
-    }
-}
-
 // MARK: - StudentInterestsSection
 
 /// Accordion-style section for viewing and editing a student's interests.
@@ -220,7 +116,7 @@ struct StudentInterestsSection: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 4)
                 } else if filteredAvailable.isEmpty && !isLoadingAvailable {
-                    Text(searchText.isEmpty ? "No additional interests found." : "No matches for "\(searchText)".")
+                    Text(searchText.isEmpty ? "No additional interests found." : "No matches for \"\(searchText)\".")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 4)
@@ -339,11 +235,13 @@ struct StudentInterestsSection: View {
 
         do {
             let db = FirebaseManager.shared.firestore
-            let ref = try db
+            let ref = db
                 .collection("users")
                 .document(uid)
                 .collection("interests")
-                .addDocument(from: newInterest)
+                .document()
+
+            try ref.setData(from: newInterest)
 
             // Assign the Firestore-generated ID back so chips are stable
             newInterest.id = ref.documentID
