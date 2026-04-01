@@ -10,7 +10,7 @@ import SwiftUI
 // MARK: - Environment Keys
 
 private struct CareerExplorerStateModelKey: EnvironmentKey {
-    static let defaultValue = CareerExplorerStateModel()
+    @MainActor static let defaultValue = CareerExplorerStateModel()
 }
 
 extension EnvironmentValues {

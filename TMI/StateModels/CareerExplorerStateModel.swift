@@ -9,247 +9,76 @@ import Foundation
 import Observation
 import SwiftUI
 
-// MARK: - Data Model
-
-struct CareerExplorerData: Equatable {
-    var careers: [Career] = []
-    var trendingCareers: [Career] = []
-    var personalizedRecommendations: [Career] = []
-    var searchInsights: CareerDiscoveryInsights?
-    var searchResults: [Career] = []
-}
-
-// MARK: - State Model
-
 @Observable
 @MainActor
-final class CareerExplorerStateModel: BaseStateModel<CareerExplorerData, IdentifiableError> {
-    
-    // MARK: - Dependencies
-    
+final class CareerExplorerStateModel {
+    // Data
+    var careers: [Career] = []
+    var searchResults: [Career] = []
+    var personalizedRecommendations: [Career] = []
+    var isLoading = false
+    var error: Error?
+
+    // UI State
+    var searchText = ""
+    var isSearching = false
+    var hasSearched = false
+    var selectedStudent: Student?
+    var selectedField: String?
+
     private let careerService = CareerService.shared
-    // AI service integration will go here, currently accessed via CareerService which uses AIInsightsService
-    
-    // MARK: - UI State Properties
-    
-    // Search state
-    var searchText: String {
-        get { ui.get("searchText") ?? "" }
-        set { ui.set("searchText", value: newValue) }
-    }
-    
-    var isSearching: Bool {
-        get { ui.get("isSearching") ?? false }
-        set { ui.set("isSearching", value: newValue) }
-    }
-    
-    var hasSearched: Bool {
-        get { ui.get("hasSearched") ?? false }
-        set { ui.set("hasSearched", value: newValue) }
-    }
-    
-    // Filter state
-    var selectedStudent: Student? {
-        get { ui.get("selectedStudent") }
-        set { ui.set("selectedStudent", value: newValue) }
-    }
-    
-    var selectedField: String? {
-        get { ui.get("selectedField") }
-        set { ui.set("selectedField", value: newValue) }
-    }
-    
-    var showPersonalizedSection: Bool {
-        get { ui.get("showPersonalizedSection") ?? false }
-        set { ui.set("showPersonalizedSection", value: newValue) }
+
+    // MARK: - Load initial data
+    func fetch() {
+        isLoading = true
+        careers = careerService.allCareers
+        isLoading = false
     }
 
-    var salaryFilter: ClosedRange<Double> {
-        get { ui.get("salaryFilter") ?? 30000...150000 }
-        set { ui.set("salaryFilter", value: newValue) }
-    }
-
-    var selectedSkills: Set<String> {
-        get { ui.get("selectedSkills") ?? [] }
-        set { ui.set("selectedSkills", value: newValue) }
-    }
-
-    // MARK: - Initialization
-    
-    override init() {
-        super.init()
-        
-        // Initialize UI state
-        ui.set("searchText", value: "")
-        ui.set("isSearching", value: false)
-        ui.set("hasSearched", value: false)
-        ui.set("showPersonalizedSection", value: false)
-        ui.set("salaryFilter", value: 30000...150000)
-        ui.set("selectedSkills", value: Set<String>())
-
-        // Initial empty state
-        Task { @MainActor in
-            self.updateState(.loaded(CareerExplorerData()))
-        }
-    }
-    
-    // MARK: - Data Operations
-    
-    @MainActor
-    override func fetch() async {
-        // Load initial data (trending, etc)
-        // For now, we simulate loading or fetch default trending careers
-        // In a real app, you might fetch this from a backend
-        
-        updateState(.loading)
-        
-        do {
-            // Simulate network delay or fetch real trending careers
-            try await Task.sleep(nanoseconds: 500_000_000) 
-            
-            // For MVP, we might just load sample data if backend isn't ready for trending
-            let trending = Array(Career.sampleCareers.prefix(5)) 
-            let all = Career.sampleCareers
-            
-            let data = CareerExplorerData(
-                careers: all,
-                trendingCareers: trending,
-                personalizedRecommendations: [],
-                searchInsights: nil,
-                searchResults: []
-            )
-            
-            updateState(.loaded(data))
-        } catch {
-            handleError(error)
-        }
-    }
-    
-    @MainActor
-    func performSearch() async {
-        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return
-        }
-        
+    // MARK: - Search (filter static catalog)
+    func performSearch() {
+        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         isSearching = true
-        // Keep existing results while searching or clear them? 
-        // Typically keep until new ones arrive or show loading overlay.
-        
-        do {
-            let response = try await careerService.searchCareersWithAI(query: searchText, student: selectedStudent)
-            
-            guard case .loaded(var currentData) = state else { return }
-            
-            currentData.searchResults = response.careers
-            currentData.searchInsights = response.insights
-            
-            hasSearched = true
-            isSearching = false
-            
-            updateState(.loaded(currentData))
-            
-        } catch {
-            isSearching = false
-            handleError(error, userFriendlyMessage: "Search failed. Please try again.")
-        }
+        searchResults = careerService.searchCareers(query: searchText)
+        hasSearched = true
+        isSearching = false
     }
-    
-    @MainActor
+
     func clearSearch() {
         searchText = ""
         hasSearched = false
-        isSearching = false
-        
-        guard case .loaded(var currentData) = state else { return }
-        currentData.searchResults = []
-        currentData.searchInsights = nil
-        updateState(.loaded(currentData))
+        searchResults = []
     }
-    
-    @MainActor
-    func loadPersonalizedRecommendations() async {
+
+    // MARK: - Personalized recommendations
+    func loadPersonalizedRecommendations(clusters: [InterestCluster] = []) {
         guard let student = selectedStudent else { return }
-        
-        // If we are already loaded, we can just update the recommendations part
-        // If not loaded, we should wait or triggering fetch
-        
-        do {
-            let recommendations = try await careerService.getCareerRecommendations(for: student)
-            let insights = try await careerService.getCareerDiscoveryInsights(for: student)
-            
-            if case .loaded(var currentData) = state {
-                currentData.personalizedRecommendations = recommendations
-                // potentially update a separate insights model or variable if needed, 
-                // but for now focus on recommendations list
-                updateState(.loaded(currentData))
-                showPersonalizedSection = true
-            } else {
-                // If state isn't loaded yet, create it
-                let data = CareerExplorerData(personalizedRecommendations: recommendations)
-                updateState(.loaded(data))
-                showPersonalizedSection = true
-            }
-        } catch {
-             print("[CareerExplorerStateModel] Failed to load recommendations: \(error)")
-             // Fallback to samples if needed, or just show error
+        if clusters.isEmpty {
+            personalizedRecommendations = careerService.fetchTrendingCareers()
+        } else {
+            personalizedRecommendations = careerService.getCareerRecommendations(from: clusters)
         }
-    }
-    
-    // MARK: - Computed Properties
-    
-    var searchResults: [Career] {
-        guard case .loaded(let data) = state else { return [] }
-        return data.searchResults
-    }
-    
-    var searchInsights: CareerDiscoveryInsights? {
-        guard case .loaded(let data) = state else { return nil }
-        return data.searchInsights
-    }
-    
-    var trendingCareers: [Career] {
-        guard case .loaded(let data) = state else { return [] }
-        return data.trendingCareers
-    }
-    
-    var personalizedRecommendations: [Career] {
-        guard case .loaded(let data) = state else { return [] }
-        return data.personalizedRecommendations
+        _ = student // suppress warning — student presence is required as a guard
     }
 
-    var careers: [Career] {
-        guard case .loaded(let data) = state else { return [] }
-        return data.careers
-    }
-
+    // MARK: - Computed
     var filteredCareers: [Career] {
-        careers.filter { career in
-            let matchesSearch =
-                searchText.isEmpty || career.title.lowercased().contains(searchText.lowercased())
-                || career.description.lowercased().contains(searchText.lowercased())
-                || career.skills.contains { $0.lowercased().contains(searchText.lowercased()) }
-
-            let matchesField = selectedField == nil || career.field == selectedField
-
-            let matchesSalary = career.salaryRange.overlaps(salaryFilter)
-
-            let matchesSkills =
-                selectedSkills.isEmpty || !selectedSkills.isDisjoint(with: Set(career.skills))
-
-            return matchesSearch && matchesField && matchesSalary && matchesSkills
+        var result = hasSearched ? searchResults : careers
+        if let field = selectedField {
+            result = result.filter { $0.field == field }
         }
+        return result
     }
 
     var hasActiveFilters: Bool {
-        selectedField != nil || !selectedSkills.isEmpty || salaryFilter.lowerBound > 30000 || salaryFilter.upperBound < 150000
+        selectedField != nil
     }
 
-    var activeFiltersCount: Int {
-        var count = 0
-        if selectedField != nil { count += 1 }
-        if !selectedSkills.isEmpty { count += 1 }
-        if salaryFilter.lowerBound > 30000 || salaryFilter.upperBound < 150000 { count += 1 }
-        return count
+    var trendingCareers: [Career] {
+        careerService.fetchTrendingCareers()
+    }
+
+    var showPersonalizedSection: Bool {
+        !personalizedRecommendations.isEmpty
     }
 }
-

@@ -105,10 +105,9 @@ final class CareerLibraryService {
         }
     }
 
-    /// Fetch AI-generated careers only
+    /// Fetch all careers from library (previously "AI-generated" filter removed)
     func fetchAIGeneratedCareers() async throws -> [Career] {
-        let allCareers = try await fetchAllCareers()
-        return allCareers.filter { $0.aiGenerated }
+        return try await fetchAllCareers()
     }
 
     // MARK: - Write Operations

@@ -19,10 +19,6 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
     let jobOutlook: String
     let growthRate: Double
 
-    // AI Generation metadata
-    let aiGenerated: Bool
-    let generatedAt: Date?
-
     // Related data
     let relatedInterests: [String]
     let tags: [String]
@@ -38,7 +34,7 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
     // Custom CodingKeys for salaryRange and new fields
     enum CodingKeys: String, CodingKey, Sendable {
         case id, title, field, description, skills, education, jobOutlook, growthRate
-        case aiGenerated, generatedAt, relatedInterests, tags
+        case relatedInterests, tags
         case createdAt, updatedAt, scope, districtId
         case salaryRangeLowerBound
         case salaryRangeUpperBound
@@ -63,8 +59,6 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
         jobOutlook = try container.decode(String.self, forKey: .jobOutlook)
         growthRate = try container.decode(Double.self, forKey: .growthRate)
 
-        aiGenerated = try container.decodeIfPresent(Bool.self, forKey: .aiGenerated) ?? false
-        generatedAt = try container.decodeIfPresent(Date.self, forKey: .generatedAt)
         relatedInterests = try container.decodeIfPresent([String].self, forKey: .relatedInterests) ?? []
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
@@ -88,8 +82,6 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
         try container.encode(education, forKey: .education)
         try container.encode(jobOutlook, forKey: .jobOutlook)
         try container.encode(growthRate, forKey: .growthRate)
-        try container.encode(aiGenerated, forKey: .aiGenerated)
-        try container.encodeIfPresent(generatedAt, forKey: .generatedAt)
         try container.encode(relatedInterests, forKey: .relatedInterests)
         try container.encode(tags, forKey: .tags)
         try container.encode(createdAt, forKey: .createdAt)
@@ -111,8 +103,6 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
         salaryRange: ClosedRange<Double>,
         jobOutlook: String,
         growthRate: Double,
-        aiGenerated: Bool = false,
-        generatedAt: Date? = nil,
         relatedInterests: [String] = [],
         tags: [String] = [],
         createdAt: Date = Date(),
@@ -129,8 +119,6 @@ struct Career: Identifiable, Codable, Sendable, Equatable {
         self.salaryRange = salaryRange
         self.jobOutlook = jobOutlook
         self.growthRate = growthRate
-        self.aiGenerated = aiGenerated
-        self.generatedAt = generatedAt
         self.relatedInterests = relatedInterests
         self.tags = tags
         self.createdAt = createdAt

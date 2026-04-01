@@ -14,7 +14,7 @@ struct StudentInterestProfileView: View {
 
     @State private var careerRecommendations: [Career] = []
     @State private var recommendedResources: [Resource] = []
-    @State private var careerInsights: CareerDiscoveryInsights?
+    // careerInsights removed — no longer using AI-based discovery insights
     @State private var isLoading = false
     @State private var selectedCareer: Career?
     @State private var showingCareerDetail = false
@@ -42,11 +42,6 @@ struct StudentInterestProfileView: View {
                     // Career Recommendations
                     if !careerRecommendations.isEmpty {
                         careerRecommendationsSection
-                    }
-
-                    // Career Discovery Insights
-                    if let insights = careerInsights {
-                        insightsSection(insights)
                     }
 
                     // Recommended Resources
@@ -188,72 +183,7 @@ struct StudentInterestProfileView: View {
 
     // MARK: - Insights Section
 
-    private func insightsSection(_ insights: CareerDiscoveryInsights) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Career Discovery Insights")
-                .font(.title3.bold())
-                .foregroundColor(.white)
-
-            TMIGlassCard(style: .elevated) {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Top Interest Category
-                    InsightRow(
-                        icon: "star.fill",
-                        title: "Top Interest Area",
-                        value: insights.topInterestCategory
-                    )
-
-                    // Strongest Career Fields
-                    if !insights.strongestCareerFields.isEmpty {
-                        InsightRow(
-                            icon: "briefcase.fill",
-                            title: "Strongest Matches",
-                            value: insights.strongestCareerFields.prefix(3).joined(separator: ", ")
-                        )
-                    }
-
-                    // Skill Gaps
-                    if !insights.skillGaps.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: "chart.bar.fill")
-                                    .foregroundColor(.orange)
-                                Text("Skills to Develop")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(.white)
-                            }
-
-                            ForEach(insights.skillGaps.prefix(3), id: \.self) { skill in
-                                Text("• \(skill)")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.9))
-                            }
-                        }
-                    }
-
-                    // Next Steps
-                    if !insights.nextSteps.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: "arrow.right.circle.fill")
-                                    .foregroundColor(.green)
-                                Text("Next Steps")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(.white)
-                            }
-
-                            ForEach(Array(insights.nextSteps.prefix(3).enumerated()), id: \.offset) { index, step in
-                                Text("\(index + 1). \(step)")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.9))
-                            }
-                        }
-                    }
-                }
-                .padding()
-            }
-        }
-    }
+    // insightsSection removed — CareerDiscoveryInsights no longer used
 
     // MARK: - Resources Section
 
@@ -316,9 +246,6 @@ struct StudentInterestProfileView: View {
 
             // Load career recommendations
             careerRecommendations = try await careerService.getCareerRecommendations(for: student)
-
-            // Load career insights
-            careerInsights = try await careerService.getCareerDiscoveryInsights(for: student)
 
             // Load recommended resources (stub for now)
             recommendedResources = []

@@ -12,78 +12,64 @@ struct CareerExplorerView: View {
   @State private var resultsAppeared = false
   @State private var showingSuggestions = false
   @State private var showingStudentPicker = false
-  @State private var showingInsightsSheet = false // UI only state
-
   // Legacy animation states (mapped to new ones or kept if needed)
   @State private var searchAppeared = false
   @State private var filtersAppeared = false
   @State private var statsAppeared = false
   @State private var animateCards = false
-  
+
   @State private var lastSearchQuery = ""
   @State private var searchSuggestions: [String] = [
     "Software Engineer", "Nurse", "Teacher", "Doctor", "Designer",
     "Technology", "Healthcare", "Education", "Business", "Arts",
     "Biology", "Mathematics", "Psychology", "Computer Science", "Art"
   ]
-  
+
   // Context awareness
   private var isStudentContext: Bool {
     studentContext.hasActiveStudent
   }
-  
+
   private var contextCareerState: StudentCareerState? {
     studentContext.prefetchedCareerState
   }
-  
+
   private var canBookmark: Bool {
     StudentAccessPolicy.canBookmarkCareers(in: accessMode)
   }
-  
+
   // Computed properties mapping to StateModel
   private var searchText: String {
       get { stateModel.searchText }
       nonmutating set { stateModel.searchText = newValue }
   }
-  
+
   private var searchTextBinding: Binding<String> {
       Binding(get: { stateModel.searchText }, set: { stateModel.searchText = $0 })
   }
-  
+
   private var searchResults: [Career] { stateModel.searchResults }
-  private var searchInsights: CareerDiscoveryInsights? { stateModel.searchInsights }
   private var hasSearched: Bool { stateModel.hasSearched }
   private var isSearching: Bool { stateModel.isSearching }
   private var selectedStudent: Student? { stateModel.selectedStudent }
   private var personalizedRecommendations: [Career] { stateModel.personalizedRecommendations }
   private var trendingCareers: [Career] { stateModel.trendingCareers }
-  
+
   // Wrappers for direct service access if needed, though mostly StateModel should handle
-  private var careerService: CareerService { CareerService.shared } 
-  
+  private var careerService: CareerService { CareerService.shared }
+
   // Legacy/Compatibility stubs
   private var careers: [Career] { stateModel.careers }
   private var filteredCareers: [Career] { stateModel.filteredCareers }
   private var selectedField: String? { stateModel.selectedField }
-  private var salaryFilter: ClosedRange<Double> {
-    get { stateModel.salaryFilter }
-    nonmutating set { stateModel.salaryFilter = newValue }
-  }
-  private var selectedSkills: Set<String> {
-    get { stateModel.selectedSkills }
-    nonmutating set { stateModel.selectedSkills = newValue }
-  }
+  @State private var selectedSkills: Set<String> = []
   private var careerStatistics: CareerStatistics? { nil }
   private var isLoading: Bool { stateModel.isLoading }
-  private var error: Error? { stateModel.errorMessage.map { NSError(domain: "TMI", code: 0, userInfo: [NSLocalizedDescriptionKey: $0]) } }
+  private var error: Error? { stateModel.error }
   private var showPersonalizedSection: Bool { stateModel.showPersonalizedSection }
   private var showTrendingSection: Bool { true }
-  private var isFilterSheetPresented: Bool {
-    get { false }
-    nonmutating set {}
-  }
   private var hasActiveFilters: Bool { stateModel.hasActiveFilters }
-  private var activeFiltersCount: Int { stateModel.activeFiltersCount }
+  private var activeFiltersCount: Int { hasActiveFilters ? 1 : 0 }
 
   // Get all unique skills across careers
   private var allSkills: [String] {
@@ -236,19 +222,10 @@ struct CareerExplorerView: View {
     .sheet(isPresented: $showingStudentPicker) {
       studentPickerSheet
     }
-    .sheet(isPresented: $showingInsightsSheet) {
-      Group {
-        if let insights = searchInsights {
-          CareerInsightsSheet(insights: insights, student: selectedStudent)
-        } else {
-          EmptyView()
-        }
-      }
-    }
     .preferredColorScheme(.dark)
     .onAppear {
       performInitialAnimation()
-      Task { await stateModel.fetch() }
+      stateModel.fetch()
     }
   }
   
@@ -269,7 +246,7 @@ struct CareerExplorerView: View {
             .offset(y: headerAppeared ? 0 : -20)
             .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1), value: headerAppeared)
           
-          Text("Search for any career, field, or subject and get AI-powered insights")
+          Text("Search for any career, field, or subject to explore your options")
             .font(.system(size: 18))
             .foregroundColor(.white.opacity(0.8))
             .multilineTextAlignment(.center)
@@ -415,31 +392,13 @@ struct CareerExplorerView: View {
               Text("Results for \"\(lastSearchQuery)\"")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(.white)
-              
-              HStack(spacing: 8) {
-                Image(systemName: "brain")
-                  .font(.system(size: 12))
-                  .foregroundColor(.tmiSecondary)
-                Text("AI-Generated Careers")
-                  .font(.system(size: 14))
-                  .foregroundColor(.tmiSecondary)
-                Text("•")
-                  .foregroundColor(.white.opacity(0.5))
-                Text("\(searchResults.count) careers found")
-                  .font(.system(size: 14))
-                  .foregroundColor(.white.opacity(0.7))
-              }
+
+              Text("\(searchResults.count) careers found")
+                .font(.system(size: 14))
+                .foregroundColor(.white.opacity(0.7))
             }
-            
+
             Spacer()
-            
-              if searchInsights != nil {
-              Button("View Insights") {
-                showingInsightsSheet = true
-              }
-              .font(.system(size: 14, weight: .medium))
-              .foregroundColor(.tmiSecondary)
-            }
           }
           .padding(.horizontal, 20)
         }
@@ -610,11 +569,9 @@ struct CareerExplorerView: View {
   // MARK: - Actions
   
   private func performSearch() {
-    Task {
-      await stateModel.performSearch()
-      withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
-         resultsAppeared = true
-      }
+    stateModel.performSearch()
+    withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+      resultsAppeared = true
     }
   }
   
@@ -644,9 +601,7 @@ struct CareerExplorerView: View {
       onStudentSelected: { student in
         stateModel.selectedStudent = student
         showingStudentPicker = false
-        Task {
-            await stateModel.loadPersonalizedRecommendations()
-        }
+        stateModel.loadPersonalizedRecommendations()
       }
     )
     .presentationDetents([.medium, .large])
@@ -678,29 +633,7 @@ struct CareerExplorerView: View {
           .font(.system(size: 18, weight: .bold))
           .foregroundColor(.white)
 
-        // AI-powered indicator
-        HStack(spacing: 4) {
-          Image(systemName: "brain")
-            .font(.system(size: 12))
-            .foregroundColor(.tmiSecondary)
-          Text("AI")
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(.tmiSecondary)
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(
-          Capsule()
-            .fill(Color.tmiSecondary.opacity(0.2))
-        )
-
         Spacer()
-
-        Button("View Insights") {
-          showingInsightsSheet = true
-        }
-        .font(.caption)
-        .foregroundColor(.tmiSecondary)
       }
 
       ScrollView(.horizontal, showsIndicators: false) {
@@ -725,7 +658,7 @@ struct CareerExplorerView: View {
         .scaleEffect(1.5)
         .tint(.white)
 
-      Text("AI-powered career discovery...")
+      Text("Loading careers...")
         .font(.headline)
         .foregroundColor(.white)
     }
@@ -803,12 +736,12 @@ struct CareerExplorerView: View {
       style: .filter(isSelected: selectedField == nil),
       action: {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-          stateModel.ui.set("selectedField", value: nil as String?)
+          stateModel.selectedField = nil
         }
       }
     )
   }
-  
+
   private var fieldButtons: some View {
     ForEach(uniqueCareerFields, id: \.self) { field in
       TMIButton(
@@ -817,7 +750,7 @@ struct CareerExplorerView: View {
         style: .filter(isSelected: selectedField == field),
         action: {
           withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            stateModel.ui.set("selectedField", value: stateModel.selectedField == field ? nil as String? : field)
+            stateModel.selectedField = stateModel.selectedField == field ? nil : field
           }
         }
       )
@@ -904,27 +837,6 @@ struct CareerExplorerView: View {
         }
 
         Spacer()
-
-        // Salary range badge if filtered
-        if salaryFilter.lowerBound > 30000 || salaryFilter.upperBound < 150000 {
-          VStack(alignment: .center, spacing: 4) {
-            Text("Salary Range")
-              .font(.system(size: 12))
-              .foregroundColor(.white.opacity(0.7))
-
-            Text(
-              "$\(Int(salaryFilter.lowerBound)/1000)k-$\(Int(salaryFilter.upperBound)/1000)k"
-            )
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundColor(.white)
-          }
-          .padding(.horizontal, 14)
-          .padding(.vertical, 8)
-          .background(
-            RoundedRectangle(cornerRadius: 12)
-              .fill(Color.tmiSecondary.opacity(0.2))
-          )
-        }
       }
 
       Divider()
@@ -970,9 +882,8 @@ struct CareerExplorerView: View {
 
       Button(action: {
         searchText = ""
-        stateModel.ui.set("selectedField", value: nil as String?)
+        stateModel.selectedField = nil
         selectedSkills = []
-        salaryFilter = 30000...150000
       }) {
         HStack(spacing: 8) {
           Image(systemName: "arrow.clockwise")
@@ -2242,146 +2153,6 @@ struct StudentPickerSheet: View {
   }
 }
 
-// MARK: - Career Insights Sheet
-
-struct CareerInsightsSheet: View {
-  let insights: CareerDiscoveryInsights
-  let student: Student?
-  @Environment(\.dismiss) private var dismiss
-  
-  var body: some View {
-    NavigationView {
-      ZStack {
-        TMIBackgroundView(variant: .career)
-        
-        ScrollView {
-          VStack(alignment: .leading, spacing: 24) {
-            // Header
-            if let student = student {
-              VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                  Text("Career Insights for \(student.name)")
-                    .font(.title2.bold())
-                    .foregroundColor(.white)
-                  
-                  Spacer()
-                  
-                  // AI-powered indicator
-                  HStack(spacing: 4) {
-                    Image(systemName: "brain")
-                      .font(.system(size: 14))
-                      .foregroundColor(.tmiSecondary)
-                    Text("AI-Powered")
-                      .font(.system(size: 12, weight: .semibold))
-                      .foregroundColor(.tmiSecondary)
-                  }
-                  .padding(.horizontal, 8)
-                  .padding(.vertical, 4)
-                  .background(
-                    Capsule()
-                      .fill(Color.tmiSecondary.opacity(0.2))
-                  )
-                }
-                
-                Text("AI analysis based on interests, academic performance, and TMI profile")
-                  .font(.caption)
-                  .foregroundColor(.white.opacity(0.7))
-              }
-              .padding(.horizontal)
-            }
-            
-            // Stats
-            VStack(spacing: 16) {
-              HStack {
-                InsightCard(
-                  title: "Careers Explored",
-                  value: "\(insights.totalCareersExplored)",
-                  icon: "briefcase"
-                )
-                
-                InsightCard(
-                  title: "Recommendations",
-                  value: "\(insights.personalizedRecommendations)",
-                  icon: "star.circle"
-                )
-              }
-              
-              if !insights.strongestCareerFields.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                  Text("Top Career Fields")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                  
-                  LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                  ], spacing: 8) {
-                    ForEach(insights.strongestCareerFields, id: \.self) { field in
-                      Text(field)
-                        .font(.caption.bold())
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                          Capsule()
-                            .fill(Color.tmiSecondary.opacity(0.2))
-                        )
-                        .foregroundColor(.tmiSecondary)
-                    }
-                  }
-                }
-                .padding(.horizontal)
-              }
-            }
-            .padding(.horizontal)
-          }
-          .padding(.bottom, 40)
-        }
-      }
-      .navigationTitle("Career Insights")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .navigationBarTrailing) {
-          Button("Done") {
-            dismiss()
-          }
-          .foregroundColor(.white)
-        }
-      }
-    }
-    .preferredColorScheme(.dark)
-  }
-}
-
-// MARK: - Insight Card
-
-struct InsightCard: View {
-  let title: String
-  let value: String
-  let icon: String
-  
-  var body: some View {
-    VStack(spacing: 8) {
-      Image(systemName: icon)
-        .font(.system(size: 24))
-        .foregroundColor(.tmiSecondary)
-      
-      Text(value)
-        .font(.title.bold())
-        .foregroundColor(.white)
-      
-      Text(title)
-        .font(.caption)
-        .foregroundColor(.white.opacity(0.7))
-        .multilineTextAlignment(.center)
-    }
-    .frame(maxWidth: .infinity)
-    .padding()
-    .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(Color.white.opacity(0.1))
-    )
-  }
-}
 
 // MARK: - Preview
 

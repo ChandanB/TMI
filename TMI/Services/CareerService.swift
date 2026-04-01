@@ -49,8 +49,6 @@ final class CareerService: @unchecked Sendable {
             salaryRange: salaryLower...salaryUpper,
             jobOutlook: jobOutlook,
             growthRate: growthRate,
-            aiGenerated: false,
-            generatedAt: nil,
             relatedInterests: path.requiredInterests,
             tags: [path.category] + path.requiredInterests
         )
