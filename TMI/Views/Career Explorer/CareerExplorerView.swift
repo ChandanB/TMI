@@ -5,6 +5,7 @@ struct CareerExplorerView: View {
   @Environment(\.careerExplorerStateModel) private var stateModel
   @Environment(\.studentContext) private var studentContext
   @Environment(\.studentAccessMode) private var accessMode
+  @Environment(\.dismiss) private var dismiss
 
   // Animation states
   @State private var headerAppeared = false
@@ -216,6 +217,17 @@ struct CareerExplorerView: View {
             }
           }
           .foregroundColor(.white)
+        }
+      }
+
+      ToolbarItem(placement: .navigationBarTrailing) {
+        Button {
+          dismiss()
+        } label: {
+          Image(systemName: "xmark.circle.fill")
+            .font(.system(size: 20))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundColor(.white.opacity(0.8))
         }
       }
     }

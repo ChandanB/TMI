@@ -60,8 +60,10 @@ struct PlanCareersSection: View {
             await loadRecommendations()
         }
         .sheet(isPresented: $showExploreSheet) {
-            CareerExplorerView()
-                .tmiSheetStyle()
+            NavigationStack {
+                CareerExplorerView()
+            }
+            .tmiSheetStyle()
         }
     }
 
