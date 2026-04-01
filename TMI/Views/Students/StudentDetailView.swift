@@ -21,7 +21,6 @@ struct StudentDetailView: View {
     @State private var showRetakeConfirmation = false
     @State private var showingScheduleMeeting = false
     @State private var expandedSections: Set<String> = []
-    @State private var planStateModel = TMIPlanListStateModel()
     @State private var interestsStateModel = InterestsAndHobbiesStateModel()
     @State private var studentMeetings: [Meeting] = []
 
@@ -70,7 +69,6 @@ struct StudentDetailView: View {
             // Start listening for real-time student updates
             stateModel.startListening()
 
-            await planStateModel.fetch()
             await loadMeetings()
             await loadStudentInterests()
             await loadSavedCareers()
@@ -97,7 +95,7 @@ struct StudentDetailView: View {
                 NavigationStack {
                     TMIPlanEditorView(preselectedStudent: student, onPlanCreated: {
                         Task {
-                            await planStateModel.refresh()
+                            await stateModel.refreshTMIPlans()
                         }
                     })
                 }
@@ -922,7 +920,7 @@ struct StudentDetailView: View {
     }
 
     private func studentPlans(for student: Student) -> [TMIPlan] {
-        planStateModel.plans.filter { plan in
+        stateModel.tmiPlans.filter { plan in
             plan.students.contains(where: { $0.id == student.id })
         }
     }

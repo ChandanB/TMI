@@ -24,7 +24,7 @@ class StudentDetailStateModel {
             var title: String {
                 switch self {
                 case .surveyPending:
-                    return "Complete interest discovery"
+                    return "Complete the interest survey"
                 case .planNeeded:
                     return "Create the first TMI plan"
                 case .planFollowUp:
@@ -39,9 +39,9 @@ class StudentDetailStateModel {
             var detail: String {
                 switch self {
                 case .surveyPending:
-                    return "The student still needs a completed survey or recorded interests."
+                    return "The student still needs a completed interest survey."
                 case .planNeeded:
-                    return "Survey context is in place, but the student still needs a plan."
+                    return "The interest survey is complete, but the student still needs a plan."
                 case .planFollowUp:
                     return "There is plan work waiting on review, approval, or revision."
                 case .engagementCheckIn:
@@ -171,7 +171,7 @@ class StudentDetailStateModel {
         studentListener = nil
     }
 
-    private func fetchTMIPlans() async {
+    func refreshTMIPlans() async {
         do {
             tmiPlans = try await planService.getPlansForStudent(studentId)
             print("[StudentDetailStateModel] Fetched \(tmiPlans.count) TMI plans")
@@ -180,5 +180,9 @@ class StudentDetailStateModel {
             // Don't override the main state - student data is still valid
             // Just log the error
         }
+    }
+
+    private func fetchTMIPlans() async {
+        await refreshTMIPlans()
     }
 }
