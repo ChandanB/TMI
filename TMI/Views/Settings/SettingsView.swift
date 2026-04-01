@@ -27,6 +27,7 @@ struct SettingsView: View {
     @State private var showingImportSheet = false
     @State private var isLoggedOut = false
     @State private var isLoaded = false
+    @State private var showingEditProfile = false
     
     // Role-based visibility
     private var currentRole: UserRole? {
@@ -112,6 +113,12 @@ struct SettingsView: View {
             withAnimation(.easeInOut(duration: 0.5).delay(0.1)) {
                 isLoaded = true
             }
+        }
+        .sheet(isPresented: $showingEditProfile) {
+            NavigationStack {
+                UserProfileView()
+            }
+            .tmiSheetStyle()
         }
     }
     
@@ -324,7 +331,7 @@ private var accountSection: some View {
             subtitle: "Update your personal information",
             icon: "person.badge.plus",
             action: {
-                // Navigate to profile editing
+                showingEditProfile = true
             }
         )
         
