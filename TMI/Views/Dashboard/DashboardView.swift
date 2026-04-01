@@ -50,6 +50,8 @@ struct RoleSpecificData: Equatable, Sendable {
   var classroomStudentCount: Int = 0
   var classroomPlansActive: Int = 0
   var classroomSurveysPending: Int = 0
+  var classroomAttentionCount: Int = 0
+  var classroomPlanGapCount: Int = 0
   var classroomStudentIds: [String] = []
   
   // Admin-specific
@@ -214,6 +216,8 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       roleData.classroomStudentCount = students.count // TODO: Filter by classroom/teacher
       roleData.classroomPlansActive = plans.filter { $0.approvalStatus == .approved }.count
       roleData.classroomSurveysPending = students.filter { $0.surveyResults?.isEmpty ?? true }.count
+      roleData.classroomAttentionCount = urgentAttentionStudents(in: students).count
+      roleData.classroomPlanGapCount = studentsMissingPlans(students: students, plans: plans).count
       roleData.classroomStudentIds = students.compactMap { $0.id }
       
     case .administrator, .admin, .superintendent, .districtAdmin:
@@ -237,20 +241,32 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   // MARK: - Next Best Action Generation
   
   static func prioritizedNextBestAction(role: UserRole?, students: [Student], plans: [TMIPlan]) -> NextBestAction? {
-    let studentsWithPlanIds = Set(plans.flatMap { $0.students.compactMap(\.id) })
     let pendingPlans = plans.filter { $0.approvalStatus == .pendingApproval }
     let canReviewApprovals = role == .counselor || role == .administrator || role == .admin
 
     let candidates: [NextBestAction] = [
       canReviewApprovals ? approvalAction(for: pendingPlans) : nil,
       lowEngagementAction(for: students),
-      missingPlanAction(for: students, studentsWithPlanIds: studentsWithPlanIds),
+      missingPlanAction(for: students, plans: plans),
       surveyFollowUpAction(for: students, role: role)
     ]
     .compactMap { $0 }
 
     return candidates.max { lhs, rhs in
       lhs.priority < rhs.priority
+    }
+  }
+
+  private static func urgentAttentionStudents(in students: [Student]) -> [Student] {
+    students.filter { $0.engagementScore < 0.3 }
+  }
+
+  private static func studentsMissingPlans(students: [Student], plans: [TMIPlan]) -> [Student] {
+    let studentsWithPlanIds = Set(plans.flatMap { $0.students.compactMap(\.id) })
+
+    return students.filter {
+      guard let studentId = $0.id else { return false }
+      return !studentsWithPlanIds.contains(studentId) && !($0.surveyResults?.isEmpty ?? true)
     }
   }
 
@@ -269,7 +285,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   }
 
   private static func lowEngagementAction(for students: [Student]) -> NextBestAction? {
-    guard let firstStudent = students.first(where: { $0.engagementScore < 0.3 }) else { return nil }
+    guard let firstStudent = urgentAttentionStudents(in: students).first else { return nil }
 
     return NextBestAction(
       id: "check_progress_\(firstStudent.id ?? "")",
@@ -282,11 +298,8 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     )
   }
 
-  private static func missingPlanAction(for students: [Student], studentsWithPlanIds: Set<String>) -> NextBestAction? {
-    guard let firstStudent = students.first(where: {
-      guard let studentId = $0.id else { return false }
-      return !studentsWithPlanIds.contains(studentId) && !($0.surveyResults?.isEmpty ?? true)
-    }) else { return nil }
+  private static func missingPlanAction(for students: [Student], plans: [TMIPlan]) -> NextBestAction? {
+    guard let firstStudent = studentsMissingPlans(students: students, plans: plans).first else { return nil }
 
     return NextBestAction(
       id: "create_plan_\(firstStudent.id ?? "")",
@@ -789,7 +802,8 @@ struct DashboardView: View {
                 }
             }
 
-            if let readyToGrowCount = studentsNeedingAttention(data), readyToGrowCount > 0 {
+            if let roleData = data.roleData, roleData.classroomAttentionCount > 0 {
+                let readyToGrowCount = roleData.classroomAttentionCount
                 StudentsReadyToGrowCard(count: readyToGrowCount) {
                     navigateToStudents = true
                 }
@@ -1006,7 +1020,7 @@ struct DashboardView: View {
             )
             RoleSummaryItem(
                 icon: "doc.text.fill",
-                value: "\(max(0, data.classroomStudentCount - data.classroomPlansActive))",
+                value: "\(data.classroomPlanGapCount)",
                 label: "Plans To Start",
                 color: .blue
             )

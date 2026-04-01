@@ -80,6 +80,49 @@ struct DashboardStateModelTests {
         #expect(action?.targetPlanId == "plan-pending")
         #expect(action?.priority == .urgent)
     }
+
+    @Test("Teacher falls back to survey follow-up when it is the only candidate")
+    func teacherFallsBackToSurveyFollowUp() {
+        let surveyPendingStudent = makeStudent(
+            id: "student-survey",
+            name: "Survey Pending",
+            surveyCompleted: false,
+            engagementScores: [0.61, 0.63]
+        )
+
+        let action = DashboardStateModel.prioritizedNextBestAction(
+            role: .teacher,
+            students: [surveyPendingStudent],
+            plans: []
+        )
+
+        #expect(action?.type == .addInterests)
+        #expect(action?.targetStudentId == "student-survey")
+        #expect(action?.priority == .low)
+    }
+
+    @Test("Next best action is nil when no candidates apply")
+    func nextBestActionIsNilWhenNoCandidatesApply() {
+        let studentWithPlan = makeStudent(
+            id: "student-covered",
+            name: "Covered Student",
+            surveyCompleted: true,
+            engagementScores: [0.64, 0.66]
+        )
+        let approvedPlan = makePlan(
+            id: "plan-approved",
+            students: [studentWithPlan],
+            approvalStatus: .approved
+        )
+
+        let action = DashboardStateModel.prioritizedNextBestAction(
+            role: .teacher,
+            students: [studentWithPlan],
+            plans: [approvedPlan]
+        )
+
+        #expect(action == nil)
+    }
 }
 
 private extension DashboardStateModelTests {
