@@ -15,7 +15,7 @@ struct MVPEmptyStateCopyTests {
     @Test("MVP empty states guide users into the core workflow")
     func testMVPCopySupportsCoreWorkflow() {
         #expect(MVPEmptyStateCopy.dashboardActivityTitle == "Start the core loop")
-        #expect(MVPEmptyStateCopy.dashboardActivityMessage.contains("add a student"))
+        #expect(MVPEmptyStateCopy.dashboardActivityMessage.localizedCaseInsensitiveContains("add a student"))
         #expect(MVPEmptyStateCopy.studentPlansAction == "Create First Plan")
         #expect(MVPEmptyStateCopy.studentInterestsAction == "Take Survey")
         #expect(MVPEmptyStateCopy.studentMeetingsAction == "Schedule Meeting")

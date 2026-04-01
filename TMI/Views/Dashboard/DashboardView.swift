@@ -773,8 +773,15 @@ struct DashboardView: View {
             .padding(.horizontal, TMISpacing.screenPadding)
             .padding(.top)
         }
-        .navigationTitle("TMI Dashboard")
+        .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink(destination: SettingsView()) {
+                    TMIAvatar(initials: "ED", color: .tmiPrimary, size: 36)
+                }
+            }
+        }
         .sheet(isPresented: $showingAllActivities) {
             NavigationStack {
                 allActivitiesView(data)
