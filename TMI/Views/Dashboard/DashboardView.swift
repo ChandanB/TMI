@@ -16,6 +16,19 @@ import SwiftUI
 import AppKit
 #endif
 
+enum MVPEmptyStateCopy {
+  static let dashboardActivityTitle = "Start the core loop"
+  static let dashboardActivityMessage = "Add a student, capture interests, and create the first TMI plan to start showing activity here."
+  static let dashboardActivityAction = "Add Student"
+
+  static let studentInterestsAction = "Take Survey"
+  static let studentPlansAction = "Create First Plan"
+  static let studentMeetingsAction = "Schedule Meeting"
+
+  static let districtPilotTitle = "Pilot data will appear here"
+  static let districtPilotMessage = "Ask each school team to add students, capture interests, and launch plans so district proof points roll up here."
+}
+
 // MARK: - Dashboard Data Model
 
 struct DashboardData: Equatable, Sendable {
@@ -686,92 +699,82 @@ struct DashboardView: View {
                 teacherActionBoardContent(data)
             } else {
                 Grid(alignment: .leading, horizontalSpacing: TMISpacing.md, verticalSpacing: TMISpacing.lg) {
-                // Header insight (1/2 width)
-                GridRow {
-                    VStack(alignment: .leading, spacing: TMISpacing.md) {
-                        DashboardHeaderView(
-                            data: data,
-                            attentionCount: studentsNeedingAttention(data) ?? 0,
-                            onNavigateToStudents: { navigateToStudents = true },
-                            onNavigateToPlans: { navigateToPlans = true }
-                        )
-                        
-                        DashboardStatsView(
-                            data: data,
-                            onNavigateToStudents: { navigateToStudents = true },
-                            onNavigateToPlans: { navigateToPlans = true }
-                        )
-                    }
-                    .gridCellColumns(2)
-                    
-                    // Quick Actions + Next Best Action (1/4 width)
-                    VStack(alignment: .leading, spacing: TMISpacing.md) {
-                        QuickActionsGrid()
-                        
-                        HStack {
-                            // Role-specific section (1/2 width) when present
-                            if let roleData = data.roleData {
-                                roleSpecificSection(roleData)
-                                 
-                            }
-
-                            VStack {
-                                // Recent Activity (1/4 width)
-                                recentActivitySection(data)
-                                    .padding()
-                                
-                                Spacer()
-                            }
-                        }
-                        
-                       
-                    }
-                    .gridCellColumns(2)
-                }
-            
-                // Actionable lists section (keep behavior, place full width if present)
-                if studentsNeedingAttention(data) != nil || (data.totalStudents - data.surveysCompleted) > 0 {
+                    // Header insight (1/2 width)
                     GridRow {
-                        VStack(spacing: TMISpacing.lg) {
-                            if let readyToGrowCount = studentsNeedingAttention(data), readyToGrowCount > 0 {
-                                StudentsReadyToGrowCard(count: readyToGrowCount) {
-                                    navigateToStudents = true
+                        VStack(alignment: .leading, spacing: TMISpacing.md) {
+                            DashboardHeaderView(
+                                data: data,
+                                attentionCount: studentsNeedingAttention(data) ?? 0,
+                                onNavigateToStudents: { navigateToStudents = true },
+                                onNavigateToPlans: { navigateToPlans = true }
+                            )
+                            
+                            DashboardStatsView(
+                                data: data,
+                                onNavigateToStudents: { navigateToStudents = true },
+                                onNavigateToPlans: { navigateToPlans = true }
+                            )
+                        }
+                        .gridCellColumns(2)
+                        
+                        // Quick Actions + Next Best Action (1/4 width)
+                        VStack(alignment: .leading, spacing: TMISpacing.md) {
+                            QuickActionsGrid()
+                            
+                            HStack {
+                                // Role-specific section (1/2 width) when present
+                                if let roleData = data.roleData {
+                                    roleSpecificSection(roleData)
+                                }
+
+                                VStack {
+                                    // Recent Activity (1/4 width)
+                                    recentActivitySection(data)
+                                        .padding()
+                                    
+                                    Spacer()
                                 }
                             }
                         }
-                        .gridCellColumns(4)
+                        .gridCellColumns(2)
                     }
-                }
+                
+                    // Actionable lists section (keep behavior, place full width if present)
+                    if studentsNeedingAttention(data) != nil || (data.totalStudents - data.surveysCompleted) > 0 {
+                        GridRow {
+                            VStack(spacing: TMISpacing.lg) {
+                                if let readyToGrowCount = studentsNeedingAttention(data), readyToGrowCount > 0 {
+                                    StudentsReadyToGrowCard(count: readyToGrowCount) {
+                                        navigateToStudents = true
+                                    }
+                                }
+                            }
+                            .gridCellColumns(4)
+                        }
+                    }
 
-                // Engagement chart (full width)
-                if !data.engagementData.isEmpty {
+                    // Engagement chart (full width)
+                    if !data.engagementData.isEmpty {
+                        GridRow {
+                            DashboardEngagementChart(data: data.engagementData)
+                                .gridCellColumns(4)
+                        }
+                    }
+
+                    // Student engagement overview (full width)
                     GridRow {
-                        DashboardEngagementChart(data: data.engagementData)
+                        StudentStatusWidget()
                             .gridCellColumns(4)
                     }
-                }
 
-                // Student engagement overview (full width)
-                GridRow {
-                    StudentStatusWidget()
-                        .gridCellColumns(4)
-                }
-
-                GridRow { Spacer(minLength: TMISpacing.xxl).gridCellColumns(4) }
+                    GridRow { Spacer(minLength: TMISpacing.xxl).gridCellColumns(4) }
                 }
             }
             .padding(.horizontal, TMISpacing.screenPadding)
             .padding(.top)
         }
-        .navigationTitle("Dashboard")
+        .navigationTitle("TMI Dashboard")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink(destination: SettingsView()) {
-                    TMIAvatar(initials: "ED", color: .tmiPrimary, size: 36)
-                }
-            }
-        }
         .sheet(isPresented: $showingAllActivities) {
             NavigationStack {
                 allActivitiesView(data)
@@ -893,13 +896,26 @@ struct DashboardView: View {
 
     private var emptyActivityState: some View {
         VStack(spacing: TMISpacing.sm) {
-            Image(systemName: "tray")
+            Image(systemName: "point.3.connected.trianglepath.dotted")
                 .font(.system(size: 32))
                 .foregroundColor(.tmiTextTertiary)
 
-            Text("No recent activity")
+            Text(MVPEmptyStateCopy.dashboardActivityTitle)
+                .font(.tmiBody)
+                .foregroundColor(.tmiTextPrimary)
+
+            Text(MVPEmptyStateCopy.dashboardActivityMessage)
                 .font(.tmiCaption)
                 .foregroundColor(.tmiTextSecondary)
+                .multilineTextAlignment(.center)
+
+            TMIButton(
+                text: MVPEmptyStateCopy.dashboardActivityAction,
+                icon: "person.badge.plus",
+                style: .primary,
+                action: { showingAddStudent = true }
+            )
+            .padding(.top, TMISpacing.sm)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, TMISpacing.xl)

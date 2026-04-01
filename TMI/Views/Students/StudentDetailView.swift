@@ -503,11 +503,11 @@ struct StudentDetailView: View {
                         .font(.system(size: 32))
                         .foregroundColor(.tmiTextTertiary)
 
-                    Text("No interests recorded yet")
+                    Text("Discover what motivates \(student.name)")
                         .font(.tmiBody)
-                        .foregroundColor(.tmiTextSecondary)
+                        .foregroundColor(.tmiTextPrimary)
 
-                    Text("Add interests to personalize \(student.name)'s learning experience")
+                    Text("Run the interest survey or add a few interests so you can build a plan from real student signals.")
                         .font(.tmiCaption)
                         .foregroundColor(.tmiTextTertiary)
                         .multilineTextAlignment(.center)
@@ -521,7 +521,7 @@ struct StudentDetailView: View {
                         )
 
                         TMIButton(
-                            text: "Take Survey",
+                            text: MVPEmptyStateCopy.studentInterestsAction,
                             icon: "list.clipboard",
                             style: .primary,
                             action: { showingSurvey = true }
@@ -670,17 +670,17 @@ struct StudentDetailView: View {
                         .font(.system(size: 32))
                         .foregroundColor(.tmiTextTertiary)
 
-                    Text("No TMI plans yet")
+                    Text("Turn interests into a support plan")
                         .font(.tmiBody)
-                        .foregroundColor(.tmiTextSecondary)
+                        .foregroundColor(.tmiTextPrimary)
 
-                    Text("Create a trauma-informed intervention plan for \(student.name)")
+                    Text("Create the first TMI plan for \(student.name) so the team has a concrete next step to review and track.")
                         .font(.tmiCaption)
                         .foregroundColor(.tmiTextTertiary)
                         .multilineTextAlignment(.center)
 
                     TMIButton(
-                        text: "Create First Plan",
+                        text: MVPEmptyStateCopy.studentPlansAction,
                         icon: "plus",
                         style: .primary,
                         action: { showingCreatePlan = true }
@@ -755,17 +755,17 @@ struct StudentDetailView: View {
                         .font(.system(size: 32))
                         .foregroundColor(.tmiTextTertiary)
 
-                    Text("No meetings scheduled")
+                    Text("Keep the core loop moving")
                         .font(.tmiBody)
-                        .foregroundColor(.tmiTextSecondary)
+                        .foregroundColor(.tmiTextPrimary)
 
-                    Text("Schedule a meeting to discuss \(student.name)'s progress")
+                    Text("Schedule a check-in once the plan is underway so the team can review progress and adjust support.")
                         .font(.tmiCaption)
                         .foregroundColor(.tmiTextTertiary)
                         .multilineTextAlignment(.center)
 
                     TMIButton(
-                        text: "Schedule Meeting",
+                        text: MVPEmptyStateCopy.studentMeetingsAction,
                         icon: "calendar.badge.plus",
                         style: .secondary,
                         action: {

@@ -40,11 +40,25 @@ struct DistrictDashboardView: View {
             // Charts Section (Placeholder for now)
             // chartSection
 
-            // Students Needing Attention
-            StudentsNeedingAttentionList(alerts: viewModel.studentsNeedingAttention)
+            if viewModel.studentsNeedingAttention.isEmpty {
+              districtGuidanceCard(
+                title: "No follow-up signals yet",
+                message: "Have schools add students, capture interests, and create plans before district follow-up trends appear.",
+                systemImage: "person.3.sequence.fill"
+              )
+            } else {
+              StudentsNeedingAttentionList(alerts: viewModel.studentsNeedingAttention)
+            }
 
-            // AI Insights
-            DistrictInsightsSummary(insights: viewModel.insights)
+            if viewModel.insights.isEmpty {
+              districtGuidanceCard(
+                title: "Insights unlock after schools use the core loop",
+                message: "Once schools add students, run surveys, and launch plans, this view will summarize adoption and engagement patterns.",
+                systemImage: "lightbulb.max.fill"
+              )
+            } else {
+              DistrictInsightsSummary(insights: viewModel.insights)
+            }
 
             // School Breakdown
             schoolBreakdownSection
@@ -174,16 +188,24 @@ struct DistrictDashboardView: View {
       Text("Pilot Readout")
         .font(.headline)
 
-      ForEach(viewModel.pilotReadout, id: \.self) { line in
-        HStack(alignment: .top, spacing: 10) {
-          Image(systemName: "checkmark.seal.fill")
-            .foregroundStyle(.blue)
-            .padding(.top, 2)
+      if viewModel.hasData {
+        ForEach(viewModel.pilotReadout, id: \.self) { line in
+          HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "checkmark.seal.fill")
+              .foregroundStyle(.blue)
+              .padding(.top, 2)
 
-          Text(line)
-            .font(.subheadline)
-            .foregroundStyle(.primary)
+            Text(line)
+              .font(.subheadline)
+              .foregroundStyle(.primary)
+          }
         }
+      } else {
+        districtGuidanceContent(
+          title: MVPEmptyStateCopy.districtPilotTitle,
+          message: MVPEmptyStateCopy.districtPilotMessage,
+          systemImage: "building.2.crop.circle"
+        )
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -201,11 +223,48 @@ struct DistrictDashboardView: View {
         .font(.headline)
         .padding(.horizontal)
 
-      ForEach(viewModel.schoolMetrics, id: \.schoolId) { school in
-        schoolCard(for: school)
+      if viewModel.schoolMetrics.isEmpty {
+        districtGuidanceCard(
+          title: "School comparisons start with school-level activity",
+          message: "When schools begin adding students and launching plans, their engagement and follow-up trends will appear here.",
+          systemImage: "chart.bar.xaxis"
+        )
+      } else {
+        ForEach(viewModel.schoolMetrics, id: \.schoolId) { school in
+          schoolCard(for: school)
+        }
       }
     }
     .padding(.vertical)
+  }
+
+  private func districtGuidanceCard(title: String, message: String, systemImage: String) -> some View {
+    districtGuidanceContent(title: title, message: message, systemImage: systemImage)
+      .padding()
+      .background(Color(UIColor.systemBackground))
+      .cornerRadius(12)
+      .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+  }
+
+  private func districtGuidanceContent(title: String, message: String, systemImage: String) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: systemImage)
+        .font(.title3)
+        .foregroundStyle(.blue)
+        .frame(width: 28)
+
+      VStack(alignment: .leading, spacing: 6) {
+        Text(title)
+          .font(.headline)
+          .foregroundStyle(.primary)
+
+        Text(message)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
+
+      Spacer()
+    }
   }
 
   private func schoolCard(for school: SchoolMetrics) -> some View {

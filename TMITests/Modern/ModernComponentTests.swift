@@ -9,6 +9,20 @@ import Testing
 import SwiftUI
 @testable import TMI
 
+@Suite("MVP Empty State Copy Tests")
+struct MVPEmptyStateCopyTests {
+
+    @Test("MVP empty states guide users into the core workflow")
+    func testMVPCopySupportsCoreWorkflow() {
+        #expect(MVPEmptyStateCopy.dashboardActivityTitle == "Start the core loop")
+        #expect(MVPEmptyStateCopy.dashboardActivityMessage.contains("add a student"))
+        #expect(MVPEmptyStateCopy.studentPlansAction == "Create First Plan")
+        #expect(MVPEmptyStateCopy.studentInterestsAction == "Take Survey")
+        #expect(MVPEmptyStateCopy.studentMeetingsAction == "Schedule Meeting")
+        #expect(MVPEmptyStateCopy.districtPilotTitle == "Pilot data will appear here")
+    }
+}
+
 // MARK: - State Model Tests
 
 @Suite("Modern State Model Tests")
