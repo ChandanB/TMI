@@ -71,6 +71,7 @@ struct Resource: Identifiable, Codable, @unchecked Sendable, Hashable {
         [
             // Featured Resources
             Resource(
+                id: "sample-resource-student-engagement",
                 title: "Understanding Student Engagement",
                 description: "A comprehensive guide to measuring and improving student engagement in educational settings.",
                 category: .article,
@@ -85,6 +86,7 @@ struct Resource: Identifiable, Codable, @unchecked Sendable, Hashable {
                 ownerUid: nil
             ),
             Resource(
+                id: "sample-resource-tmi-implementation",
                 title: "TMI Implementation Course",
                 description: "Step-by-step course on implementing Tangible Modification Intervention in your school or district.",
                 category: .course,
@@ -99,6 +101,7 @@ struct Resource: Identifiable, Codable, @unchecked Sendable, Hashable {
                 ownerUid: nil
             ),
             Resource(
+                id: "sample-resource-interest-assessment",
                 title: "Student Interest Assessment Toolkit",
                 description: "Comprehensive toolkit with validated instruments for assessing student interests across age groups.",
                 category: .tool,
