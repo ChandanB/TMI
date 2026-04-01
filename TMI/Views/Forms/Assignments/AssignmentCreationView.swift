@@ -64,7 +64,11 @@ struct AssignmentCreationView: View {
           cohortSelectionStep
             .tag(2)
         }
+        #if canImport(UIKit)
         .tabViewStyle(.page(indexDisplayMode: .never))
+        #else
+        .tabViewStyle(.automatic)
+        #endif
         .animation(.easeInOut, value: currentStep)
         
         // Navigation Buttons

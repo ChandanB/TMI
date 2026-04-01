@@ -785,6 +785,7 @@ struct DashboardView: View {
             }
         }
         .tmiCard()
+        .padding()
     }
 
     private func activityRow(_ activity: RecentActivity) -> some View {

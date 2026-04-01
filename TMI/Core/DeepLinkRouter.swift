@@ -74,23 +74,23 @@ final class DeepLinkRouter {
             
         case .resource:
             return NavigationAction(
-                targetTab: .resources,
+                targetTab: .students,
                 destination: destination,
                 studentId: nil,
                 planId: nil
             )
-            
+
         case .studentInterests(let studentId):
             return NavigationAction(
-                targetTab: .interests,
+                targetTab: .students,
                 destination: destination,
                 studentId: studentId,
                 planId: nil
             )
-            
+
         case .studentCareers(let studentId):
             return NavigationAction(
-                targetTab: .careerExplorer,
+                targetTab: .students,
                 destination: destination,
                 studentId: studentId,
                 planId: nil
@@ -106,7 +106,7 @@ final class DeepLinkRouter {
             
         case .districtApprovals(let districtId):
             return NavigationAction(
-                targetTab: .districtDashboard,
+                targetTab: .dashboard,
                 destination: destination,
                 studentId: nil,
                 planId: nil
@@ -114,7 +114,7 @@ final class DeepLinkRouter {
             
         case .districtCompliance(let districtId):
             return NavigationAction(
-                targetTab: .districtDashboard,
+                targetTab: .dashboard,
                 destination: destination,
                 studentId: nil,
                 planId: nil

@@ -44,7 +44,7 @@ struct PlanFormsSection: View {
                 .padding(.vertical, 8)
             } else {
                 ForEach(assignments) { assignment in
-                    FormAssignmentCard(assignment: assignment)
+                    PlanFormAssignmentCard(assignment: assignment)
                 }
             }
 
@@ -121,7 +121,7 @@ struct PlanFormsSection: View {
 // MARK: - FormAssignmentCard
 
 /// A card showing a single form assignment with status badge and completion info.
-private struct FormAssignmentCard: View {
+private struct PlanFormAssignmentCard: View {
     let assignment: FormAssignment
 
     // MARK: Computed

@@ -480,6 +480,7 @@ struct PlanApprovalDetailView: View {
 
 // MARK: - Activity View Controller
 
+#if canImport(UIKit)
 struct ActivityViewController: UIViewControllerRepresentable {
     let activityItems: [Any]
 
@@ -489,6 +490,23 @@ struct ActivityViewController: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#else
+struct ActivityViewController: View {
+    let activityItems: [Any]
+
+    var body: some View {
+        if let url = activityItems.first as? URL {
+            ShareLink(item: url) {
+                Label("Share Export", systemImage: "square.and.arrow.up")
+            }
+            .padding()
+        } else {
+            Text("Sharing is unavailable for this item.")
+                .padding()
+        }
+    }
+}
+#endif
 
 // MARK: - Preview
 

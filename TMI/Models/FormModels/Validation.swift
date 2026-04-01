@@ -11,6 +11,11 @@ import CoreTransferable
 import FirebaseFirestore
 import UniformTypeIdentifiers
 
+enum ValidationKeyboardType: String, Codable, Sendable {
+    case `default`
+    case numberPad
+}
+
 enum ValidationType: String, Codable, CaseIterable, Sendable {
     case minLength = "Minimum Length"
     case maxLength = "Maximum Length"
@@ -89,7 +94,7 @@ enum ValidationType: String, Codable, CaseIterable, Sendable {
         }
     }
     
-    var keyboardType: UIKeyboardType {
+    var keyboardType: ValidationKeyboardType {
         switch self {
         case .minValue, .maxValue:
             return .numberPad
@@ -249,5 +254,4 @@ extension FieldType {
         }
     }
 }
-
 

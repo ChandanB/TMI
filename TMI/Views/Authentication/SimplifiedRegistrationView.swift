@@ -179,6 +179,7 @@ struct SimplifiedRegistrationView: View {
                 }
             }
         }
+        .frame(minWidth: 600, minHeight: 900)
     }
 
     private func register() {
@@ -225,7 +226,7 @@ struct SimplifiedRegistrationView: View {
                     firstName: firstName,
                     lastName: lastName,
                     role: selectedAccountType.userRole,
-                    institutionCode: nil, // SimplifiedRegistrationView doesn't collect institution code
+                    institutionCode: nil,
                     districtId: nil
                 )
 

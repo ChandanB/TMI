@@ -243,7 +243,7 @@ struct StudentProfileView: View {
         VStack(spacing: TMISpacing.md) {
             Text(isEditMode ? "Edit Student Profile" : "New Student Intake")
                 .font(.tmiTitle1)
-                .foregroundStyle(.tmiTextPrimary)
+                .foregroundStyle(.tmiText)
 
             Text(isEditMode
                  ? "Update \(existingStudent?.name ?? "student") information"
@@ -263,13 +263,13 @@ struct StudentProfileView: View {
             HStack(spacing: TMISpacing.md) {
                 labeledField(label: "First Name *", placeholder: "First") {
                     TextField("", text: $firstName,
-                              prompt: Text("First").foregroundStyle(.tmiTextTertiary))
+                              prompt: Text("First").foregroundStyle(.tmiTextSecondary))
                         .textInputAutocapitalization(.words)
                 }
 
                 labeledField(label: "Last Name *", placeholder: "Last") {
                     TextField("", text: $lastName,
-                              prompt: Text("Last").foregroundStyle(.tmiTextTertiary))
+                              prompt: Text("Last").foregroundStyle(.tmiTextSecondary))
                         .textInputAutocapitalization(.words)
                 }
             }
@@ -295,7 +295,7 @@ struct StudentProfileView: View {
             // School
             labeledField(label: "School *", placeholder: "School name") {
                 TextField("", text: $school,
-                          prompt: Text("School name").foregroundStyle(.tmiTextTertiary))
+                          prompt: Text("School name").foregroundStyle(.tmiTextSecondary))
                     .textInputAutocapitalization(.words)
             }
 
@@ -316,7 +316,7 @@ struct StudentProfileView: View {
             // Student ID
             labeledField(label: "Student ID", placeholder: "School-issued ID (optional)") {
                 TextField("", text: $studentID,
-                          prompt: Text("School-issued ID (optional)").foregroundStyle(.tmiTextTertiary))
+                          prompt: Text("School-issued ID (optional)").foregroundStyle(.tmiTextSecondary))
                     .autocorrectionDisabled()
             }
         }
@@ -328,7 +328,7 @@ struct StudentProfileView: View {
         VStack(spacing: TMISpacing.md) {
             labeledField(label: "Guardian / Parent Name", placeholder: "Full name") {
                 TextField("", text: $guardianName,
-                          prompt: Text("Full name").foregroundStyle(.tmiTextTertiary))
+                          prompt: Text("Full name").foregroundStyle(.tmiTextSecondary))
                     .textInputAutocapitalization(.words)
             }
 
@@ -353,13 +353,13 @@ struct StudentProfileView: View {
             HStack(spacing: TMISpacing.md) {
                 labeledField(label: "Phone", placeholder: "(555) 123-4567") {
                     TextField("", text: $guardianPhone,
-                              prompt: Text("(555) 123-4567").foregroundStyle(.tmiTextTertiary))
+                              prompt: Text("(555) 123-4567").foregroundStyle(.tmiTextSecondary))
                         .keyboardType(.phonePad)
                 }
 
                 labeledField(label: "Email", placeholder: "email@example.com") {
                     TextField("", text: $guardianEmail,
-                              prompt: Text("email@example.com").foregroundStyle(.tmiTextTertiary))
+                              prompt: Text("email@example.com").foregroundStyle(.tmiTextSecondary))
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -368,14 +368,14 @@ struct StudentProfileView: View {
 
             labeledField(label: "Emergency Contact (if different)", placeholder: "Name") {
                 TextField("", text: $emergencyContact,
-                          prompt: Text("Name").foregroundStyle(.tmiTextTertiary))
+                          prompt: Text("Name").foregroundStyle(.tmiTextSecondary))
                     .textInputAutocapitalization(.words)
             }
 
             if !emergencyContact.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 labeledField(label: "Emergency Phone", placeholder: "(555) 123-4567") {
                     TextField("", text: $emergencyPhone,
-                              prompt: Text("(555) 123-4567").foregroundStyle(.tmiTextTertiary))
+                              prompt: Text("(555) 123-4567").foregroundStyle(.tmiTextSecondary))
                         .keyboardType(.phonePad)
                 }
             }
@@ -394,7 +394,7 @@ struct StudentProfileView: View {
                 .frame(minHeight: 100)
                 .scrollContentBackground(.hidden)
                 .font(.tmiBody)
-                .foregroundStyle(.tmiTextPrimary)
+                .foregroundStyle(.tmiText)
                 .padding(TMISpacing.sm)
                 .background(Color.tmiSurface)
                 .cornerRadius(TMIRadius.sm)
@@ -406,7 +406,7 @@ struct StudentProfileView: View {
                     if behavioralNotes.isEmpty {
                         Text("Add notes about the student's needs, behaviors, or other relevant context…")
                             .font(.tmiBody)
-                            .foregroundStyle(.tmiTextTertiary)
+                            .foregroundStyle(.tmiTextSecondary)
                             .padding(.top, TMISpacing.sm + 4)
                             .padding(.leading, TMISpacing.sm + 4)
                             .allowsHitTesting(false)
@@ -451,7 +451,7 @@ struct StudentProfileView: View {
 
             field()
                 .font(.tmiBody)
-                .foregroundStyle(.tmiTextPrimary)
+                .foregroundStyle(.tmiText)
                 .padding(TMISpacing.md)
                 .background(Color.tmiSurface)
                 .cornerRadius(TMIRadius.sm)
@@ -536,7 +536,7 @@ struct StudentProfileView: View {
                         studentId: studentId,
                         interestId: interestId,
                         level: 3,
-                        source: .manual
+                        source: .staff
                     )
                 }
             }
@@ -599,7 +599,7 @@ struct StudentProfileView: View {
                         studentId: studentId,
                         interestId: interestId,
                         level: 3,
-                        source: .manual
+                        source: .staff
                     )
                 }
             }

@@ -120,23 +120,20 @@ struct MainTabView: View {
     }
     
     // MARK: - Staff Tab View
-    
+
     private var staffTabView: some View {
         TabView(selection: $selectedTab) {
             ForEach(availableTabs, id: \.self) { tab in
                 NavigationStack {
                     destinationView(for: tab)
                         .navigationTitle(tab.label)
-                        .navigationBarTitleDisplayMode(.large)
                         .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                // Workspace button - shows active student/plan context
+                            ToolbarItem(placement: .automatic) {
                                 if studentContext.hasActiveStudent {
                                     workspaceButton
                                 }
                             }
-                            
-                            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                            ToolbarItemGroup(placement: .automatic) {
                                 NotificationBellButton()
                                 profileMenu
                             }
@@ -148,6 +145,7 @@ struct MainTabView: View {
                 .tag(tab)
             }
         }
+        .tabViewStyle(.sidebarAdaptable)
         .accentColor(.tmiSecondary)
         .sheet(isPresented: $showingUserProfile) {
             UserProfileView()
@@ -343,7 +341,7 @@ struct WorkspacePanelView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 24))
-                            .foregroundColor(.tmiTextTertiary)
+                            .foregroundColor(.tmiTextSecondary)
                     }
                 }
                 
@@ -371,7 +369,7 @@ struct WorkspacePanelView: View {
             VStack(spacing: TMISpacing.md) {
                 Image(systemName: "person.crop.circle.badge.questionmark")
                     .font(.system(size: 40))
-                    .foregroundColor(.tmiTextTertiary)
+                    .foregroundColor(.tmiTextSecondary)
                 
                 Text("No Student Selected")
                     .font(.headline)

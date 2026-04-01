@@ -9,6 +9,9 @@ import Foundation
 import SDWebImageSwiftUI
 import SwiftUI
 import UniformTypeIdentifiers
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct BottomSheet<SheetContent: View>: ViewModifier {
   let sheetHeight: CGFloat
@@ -74,6 +77,7 @@ struct KeyboardAvoiding: ViewModifier {
   }
 
   private func subscribeToKeyboardEvents() {
+    #if canImport(UIKit)
     NotificationCenter.default.addObserver(
       forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main
     ) { (notification) in
@@ -87,13 +91,16 @@ struct KeyboardAvoiding: ViewModifier {
     ) { (_) in
       Task { @MainActor in keyboardHeight = 0 }
     }
+    #endif
   }
 
   private func unsubscribeFromKeyboardEvents() {
+    #if canImport(UIKit)
     NotificationCenter.default.removeObserver(
       self, name: UIResponder.keyboardWillShowNotification, object: nil)
     NotificationCenter.default.removeObserver(
       self, name: UIResponder.keyboardWillHideNotification, object: nil)
+    #endif
   }
 }
 
@@ -107,6 +114,7 @@ struct CustomFontModifier: ViewModifier {
 }
 
 // MARK: - DocumentPicker
+#if canImport(UIKit)
 struct DocumentPicker: UIViewControllerRepresentable {
   @Binding var documentURL: URL?
   var didPickDocument: (Data) -> Void
@@ -144,3 +152,19 @@ struct DocumentPicker: UIViewControllerRepresentable {
     }
   }
 }
+#else
+struct DocumentPicker: View {
+  @Binding var documentURL: URL?
+  var didPickDocument: (Data) -> Void
+
+  var body: some View {
+    VStack(spacing: 12) {
+      Image(systemName: "doc")
+        .font(.largeTitle)
+      Text("Document import is available on iOS.")
+        .multilineTextAlignment(.center)
+    }
+    .padding()
+  }
+}
+#endif

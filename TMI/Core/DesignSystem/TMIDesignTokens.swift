@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
 
 // MARK: - Color Tokens (Additional)
 
@@ -26,9 +29,17 @@ extension Color {
     // MARK: - Helper Initializers
 
     init(light: Color, dark: Color) {
+        #if canImport(UIKit)
         self.init(uiColor: UIColor { traitCollection in
             traitCollection.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light)
         })
+        #elseif canImport(AppKit)
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(dark) : NSColor(light)
+        })
+        #else
+        self = light
+        #endif
     }
 
     init(hex: String) {

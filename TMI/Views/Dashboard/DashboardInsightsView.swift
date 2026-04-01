@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#endif
 
 // MARK: -  Insights View
 
@@ -144,12 +147,11 @@ struct DashboardInsightsView: View {
             Button {
               // Export report action - share dashboard data
               let reportText = generateDashboardReport()
+              #if canImport(UIKit)
               let activityController = UIActivityViewController(
                 activityItems: [reportText],
                 applicationActivities: nil
               )
-              
-              #if os(iOS)
               if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                  let window = windowScene.windows.first,
                  let rootViewController = window.rootViewController {
@@ -157,6 +159,10 @@ struct DashboardInsightsView: View {
                 activityController.popoverPresentationController?.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
                 rootViewController.present(activityController, animated: true)
               }
+              #endif
+              #if canImport(AppKit)
+              NSPasteboard.general.clearContents()
+              NSPasteboard.general.setString(reportText, forType: .string)
               #endif
             } label: {
               HStack {

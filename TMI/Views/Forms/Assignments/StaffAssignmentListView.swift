@@ -31,7 +31,11 @@ struct StaffAssignmentListView: View {
               AssignmentRow(assignment: assignment)
             }
           }
+          #if canImport(UIKit)
           .listStyle(.insetGrouped)
+          #else
+          .listStyle(.inset)
+          #endif
           .refreshable {
               await loadAssignments()
           }

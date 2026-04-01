@@ -8,7 +8,7 @@
 import Foundation
 import FirebaseAuth
 import FirebaseFirestore
-import UIKit
+import SwiftUI
 
 @MainActor
 class SurveyDeliveryService {

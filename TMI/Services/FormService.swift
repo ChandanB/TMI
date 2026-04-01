@@ -7,6 +7,7 @@
 
 import Firebase
 import FirebaseAuth
+import Foundation
 
 // MARK: - Optional Protocol Helper
 
@@ -234,10 +235,17 @@ struct FormFieldValidator {
             return validatePhoneNumber(phoneNumber)
         },
         .url: {
-            guard let urlString = $0.value as? String, let url = URL(string: urlString) else { return false }
-            return DispatchQueue.main.sync {
-                UIApplication.shared.canOpenURL(url)
+            guard
+                let urlString = $0.value as? String,
+                let components = URLComponents(string: urlString),
+                let scheme = components.scheme?.lowercased(),
+                let host = components.host,
+                !host.isEmpty
+            else {
+                return false
             }
+
+            return scheme == "http" || scheme == "https"
         },
         .file: { $0.value is String } // Assuming file value is a string (e.g., a URL to the file); might require custom validation
     ]

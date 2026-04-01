@@ -18,6 +18,7 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
   var isEmailVerified: Bool
   let role: UserRole
   var dateOfBirth: Date?
+  var institutionCode: String?
   var institutionID: String?
   var institutionName: String?
   var districtId: String?
@@ -56,6 +57,7 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     isEmailVerified: Bool = false,
     role: UserRole,
     dateOfBirth: Date? = nil,
+    institutionCode: String? = nil,
     institutionID: String? = nil,
     institutionName: String? = nil,
     districtId: String? = nil,
@@ -81,6 +83,7 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     self.isEmailVerified = isEmailVerified
     self.role = role
     self.dateOfBirth = dateOfBirth
+    self.institutionCode = institutionCode
     self.institutionID = institutionID
     self.institutionName = institutionName
     self.districtId = districtId
@@ -109,6 +112,7 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     case isEmailVerified
     case role
     case dateOfBirth
+    case institutionCode
     case institutionID
     case institutionName
     case districtId
@@ -154,6 +158,7 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     email = try container.decode(String.self, forKey: .email)
     isEmailVerified = try container.decodeIfPresent(Bool.self, forKey: .isEmailVerified) ?? false
     dateOfBirth = try container.decodeIfPresent(Date.self, forKey: .dateOfBirth)
+    institutionCode = try container.decodeIfPresent(String.self, forKey: .institutionCode)
     institutionID = try container.decodeIfPresent(String.self, forKey: .institutionID)
     institutionName = try container.decodeIfPresent(String.self, forKey: .institutionName)
     districtId = try container.decodeIfPresent(String.self, forKey: .districtId)
@@ -186,6 +191,7 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     try container.encode(isEmailVerified, forKey: .isEmailVerified)
     try container.encode(role, forKey: .role)
     try container.encodeIfPresent(dateOfBirth, forKey: .dateOfBirth)
+    try container.encodeIfPresent(institutionCode, forKey: .institutionCode)
     try container.encodeIfPresent(institutionID, forKey: .institutionID)
     try container.encodeIfPresent(institutionName, forKey: .institutionName)
     try container.encodeIfPresent(districtId, forKey: .districtId)
@@ -894,4 +900,3 @@ enum TMIUserValidationError: LocalizedError, Equatable {
     }
   }
 }
-

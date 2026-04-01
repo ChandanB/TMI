@@ -187,21 +187,21 @@ enum AuthenticationErrorType: String, CaseIterable {
     switch self {
     case .invalidCredentials:
       return
-        "It looks like the email or password isn't quite right. No worries - this happens to everyone!"
+        "It looks like the email or password isn't quite right."
     case .accountNotFound:
       return "We don't have an account with that email address yet. Would you like to create one?"
     case .accountLocked:
       return
-        "Your account has been temporarily secured for your safety. Let's get this resolved together."
+        "Your account has been temporarily secured for your safety."
     case .accountSuspended:
-      return "Your account needs some attention. We're here to help you get back on track."
+      return "Your account needs some attention"
     case .emailNotVerified:
       return "We need to verify your email address to keep your account secure."
     case .ageVerificationFailed:
       return "We need to verify your age to ensure we're providing the right protections for you."
     case .institutionVerificationFailed:
       return
-        "We're having trouble connecting you with your institution. Let's work through this together."
+        "We're having trouble connecting you with your institution."
     case .missingConsent, .expiredConsent:
       return "We need to update your consent preferences to continue protecting your information."
     case .parentalConsentRequired:
@@ -211,15 +211,15 @@ enum AuthenticationErrorType: String, CaseIterable {
     case .mfaRequired:
       return "We need to verify it's really you with an additional security check."
     case .mfaFailed:
-      return "The security code didn't match. Let's try again when you're ready."
+      return "The security code didn't match."
     case .networkError:
       return
-        "We're having trouble connecting right now. Your information is safe - let's try again in a moment."
+        "We're having trouble connecting right now. Try again in a moment."
     case .serverError:
       return
-        "Something went wrong on our end. Your information is secure, and we're working to fix this."
+        "Something went wrong on our end. We're working to fix this."
     case .unknownError:
-      return "Something unexpected happened. You're safe, and we're here to help figure this out."
+      return "Something unexpected happened."
     }
   }
 
@@ -354,22 +354,22 @@ enum SuspensionReason: String, CaseIterable, Equatable {
     switch self {
     case .securityConcern:
       return
-        "We've temporarily secured your account to protect your information. We're here to help resolve this safely."
+        "We've temporarily secured your account to protect your information."
     case .policyViolation:
       return
-        "Your account needs some attention to ensure everyone feels safe. Let's work together to address this."
+        "Your account needs some attention to ensure everyone feels safe."
     case .complianceIssue:
       return
-        "We need to make sure we're following all the rules that keep you protected. This is just a precaution."
+        "We need to make sure we're following all the rules that keep you protected."
     case .parentalRequest:
       return
-        "Your parent or guardian has requested that we pause your account. They can reactivate it anytime."
+        "Your parent or guardian has requested that we pause your account."
     case .institutionalRequest:
       return
-        "Your school has asked us to temporarily pause your account. They can provide more information."
+        "Your school has asked us to temporarily pause your account."
     case .dataProtectionConcern:
       return
-        "We're taking extra care to protect your information. Your safety and privacy are our top priorities."
+        "We're taking extra care to protect your information."
     }
   }
 }
@@ -730,10 +730,8 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   }
 
   func updateInstitutionCode(_ code: String) {
-    // Institution code is optional and NOT required to complete registration.
-    // Users may enter it if they wish, but registration proceeds regardless.
     institutionCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
-    registrationData.institutionCode = code
+    registrationData.institutionCode = institutionCode
   }
 
   func updateGuardianEmail(_ email: String) {
@@ -903,7 +901,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
         return .basicInfo
       }
     case .institutionVerification:
-      // Proceed to next step even if institutionCode is empty - institution code is optional.
+      // Registration UI handles institution-code validation for institutional roles.
       if role == .socialWorker {
         return .credentialVerification
       } else {
@@ -994,9 +992,6 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     let age = Calendar.current.dateComponents([.year], from: birthDate, to: Date()).year ?? 0
     return age >= 4 && age <= 120  // Reasonable age range
   }
-
-  // Note: Institution code validation not enforced. This is a product decision:
-  // users may optionally enter their institution code, but registration does not require it.
 
   // MARK: - Consent Methods
 
@@ -1125,7 +1120,7 @@ enum AuthenticationMethod {
 struct RegistrationData {
   var selectedRole: UserRole?
   var dateOfBirth: Date?
-  /// Institution code is optional; users may enter it, but it is not required to complete registration.
+  /// Institution code is required for roles with institutional affiliation.
   var institutionCode: String?
   var guardianEmail: String?
   var emergencyContacts: [EmergencyContact] = []
@@ -1141,4 +1136,3 @@ extension UserRole {
     self == .parent || self == .legalGuardian
   }
 }
-

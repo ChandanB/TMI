@@ -6,57 +6,73 @@
 //
 
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 
 /// Utility class for providing haptic feedback throughout the app
 class TMIHaptics {
     /// Generates a light impact haptic feedback
     static func lightImpact() {
+        #if canImport(UIKit)
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.prepare()
         generator.impactOccurred()
+        #endif
     }
     
     /// Generates a medium impact haptic feedback
     static func mediumImpact() {
+        #if canImport(UIKit)
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.prepare()
         generator.impactOccurred()
+        #endif
     }
     
     /// Generates a heavy impact haptic feedback
     static func heavyImpact() {
+        #if canImport(UIKit)
         let generator = UIImpactFeedbackGenerator(style: .heavy)
         generator.prepare()
         generator.impactOccurred()
+        #endif
     }
     
     /// Generates a selection haptic feedback
     static func selectionChanged() {
+        #if canImport(UIKit)
         let generator = UISelectionFeedbackGenerator()
         generator.prepare()
         generator.selectionChanged()
+        #endif
     }
     
     /// Generates a success notification haptic feedback
     static func success() {
+        #if canImport(UIKit)
         let generator = UINotificationFeedbackGenerator()
         generator.prepare()
         generator.notificationOccurred(.success)
+        #endif
     }
     
     /// Generates a warning notification haptic feedback
     static func warning() {
+        #if canImport(UIKit)
         let generator = UINotificationFeedbackGenerator()
         generator.prepare()
         generator.notificationOccurred(.warning)
+        #endif
     }
     
     /// Generates an error notification haptic feedback
     static func error() {
+        #if canImport(UIKit)
         let generator = UINotificationFeedbackGenerator()
         generator.prepare()
         generator.notificationOccurred(.error)
+        #endif
     }
 }
 
@@ -76,5 +92,4 @@ extension View {
         }
     }
 }
-
 

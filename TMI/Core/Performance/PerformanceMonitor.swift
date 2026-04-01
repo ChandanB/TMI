@@ -7,7 +7,6 @@
 
 import os.signpost
 import Foundation
-import UIKit
 import Network
 import Observation
 import SwiftUI

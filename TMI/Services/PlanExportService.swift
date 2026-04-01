@@ -7,8 +7,19 @@
 //
 
 import Foundation
-import UIKit
+import SwiftUI
 import PDFKit
+import CoreGraphics
+
+#if canImport(UIKit)
+import UIKit
+private typealias PlatformFont = UIFont
+private typealias PlatformColor = UIColor
+#elseif canImport(AppKit)
+import AppKit
+private typealias PlatformFont = NSFont
+private typealias PlatformColor = NSColor
+#endif
 
 /// Service for exporting TMI plans to various formats
 class PlanExportService {
@@ -41,16 +52,11 @@ class PlanExportService {
             kCGPDFContextAuthor: plan.createdBy,
             kCGPDFContextTitle: plan.title
         ]
-        let format = UIGraphicsPDFRendererFormat()
-        format.documentInfo = pdfMetaData as [String: Any]
-
         let pageWidth = 8.5 * 72.0
         let pageHeight = 11.0 * 72.0
         let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
 
-        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
-
-        let data = renderer.pdfData { context in
+        let data = try makePDFData(bounds: pageRect, metadata: pdfMetaData) { context in
             var yPosition: CGFloat = 50
             let margin: CGFloat = 50
             let contentWidth = pageWidth - (margin * 2)
@@ -58,16 +64,17 @@ class PlanExportService {
             // Helper to start new page if needed
             func checkPageBreak(requiredSpace: CGFloat) {
                 if yPosition + requiredSpace > pageHeight - margin {
-                    context.beginPage()
+                    context.endPDFPage()
+                    context.beginPDFPage(nil)
                     yPosition = 50
                 }
             }
 
             // Start first page
-            context.beginPage()
+            context.beginPDFPage(nil)
 
             // Title
-            let titleFont = UIFont.boldSystemFont(ofSize: 24)
+            let titleFont = PlatformFont.boldSystemFont(ofSize: 24)
             let titleAttributes: [NSAttributedString.Key: Any] = [.font: titleFont]
             let titleString = plan.title as NSString
             let titleRect = CGRect(x: margin, y: yPosition, width: contentWidth, height: 40)
@@ -75,8 +82,8 @@ class PlanExportService {
             yPosition += 50
 
             // Model and Status
-            let headerFont = UIFont.systemFont(ofSize: 12)
-            let headerAttributes: [NSAttributedString.Key: Any] = [.font: headerFont, .foregroundColor: UIColor.gray]
+            let headerFont = PlatformFont.systemFont(ofSize: 12)
+            let headerAttributes: [NSAttributedString.Key: Any] = [.font: headerFont, .foregroundColor: PlatformColor.gray]
 
             let modelText = "Model: \(plan.model.rawValue)" as NSString
             modelText.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: headerAttributes)
@@ -90,12 +97,12 @@ class PlanExportService {
             if let description = plan.description, !description.isEmpty {
                 checkPageBreak(requiredSpace: 60)
 
-                let sectionFont = UIFont.boldSystemFont(ofSize: 16)
+                let sectionFont = PlatformFont.boldSystemFont(ofSize: 16)
                 let sectionAttributes: [NSAttributedString.Key: Any] = [.font: sectionFont]
                 "Description".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: sectionAttributes)
                 yPosition += 25
 
-                let bodyFont = UIFont.systemFont(ofSize: 12)
+                let bodyFont = PlatformFont.systemFont(ofSize: 12)
                 let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
                 let descRect = CGRect(x: margin, y: yPosition, width: contentWidth, height: 200)
                 let descString = description as NSString
@@ -107,12 +114,12 @@ class PlanExportService {
             if !inputs.isEmpty {
                 checkPageBreak(requiredSpace: 60)
 
-                let sectionFont = UIFont.boldSystemFont(ofSize: 16)
+                let sectionFont = PlatformFont.boldSystemFont(ofSize: 16)
                 let sectionAttributes: [NSAttributedString.Key: Any] = [.font: sectionFont]
                 "Plan Inputs".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: sectionAttributes)
                 yPosition += 25
 
-                let bodyFont = UIFont.systemFont(ofSize: 12)
+                let bodyFont = PlatformFont.systemFont(ofSize: 12)
                 let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
 
                 for input in inputs {
@@ -136,12 +143,12 @@ class PlanExportService {
             if evidenceSummary.totalEntries > 0 {
                 checkPageBreak(requiredSpace: 60)
 
-                let sectionFont = UIFont.boldSystemFont(ofSize: 16)
+                let sectionFont = PlatformFont.boldSystemFont(ofSize: 16)
                 let sectionAttributes: [NSAttributedString.Key: Any] = [.font: sectionFont]
                 "Evidence Summary".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: sectionAttributes)
                 yPosition += 25
 
-                let bodyFont = UIFont.systemFont(ofSize: 12)
+                let bodyFont = PlatformFont.systemFont(ofSize: 12)
                 let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
 
                 let summaryLines = [
@@ -167,12 +174,12 @@ class PlanExportService {
             if !plan.students.isEmpty {
                 checkPageBreak(requiredSpace: 60)
 
-                let sectionFont = UIFont.boldSystemFont(ofSize: 16)
+                let sectionFont = PlatformFont.boldSystemFont(ofSize: 16)
                 let sectionAttributes: [NSAttributedString.Key: Any] = [.font: sectionFont]
                 "Students".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: sectionAttributes)
                 yPosition += 25
 
-                let bodyFont = UIFont.systemFont(ofSize: 12)
+                let bodyFont = PlatformFont.systemFont(ofSize: 12)
                 let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
 
                 for student in plan.students {
@@ -188,12 +195,12 @@ class PlanExportService {
             if !plan.goals.isEmpty {
                 checkPageBreak(requiredSpace: 60)
 
-                let sectionFont = UIFont.boldSystemFont(ofSize: 16)
+                let sectionFont = PlatformFont.boldSystemFont(ofSize: 16)
                 let sectionAttributes: [NSAttributedString.Key: Any] = [.font: sectionFont]
                 "Goals".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: sectionAttributes)
                 yPosition += 25
 
-                let bodyFont = UIFont.systemFont(ofSize: 12)
+                let bodyFont = PlatformFont.systemFont(ofSize: 12)
                 let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
 
                 for (index, goal) in plan.goals.enumerated() {
@@ -206,7 +213,7 @@ class PlanExportService {
                     yPosition += goalSize.height + 5
 
                     let statusText = "Status: \(goal.status.rawValue) | Progress: \(Int(goal.progress * 100))%" as NSString
-                    let statusAttributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 10), .foregroundColor: UIColor.gray]
+                    let statusAttributes: [NSAttributedString.Key: Any] = [.font: PlatformFont.systemFont(ofSize: 10), .foregroundColor: PlatformColor.gray]
                     statusText.draw(at: CGPoint(x: margin + 10, y: yPosition), withAttributes: statusAttributes)
                     yPosition += 20
                 }
@@ -217,12 +224,12 @@ class PlanExportService {
             if !plan.interests.isEmpty {
                 checkPageBreak(requiredSpace: 60)
 
-                let sectionFont = UIFont.boldSystemFont(ofSize: 16)
+                let sectionFont = PlatformFont.boldSystemFont(ofSize: 16)
                 let sectionAttributes: [NSAttributedString.Key: Any] = [.font: sectionFont]
                 "Interests & Hobbies".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: sectionAttributes)
                 yPosition += 25
 
-                let bodyFont = UIFont.systemFont(ofSize: 12)
+                let bodyFont = PlatformFont.systemFont(ofSize: 12)
                 let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
 
                 let interestNames = plan.interests.map { $0.name }.joined(separator: ", ")
@@ -237,12 +244,12 @@ class PlanExportService {
             if !plan.approvalHistory.isEmpty {
                 checkPageBreak(requiredSpace: 60)
 
-                let sectionFont = UIFont.boldSystemFont(ofSize: 16)
+                let sectionFont = PlatformFont.boldSystemFont(ofSize: 16)
                 let sectionAttributes: [NSAttributedString.Key: Any] = [.font: sectionFont]
                 "Approval History".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: sectionAttributes)
                 yPosition += 25
 
-                let bodyFont = UIFont.systemFont(ofSize: 11)
+                let bodyFont = PlatformFont.systemFont(ofSize: 11)
                 let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
 
                 for entry in plan.approvalHistory {
@@ -257,7 +264,7 @@ class PlanExportService {
                     yPosition += 18
 
                     if let comment = entry.comment, !comment.isEmpty {
-                        let commentAttributes: [NSAttributedString.Key: Any] = [.font: UIFont.italicSystemFont(ofSize: 10), .foregroundColor: UIColor.gray]
+                        let commentAttributes: [NSAttributedString.Key: Any] = [.font: italicSystemFont(ofSize: 10), .foregroundColor: PlatformColor.gray]
                         let commentText = "  \"\(comment)\"" as NSString
                         let commentRect = CGRect(x: margin + 20, y: yPosition, width: contentWidth - 30, height: 100)
                         let commentSize = commentText.boundingRect(with: CGSize(width: contentWidth - 30, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: commentAttributes, context: nil)
@@ -272,10 +279,12 @@ class PlanExportService {
             // Footer
             checkPageBreak(requiredSpace: 30)
             yPosition = pageHeight - 40
-            let footerFont = UIFont.systemFont(ofSize: 10)
-            let footerAttributes: [NSAttributedString.Key: Any] = [.font: footerFont, .foregroundColor: UIColor.lightGray]
+            let footerFont = PlatformFont.systemFont(ofSize: 10)
+            let footerAttributes: [NSAttributedString.Key: Any] = [.font: footerFont, .foregroundColor: PlatformColor.lightGray]
             let footerText = "Generated by TMI App on \(Date().formatted())" as NSString
             footerText.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: footerAttributes)
+
+            context.endPDFPage()
         }
 
         return data
@@ -968,6 +977,42 @@ class PlanExportService {
     }
 }
 
+private extension PlanExportService {
+    func makePDFData(
+        bounds: CGRect,
+        metadata: [CFString: Any],
+        draw: (CGContext) -> Void
+    ) throws -> Data {
+        let data = NSMutableData()
+        guard let consumer = CGDataConsumer(data: data as CFMutableData) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+
+        var mediaBox = bounds
+        guard let context = CGContext(
+            consumer: consumer,
+            mediaBox: &mediaBox,
+            metadata as CFDictionary
+        ) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+
+        draw(context)
+        context.closePDF()
+
+        return data as Data
+    }
+
+    func italicSystemFont(ofSize size: CGFloat) -> PlatformFont {
+        #if canImport(UIKit)
+        return PlatformFont.italicSystemFont(ofSize: size)
+        #elseif canImport(AppKit)
+        let baseFont = PlatformFont.systemFont(ofSize: size)
+        return NSFontManager.shared.convert(baseFont, toHaveTrait: .italicFontMask)
+        #endif
+    }
+}
+
 // MARK: - Error Handling
 
 enum PlanExportError: Error, LocalizedError {
@@ -983,4 +1028,3 @@ enum PlanExportError: Error, LocalizedError {
         }
     }
 }
-

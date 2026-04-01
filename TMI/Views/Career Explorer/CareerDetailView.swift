@@ -84,7 +84,7 @@ struct CareerDetailView: View {
                 educationTab.tag(2)
                 pathwayTab.tag(3)
               }
-              .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+              .tabViewStyle(.automatic)
 
               // Related resources section
               if !careerResources.isEmpty {

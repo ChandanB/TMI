@@ -6,7 +6,18 @@
 //
 
 import Foundation
+import SwiftUI
+import CoreGraphics
+
+#if canImport(UIKit)
 import UIKit
+private typealias PlatformFont = UIFont
+private typealias PlatformColor = UIColor
+#elseif canImport(AppKit)
+import AppKit
+private typealias PlatformFont = NSFont
+private typealias PlatformColor = NSColor
+#endif
 
 /// Service for exporting district reports to various formats
 class DistrictExportService {
@@ -86,25 +97,20 @@ class DistrictExportService {
       kCGPDFContextTitle: "District Report - \(districtName)"
     ]
 
-    let format = UIGraphicsPDFRendererFormat()
-    format.documentInfo = pdfMetaData as [String: Any]
-
     let pageWidth: CGFloat = 8.5 * 72.0 // US Letter
     let pageHeight: CGFloat = 11.0 * 72.0
-    let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
     let margin: CGFloat = 50.0
+    let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
 
-    let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
-
-    let data = renderer.pdfData { context in
-      context.beginPage()
+    let data = try makePDFData(bounds: pageRect, metadata: pdfMetaData) { context in
+      context.beginPDFPage(nil)
 
       var currentY: CGFloat = margin
 
       // Title
       let titleAttributes: [NSAttributedString.Key: Any] = [
-        .font: UIFont.boldSystemFont(ofSize: 24),
-        .foregroundColor: UIColor.black
+        .font: PlatformFont.boldSystemFont(ofSize: 24),
+        .foregroundColor: PlatformColor.black
       ]
       let title = "District Report"
       let titleSize = title.size(withAttributes: titleAttributes)
@@ -113,8 +119,8 @@ class DistrictExportService {
 
       // District Name
       let districtAttributes: [NSAttributedString.Key: Any] = [
-        .font: UIFont.systemFont(ofSize: 18),
-        .foregroundColor: UIColor.darkGray
+        .font: PlatformFont.systemFont(ofSize: 18),
+        .foregroundColor: PlatformColor.darkGray
       ]
       let districtSize = districtName.size(withAttributes: districtAttributes)
       districtName.draw(at: CGPoint(x: margin, y: currentY), withAttributes: districtAttributes)
@@ -122,8 +128,8 @@ class DistrictExportService {
 
       // Date
       let dateAttributes: [NSAttributedString.Key: Any] = [
-        .font: UIFont.systemFont(ofSize: 12),
-        .foregroundColor: UIColor.gray
+        .font: PlatformFont.systemFont(ofSize: 12),
+        .foregroundColor: PlatformColor.gray
       ]
       let dateString = "Generated: \(Date().formatted(date: .long, time: .shortened))"
       let dateSize = dateString.size(withAttributes: dateAttributes)
@@ -132,12 +138,12 @@ class DistrictExportService {
 
       // Key Metrics Section
       let sectionAttributes: [NSAttributedString.Key: Any] = [
-        .font: UIFont.boldSystemFont(ofSize: 16),
-        .foregroundColor: UIColor.black
+        .font: PlatformFont.boldSystemFont(ofSize: 16),
+        .foregroundColor: PlatformColor.black
       ]
       let bodyAttributes: [NSAttributedString.Key: Any] = [
-        .font: UIFont.systemFont(ofSize: 12),
-        .foregroundColor: UIColor.black
+        .font: PlatformFont.systemFont(ofSize: 12),
+        .foregroundColor: PlatformColor.black
       ]
 
       let metricsTitle = "Key Metrics"
@@ -185,7 +191,7 @@ class DistrictExportService {
 
         // Check if we need a new page
         if currentY + insightSize.height > pageHeight - margin {
-          context.beginPage()
+          context.beginPDFPage(nil)
           currentY = margin
         }
 
@@ -197,7 +203,7 @@ class DistrictExportService {
 
       // School Breakdown Section
       if currentY + 100 > pageHeight - margin {
-        context.beginPage()
+        context.beginPDFPage(nil)
         currentY = margin
       }
 
@@ -209,13 +215,13 @@ class DistrictExportService {
       for school in schoolMetrics {
         // Check if we need a new page
         if currentY + 80 > pageHeight - margin {
-          context.beginPage()
+          context.beginPDFPage(nil)
           currentY = margin
         }
 
         let schoolNameAttributes: [NSAttributedString.Key: Any] = [
-          .font: UIFont.boldSystemFont(ofSize: 12),
-          .foregroundColor: UIColor.black
+          .font: PlatformFont.boldSystemFont(ofSize: 12),
+          .foregroundColor: PlatformColor.black
         ]
 
         let schoolNameSize = school.schoolName.size(withAttributes: schoolNameAttributes)
@@ -242,12 +248,14 @@ class DistrictExportService {
 
       // Footer
       let footerAttributes: [NSAttributedString.Key: Any] = [
-        .font: UIFont.systemFont(ofSize: 10),
-        .foregroundColor: UIColor.gray
+        .font: PlatformFont.systemFont(ofSize: 10),
+        .foregroundColor: PlatformColor.gray
       ]
       let footer = "Generated with PathFinder TMI | https://claude.com/claude-code"
       let footerSize = footer.size(withAttributes: footerAttributes)
       footer.draw(at: CGPoint(x: margin, y: pageHeight - margin - footerSize.height), withAttributes: footerAttributes)
+
+      context.endPDFPage()
     }
 
     // Write to temp file
@@ -317,16 +325,50 @@ class DistrictExportService {
     return tempURL
   }
 
+  #if canImport(UIKit)
   /// Share exported file using UIActivityViewController
   func shareFile(url: URL, from viewController: UIViewController?) {
     let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
 
     if let popoverController = activityVC.popoverPresentationController {
       popoverController.sourceView = viewController?.view
-      popoverController.sourceRect = CGRect(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2, width: 0, height: 0)
+      popoverController.sourceRect = CGRect(
+        x: UIScreen.main.bounds.width / 2,
+        y: UIScreen.main.bounds.height / 2,
+        width: 0,
+        height: 0
+      )
       popoverController.permittedArrowDirections = []
     }
 
-    viewController?.present(activityVC, animated: true, completion: nil)
+    viewController?.present(activityVC, animated: true)
+  }
+  #endif
+}
+private extension DistrictExportService {
+  func makePDFData(
+    bounds: CGRect,
+    metadata: [CFString: Any],
+    draw: (CGContext) -> Void
+  ) throws -> Data {
+    let data = NSMutableData()
+    guard let consumer = CGDataConsumer(data: data as CFMutableData) else {
+      throw CocoaError(.fileWriteUnknown)
+    }
+
+    var mediaBox = bounds
+    guard let context = CGContext(
+      consumer: consumer,
+      mediaBox: &mediaBox,
+      metadata as CFDictionary
+    ) else {
+      throw CocoaError(.fileWriteUnknown)
+    }
+
+    draw(context)
+    context.closePDF()
+
+    return data as Data
   }
 }
+

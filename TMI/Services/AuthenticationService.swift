@@ -71,12 +71,15 @@ final class AuthenticationService {
         districtId: String? = nil,
         dateOfBirth: Date? = nil
     ) async throws -> TMIUser {
+        let normalizedInstitutionCode = institutionCode?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
         // Validate inputs
         try validateSignupInputs(
             email: email,
             password: password,
             role: role,
-            institutionCode: institutionCode,
+            institutionCode: normalizedInstitutionCode,
             dateOfBirth: dateOfBirth
         )
 
@@ -86,7 +89,7 @@ final class AuthenticationService {
         var verifiedDistrictId: String?
         var verifiedSchoolId: String?
 
-        if let code = institutionCode, !code.isEmpty {
+        if let code = normalizedInstitutionCode, !code.isEmpty {
             let institutionData = try await verifyInstitution(code: code)
             verifiedInstitutionID = institutionData.id
             verifiedInstitutionName = institutionData.name
@@ -120,6 +123,7 @@ final class AuthenticationService {
             isEmailVerified: false,
             role: role,
             dateOfBirth: dateOfBirth,
+            institutionCode: normalizedInstitutionCode,
             institutionID: verifiedInstitutionID,
             institutionName: verifiedInstitutionName,
             districtId: verifiedDistrictId,
@@ -167,13 +171,6 @@ final class AuthenticationService {
         // Validate password strength
         guard password.count >= 8 else {
             throw AuthError.weakPassword
-        }
-
-        // Check role-specific requirements
-        if role.requiresInstitutionalAffiliation {
-            guard institutionCode != nil && !institutionCode!.isEmpty else {
-                throw AuthError.institutionCodeRequired
-            }
         }
 
         // Students require date of birth for age verification

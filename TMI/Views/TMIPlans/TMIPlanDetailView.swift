@@ -187,7 +187,7 @@ struct TMIPlanDetailView: View {
         }
         .sheet(isPresented: $showingEditSheet) {
             NavigationStack {
-                TMIPlanEditorView(existingPlan: plan, onSave: { updatedPlan in
+                TMIPlanEditorView(existingPlan: plan, onSaved: { updatedPlan in
                     plan = updatedPlan
                     Task {
                         await refreshPlan()

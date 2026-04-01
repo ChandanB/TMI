@@ -9,6 +9,7 @@ struct RegistrationView: View {
   @State private var confirmPassword = ""
   @State private var displayName = ""
   @State private var selectedRole: UserRole = .teacher
+  @State private var institutionCode = ""
   @State private var isRegistering = false
   @State private var errorMessage: String?
 
@@ -26,6 +27,7 @@ struct RegistrationView: View {
     case email
     case password
     case confirmPassword
+    case institutionCode
   }
 
   var body: some View {
@@ -142,7 +144,11 @@ struct RegistrationView: View {
                 text: $confirmPassword,
                 isSecure: true,
                 onSubmit: {
-                  register()
+                  if selectedRole.requiresInstitutionalAffiliation {
+                    focusedField = .institutionCode
+                  } else {
+                    register()
+                  }
                 }
               )
               .focused($focusedField, equals: .confirmPassword)
@@ -175,6 +181,30 @@ struct RegistrationView: View {
                   .delay(0.5),
                 value: animateFields
               )
+
+              if selectedRole.requiresInstitutionalAffiliation {
+                TMITextField(
+                  icon: "building.2.fill",
+                  placeholder: "Institution Code",
+                  text: $institutionCode,
+                  onSubmit: {
+                    register()
+                  }
+                )
+                .focused($focusedField, equals: .institutionCode)
+                .offset(x: animateFields ? 0 : -30)
+                .opacity(animateFields ? 1.0 : 0)
+                .animation(
+                  Animation.spring(response: 0.6, dampingFraction: 0.8)
+                    .delay(0.55),
+                  value: animateFields
+                )
+
+                Text("Enter the code provided by your school or district.")
+                  .font(.system(size: 12))
+                  .foregroundColor(.white.opacity(0.6))
+                  .frame(maxWidth: .infinity, alignment: .leading)
+              }
 
               // Error Message
               if let errorMessage = errorMessage {
@@ -256,6 +286,11 @@ struct RegistrationView: View {
         }
       }
       .preferredColorScheme(.dark)
+      .onChange(of: selectedRole) { _, newRole in
+        if !newRole.requiresInstitutionalAffiliation {
+          institutionCode = ""
+        }
+      }
       .onAppear {
         // Set initial focus to displayName field after a slight delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
@@ -310,6 +345,12 @@ struct RegistrationView: View {
       return
     }
 
+    let trimmedInstitutionCode = institutionCode.trimmingCharacters(in: .whitespacesAndNewlines)
+    if selectedRole.requiresInstitutionalAffiliation && trimmedInstitutionCode.isEmpty {
+      errorMessage = "Please enter your institution code"
+      return
+    }
+
     isRegistering = true
     errorMessage = nil
 
@@ -321,13 +362,13 @@ struct RegistrationView: View {
         let lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
 
         // Use AuthenticationService for unified registration
-        let tmiUser = try await AuthenticationService.shared.signUp(
+        _ = try await AuthenticationService.shared.signUp(
           email: email,
           password: password,
           firstName: firstName,
           lastName: lastName,
           role: selectedRole,
-          institutionCode: nil, // RegistrationView doesn't collect institution code
+          institutionCode: selectedRole.requiresInstitutionalAffiliation ? trimmedInstitutionCode : nil,
           districtId: nil
         )
 

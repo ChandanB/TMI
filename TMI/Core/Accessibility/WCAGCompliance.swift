@@ -1,5 +1,7 @@
 import SwiftUI
-import UIKit
+#if canImport(AppKit)
+import AppKit
+#endif
 
 /// WCAG 2.1 compliance checker and utilities
 struct WCAGCompliance {
@@ -54,6 +56,7 @@ struct WCAGCompliance {
     
     /// Calculate relative luminance of a color
     private static func getRelativeLuminance(color: Color) -> Double {
+        #if canImport(UIKit)
         let uiColor = UIColor(color)
         var red: CGFloat = 0
         var green: CGFloat = 0
@@ -61,6 +64,20 @@ struct WCAGCompliance {
         var alpha: CGFloat = 0
         
         uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        #elseif canImport(AppKit)
+        let nsColor = NSColor(color)
+        let resolvedColor = nsColor.usingColorSpace(.sRGB) ?? .black
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        resolvedColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        #else
+        let red: CGFloat = 0
+        let green: CGFloat = 0
+        let blue: CGFloat = 0
+        #endif
         
         // Convert to sRGB and apply gamma correction
         let r = red <= 0.03928 ? red / 12.92 : pow((red + 0.055) / 1.055, 2.4)
@@ -474,4 +491,3 @@ private struct WCAGComplianceModifier: ViewModifier {
             .allowsTightening(false) // Prevent text compression for readability
     }
 }
-

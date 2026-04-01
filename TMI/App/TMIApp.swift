@@ -12,19 +12,13 @@ import SwiftUI
 import FirebaseCore
 import FirebaseAuth
 
-class AppDelegate: NSObject, UIApplicationDelegate {
-    func application(_ application: UIApplication,
-                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+@main
+struct TMIApp: App {
+    init() {
         if FirebaseApp.app() == nil {
             FirebaseApp.configure()
         }
-        return true
     }
-}
-
-@main
-struct TMIApp: App {
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     
     // MARK: - Shared State Models
     
@@ -177,4 +171,3 @@ struct LoadingView: View {
         .environment(\.studentContext, StudentContextStateModel())
         .environment(\.dashboardStateModel, DashboardStateModel())
 }
-

@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
+#if canImport(SafariServices)
 import SafariServices
+#endif
 
 // Resource detail view with career connections and improved metadata
 struct ResourceDetailView: View {
@@ -589,6 +591,7 @@ struct CompactResourceRow: View {
 
 // MARK: - Safari Web View
 
+#if canImport(UIKit) && canImport(SafariServices)
 struct SafariWebView: UIViewControllerRepresentable {
     let url: URL
 
@@ -600,9 +603,24 @@ struct SafariWebView: UIViewControllerRepresentable {
         // No updates needed
     }
 }
+#else
+struct SafariWebView: View {
+    let url: URL
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "safari")
+                .font(.largeTitle)
+            Link("Open Resource in Browser", destination: url)
+        }
+        .padding()
+    }
+}
+#endif
 
 // MARK: - Share Sheet
 
+#if canImport(UIKit)
 struct ShareSheet: UIViewControllerRepresentable {
     let url: String
 
@@ -616,6 +634,18 @@ struct ShareSheet: UIViewControllerRepresentable {
         // No updates needed
     }
 }
+#else
+struct ShareSheet: View {
+    let url: String
+
+    var body: some View {
+        ShareLink(item: url) {
+            Label("Share Resource", systemImage: "square.and.arrow.up")
+        }
+        .padding()
+    }
+}
+#endif
 
 
 // MARK: - Preview

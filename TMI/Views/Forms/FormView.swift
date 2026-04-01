@@ -216,7 +216,9 @@ struct DynamicFormFieldView: View {
               text: binding(String.self, for: id)
             )
             .keyboardType(.URL)
+            #if canImport(UIKit)
             .autocapitalization(.none)
+            #endif
 
           case .file:
             Button {

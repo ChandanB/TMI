@@ -5,14 +5,14 @@
 //  Created by Chandan Brown on 4/20/25.
 //
 
-import UIKit
+import SwiftUI
 import Combine
 import FirebaseStorage
 
 
 /// Represents an image that can come from either a URL or a direct UIImage
 /// Used for flexible image handling throughout the app
-public enum ImageSource: Codable, Hashable, Identifiable, Sendable {
+public enum ImageSource: Codable, Identifiable {
     /// Remote image referenced by URL string
     case url(String)
     
@@ -25,9 +25,9 @@ public enum ImageSource: Codable, Hashable, Identifiable, Sendable {
     public var id: String {
         switch self {
         case .url(let urlString):
-            return "url_\(urlString.hashValue)"
-        case .image:
-            return "image_\(UUID().uuidString)"
+            return "url_\(urlString)"
+        case .image(let image):
+            return "image_\(image.imageFingerprint.base64EncodedString())"
         }
     }
     
@@ -223,21 +223,41 @@ public enum ImageSource: Codable, Hashable, Identifiable, Sendable {
             return self
             
         case .image(let originalImage):
-            let aspectRatio = originalImage.size.width / originalImage.size.height
-            let targetHeight = targetWidth / aspectRatio
-            
-            UIGraphicsBeginImageContextWithOptions(CGSize(width: targetWidth, height: targetHeight), false, 0)
-            originalImage.draw(in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
-            let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
-            UIGraphicsEndImageContext()
-            
-            if let resizedImage = resizedImage {
-                return .image(resizedImage)
+            guard let resizedImage = originalImage.tmiResized(toWidth: targetWidth) else {
+                return self
             }
-            return self
+            return .image(resizedImage)
         }
     }
 }
+
+extension ImageSource: Equatable {
+    public static func == (lhs: ImageSource, rhs: ImageSource) -> Bool {
+        switch (lhs, rhs) {
+        case let (.url(lhsURL), .url(rhsURL)):
+            return lhsURL == rhsURL
+        case let (.image(lhsImage), .image(rhsImage)):
+            return lhsImage.imageFingerprint == rhsImage.imageFingerprint
+        default:
+            return false
+        }
+    }
+}
+
+extension ImageSource: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .url(let urlString):
+            hasher.combine(0)
+            hasher.combine(urlString)
+        case .image(let image):
+            hasher.combine(1)
+            hasher.combine(image.imageFingerprint)
+        }
+    }
+}
+
+extension ImageSource: @unchecked Sendable {}
 
 // MARK: - Utility Functions
 
@@ -366,6 +386,7 @@ extension ImageSource {
 
 // MARK: - UIImage Extensions
 
+#if canImport(UIKit)
 extension UIImage {
     /// Checks if the image has an alpha channel (transparency)
     var hasAlphaChannel: Bool {
@@ -376,4 +397,76 @@ extension UIImage {
                alphaInfo == .premultipliedFirst ||
                alphaInfo == .premultipliedLast
     }
+
+    var imageFingerprint: Data {
+        pngData() ?? jpegData(compressionQuality: 1.0) ?? Data()
+    }
+
+    func tmiResized(toWidth targetWidth: CGFloat) -> UIImage? {
+        let aspectRatio = size.width / size.height
+        let targetHeight = targetWidth / aspectRatio
+
+        UIGraphicsBeginImageContextWithOptions(CGSize(width: targetWidth, height: targetHeight), false, 0)
+        draw(in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return resizedImage
+    }
 }
+#elseif canImport(AppKit)
+import AppKit
+
+extension UIImage {
+    /// Checks if the image has an alpha channel (transparency)
+    var hasAlphaChannel: Bool {
+        guard let cgImage = cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
+        let alphaInfo = cgImage.alphaInfo
+        return alphaInfo == .first ||
+               alphaInfo == .last ||
+               alphaInfo == .premultipliedFirst ||
+               alphaInfo == .premultipliedLast
+    }
+
+    var imageFingerprint: Data {
+        pngData() ?? tiffRepresentation ?? Data()
+    }
+
+    func pngData() -> Data? {
+        guard let tiffRepresentation,
+              let imageRep = NSBitmapImageRep(data: tiffRepresentation) else {
+            return nil
+        }
+        return imageRep.representation(using: .png, properties: [:])
+    }
+
+    func jpegData(compressionQuality: CGFloat) -> Data? {
+        guard let tiffRepresentation,
+              let imageRep = NSBitmapImageRep(data: tiffRepresentation) else {
+            return nil
+        }
+        return imageRep.representation(
+            using: .jpeg,
+            properties: [.compressionFactor: compressionQuality]
+        )
+    }
+
+    func tmiResized(toWidth targetWidth: CGFloat) -> UIImage? {
+        guard size.width > 0, size.height > 0 else { return nil }
+
+        let aspectRatio = size.width / size.height
+        let targetSize = CGSize(width: targetWidth, height: targetWidth / aspectRatio)
+        let resizedImage = NSImage(size: targetSize)
+
+        resizedImage.lockFocus()
+        draw(
+            in: CGRect(origin: .zero, size: targetSize),
+            from: CGRect(origin: .zero, size: size),
+            operation: .copy,
+            fraction: 1
+        )
+        resizedImage.unlockFocus()
+
+        return resizedImage
+    }
+}
+#endif

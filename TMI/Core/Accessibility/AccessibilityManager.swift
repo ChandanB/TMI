@@ -48,12 +48,21 @@ final class AccessibilityManager: Sendable {
     
     /// Update all accessibility settings
     func updateAccessibilitySettings() {
+        #if canImport(UIKit)
         isVoiceOverEnabled = UIAccessibility.isVoiceOverRunning
         isReduceMotionEnabled = UIAccessibility.isReduceMotionEnabled
         isIncreaseContrastEnabled = UIAccessibility.isDarkerSystemColorsEnabled
         isReduceTransparencyEnabled = UIAccessibility.isReduceTransparencyEnabled
         isBoldTextEnabled = UIAccessibility.isBoldTextEnabled
         preferredContentSizeCategory = ContentSizeCategory(UIApplication.shared.preferredContentSizeCategory)
+        #else
+        isVoiceOverEnabled = false
+        isReduceMotionEnabled = false
+        isIncreaseContrastEnabled = false
+        isReduceTransparencyEnabled = false
+        isBoldTextEnabled = false
+        preferredContentSizeCategory = .medium
+        #endif
     }
     
     /// Post accessibility announcement
@@ -77,7 +86,9 @@ final class AccessibilityManager: Sendable {
     /// Focus on specific element
     func focusOn(element: String) {
         focusedElement = element
+        #if canImport(UIKit)
         UIAccessibility.post(notification: .layoutChanged, argument: nil)
+        #endif
     }
     
     /// Clear focus
@@ -165,6 +176,7 @@ final class AccessibilityManager: Sendable {
     // MARK: - Private Methods
     
     private func setupNotificationObservers() {
+        #if canImport(UIKit)
         let notificationCenter = NotificationCenter.default
         
         notificationCenter.addObserver(
@@ -206,6 +218,7 @@ final class AccessibilityManager: Sendable {
                 self?.updateAccessibilitySettings()
             }
         }
+        #endif
     }
     
     private func processAnnouncementQueue() {
@@ -214,7 +227,9 @@ final class AccessibilityManager: Sendable {
         isProcessingAnnouncements = true
         let message = announcementQueue.removeFirst()
         
+        #if canImport(UIKit)
         UIAccessibility.post(notification: .announcement, argument: message)
+        #endif
         
         // Wait before processing next announcement
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
@@ -239,7 +254,7 @@ struct AccessibilityAnnouncement {
 }
 
 struct AccessibilityNotification {
-    let type: UIAccessibility.Notification
+    let type: UIAccessibility.Announcement
     let argument: Any?
     let timestamp: Date
 }
@@ -492,6 +507,7 @@ extension View {
 
 // MARK: - ContentSizeCategory Extension
 
+#if canImport(UIKit)
 extension ContentSizeCategory {
     init(_ uiContentSizeCategory: UIContentSizeCategory) {
         switch uiContentSizeCategory {
@@ -511,3 +527,4 @@ extension ContentSizeCategory {
         }
     }
 }
+#endif
