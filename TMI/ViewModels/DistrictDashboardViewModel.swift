@@ -172,7 +172,7 @@ class DistrictDashboardViewModel {
   ]
 
   struct PilotSummary: Equatable {
-    let participatingSchools: Int
+    let participatingSchools: String
     let activePlans: Int
     let engagementRate: String
     let needsAttention: Int
@@ -208,7 +208,15 @@ class DistrictDashboardViewModel {
     return participatingSchools.isEmpty ? visibleSchoolMetrics : participatingSchools
   }
 
+  private var isDateFiltered: Bool {
+    filter.dateRange != nil
+  }
+
   private var engagementPopulationDescription: String {
+    if isDateFiltered {
+      return "the selected date range"
+    }
+
     if summarySourceSchoolMetrics.contains(where: { $0.activePlansCount > 0 }) {
       return "participating schools with active plans"
     }
@@ -217,6 +225,10 @@ class DistrictDashboardViewModel {
   }
 
   private var engagementSummaryPercentage: String {
+    if isDateFiltered {
+      return metrics.engagementPercentage
+    }
+
     let sourceSchools = summarySourceSchoolMetrics
     let totalStudents = sourceSchools.reduce(0) { $0 + $1.studentCount }
 
@@ -231,10 +243,18 @@ class DistrictDashboardViewModel {
     return String(format: "%.1f%%", weightedEngagement * 100)
   }
 
+  private var participationSummaryText: String {
+    if isDateFiltered {
+      return "Unavailable"
+    }
+
+    return "\(participatingSchoolsCount)"
+  }
+
   var pilotSummary: PilotSummary {
     if let selectedSchool = visibleSchoolMetrics.first, filter.schoolId != nil {
       return PilotSummary(
-        participatingSchools: selectedSchool.activePlansCount > 0 ? 1 : 0,
+        participatingSchools: isDateFiltered ? "Unavailable" : (selectedSchool.activePlansCount > 0 ? "1" : "0"),
         activePlans: selectedSchool.activePlansCount,
         engagementRate: engagementSummaryPercentage,
         needsAttention: selectedSchool.flaggedStudentsCount
@@ -242,7 +262,7 @@ class DistrictDashboardViewModel {
     }
 
     PilotSummary(
-      participatingSchools: participatingSchoolsCount,
+      participatingSchools: participationSummaryText,
       activePlans: metrics.activePlansCount,
       engagementRate: engagementSummaryPercentage,
       needsAttention: metrics.flaggedStudentsCount
@@ -251,10 +271,17 @@ class DistrictDashboardViewModel {
 
   var pilotReadout: [String] {
     let summary = pilotSummary
-    let participationLabel = summary.participatingSchools == 1 ? "school is" : "schools are"
+    let participationLine: String
+
+    if isDateFiltered {
+      participationLine = "Participating school count is unavailable for the selected date range."
+    } else {
+      let participationLabel = summary.participatingSchools == "1" ? "school is" : "schools are"
+      participationLine = "\(summary.participatingSchools) \(participationLabel) actively participating in the TMI pilot."
+    }
 
     return [
-      "\(summary.participatingSchools) \(participationLabel) actively participating in the TMI pilot.",
+      participationLine,
       "\(summary.activePlans) active plans are giving teams observable intervention coverage.",
       "\(summary.engagementRate) average student engagement across \(engagementPopulationDescription).",
       "\(summary.needsAttention) students currently need follow-up."

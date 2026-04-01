@@ -28,7 +28,7 @@ struct DistrictDashboardViewModelTests {
 
         #expect(
             viewModel.pilotSummary == DistrictDashboardViewModel.PilotSummary(
-                participatingSchools: 2,
+                participatingSchools: "2",
                 activePlans: 14,
                 engagementRate: "73.3%",
                 needsAttention: 3
@@ -87,13 +87,39 @@ struct DistrictDashboardViewModelTests {
 
         #expect(
             viewModel.pilotSummary == DistrictDashboardViewModel.PilotSummary(
-                participatingSchools: 1,
+                participatingSchools: "1",
                 activePlans: 2,
                 engagementRate: "60.0%",
                 needsAttention: 1
             )
         )
         #expect(viewModel.pilotReadout.first == "1 school is actively participating in the TMI pilot.")
+    }
+
+    @Test("Date-filtered summary degrades participating-school evidence instead of using unfiltered school metrics")
+    func dateFilteredPilotSummary() {
+        let viewModel = DistrictDashboardViewModel()
+        viewModel.filter.dateRange = .thisMonth
+        viewModel.metrics = DistrictMetrics(
+            activePlansCount: 6,
+            avgEngagementRate: 0.55,
+            flaggedStudentsCount: 2
+        )
+        viewModel.schoolMetrics = [
+            SchoolMetrics(schoolId: "north", schoolName: "North", studentCount: 100, activePlansCount: 4, engagementRate: 0.80, flaggedStudentsCount: 1),
+            SchoolMetrics(schoolId: "west", schoolName: "West", studentCount: 50, activePlansCount: 2, engagementRate: 0.60, flaggedStudentsCount: 1)
+        ]
+
+        #expect(
+            viewModel.pilotSummary == DistrictDashboardViewModel.PilotSummary(
+                participatingSchools: "Unavailable",
+                activePlans: 6,
+                engagementRate: "55.0%",
+                needsAttention: 2
+            )
+        )
+        #expect(viewModel.pilotReadout.first == "Participating school count is unavailable for the selected date range.")
+        #expect(viewModel.pilotReadout[2] == "55.0% average student engagement for the selected date range.")
     }
 
     @Test("Last updated display uses stored timestamp instead of the current date")
