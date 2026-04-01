@@ -1,0 +1,6 @@
+{"type":"server-started","port":56534,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:56534","screen_dir":"/Users/chandanbrown/Development/TMI/.superpowers/brainstorm/7576-1774996525/content","state_dir":"/Users/chandanbrown/Development/TMI/.superpowers/brainstorm/7576-1774996525/state"}
+{"type":"screen-added","file":"/Users/chandanbrown/Development/TMI/.superpowers/brainstorm/7576-1774996525/content/01-tab-structure.html"}
+{"type":"screen-added","file":"/Users/chandanbrown/Development/TMI/.superpowers/brainstorm/7576-1774996525/content/02-student-profile.html"}
+{"type":"screen-added","file":"/Users/chandanbrown/Development/TMI/.superpowers/brainstorm/7576-1774996525/content/03-tmi-plan-editor.html"}
+{"type":"screen-added","file":"/Users/chandanbrown/Development/TMI/.superpowers/brainstorm/7576-1774996525/content/04-dashboard.html"}
+{"type":"server-stopped","reason":"owner process exited"}

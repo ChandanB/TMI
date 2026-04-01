@@ -89,6 +89,7 @@ struct StudentListView: View {
             VStack(spacing: 0) {
                 HStack(alignment: .center, spacing: 8) {
                     HelpTooltipButton(message: "Browse, search, and filter all students. You can add new students or view details about each student’s progress and plans.")
+                    
                     Spacer()
                 }
                 .padding(.horizontal, TMISpacing.screenPadding)
@@ -388,33 +389,24 @@ struct StudentListView: View {
                 Label("Create TMI Plan", systemImage: "doc.badge.plus")
             }
 
-            Button {
-                Task {
-                    do {
-                        let result = try await SurveyDeliveryService.shared.sendSurvey(
-                            to: student,
-                            deliveryMethod: .link  // Use .email when guardian emails are available
-                        )
-                        print("[StudentList] \(result.message)")
-                        TMIHaptics.success()
-
-                        // Show success feedback
-                        await MainActor.run {
-                            // You could show a success toast/alert here
-                        }
-                    } catch {
-                        print("[StudentList] Survey send failed: \(error.localizedDescription)")
-                        TMIHaptics.error()
-
-                        // Show error feedback
-                        await MainActor.run {
-                            // You could show an error alert here
-                        }
-                    }
-                }
-            } label: {
-                Label("Send Survey", systemImage: "envelope")
-            }
+            // TODO: Implement survey delivery when backend service is ready
+            // Button {
+            //     Task {
+            //         do {
+            //             let result = try await SurveyDeliveryService.shared.sendSurvey(
+            //                 to: student,
+            //                 deliveryMethod: .link
+            //             )
+            //             print("[StudentList] \(result.message)")
+            //             TMIHaptics.success()
+            //         } catch {
+            //             print("[StudentList] Survey send failed: \(error.localizedDescription)")
+            //             TMIHaptics.error()
+            //         }
+            //     }
+            // } label: {
+            //     Label("Send Survey", systemImage: "envelope")
+            // }
 
             Divider()
 

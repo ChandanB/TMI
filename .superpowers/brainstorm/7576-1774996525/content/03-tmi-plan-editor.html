@@ -1,0 +1,215 @@
+<h2>TMI Plan Editor: Accordion Layout</h2>
+<p class="subtitle">Unified create/edit view. Absorbs Forms, Interests, Careers, and Resources into the plan flow.</p>
+
+<div class="mockup">
+  <div class="mockup-header">TMIPlanEditorView — Create / Edit</div>
+  <div class="mockup-body" style="padding: 0;">
+
+    <!-- Nav bar mock -->
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #333;">
+      <span style="color: #60a5fa; font-size: 14px;">Cancel</span>
+      <span style="font-weight: 600; font-size: 15px; color: #e5e7eb;">New TMI Plan</span>
+      <span style="color: #60a5fa; font-size: 14px; font-weight: 600;">Save</span>
+    </div>
+
+    <!-- Section 1: Plan Details (expanded) -->
+    <div style="border-bottom: 1px solid #333;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #1a2332;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 16px;">📋</span>
+          <span style="font-weight: 600; color: #e5e7eb;">Plan Details</span>
+          <span style="background: #dc2626; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px;">REQUIRED</span>
+        </div>
+        <span style="color: #6b7280; font-size: 18px;">▼</span>
+      </div>
+      <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <div style="font-size: 12px; color: #9ca3af; margin-bottom: 4px;">Plan Title</div>
+          <div style="background: #1e293b; border: 1px solid #374151; border-radius: 8px; padding: 10px 12px; color: #9ca3af; font-size: 14px;">Auto-generated from model + student</div>
+        </div>
+        <div>
+          <div style="font-size: 12px; color: #9ca3af; margin-bottom: 4px;">TMI Model</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div style="background: #1e293b; border: 2px solid #2563eb; border-radius: 10px; padding: 10px; text-align: center;">
+              <div style="font-size: 20px; margin-bottom: 4px;">🏃</div>
+              <div style="font-size: 12px; color: #93c5fd; font-weight: 600;">Chase Your Space</div>
+            </div>
+            <div style="background: #1e293b; border: 1px solid #374151; border-radius: 10px; padding: 10px; text-align: center;">
+              <div style="font-size: 20px; margin-bottom: 4px;">🎯</div>
+              <div style="font-size: 12px; color: #d1d5db;">Acknowledge Interests</div>
+            </div>
+            <div style="background: #1e293b; border: 1px solid #374151; border-radius: 10px; padding: 10px; text-align: center;">
+              <div style="font-size: 20px; margin-bottom: 4px;">🧠</div>
+              <div style="font-size: 12px; color: #d1d5db;">Align Your Mind</div>
+            </div>
+            <div style="background: #1e293b; border: 1px solid #374151; border-radius: 10px; padding: 10px; text-align: center;">
+              <div style="font-size: 20px; margin-bottom: 4px;">🔄</div>
+              <div style="font-size: 12px; color: #d1d5db;">Direct & Correct</div>
+            </div>
+          </div>
+          <div style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 4px;">+ 2 more models</div>
+        </div>
+        <div>
+          <div style="font-size: 12px; color: #9ca3af; margin-bottom: 4px;">Description</div>
+          <div style="background: #1e293b; border: 1px solid #374151; border-radius: 8px; padding: 10px 12px; color: #9ca3af; font-size: 14px; min-height: 60px;">Describe the plan goals...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Student Selection (collapsed, with student shown) -->
+    <div style="border-bottom: 1px solid #333;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #111827;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 16px;">👤</span>
+          <span style="font-weight: 600; color: #e5e7eb;">Students</span>
+          <span style="background: #dc2626; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px;">REQUIRED</span>
+          <span style="background: #059669; color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px;">2 selected</span>
+        </div>
+        <span style="color: #6b7280; font-size: 18px;">▶</span>
+      </div>
+    </div>
+
+    <!-- Section 3: Interests & Hobbies (collapsed) -->
+    <div style="border-bottom: 1px solid #333;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #111827;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 16px;">🎨</span>
+          <span style="font-weight: 600; color: #e5e7eb;">Interests & Hobbies</span>
+          <span style="background: #be185d; color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px;">4 linked</span>
+        </div>
+        <span style="color: #6b7280; font-size: 18px;">▶</span>
+      </div>
+    </div>
+
+    <!-- Section 4: Career Pathways (collapsed) -->
+    <div style="border-bottom: 1px solid #333;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #111827;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 16px;">💼</span>
+          <span style="font-weight: 600; color: #e5e7eb;">Career Pathways</span>
+        </div>
+        <span style="color: #6b7280; font-size: 18px;">▶</span>
+      </div>
+    </div>
+
+    <!-- Section 5: Resources (collapsed) -->
+    <div style="border-bottom: 1px solid #333;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #111827;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 16px;">📚</span>
+          <span style="font-weight: 600; color: #e5e7eb;">Resources</span>
+          <span style="background: #4f46e5; color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px;">2 attached</span>
+        </div>
+        <span style="color: #6b7280; font-size: 18px;">▶</span>
+      </div>
+    </div>
+
+    <!-- Section 6: Forms & Surveys (collapsed) -->
+    <div style="border-bottom: 1px solid #333;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #111827;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 16px;">📝</span>
+          <span style="font-weight: 600; color: #e5e7eb;">Forms & Surveys</span>
+          <span style="background: #d97706; color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px;">1 pending</span>
+        </div>
+        <span style="color: #6b7280; font-size: 18px;">▶</span>
+      </div>
+    </div>
+
+    <!-- Section 7: Goals & Progress (collapsed) -->
+    <div style="border-bottom: 1px solid #333;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #111827;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 16px;">🎯</span>
+          <span style="font-weight: 600; color: #e5e7eb;">Goals & Progress</span>
+        </div>
+        <span style="color: #6b7280; font-size: 18px;">▶</span>
+      </div>
+    </div>
+
+    <!-- Section 8: Approval (collapsed, status shown) -->
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #111827;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 16px;">✅</span>
+          <span style="font-weight: 600; color: #e5e7eb;">Approval</span>
+          <span style="background: #374151; color: #9ca3af; font-size: 11px; padding: 2px 8px; border-radius: 10px;">Draft</span>
+        </div>
+        <span style="color: #6b7280; font-size: 18px;">▶</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<h3 style="margin-top: 28px;">Key Differences from Student Profile</h3>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px;">
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px;">
+    <div style="font-weight: 600; color: #059669; margin-bottom: 8px;">Student Profile</div>
+    <ul style="color: #d1d5db; font-size: 13px; line-height: 1.8; padding-left: 16px; margin: 0;">
+      <li>Interests/Careers/Resources belong to the <strong>student</strong></li>
+      <li>Career section shows AI recommendations</li>
+      <li>"Explore Careers" opens full explorer sheet</li>
+      <li>No forms or approval sections</li>
+      <li>Data persists on the student record</li>
+    </ul>
+  </div>
+  <div style="background: #1e293b; border-radius: 12px; padding: 16px;">
+    <div style="font-weight: 600; color: #d97706; margin-bottom: 8px;">TMI Plan Editor</div>
+    <ul style="color: #d1d5db; font-size: 13px; line-height: 1.8; padding-left: 16px; margin: 0;">
+      <li>Interests/Careers/Resources are <strong>linked to the plan</strong></li>
+      <li>Can pull from selected students' existing data</li>
+      <li>Includes Forms & Surveys management</li>
+      <li>Includes Goals, Progress tracking</li>
+      <li>Has Approval workflow section</li>
+    </ul>
+  </div>
+</div>
+
+<h3 style="margin-top: 28px;">Expanded: Forms & Surveys Section</h3>
+<p class="subtitle">Previously its own tab — now embedded in the plan flow where it naturally belongs.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Forms & Surveys (expanded)</div>
+  <div class="mockup-body" style="padding: 0;">
+
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #1a2332; border-bottom: 1px solid #333;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 16px;">📝</span>
+        <span style="font-weight: 600; color: #e5e7eb;">Forms & Surveys</span>
+        <span style="background: #d97706; color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px;">1 pending</span>
+      </div>
+      <span style="color: #6b7280; font-size: 18px;">▼</span>
+    </div>
+
+    <div style="padding: 16px;">
+      <!-- Assigned forms -->
+      <div style="font-size: 12px; color: #9ca3af; margin-bottom: 8px;">ASSIGNED</div>
+
+      <div style="background: #1e293b; border: 1px solid #374151; border-radius: 10px; padding: 14px; margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+          <div>
+            <div style="font-weight: 600; color: #e5e7eb; font-size: 14px;">Interest Discovery Survey v2</div>
+            <div style="color: #9ca3af; font-size: 12px; margin-top: 2px;">Sent Mar 28 · Due Apr 4</div>
+          </div>
+          <span style="background: #d97706; color: white; font-size: 11px; padding: 3px 8px; border-radius: 6px;">Pending</span>
+        </div>
+      </div>
+
+      <div style="background: #1e293b; border: 1px solid #059669; border-radius: 10px; padding: 14px; margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+          <div>
+            <div style="font-weight: 600; color: #e5e7eb; font-size: 14px;">Behavioral Assessment</div>
+            <div style="color: #9ca3af; font-size: 12px; margin-top: 2px;">Completed Mar 20</div>
+          </div>
+          <span style="background: #059669; color: white; font-size: 11px; padding: 3px 8px; border-radius: 6px;">Complete</span>
+        </div>
+      </div>
+
+      <!-- Add form button -->
+      <div style="background: #1e293b; border: 1px dashed #374151; border-radius: 10px; padding: 14px; text-align: center; cursor: pointer;">
+        <span style="color: #60a5fa; font-size: 14px;">+ Assign Form or Survey</span>
+      </div>
+    </div>
+  </div>
+</div>

@@ -46,13 +46,13 @@ struct TMIBackgroundView: View {
       switch self {
       case .default, .dashboard:
         return [
-          Color(red: 0.08, green: 0.08, blue: 0.15),
-          Color(red: 0.14, green: 0.14, blue: 0.25),
+          Color(red: 0.05, green: 0.045, blue: 0.03),  // near-black warm brown
+          Color(red: 0.10, green: 0.085, blue: 0.05),  // very dark amber
         ]
       case .auth:
         return [
-          Color(red: 0.05, green: 0.05, blue: 0.15),
-          Color(red: 0.1, green: 0.1, blue: 0.3),
+          Color(red: 0.045, green: 0.04, blue: 0.025), // near-black warm base
+          Color(red: 0.095, green: 0.08, blue: 0.045), // very dark golden brown
         ]
       case .career:
         return [
@@ -62,8 +62,8 @@ struct TMIBackgroundView: View {
         ]
       case .plans:
         return [
-          Color(red: 0.08, green: 0.08, blue: 0.15),
-          Color(red: 0.14, green: 0.14, blue: 0.25),
+          Color(red: 0.06, green: 0.055, blue: 0.035), // very dark bronze
+          Color(red: 0.11, green: 0.095, blue: 0.055), // subtle golden highlight
         ]
       }
     }
@@ -86,14 +86,14 @@ struct TMIBackgroundView: View {
       )
       .ignoresSafeArea()
 
-      // Animated overlays
-      animatedOverlays
-
-      // Particle effect (conditional)
-      if variant.includeParticles {
-        TMIParticleEffect()
-          .opacity(0.3)
-      }
+//      // Animated overlays
+//      animatedOverlays
+//
+//      // Particle effect (conditional)
+//      if variant.includeParticles {
+//        TMIParticleEffect()
+//          .opacity(0.3)
+//      }
     }
     .onAppear {
       animateGradient = true
@@ -876,3 +876,4 @@ extension View {
     }
   }
 #endif
+

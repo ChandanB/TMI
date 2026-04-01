@@ -38,7 +38,7 @@ extension Color {
 
     /// Primary surface color - background for cards and elevated surfaces
     static var tmiSurface: Color {
-        Color(light: Color(hex: "#F9FAFB"), dark: Color(hex: "#1F2937"))
+        Color(light: Color(hex: "#F9FAFB"), dark: Color(hex: "#000f24"))
     }
 
     /// Secondary text color

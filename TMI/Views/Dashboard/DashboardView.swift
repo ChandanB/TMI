@@ -645,77 +645,92 @@ struct DashboardView: View {
     @ViewBuilder
     private func dashboardContent(_ data: DashboardData) -> some View {
         ScrollView {
-            VStack(spacing: TMISpacing.lg) {
-                // Recent Activity Preview
-                recentActivitySection(data)
-                
-                // Quick Action Cards 
-                QuickActionsGrid()
-                
-                // Hero Section - Primary Insight
-                // Hero Section - Primary Insight
-                DashboardHeaderView(
-                    data: data,
-                    attentionCount: studentsNeedingAttention(data) ?? 0,
-                    onNavigateToStudents: { navigateToStudents = true },
-                    onNavigateToPlans: { navigateToPlans = true }
-                )
+            Grid(alignment: .leading, horizontalSpacing: TMISpacing.md, verticalSpacing: TMISpacing.lg) {
+                // Overview section title + stats (full width)
+                GridRow {
+                    VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                        DashboardStatsView(
+                            data: data,
+                            onNavigateToStudents: { navigateToStudents = true },
+                            onNavigateToPlans: { navigateToPlans = true }
+                        )
+                    }
+                    .gridCellColumns(4)
+                }
+
+                // Header insight (1/2 width)
+                GridRow {
+                    DashboardHeaderView(
+                        data: data,
+                        attentionCount: studentsNeedingAttention(data) ?? 0,
+                        onNavigateToStudents: { navigateToStudents = true },
+                        onNavigateToPlans: { navigateToPlans = true }
+                    )
                     .padding(.top, TMISpacing.md)
+                    .gridCellColumns(2)
+                    
+                    GridRow {
+                        // Quick Actions + Next Best Action (1/4 width)
+                        VStack(alignment: .leading, spacing: TMISpacing.md) {
+                            QuickActionsGrid()
+                        }
 
-                // Quick Stats Row
-                DashboardStatsView(
-                    data: data,
-                    onNavigateToStudents: { navigateToStudents = true },
-                    onNavigateToPlans: { navigateToPlans = true }
-                )
-                
-                // Next Best Action Card
-                if let nextAction = data.nextBestAction {
-                    NextBestActionCard(action: nextAction) {
-                        handleNextAction(nextAction)
+                        .gridCellColumns(1)
+
+                        // Recent Activity (1/4 width)
+                        recentActivitySection(data)
+                            .gridCellColumns(1)
+                    }
+                    
+                    // Role-specific section (1/2 width) when present
+                    if let roleData = data.roleData {
+                        GridRow {
+                            roleSpecificSection(roleData)
+                                .gridCellColumns(2)
+                        }
                     }
                 }
-                
-                // Role-Specific Summary Section
-                if let roleData = data.roleData {
-                    roleSpecificSection(roleData)
-                }
-                
-                // Actionable Lists Section
+
+                // Actionable lists section (keep behavior, place full width if present)
                 if studentsNeedingAttention(data) != nil || (data.totalStudents - data.surveysCompleted) > 0 {
-                    VStack(spacing: TMISpacing.lg) {
-                        // Students Ready to Grow
-                        if let readyToGrowCount = studentsNeedingAttention(data), readyToGrowCount > 0 {
-                            StudentsReadyToGrowCard(count: readyToGrowCount) {
-                                navigateToStudents = true
+                    GridRow {
+                        VStack(spacing: TMISpacing.lg) {
+                            if let readyToGrowCount = studentsNeedingAttention(data), readyToGrowCount > 0 {
+                                StudentsReadyToGrowCard(count: readyToGrowCount) {
+                                    navigateToStudents = true
+                                }
                             }
                         }
-                        
-                        // Surveys Pending
-                        if (data.totalStudents - data.surveysCompleted) > 0 {
-                            SurveysPendingCard(count: data.totalStudents - data.surveysCompleted) {
-                                navigateToStudents = true
-                            }
-                        }
+                        .gridCellColumns(4)
                     }
                 }
 
-                // Engagement Chart (Simplified)
+                // Engagement chart (full width)
                 if !data.engagementData.isEmpty {
-                    DashboardEngagementChart(data: data.engagementData)
+                    GridRow {
+                        DashboardEngagementChart(data: data.engagementData)
+                            .gridCellColumns(4)
+                    }
                 }
-                
-                // Student Engagement Overview - NEW
-                StudentStatusWidget()
 
-                // District Overview (admin/superintendent roles only)
+                // Student engagement overview (full width)
+                GridRow {
+                    StudentStatusWidget()
+                        .gridCellColumns(4)
+                }
+
+                // District Overview (admins only) - full width
                 if isDistrictAdminRole {
-                    districtOverviewSection
+                    GridRow {
+                        districtOverviewSection
+                            .gridCellColumns(4)
+                    }
                 }
 
-                Spacer(minLength: TMISpacing.xxl)
+                GridRow { Spacer(minLength: TMISpacing.xxl).gridCellColumns(4) }
             }
             .padding(.horizontal, TMISpacing.screenPadding)
+            .padding(.top)
         }
         .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.large)
@@ -785,7 +800,6 @@ struct DashboardView: View {
             }
         }
         .tmiCard()
-        .padding()
     }
 
     private func activityRow(_ activity: RecentActivity) -> some View {
@@ -1074,6 +1088,62 @@ struct DashboardView: View {
     }
 }
 
+// MARK: - Next Best Quick Action Tile
+
+struct NextBestQuickActionTile: View {
+    let action: NextBestAction
+    let onAction: () -> Void
+
+    var body: some View {
+        Button(action: onAction) {
+            HStack(spacing: TMISpacing.md) {
+                Circle()
+                    .fill(priorityColor.opacity(0.15))
+                    .frame(width: 36, height: 36)
+                    .overlay(
+                        Image(systemName: actionIcon)
+                            .foregroundColor(priorityColor)
+                            .font(.system(size: 14, weight: .semibold))
+                    )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Next Step")
+                        .font(.tmiCaption)
+                        .foregroundColor(.tmiTextSecondary)
+                    Text(action.title)
+                        .font(.tmiBody)
+                        .foregroundColor(.tmiTextPrimary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .tmiCard()
+    }
+
+    private var priorityColor: Color {
+        switch action.priority {
+        case .urgent: return .red
+        case .high: return .orange
+        case .medium: return .blue
+        case .low: return .gray
+        }
+    }
+
+    private var actionIcon: String {
+        switch action.type {
+        case .createPlan: return "plus.rectangle.fill"
+        case .reviewPlan: return "doc.text.magnifyingglass"
+        case .scheduleMeeting: return "calendar.badge.plus"
+        case .completeNotes: return "note.text.badge.plus"
+        case .addInterests: return "heart.text.square.fill"
+        case .checkProgress: return "chart.line.uptrend.xyaxis"
+        case .pendingApproval: return "checkmark.circle.badge.questionmark"
+        }
+    }
+}
+
 // MARK: - Next Best Action Card
 
 struct NextBestActionCard: View {
@@ -1189,3 +1259,4 @@ struct RoleSummaryItem: View {
 }
 
 // MARK: - Actionable Cards moved to Components/ActionableCards.swift
+

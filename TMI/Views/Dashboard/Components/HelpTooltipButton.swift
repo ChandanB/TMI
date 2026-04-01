@@ -45,5 +45,6 @@ struct HelpTooltipButton: View {
             }
         }
         .padding(.leading, 2)
+        .padding(.bottom)
     }
 }
