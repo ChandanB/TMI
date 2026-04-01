@@ -33,10 +33,6 @@ struct SettingsView: View {
         authStateModel.currentUser?.role
     }
     
-    private var isStaff: Bool {
-        currentRole?.isStaffRole ?? false
-    }
-    
     private var isDistrictAdmin: Bool {
         currentRole?.isDistrictRole ?? false
     }
@@ -72,13 +68,6 @@ struct SettingsView: View {
                             .offset(y: isLoaded ? 0 : 20)
                             .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: isLoaded)
                         
-                        // Staff-only sections
-                        if isStaff {
-                            staffSettingsSection
-                                .opacity(isLoaded ? 1 : 0)
-                                .offset(y: isLoaded ? 0 : 20)
-                                .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.3), value: isLoaded)
-                        }
                         
                         // District admin-only sections
                         if isDistrictAdmin {
@@ -104,17 +93,12 @@ struct SettingsView: View {
                                 .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.3), value: isLoaded)
                         }
                         
-                        // Support & Legal Section - visible to all
-                        supportLegalSection
-                            .opacity(isLoaded ? 1 : 0)
-                            .offset(y: isLoaded ? 0 : 20)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.6), value: isLoaded)
                         
-                        // Dangerous Actions Section - visible to all
+                        // Account Actions Section - visible to all
                         dangerousActionsSection
                             .opacity(isLoaded ? 1 : 0)
                             .offset(y: isLoaded ? 0 : 20)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.7), value: isLoaded)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.6), value: isLoaded)
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 40)
@@ -132,29 +116,7 @@ struct SettingsView: View {
     }
     
     // MARK: - Role-Specific Sections
-    
-    private var staffSettingsSection: some View {
-        settingsSectionCard(title: "Staff Settings", icon: "person.badge.key") {
-            VStack(spacing: 0) {
-                settingsRow(icon: "person.crop.circle.badge.checkmark", title: "Student Mode Settings") {
-                    // Student mode configuration
-                }
-                
-                Divider().background(Color.white.opacity(0.1))
-                
-                settingsRow(icon: "bell.badge", title: "Notification Preferences") {
-                    // Notification settings
-                }
-                
-                Divider().background(Color.white.opacity(0.1))
-                
-                settingsRow(icon: "calendar", title: "Meeting Defaults") {
-                    // Default meeting settings
-                }
-            }
-        }
-    }
-    
+
     private var districtAdminSection: some View {
         settingsSectionCard(title: "District Administration", icon: "building.2") {
             VStack(spacing: 0) {
@@ -459,64 +421,6 @@ extension SettingsView {
         }
     }
 
-    private var supportLegalSection: some View {
-        SettingsSection(title: "Support & Legal", icon: "info.circle.fill") {
-            SettingsRow(
-                title: "Help Center",
-                subtitle: "Get help using TMI",
-                icon: "questionmark.circle.fill",
-                action: {
-                    if let url = URL(string: "https://tmi-help.example.com") {
-                        UIApplication.shared.open(url)
-                    }
-                }
-            )
-            
-            SettingsRow(
-                title: "Contact Support",
-                subtitle: "Reach out to our team",
-                icon: "envelope.fill",
-                action: {
-                    if let url = URL(string: "mailto:support@tmi-app.com") {
-                        UIApplication.shared.open(url)
-                    }
-                }
-            )
-            
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("App Version")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
-                    
-                    Spacer()
-                    
-                    Text("1.0.0 (Build 100)")
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
-                }
-                
-                HStack(spacing: 20) {
-                    Button("Privacy Policy") {
-                        if let url = URL(string: "https://tmi-app.com/privacy") {
-                            UIApplication.shared.open(url)
-                        }
-                    }
-                    .font(.system(size: 14))
-                    .foregroundColor(.tmiSecondary)
-                    
-                    Button("Terms of Service") {
-                        if let url = URL(string: "https://tmi-app.com/terms") {
-                            UIApplication.shared.open(url)
-                        }
-                    }
-                    .font(.system(size: 14))
-                    .foregroundColor(.tmiSecondary)
-                }
-            }
-            .padding(.vertical, 8)
-        }
-    }
 
     private var dangerousActionsSection: some View {
         SettingsSection(title: "Account Actions", icon: "exclamationmark.triangle.fill") {
