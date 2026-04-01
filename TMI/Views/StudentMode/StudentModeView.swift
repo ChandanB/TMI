@@ -221,6 +221,7 @@ struct StudentInterestsTab: View {
             .sheet(isPresented: $showingInterestSurvey) {
                 if let studentId = student.id {
                     StudentSurveyFlow(studentId: studentId)
+                        .tmiSheetStyle()
                 }
             }
             .task {

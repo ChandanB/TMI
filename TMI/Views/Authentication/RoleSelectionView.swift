@@ -112,10 +112,12 @@ struct RoleSelectionView: View {
     .sheet(isPresented: $showingInfoSheet) {
       RoleInformationSheet()
         .preferredColorScheme(.dark)
+        .tmiSheetStyle()
     }
     .sheet(isPresented: $showingAgeVerification) {
       AgeVerificationView(selectedRole: selectedRole!)
         .preferredColorScheme(.dark)
+        .tmiSheetStyle()
         .onDisappear {
           // After age verification, proceed to registration
           showingRegistrationView = true
@@ -127,6 +129,7 @@ struct RoleSelectionView: View {
     .sheet(isPresented: $showingRegistrationView) {
       RegistrationView()
         .preferredColorScheme(.dark)
+        .tmiSheetStyle()
     }
     .onAppear {
       // Trigger animations
@@ -461,6 +464,7 @@ struct InstitutionVerificationSection: View {
     .sheet(isPresented: $showingInstitutionSearch) {
       InstitutionSearchView(selectedInstitution: $selectedInstitution)
         .preferredColorScheme(.dark)
+        .tmiSheetStyle()
         .onDisappear {
           // When institution is selected, update code accordingly
           if let selected = selectedInstitution {

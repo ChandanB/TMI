@@ -57,6 +57,7 @@ struct MeetingCalendarView: View {
             NavigationStack {
                 MeetingDetailView(meeting: meeting, onUpdate: {})
             }
+            .tmiSheetStyle()
         }
     }
 

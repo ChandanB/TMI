@@ -140,6 +140,7 @@ struct StudentListView: View {
                     showingAddStudent = false
                 }
             }
+            .tmiSheetStyle()
         }
         .task {
             await stateModel.fetch()
@@ -247,6 +248,7 @@ struct StudentListView: View {
                         }
                     }
             }
+            .tmiSheetStyle()
         }
     }
 

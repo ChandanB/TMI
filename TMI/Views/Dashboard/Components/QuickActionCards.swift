@@ -167,6 +167,7 @@ struct QuickActionsGrid: View {
                     }
                 })
             }
+            .tmiSheetStyle()
         }
         .sheet(isPresented: $showingCreatePlan) {
             NavigationStack {
@@ -182,16 +183,19 @@ struct QuickActionsGrid: View {
                         }
                     }
             }
+            .tmiSheetStyle()
         }
         .sheet(isPresented: $showingStudentsNeedingSupport) {
             NavigationStack {
                 StudentsNeedingSupportView()
             }
+            .tmiSheetStyle()
         }
         .sheet(isPresented: $showingViewAllStudents) {
             NavigationStack {
                 StudentListView()
             }
+            .tmiSheetStyle()
         }
     }
 
@@ -392,6 +396,7 @@ struct StudentSelectorForPlanView: View {
                         }
                     }
             }
+            .tmiSheetStyle()
         }
     }
 

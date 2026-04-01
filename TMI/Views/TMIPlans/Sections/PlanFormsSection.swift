@@ -69,6 +69,7 @@ struct PlanFormsSection: View {
                     }
                 }
             }
+            .tmiSheetStyle()
         }
     }
 

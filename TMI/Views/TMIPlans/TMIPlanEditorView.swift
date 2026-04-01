@@ -265,9 +265,11 @@ struct TMIPlanEditorView: View {
         }
         .sheet(isPresented: $showStudentPicker) {
             studentPickerSheet
+                .tmiSheetStyle()
         }
         .sheet(isPresented: $showAddGoal) {
             addGoalSheet
+                .tmiSheetStyle()
         }
         .task {
             await loadAvailableStudents()

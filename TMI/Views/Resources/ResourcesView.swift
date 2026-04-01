@@ -218,6 +218,7 @@ struct ResourcesView: View {
             await stateModel.addResource(resource)
           }
         })
+        .tmiSheetStyle()
       }
     }
     .onAppear {
@@ -244,8 +245,7 @@ struct ResourcesView: View {
           }
         }
       )
-      .presentationDetents([.medium, .large])
-      .presentationDragIndicator(.visible)
+      .tmiSheetStyle()
     }
     .sheet(isPresented: $showingAllRecommendations) {
       if let student = selectedStudent {
@@ -253,8 +253,7 @@ struct ResourcesView: View {
           student: student,
           recommendations: studentRecommendations
         )
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+        .tmiSheetStyle()
       }
     }
     .preferredColorScheme(.dark)

@@ -123,6 +123,7 @@ struct FormAssignmentCreateView: View {
           selectedTemplate: $selectedTemplate,
           templates: availableTemplates
         )
+        .tmiSheetStyle()
       }
       .task {
         await loadTemplates()

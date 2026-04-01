@@ -604,6 +604,7 @@ struct DashboardView: View {
                     }
                 })
             }
+            .tmiSheetStyle()
         }
         .navigationDestination(isPresented: $navigateToStudents) {
             StudentListView()
@@ -745,6 +746,7 @@ struct DashboardView: View {
             NavigationStack {
                 allActivitiesView(data)
             }
+            .tmiSheetStyle()
         }
     }
 

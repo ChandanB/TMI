@@ -101,6 +101,7 @@ struct StudentDetailView: View {
                         }
                     })
                 }
+                .tmiSheetStyle()
             }
         }
         .sheet(isPresented: $showingEditStudent) {
@@ -110,6 +111,7 @@ struct StudentDetailView: View {
                         // No need to manually refresh - listener will update automatically
                     }
                 }
+                .tmiSheetStyle()
             }
         }
         .sheet(isPresented: $showingAllPlans) {
@@ -124,6 +126,7 @@ struct StudentDetailView: View {
                             }
                         }
                 }
+                .tmiSheetStyle()
             }
         }
         .sheet(isPresented: $showingProgress) {
@@ -138,6 +141,7 @@ struct StudentDetailView: View {
                             }
                         }
                 }
+                .tmiSheetStyle()
             }
         }
         .alert("Retake Survey?", isPresented: $showRetakeConfirmation) {
@@ -170,6 +174,7 @@ struct StudentDetailView: View {
                             }
                         }
                 }
+                .tmiSheetStyle()
             }
         }
     }
@@ -493,8 +498,7 @@ struct StudentDetailView: View {
                         }
                     }
                 }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+                .tmiSheetStyle()
             }
         }
     }
@@ -726,6 +730,7 @@ struct StudentDetailView: View {
                     planId: scheduleMeetingCoordinator.planId ?? "",
                     relatedStudentIds: [studentId]
                 )
+                .tmiSheetStyle()
             }
         }
     }

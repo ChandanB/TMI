@@ -69,6 +69,7 @@ struct MeetingDetailView: View {
             AddActionItemSheet(onSave: { actionItem in
                 Task { await addActionItem(actionItem) }
             })
+            .tmiSheetStyle()
         }
     }
 

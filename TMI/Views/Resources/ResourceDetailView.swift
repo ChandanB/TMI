@@ -124,9 +124,11 @@ struct ResourceDetailView: View {
         }
         .sheet(isPresented: $showWebView) {
             SafariWebView(url: URL(string: resource.url) ?? URL(string: "https://example.com")!)
+                .tmiSheetStyle()
         }
         .sheet(isPresented: $showShareSheet) {
             ShareSheet(url: resource.url)
+                .tmiSheetStyle()
         }
         .alert("Resource Bookmarked", isPresented: $showBookmarkConfirmation) {
             Button("OK") { }

@@ -56,6 +56,7 @@ struct PlanApprovalView: View {
                         }
                     )
                 }
+                .tmiSheetStyle()
             }
         }
     }

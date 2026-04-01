@@ -38,6 +38,7 @@ struct StudentFormListView: View {
           assignment: assignment,
           existingSubmission: getSubmission(for: assignment)
         )
+        .tmiSheetStyle()
       }
     }
     .task {

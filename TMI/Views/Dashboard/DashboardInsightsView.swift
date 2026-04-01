@@ -193,8 +193,7 @@ struct DashboardInsightsView: View {
     }
     .sheet(isPresented: $showingLegacyInsights) {
       LegacyInsightsView(dashboardData: dashboardData)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .tmiSheetStyle()
     }
     .preferredColorScheme(.dark)
   }

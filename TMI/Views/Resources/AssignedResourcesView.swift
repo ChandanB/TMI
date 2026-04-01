@@ -58,6 +58,7 @@ struct AssignedResourcesView: View {
                         Task { await loadAssignments() }
                     }
                 )
+                .tmiSheetStyle()
             }
         }
     }

@@ -53,6 +53,7 @@ struct CareerExplorationView: View {
             NavigationStack {
                 CareerPathDetailView(career: career, studentId: studentId)
             }
+            .tmiSheetStyle()
         }
     }
 

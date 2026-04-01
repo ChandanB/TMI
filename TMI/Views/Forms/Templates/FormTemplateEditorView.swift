@@ -118,6 +118,7 @@ struct FormTemplateEditorView: View {
               guard let index = currentSectionIndex else { return }
               template.sections[index].fields.append(newField)
           }
+          .tmiSheetStyle()
       }
       .alert("Error", isPresented: .constant(errorMessage != nil)) {
           Button("OK") { errorMessage = nil }

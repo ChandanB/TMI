@@ -248,9 +248,11 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingExportSheet) {
             DataExportView()
+                .tmiSheetStyle()
         }
         .sheet(isPresented: $showingImportSheet) {
             DataImportView()
+                .tmiSheetStyle()
         }
     }
 }

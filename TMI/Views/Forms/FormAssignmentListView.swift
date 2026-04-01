@@ -33,9 +33,11 @@ struct FormAssignmentListView: View {
     }
     .sheet(isPresented: $showingCreateAssignment) {
       FormAssignmentCreateView(viewModel: viewModel)
+        .tmiSheetStyle()
     }
     .sheet(item: $selectedAssignment) { assignment in
       FormAssignmentDetailView(assignment: assignment, viewModel: viewModel)
+        .tmiSheetStyle()
     }
     .task {
       if !viewModel.hasAssignments {

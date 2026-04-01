@@ -144,6 +144,7 @@ struct PlanInterestsSection: View {
         }
         .sheet(isPresented: $showNewInterestSheet) {
             newInterestSheetView
+                .tmiSheetStyle()
         }
     }
 

@@ -316,6 +316,7 @@ struct UserProfileView: View {
         ) {
             if case .loaded(let profileData) = stateModel.state {
                 ChangeEmailView(stateModel: stateModel, profileData: profileData)
+                    .tmiSheetStyle()
             }
         }
         .preferredColorScheme(.dark)

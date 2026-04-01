@@ -113,6 +113,7 @@ struct FormSubmissionsView: View {
                 submission: submission,
                 template: viewModel.templates[submission.formId]
             )
+            .tmiSheetStyle()
         }
     }
     

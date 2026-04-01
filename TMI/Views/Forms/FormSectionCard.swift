@@ -212,7 +212,7 @@ struct CustomToolbarView: View {
         .foregroundColor(.primary)
         .sheet(isPresented: $showingPredefinedSections) {
             PredefinedSectionsView(viewModel: viewModel)
-                .presentationSizing(.page)
+                .tmiSheetStyle()
         }
     }
     

@@ -63,6 +63,7 @@ struct StudentInterestProfileView: View {
                 NavigationStack {
                     CareerDetailView(career: career, student: student)
                 }
+                .tmiSheetStyle()
             }
         }
         .sheet(isPresented: $showingResourceAssignment) {
@@ -72,6 +73,7 @@ struct StudentInterestProfileView: View {
                     student: student,
                     assignmentService: assignmentService
                 )
+                .tmiSheetStyle()
             }
         }
     }

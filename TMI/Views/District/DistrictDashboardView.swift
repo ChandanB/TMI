@@ -72,6 +72,7 @@ struct DistrictDashboardView: View {
     }
     .sheet(isPresented: $showingExportSheet) {
       exportSheet
+        .tmiSheetStyle()
     }
     .sheet(isPresented: $showingFilterSheet) {
       DistrictSchoolFilter(filter: viewModel.filter) { newFilter in
@@ -79,6 +80,7 @@ struct DistrictDashboardView: View {
           await viewModel.applyFilter(newFilter)
         }
       }
+      .tmiSheetStyle()
     }
     .task {
       // Load sample data for demo purposes

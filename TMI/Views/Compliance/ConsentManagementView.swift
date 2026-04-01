@@ -125,6 +125,7 @@ struct ConsentManagementView: View {
         .sheet(isPresented: $showingConsentDetail) {
             if let student = selectedStudent {
                 StudentConsentDetailView(student: student)
+                    .tmiSheetStyle()
             }
         }
     }
@@ -511,6 +512,7 @@ struct StudentConsentDetailView: View {
                             Task { await loadConsents() }
                         }
                     )
+                    .tmiSheetStyle()
                 }
             }
         }

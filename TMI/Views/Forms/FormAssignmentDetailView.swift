@@ -74,6 +74,7 @@ struct FormAssignmentDetailView: View {
       }
       .sheet(item: $selectedSubmission) { submission in
         SubmissionReviewView(submission: submission, assignment: assignment)
+          .tmiSheetStyle()
       }
       .task {
         await loadData()

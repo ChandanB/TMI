@@ -112,12 +112,15 @@ struct FormsAndSurveysView: View {
     .preferredColorScheme(.dark)
     .sheet(isPresented: $showingFormCreation) {
       FormCreationView()
+        .tmiSheetStyle()
     }
     .sheet(isPresented: $showingFormBuilder) {
       FormBuilderView()
+        .tmiSheetStyle()
     }
     .sheet(isPresented: $showingFormImport) {
       FormImportView()
+        .tmiSheetStyle()
     }
   }
 

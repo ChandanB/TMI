@@ -67,9 +67,7 @@ struct InterestsAndHobbiesView: View {
         .toolbar { toolbarContent }
         .sheet(isPresented: binding(stateModel, \.showingAddSheet)) {
             AddItemSheet()
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(30)
+                .tmiSheetStyle()
         }
         .preferredColorScheme(.dark)
         .task {
@@ -575,6 +573,7 @@ struct AddItemSheet: View {
             }
             .sheet(isPresented: $showingPredefinedList) {
                 PredefinedInterestsListView()
+                    .tmiSheetStyle()
             }
         }
     }

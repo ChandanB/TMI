@@ -149,14 +149,11 @@ struct MainTabView: View {
         .accentColor(.tmiSecondary)
         .sheet(isPresented: $showingUserProfile) {
             UserProfileView()
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(30)
+                .tmiSheetStyle()
         }
         .sheet(isPresented: $showingWorkspacePanel) {
             WorkspacePanelView()
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .tmiSheetStyle()
         }
         .alert("Sign Out", isPresented: $showingSignOutConfirmation) {
             Button("Sign Out", role: .destructive) {

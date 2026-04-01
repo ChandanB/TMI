@@ -194,6 +194,7 @@ struct TMIPlanDetailView: View {
                     }
                 })
             }
+            .tmiSheetStyle()
         }
         .alert("Delete TMI Plan", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) {}
@@ -206,6 +207,7 @@ struct TMIPlanDetailView: View {
                 NavigationStack {
                     StudentDetailView(studentId: studentId)
                 }
+                .tmiSheetStyle()
             }
         }
         .sheet(isPresented: $showingAddInterest) {
@@ -221,6 +223,7 @@ struct TMIPlanDetailView: View {
                     }
                 }
             }
+            .tmiSheetStyle()
         }
         .sheet(isPresented: $showingAddGoal) {
             NavigationStack {
@@ -230,6 +233,7 @@ struct TMIPlanDetailView: View {
                     }
                 }
             }
+            .tmiSheetStyle()
         }
         .sheet(item: $selectedGoal) { goal in
             NavigationStack {
@@ -239,6 +243,7 @@ struct TMIPlanDetailView: View {
                     }
                 }
             }
+            .tmiSheetStyle()
         }
         .sheet(isPresented: $showingCompleteSurvey, onDismiss: {
             // Refresh plan and interests after survey completion
@@ -253,6 +258,7 @@ struct TMIPlanDetailView: View {
                     context: .planDetail(planId: plan.id ?? "")
                 )
             }
+            .tmiSheetStyle()
         }
         .sheet(isPresented: $showingAddResource) {
             NavigationStack {
@@ -262,6 +268,7 @@ struct TMIPlanDetailView: View {
                     }
                 }
             }
+            .tmiSheetStyle()
         }
         .sheet(isPresented: $showingScheduleMeeting) {
             NavigationStack {
@@ -275,6 +282,7 @@ struct TMIPlanDetailView: View {
                     }
                 )
             }
+            .tmiSheetStyle()
         }
         .sheet(isPresented: $showingAllMeetings) {
             NavigationStack {
@@ -284,10 +292,12 @@ struct TMIPlanDetailView: View {
                     context: .plan(planId: plan.id ?? "")
                 )
             }
+            .tmiSheetStyle()
         }
         .sheet(isPresented: $showingShareSheet) {
             if let pdfURL = exportedPDFURL {
                 ActivityShareSheet(activityItems: [pdfURL])
+                    .tmiSheetStyle()
             }
         }
         .refreshable {

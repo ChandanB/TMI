@@ -139,6 +139,7 @@ struct TMIPlanListView: View {
             NavigationStack {
                 newPlanSelector
             }
+            .tmiSheetStyle()
         }
         .sheet(item: $selectedPlanForStudents) { plan in
             NavigationStack {
@@ -175,6 +176,7 @@ struct TMIPlanListView: View {
                     }
                 }
             }
+            .tmiSheetStyle()
         }
         .task {
             await stateModel.fetch()

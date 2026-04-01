@@ -136,6 +136,7 @@ struct StudentInterestsSection: View {
         }
         .sheet(isPresented: $showNewInterestSheet) {
             newInterestSheetView
+                .tmiSheetStyle()
         }
     }
 

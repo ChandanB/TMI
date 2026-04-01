@@ -103,6 +103,7 @@ struct CreateEditMeetingView: View {
         }
         .sheet(isPresented: $showingAddParticipant) {
             addParticipantSheet
+                .tmiSheetStyle()
         }
     }
 

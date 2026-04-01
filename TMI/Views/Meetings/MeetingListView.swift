@@ -61,11 +61,13 @@ struct MeetingListView: View {
                     Task { await viewModel.loadMeetings() }
                 })
             }
+            .tmiSheetStyle()
         }
         .sheet(isPresented: $showingCalendarView) {
             NavigationStack {
                 MeetingCalendarView(meetings: viewModel.meetings)
             }
+            .tmiSheetStyle()
         }
         .sheet(item: $selectedMeeting) { meeting in
             NavigationStack {
@@ -74,6 +76,7 @@ struct MeetingListView: View {
                     onUpdate: { Task { await viewModel.loadMeetings() } }
                 )
             }
+            .tmiSheetStyle()
         }
     }
 

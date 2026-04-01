@@ -187,6 +187,7 @@ struct NotificationBellButton: View {
         }
         .sheet(isPresented: $showingNotifications) {
             NotificationCenterView()
+                .tmiSheetStyle()
         }
     }
 }

@@ -215,10 +215,12 @@ struct AuthenticationView: View {
       .sheet(isPresented: $showingRegistration) {
         SimplifiedRegistrationView()
           .preferredColorScheme(.dark)
+          .tmiSheetStyle()
       }
       .sheet(isPresented: $showingSupportResources) {
         SupportResourcesView()
           .preferredColorScheme(.dark)
+          .tmiSheetStyle()
       }
       .alert("Reset Password", isPresented: $showingForgotPassword) {
         TextField("Email", text: Binding(

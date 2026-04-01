@@ -506,6 +506,7 @@ struct TableField: View {
         }
         .sheet(isPresented: $showingEditor) {
             TableEditorView(data: $data, label: label)
+                .tmiSheetStyle()
         }
     }
 }

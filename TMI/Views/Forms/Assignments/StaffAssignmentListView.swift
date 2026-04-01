@@ -56,6 +56,7 @@ struct StaffAssignmentListView: View {
       }
       .sheet(isPresented: $showingCreationSheet) {
           AssignmentCreationView()
+              .tmiSheetStyle()
       }
     }
   }

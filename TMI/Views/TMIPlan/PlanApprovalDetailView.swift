@@ -76,6 +76,7 @@ struct PlanApprovalDetailView: View {
         .sheet(isPresented: $showingExport) {
             if let url = exportURL {
                 ActivityViewController(activityItems: [url])
+                    .tmiSheetStyle()
             }
         }
     }

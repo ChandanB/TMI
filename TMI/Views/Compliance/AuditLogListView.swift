@@ -99,6 +99,7 @@ struct AuditLogListView: View {
         .sheet(isPresented: $showingExport) {
             if let url = exportURL {
                 ShareSheet(url: url.path())
+                    .tmiSheetStyle()
             }
         }
     }

@@ -94,6 +94,7 @@ struct ScheduleMeetingView: View {
         }
         .sheet(isPresented: $showingAddParticipant) {
             addParticipantSheet
+                .tmiSheetStyle()
         }
         .onAppear {
             // Pre-fill title based on meeting type

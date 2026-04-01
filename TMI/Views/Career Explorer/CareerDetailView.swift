@@ -144,9 +144,11 @@ struct CareerDetailView: View {
     }
     .sheet(isPresented: $showSchoolFinder) {
       SchoolFinderView(careerField: career.field)
+        .tmiSheetStyle()
     }
     .sheet(isPresented: $showResourcesSheet) {
       CareerResourcesView(career: career, resources: careerResources)
+        .tmiSheetStyle()
     }
   }
 

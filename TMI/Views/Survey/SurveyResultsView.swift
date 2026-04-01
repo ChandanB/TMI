@@ -254,6 +254,7 @@ struct SurveyResultsView: View {
                                 careerMatches: careerMatches
                             )
                         }
+                        .tmiSheetStyle()
                     }
                 }
 
@@ -288,6 +289,7 @@ struct SurveyResultsView: View {
                                 showingAddInterests = false
                             }
                         }
+                        .tmiSheetStyle()
                     }
                 }
 

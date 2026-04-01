@@ -116,10 +116,12 @@ struct MyFormsView: View {
         .sheet(isPresented: $showingFormEditor) {
             if let templateToEdit = selectedFormTemplate {
                 FormDetailEditorView(template: templateToEdit)
+                    .tmiSheetStyle()
             }
         }
         .sheet(isPresented: $showingCreationView) {
             FormCreationView()
+                .tmiSheetStyle()
         }
     }
 }

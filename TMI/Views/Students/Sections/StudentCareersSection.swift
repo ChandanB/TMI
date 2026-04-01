@@ -55,6 +55,7 @@ struct StudentCareersSection: View {
         }
         .sheet(isPresented: $showExploreSheet) {
             CareerExplorerView()
+                .tmiSheetStyle()
         }
     }
 

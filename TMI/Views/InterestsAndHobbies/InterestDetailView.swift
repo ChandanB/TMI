@@ -53,6 +53,7 @@ struct InterestDetailView: View {
             }
         }) {
             EditInterestSheet(interest: interest)
+                .tmiSheetStyle()
         }
         .sheet(isPresented: $showingConnectStudent) {
             ConnectStudentSheet(interest: interest, onConnect: { student in
@@ -60,6 +61,7 @@ struct InterestDetailView: View {
                     await connectStudentToInterest(student)
                 }
             })
+            .tmiSheetStyle()
         }
         .alert("Delete Interest", isPresented: $showingDeleteAlert) {
             deleteAlertButtons

@@ -209,12 +209,14 @@ struct FormTemplateLibraryView: View {
     .sheet(isPresented: $showingTemplateDetail) {
       if let template = viewModel.selectedTemplate {
         FormTemplateDetailView(template: template)
+          .tmiSheetStyle()
       }
     }
     .sheet(isPresented: $showingTemplateEditor) {
       NavigationStack {
         FormTemplateEditorView()
       }
+      .tmiSheetStyle()
       .onDisappear {
         // Refresh templates after creation
         Task {

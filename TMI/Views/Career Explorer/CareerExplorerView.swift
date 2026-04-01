@@ -221,6 +221,7 @@ struct CareerExplorerView: View {
     }
     .sheet(isPresented: $showingStudentPicker) {
       studentPickerSheet
+        .tmiSheetStyle()
     }
     .preferredColorScheme(.dark)
     .onAppear {

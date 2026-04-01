@@ -118,6 +118,7 @@ struct PlanTemplateLibraryView: View {
                     showingTemplateDetail = false
                     onSelectTemplate(template)
                 }
+                .tmiSheetStyle()
             }
         }
     }
