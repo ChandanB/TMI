@@ -6,7 +6,11 @@
 //
 
 import FirebaseAuth
+import FirebaseFirestore
+import FirebaseStorage
 import Observation
+import PhotosUI
+import SDWebImageSwiftUI
 import SwiftUI
 
 
@@ -16,24 +20,31 @@ import SwiftUI
 final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableError> {
     // MARK: - Dependencies
     private let firebaseManager: FirebaseManager
-    
+
+    // MARK: - Photo State
+    var organization: String = ""
+    var photoURL: String?
+    var selectedPhotoItem: PhotosPickerItem?
+    var selectedPhotoData: Data?
+    var isUploadingPhoto = false
+
     // MARK: - Initialization
-    
+
     init(firebaseManager: FirebaseManager = FIREBASE_MANAGER) {
         self.firebaseManager = firebaseManager
         super.init()
-        
+
         // Initialize UI state
         ui.set("isChangingEmail", value: false)
     }
-    
+
     // MARK: - Data Fetching
-    
+
     @MainActor
     override func fetch() async {
         print("[UserProfileStateModel] Starting fetch")
         updateState(.loading)
-        
+
         guard let user = Auth.auth().currentUser else {
             print("[UserProfileStateModel] No authenticated user found")
             let error = ErrorHandlingHelper.handleError(
@@ -43,15 +54,15 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             updateState(.error(error))
             return
         }
-        
+
         print("[UserProfileStateModel] Found authenticated user: \(user.uid)")
-        
+
         // Initialize profile data with Auth data
         var profileData = UserProfileData(displayName: user.displayName ?? "User")
         profileData.email = user.email ?? ""
         profileData.displayName = user.displayName ?? "User"
         profileData.isEmailVerified = user.isEmailVerified
-        
+
         do {
             // Load user profile from Firestore
             print("[UserProfileStateModel] Attempting to load Firestore profile")
@@ -59,7 +70,9 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
                 print("[UserProfileStateModel] Found Firestore profile data: \(userData)")
                 profileData.displayName = userData["displayName"] as? String ?? profileData.displayName
                 profileData.role = userData["role"] as? String ?? "student"
-                
+                organization = userData["organization"] as? String ?? ""
+                photoURL = userData["photoURL"] as? String
+
                 print("[UserProfileStateModel] Successfully loaded profile for: \(profileData.displayName)")
                 updateState(.loaded(profileData))
             } else {
@@ -69,25 +82,25 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             }
         } catch {
             print("[UserProfileStateModel] Error loading profile: \(error)")
-            
+
             // If Firestore fails, still show the user profile with Auth data
             print("[UserProfileStateModel] Falling back to Auth data due to Firestore error")
             updateState(.loaded(profileData))
-            
+
             // Show a warning but don't fail completely
             ui.alertMessage = "Some profile features may be limited due to a connection issue"
             ui.isShowingAlert = true
         }
     }
-    
+
     @MainActor
     override func refresh() async {
         resetState()
         await fetch()
     }
-    
+
     // MARK: - Profile Update Methods
-    
+
     @MainActor
     func updateProfile() async {
         guard let profileData = state.value else {
@@ -98,9 +111,9 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             updateState(.error(error))
             return
         }
-        
+
         updateState(.loading)
-        
+
         do {
             // Update displayName in Auth
             if let user = Auth.auth().currentUser {
@@ -108,16 +121,17 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
                 changeRequest.displayName = profileData.displayName
                 try await changeRequest.commitChanges()
             }
-            
-            // Update profile in Firestore
+
+            // Update profile in Firestore (including organization)
             try await firebaseManager.updateUserProfile(data: [
-                "displayName": profileData.displayName
+                "displayName": profileData.displayName,
+                "organization": organization
             ])
-            
+
             // Show success message
             ui.alertMessage = "Profile updated successfully"
             ui.isShowingAlert = true
-            
+
             // Refresh data to ensure we have the latest
             await fetch()
         } catch {
@@ -125,7 +139,31 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             updateState(.error(handledError))
         }
     }
-    
+
+    @MainActor
+    func uploadProfilePhoto() async {
+        guard let photoData = selectedPhotoData else { return }
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        isUploadingPhoto = true
+        defer { isUploadingPhoto = false }
+
+        do {
+            let storageRef = Storage.storage().reference().child("users/\(uid)/profile.jpg")
+            let metadata = StorageMetadata()
+            metadata.contentType = "image/jpeg"
+            _ = try await storageRef.putDataAsync(photoData, metadata: metadata)
+            let url = try await storageRef.downloadURL()
+            photoURL = url.absoluteString
+
+            let userRef = Firestore.firestore().collection("users").document(uid)
+            try await userRef.updateData(["photoURL": url.absoluteString])
+        } catch {
+            let handledError = ErrorHandlingHelper.handleError(error, userFriendlyMessage: "Failed to upload photo")
+            ui.alertMessage = handledError.message
+            ui.isShowingAlert = true
+        }
+    }
+
     @MainActor
     func updateEmail() async {
         guard let profileData = state.value else {
@@ -136,7 +174,7 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             updateState(.error(error))
             return
         }
-        
+
         guard !profileData.newEmail.isEmpty, !profileData.currentPassword.isEmpty else {
             let error = ErrorHandlingHelper.handleError(
                 FirebaseError.missingData("Please fill in all fields"),
@@ -145,27 +183,27 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             updateState(.error(error))
             return
         }
-        
+
         updateState(.loading)
-        
+
         do {
             // Re-authenticate user first (required for sensitive operations)
             try await firebaseManager.reauthenticate(with: profileData.currentPassword)
-            
+
             // Update email in Auth and Firestore
             try await firebaseManager.updateEmail(to: profileData.newEmail)
-            
+
             // Update local state
             var updatedProfile = profileData
             updatedProfile.email = profileData.newEmail
             updatedProfile.newEmail = ""
             updatedProfile.currentPassword = ""
-            
+
             updateState(.loaded(updatedProfile))
-            
+
             // Close email change sheet
             ui.set("isChangingEmail", value: false)
-            
+
             // Show success message
             ui.alertMessage = "Email updated successfully"
             ui.isShowingAlert = true
@@ -174,18 +212,18 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             updateState(.error(handledError))
         }
     }
-    
+
     @MainActor
     func sendVerificationEmail() async {
         updateState(.loading)
-        
+
         do {
             try await firebaseManager.verifyEmail()
-            
+
             // Show success message
             ui.alertMessage = "Verification email sent"
             ui.isShowingAlert = true
-            
+
             // Refresh to get updated verification status
             await fetch()
         } catch {
@@ -193,7 +231,7 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             updateState(.error(handledError))
         }
     }
-    
+
     @MainActor
     func signOut() {
         do {
@@ -203,29 +241,29 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             updateState(.error(handledError))
         }
     }
-    
+
     // MARK: - Form Field Update Methods
-    
+
     @MainActor func updateDisplayName(_ newValue: String) {
         guard var profileData = state.value else { return }
         profileData.displayName = newValue
         updateState(.loaded(profileData))
     }
-    
+
     @MainActor func updateNewEmail(_ newValue: String) {
         guard var profileData = state.value else { return }
         profileData.newEmail = newValue
         updateState(.loaded(profileData))
     }
-    
+
     @MainActor func updateCurrentPassword(_ newValue: String) {
         guard var profileData = state.value else { return }
         profileData.currentPassword = newValue
         updateState(.loaded(profileData))
     }
-    
+
     // MARK: - UI State Accessors
-    
+
     var isChangingEmail: Bool {
         get { return ui.get("isChangingEmail") ?? false }
         set { ui.set("isChangingEmail", value: newValue) }
@@ -242,33 +280,33 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
 struct UserProfileView: View {
     @State private var stateModel = UserProfileStateModel()
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         ZStack {
             // Unified Background
             TMIBackgroundView(variant: .default)
                 .ignoresSafeArea()
-            
+
             Group {
                 switch stateModel.state {
                 case .idle, .loading:
                     ProgressView()
                         .scaleEffect(1.5)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    
+
                 case .loaded(let profileData):
                     userProfileForm(profileData, stateModel: stateModel, dismiss: dismiss)
-                    
+
                 case .error(let error):
                     VStack(spacing: 16) {
                         Text("Error loading profile")
                             .font(.headline)
                             .foregroundColor(.white)
-                        
+
                         Text(error.message)
                             .foregroundColor(.red)
                             .multilineTextAlignment(.center)
-                        
+
                         TMIButton(
                             text: "Try Again",
                             style: .primary,
@@ -335,13 +373,60 @@ struct UserProfileView: View {
 private func userProfileForm(_ profileData: UserProfileData, stateModel: UserProfileStateModel, dismiss: DismissAction) -> some View {
     ScrollView {
         VStack(spacing: 20) {
+            // Profile Photo Section
+            TMIGlassCard(style: .default) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Profile Photo")
+                        .font(.headline)
+                        .foregroundColor(.white)
+
+                    HStack(spacing: 16) {
+                        if let photoURLString = stateModel.photoURL, let url = URL(string: photoURLString) {
+                            WebImage(url: url)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 80, height: 80)
+                                .clipShape(Circle())
+                        } else if let photoData = stateModel.selectedPhotoData,
+                                  let nsImage = NSImage(data: photoData) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 80, height: 80)
+                                .clipShape(Circle())
+                        } else {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .frame(width: 80, height: 80)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        PhotosPicker(selection: $stateModel.selectedPhotoItem, matching: .images) {
+                            Text("Change Photo")
+                        }
+
+                        if stateModel.isUploadingPhoto {
+                            ProgressView()
+                        }
+                    }
+                }
+            }
+            .onChange(of: stateModel.selectedPhotoItem) { _, newItem in
+                Task {
+                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                        stateModel.selectedPhotoData = data
+                        await stateModel.uploadProfilePhoto()
+                    }
+                }
+            }
+
             // Profile Information Section
             TMIGlassCard(style: .default) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Profile Information")
                         .font(.headline)
                         .foregroundColor(.white)
-                    
+
                     HStack {
                         Text("Email")
                             .foregroundColor(.white)
@@ -349,31 +434,11 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                         Text(profileData.email)
                             .foregroundColor(.white.opacity(0.7))
                     }
-                    
-//                    HStack {
-//                        Text("Email Status")
-//                            .foregroundColor(.white)
-//                        Spacer()
-//                        if profileData.isEmailVerified {
-//                            Label("Verified", systemImage: "checkmark.circle.fill")
-//                                .foregroundColor(.green)
-//                        } else {
-//                            TMIButton(
-//                                text: "Verify Now",
-//                                style: .tertiary,
-//                                action: {
-//                                    Task {
-//                                        await stateModel.sendVerificationEmail()
-//                                    }
-//                                }
-//                            )
-//                        }
-//                    }
-//                    
+
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Display Name")
                             .foregroundColor(.white)
-                        
+
                         TMITextField(
                             icon: "person",
                             placeholder: "Display Name",
@@ -385,14 +450,44 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                     }
                 }
             }
-            
+
+            // Role Section (read-only)
+            TMIGlassCard(style: .default) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Role")
+                        .font(.headline)
+                        .foregroundColor(.white)
+
+                    Text(profileData.role.isEmpty ? "Unknown" : profileData.role)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // Organization Section
+            TMIGlassCard(style: .default) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("School / Organization")
+                        .font(.headline)
+                        .foregroundColor(.white)
+
+                    TMITextField(
+                        icon: "building.2",
+                        placeholder: "Enter your school or organization",
+                        text: Binding(
+                            get: { stateModel.organization },
+                            set: { stateModel.organization = $0 }
+                        )
+                    )
+                }
+            }
+
             // Account Settings Section
             TMIGlassCard(style: .default) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Account Settings")
                         .font(.headline)
                         .foregroundColor(.white)
-                    
+
                     TMIButton(
                         text: "Change Email",
                         icon: "envelope",
@@ -401,7 +496,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                             stateModel.isChangingEmail = true
                         }
                     )
-                    
+
                     NavigationLink(destination: ChangePasswordView()) {
                         HStack {
                             Image(systemName: "lock")
@@ -416,7 +511,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                     }
                 }
             }
-            
+
             // Sign Out Section
             TMIGlassCard(style: .default) {
                 TMIButton(
@@ -440,14 +535,14 @@ struct ChangeEmailView: View {
     let stateModel: UserProfileStateModel
     let profileData: UserProfileData
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 // Unified Background
                 TMIBackgroundView(variant: .default)
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 20) {
                         TMIGlassCard(style: .default) {
@@ -455,7 +550,7 @@ struct ChangeEmailView: View {
                                 Text("Change Email")
                                     .font(.headline)
                                     .foregroundColor(.white)
-                                
+
                                 TMITextField(
                                     icon: "envelope",
                                     placeholder: "New Email",
@@ -465,7 +560,7 @@ struct ChangeEmailView: View {
                                     ),
                                     keyboardType: .emailAddress
                                 )
-                                
+
                                 TMITextField(
                                     icon: "lock",
                                     placeholder: "Current Password",
@@ -475,7 +570,7 @@ struct ChangeEmailView: View {
                                     ),
                                     isSecure: true
                                 )
-                                
+
                                 Text("You'll need to verify your new email after changing it.")
                                     .font(.caption)
                                     .foregroundColor(.white.opacity(0.7))
@@ -485,7 +580,7 @@ struct ChangeEmailView: View {
                     }
                     .padding(20)
                 }
-                
+
                 if stateModel.isLoading {
                     ProgressView()
                         .scaleEffect(1.5)
@@ -503,7 +598,7 @@ struct ChangeEmailView: View {
                     }
                     .foregroundColor(.white)
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     TMIButton(
                         text: "Save",
@@ -526,4 +621,3 @@ struct ChangeEmailView: View {
 #Preview {
     UserProfileView()
 }
-
