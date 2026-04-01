@@ -405,16 +405,19 @@ struct SurveyResultsView: View {
                     duration: surveyDuration
                 )
 
-                // Save interests to edge collection (critical for TMI Plan creation)
-                // Convert topInterests to [interestId: level] format
-                var interestResults: [String: Int] = [:]
-                for interestId in surveyResponse.topInterests {
-                    interestResults[interestId] = 3  // Default affinity level
+                // Save interests to edge collection using proper interest IDs
+                // convertClustersToInterests resolves clusters → Interest objects with stable IDs from PredefinedInterestsData
+                let interests = SurveyService.shared.convertClustersToInterests(analyzedClusters)
+                let interestResults = Dictionary(uniqueKeysWithValues: interests.compactMap { interest -> (String, Int)? in
+                    guard let id = interest.id else { return nil }
+                    return (id, 3) // Default affinity level
+                })
+                if !interestResults.isEmpty {
+                    try await StudentInterestService.shared.saveSurveyResults(
+                        studentId: studentId,
+                        results: interestResults
+                    )
                 }
-                try await StudentInterestService.shared.saveSurveyResults(
-                    studentId: studentId,
-                    results: interestResults
-                )
 
                 // Update plan snapshot if launched from plan context
                 if case .planDetail(let planId) = context {

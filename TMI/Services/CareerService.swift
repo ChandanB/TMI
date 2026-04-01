@@ -26,7 +26,7 @@ final class CareerService: @unchecked Sendable {
     // MARK: - Career Conversion
 
     /// Convert a CareerPath to a Career for the existing API surface
-    private func careerFromPath(_ path: CareerPath) -> Career {
+    func careerFromPath(_ path: CareerPath) -> Career {
         let salaryLower = Double(path.estimatedSalary?.min ?? 30000)
         let salaryUpper = Double(path.estimatedSalary?.max ?? 100000)
 

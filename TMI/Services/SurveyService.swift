@@ -493,7 +493,7 @@ final class SurveyService: @unchecked Sendable {
   }
 
   /// Convert interest clusters to actual Interest objects using predefined database
-  private func convertClustersToInterests(_ clusters: [InterestCluster]) -> [Interest] {
+  func convertClustersToInterests(_ clusters: [InterestCluster]) -> [Interest] {
     print("[SurveyService] Converting \(clusters.count) interest clusters to Interest objects")
 
     return clusters.compactMap { cluster in

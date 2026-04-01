@@ -16,6 +16,7 @@ struct CareerExplorationView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedCareer: CareerPath?
     @State private var showingCareerDetail = false
+    @State private var savedCareerIds: Set<String> = []
 
     var body: some View {
         ZStack {
@@ -165,6 +166,11 @@ struct CareerExplorationView: View {
                             .font(.tmiCaption)
                             .foregroundColor(.tmiTextSecondary)
                     }
+
+                    Spacer()
+
+                    // Save Career button
+                    saveCareerButton(for: match)
                 }
             }
             .padding(TMISpacing.md)
@@ -227,6 +233,9 @@ struct CareerExplorationView: View {
                 Text("\(match.matchPercentage)%")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.tmiSuccess)
+
+                // Save Career button (compact)
+                saveCareerButton(for: match)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, TMISpacing.md)
@@ -239,6 +248,38 @@ struct CareerExplorationView: View {
     }
 
     // MARK: - Helpers
+
+    /// Save Career button — persists the career to the student's savedCareers subcollection
+    private func saveCareerButton(for match: CareerMatchResult) -> some View {
+        let careerId = match.career.id.uuidString
+        let isSaved = savedCareerIds.contains(careerId)
+
+        return Button(action: {
+            guard !isSaved else { return }
+            savedCareerIds.insert(careerId)
+            TMIHaptics.lightImpact()
+            Task {
+                try? await CareerService.shared.saveCareer(
+                    career: CareerService.shared.careerFromPath(match.career),
+                    for: studentId
+                )
+            }
+        }) {
+            Label(
+                isSaved ? "Saved" : "Save",
+                systemImage: isSaved ? "checkmark.circle.fill" : "plus.circle"
+            )
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(isSaved ? .tmiSuccess : .tmiPrimary)
+            .padding(.horizontal, TMISpacing.sm)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill((isSaved ? Color.tmiSuccess : Color.tmiPrimary).opacity(0.12))
+            )
+        }
+        .buttonStyle(.plain)
+    }
 
     private func interestTag(_ interest: String) -> some View {
         let cluster = InterestCluster.allCategories.first { $0.name == interest }

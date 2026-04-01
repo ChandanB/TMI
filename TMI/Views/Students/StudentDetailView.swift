@@ -1067,11 +1067,19 @@ struct StudentDetailView: View {
             // Fetch student interest edges
             studentInterestEdges = try await studentInterestService.getStudentInterests(studentId: studentId)
 
-            // Resolve interest IDs to full Interest objects
+            // Resolve interest IDs to full Interest objects.
+            // Primary: look up in Firestore global library.
+            // Fallback: match against PredefinedInterestsData so survey-saved interests
+            //           (which use stable hash IDs) resolve even if the library isn't seeded.
             var interests: [Interest] = []
             for edge in studentInterestEdges {
-                if let interest = try await interestLibraryService.fetchInterest(id: edge.interestId) {
-                    interests.append(interest)
+                if let firestoreInterest = try await interestLibraryService.fetchInterest(id: edge.interestId) {
+                    interests.append(firestoreInterest)
+                } else if let predefined = PredefinedInterestsData.allPredefinedInterests.first(where: { $0.id == edge.interestId }) {
+                    interests.append(predefined)
+                    print("[StudentDetailView] Resolved interest \(edge.interestId) from PredefinedInterestsData")
+                } else {
+                    print("[StudentDetailView] Could not resolve interest ID: \(edge.interestId)")
                 }
             }
 
