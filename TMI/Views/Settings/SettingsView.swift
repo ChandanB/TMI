@@ -324,25 +324,27 @@ private var headerView: some View {
 
 // MARK: - Settings Sections
 
-private var accountSection: some View {
-    SettingsSection(title: "Account", icon: "person.circle.fill") {
-        SettingsRow(
-            title: "Edit Profile",
-            subtitle: "Update your personal information",
-            icon: "person.badge.plus",
-            action: {
-                showingEditProfile = true
-            }
-        )
-        
-        //      SettingsRow(
-        //        title: "Notification Preferences",
-        //        subtitle: "Manage your notification settings",
-        //        icon: "bell.badge",
-        //        action: {
-        //          // Navigate to notification settings
-        //        }
-        //      )
+extension SettingsView {
+    private var accountSection: some View {
+        SettingsSection(title: "Account", icon: "person.circle.fill") {
+            SettingsRow(
+                title: "Edit Profile",
+                subtitle: "Update your personal information",
+                icon: "person.badge.plus",
+                action: {
+                    showingEditProfile = true
+                }
+            )
+
+            //      SettingsRow(
+            //        title: "Notification Preferences",
+            //        subtitle: "Manage your notification settings",
+            //        icon: "bell.badge",
+            //        action: {
+            //          // Navigate to notification settings
+            //        }
+            //      )
+        }
     }
 }
 

@@ -401,7 +401,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                                 .foregroundStyle(.secondary)
                         }
 
-                        PhotosPicker(selection: $stateModel.selectedPhotoItem, matching: .images) {
+                        PhotosPicker(selection: Bindable(stateModel).selectedPhotoItem, matching: .images) {
                             Text("Change Photo")
                         }
 

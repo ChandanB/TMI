@@ -210,18 +210,14 @@ struct StudentCareersSection: View {
         recommendationError = nil
         defer { isLoadingRecommendations = false }
 
-        do {
-            let all = try await CareerService.shared.fetchAllCareers()
-            // Filter: career must have at least one relatedInterest matching a student interest name
-            recommendedCareers = all.filter { career in
-                career.relatedInterests.contains { interestNames.contains($0.lowercased()) }
-            }
-            // Sort by match count descending
-            .sorted { a, b in
-                matchingInterests(for: a).count > matchingInterests(for: b).count
-            }
-        } catch {
-            recommendationError = "Could not load recommendations: \(error.localizedDescription)"
+        let all = CareerService.shared.allCareers
+        // Filter: career must have at least one relatedInterest matching a student interest name
+        recommendedCareers = all.filter { career in
+            career.relatedInterests.contains { interestNames.contains($0.lowercased()) }
+        }
+        // Sort by match count descending
+        .sorted { a, b in
+            matchingInterests(for: a).count > matchingInterests(for: b).count
         }
     }
 }

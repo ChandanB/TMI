@@ -421,7 +421,7 @@ struct ResourceDetailView: View {
             relatedResources = try await resourceService.fetchResources(withTags: resource.tags)
             
             // Load career recommendations based on resource content
-            let allCareers = try await careerService.fetchAllCareers()
+            let allCareers = careerService.allCareers
             careerRecommendations = findRelatedCareers(from: allCareers)
             
         } catch {
