@@ -13,6 +13,66 @@ import FirebaseFirestore
 @MainActor
 @Observable
 class StudentDetailStateModel {
+    struct Summary: Equatable, Sendable {
+        enum FollowUpStatus: Equatable, Sendable {
+            case surveyPending
+            case planNeeded
+            case planFollowUp
+            case engagementCheckIn
+            case onTrack
+
+            var title: String {
+                switch self {
+                case .surveyPending:
+                    return "Complete interest discovery"
+                case .planNeeded:
+                    return "Create the first TMI plan"
+                case .planFollowUp:
+                    return "Follow up on current intervention"
+                case .engagementCheckIn:
+                    return "Check in on engagement"
+                case .onTrack:
+                    return "Keep momentum going"
+                }
+            }
+
+            var detail: String {
+                switch self {
+                case .surveyPending:
+                    return "The student still needs a completed survey or recorded interests."
+                case .planNeeded:
+                    return "Survey context is in place, but the student still needs a plan."
+                case .planFollowUp:
+                    return "There is plan work waiting on review, approval, or revision."
+                case .engagementCheckIn:
+                    return "Recent engagement is low enough to warrant a teacher touchpoint."
+                case .onTrack:
+                    return "Survey, plan, and current engagement all look covered."
+                }
+            }
+
+            var symbolName: String {
+                switch self {
+                case .surveyPending:
+                    return "list.clipboard"
+                case .planNeeded:
+                    return "doc.badge.plus"
+                case .planFollowUp:
+                    return "checklist"
+                case .engagementCheckIn:
+                    return "figure.teacher"
+                case .onTrack:
+                    return "checkmark.circle"
+                }
+            }
+        }
+
+        var activePlanCount: Int
+        var assignedNextStepCount: Int
+        var needsFollowUp: Bool
+        var followUpStatus: FollowUpStatus
+    }
+
     enum State {
         case idle
         case loading
@@ -24,6 +84,46 @@ class StudentDetailStateModel {
     var student: Student?
     var tmiPlans: [TMIPlan] = []
     var errorMessage: String?
+    var summary: Summary {
+        let hasCompletedSurvey = student?.surveyResults?.contains(where: { $0.isComplete }) ?? false
+        let hasPlans = !tmiPlans.isEmpty
+        let plansNeedingFollowUp = tmiPlans.filter {
+            $0.approvalStatus == .draft
+                || $0.approvalStatus == .pendingApproval
+                || $0.approvalStatus == .changesRequested
+        }.count
+        let needsEngagementCheckIn = (student?.engagementScore ?? 1) < 0.3
+
+        let followUpStatus: Summary.FollowUpStatus
+        if !hasCompletedSurvey {
+            followUpStatus = .surveyPending
+        } else if !hasPlans {
+            followUpStatus = .planNeeded
+        } else if plansNeedingFollowUp > 0 {
+            followUpStatus = .planFollowUp
+        } else if needsEngagementCheckIn {
+            followUpStatus = .engagementCheckIn
+        } else {
+            followUpStatus = .onTrack
+        }
+
+        var assignedNextStepCount = plansNeedingFollowUp
+        if !hasCompletedSurvey {
+            assignedNextStepCount += 1
+        } else if !hasPlans {
+            assignedNextStepCount += 1
+        }
+        if needsEngagementCheckIn {
+            assignedNextStepCount += 1
+        }
+
+        return Summary(
+            activePlanCount: tmiPlans.count,
+            assignedNextStepCount: assignedNextStepCount,
+            needsFollowUp: followUpStatus != .onTrack,
+            followUpStatus: followUpStatus
+        )
+    }
 
     private let studentId: String
     private let studentService = StudentService.shared

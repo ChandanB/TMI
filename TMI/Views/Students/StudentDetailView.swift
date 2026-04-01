@@ -227,10 +227,15 @@ struct StudentDetailView: View {
 
     @ViewBuilder
     private func studentContentView(student: Student) -> some View {
+        let summary = stateModel.summary
+
         ScrollView {
             VStack(spacing: TMISpacing.lg) {
                 // Hero Section
                 heroSection(student: student)
+
+                // Teacher Command Center
+                commandCenterSection(student: student, summary: summary)
 
                 // Quick Actions
                 quickActionsRow(student: student)
@@ -238,17 +243,17 @@ struct StudentDetailView: View {
                 // Key Stats
                 keyStatsSection(student: student)
 
-                // Interests Section
-                interestsSection(student: student)
-
-                // Saved Careers Section
-                savedCareersSection(student: student)
-
                 // TMI Plans Section
                 tmiPlansSection(student: student)
 
                 // Meetings Section
                 meetingsSection(student: student)
+
+                // Interests Section
+                interestsSection(student: student)
+
+                // Saved Careers Section
+                savedCareersSection(student: student)
 
                 // Academic Performance
                 if let academic = student.academicPerformance {
@@ -347,6 +352,64 @@ struct StudentDetailView: View {
             .cornerRadius(TMIRadius.md)
         }
         .buttonStyle(.plain)
+    }
+
+    private func commandCenterSection(
+        student: Student,
+        summary: StudentDetailStateModel.Summary
+    ) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(alignment: .top, spacing: TMISpacing.md) {
+                Image(systemName: summary.followUpStatus.symbolName)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(summary.needsFollowUp ? .tmiPrimary : .tmiSuccess)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle()
+                            .fill((summary.needsFollowUp ? Color.tmiPrimary : Color.tmiSuccess).opacity(0.12))
+                    )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Teacher Command Center")
+                        .font(.tmiCaption)
+                        .foregroundColor(.tmiTextSecondary)
+
+                    Text(summary.followUpStatus.title)
+                        .font(.tmiTitle3)
+                        .foregroundColor(.tmiTextPrimary)
+
+                    Text(summary.followUpStatus.detail)
+                        .font(.tmiBody)
+                        .foregroundColor(.tmiTextSecondary)
+                }
+
+                Spacer()
+
+                TMIBadge(
+                    text: summary.needsFollowUp ? "Needs Follow-Up" : "On Track",
+                    color: summary.needsFollowUp ? .tmiPrimary : .tmiSuccess,
+                    style: .solid
+                )
+            }
+
+            HStack(spacing: TMISpacing.md) {
+                statCard(
+                    value: "\(summary.activePlanCount)",
+                    label: "Active Plans"
+                )
+
+                statCard(
+                    value: "\(summary.assignedNextStepCount)",
+                    label: "Next Steps"
+                )
+
+                statCard(
+                    value: "\(Int(student.engagementScore * 100))%",
+                    label: "Engagement"
+                )
+            }
+        }
+        .tmiCard()
     }
 
     // MARK: - Key Stats
