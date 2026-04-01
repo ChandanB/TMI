@@ -30,6 +30,10 @@ struct StudentDetailView: View {
     @State private var resolvedInterests: [Interest] = []
     @State private var isLoadingInterests = false
 
+    // Saved Careers
+    @State private var savedCareers: [Career] = []
+    @State private var isLoadingSavedCareers = false
+
     // Environment dependencies
     @Environment(\.studentModeSession) private var studentModeSession
     @Environment(\.studentContext) private var studentContext
@@ -38,6 +42,7 @@ struct StudentDetailView: View {
     private let meetingService = MeetingService.shared
     private let studentInterestService = StudentInterestService.shared
     private let interestLibraryService = InterestLibraryService.shared
+    private let careerService = CareerService.shared
 
     init(studentId: String) {
         self.studentId = studentId
@@ -68,6 +73,7 @@ struct StudentDetailView: View {
             await planStateModel.fetch()
             await loadMeetings()
             await loadStudentInterests()
+            await loadSavedCareers()
         }
         .onChange(of: stateModel.student?.id) { _, newStudentId in
             // Set shared student context when student loads
@@ -229,6 +235,9 @@ struct StudentDetailView: View {
 
                 // Interests Section
                 interestsSection(student: student)
+
+                // Saved Careers Section
+                savedCareersSection(student: student)
 
                 // TMI Plans Section
                 tmiPlansSection(student: student)
@@ -488,6 +497,47 @@ struct StudentDetailView: View {
                 .presentationDragIndicator(.visible)
             }
         }
+    }
+
+    // MARK: - Saved Careers Section
+
+    private func savedCareersSection(student: Student) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            if isLoadingSavedCareers {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(.tmiPrimary)
+                    Spacer()
+                }
+                .padding(.vertical, TMISpacing.lg)
+            } else if !savedCareers.isEmpty {
+                Text("Saved Careers")
+                    .font(.tmiTitle3)
+                    .foregroundColor(.tmiTextPrimary)
+
+                VStack(alignment: .leading, spacing: TMISpacing.md) {
+                    ForEach(savedCareers) { career in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(career.title)
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.tmiTextPrimary)
+                                Text(career.field)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(career.education)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+        .tmiCard()
     }
 
     // MARK: - TMI Plans Section
@@ -1096,6 +1146,16 @@ struct StudentDetailView: View {
     /// Get the affinity level for a specific interest
     private func getInterestLevel(for interestId: String) -> Int {
         studentInterestEdges.first { $0.interestId == interestId }?.level ?? 0
+    }
+
+    private func loadSavedCareers() async {
+        isLoadingSavedCareers = true
+        defer { isLoadingSavedCareers = false }
+        do {
+            savedCareers = try await careerService.fetchSavedCareers(for: studentId)
+        } catch {
+            print("Failed to load saved careers: \(error)")
+        }
     }
 
     // MARK: - Student Mode
