@@ -23,7 +23,9 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
   var institutionName: String?
   var districtId: String?
   var schoolId: String?
-  
+  var photoURL: String?
+  var organization: String?
+
   // Verification and compliance
   var verificationStatus: VerificationStatus
   var consentRecords: [ConsentRecord]
@@ -62,6 +64,8 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     institutionName: String? = nil,
     districtId: String? = nil,
     schoolId: String? = nil,
+    photoURL: String? = nil,
+    organization: String? = nil,
     verificationStatus: VerificationStatus = VerificationStatus(),
     consentRecords: [ConsentRecord] = [],
     parentalConsentStatus: ParentalConsentStatus = .notRequired,
@@ -88,6 +92,8 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     self.institutionName = institutionName
     self.districtId = districtId
     self.schoolId = schoolId
+    self.photoURL = photoURL
+    self.organization = organization
     self.verificationStatus = verificationStatus
     self.consentRecords = consentRecords
     self.parentalConsentStatus = parentalConsentStatus
@@ -835,6 +841,8 @@ struct UserProfileData: Codable, Sendable {
   var role: String = "student"
   var newEmail: String = ""
   var currentPassword: String = ""
+  var photoURL: String?
+  var organization: String?
 
   init(
     displayName: String,
@@ -842,7 +850,9 @@ struct UserProfileData: Codable, Sendable {
     isEmailVerified: Bool = false,
     role: String = "student",
     newEmail: String = "",
-    currentPassword: String = ""
+    currentPassword: String = "",
+    photoURL: String? = nil,
+    organization: String? = nil
   ) {
     self.displayName = displayName
     self.email = email
@@ -850,6 +860,8 @@ struct UserProfileData: Codable, Sendable {
     self.role = role
     self.newEmail = newEmail
     self.currentPassword = currentPassword
+    self.photoURL = photoURL
+    self.organization = organization
   }
 }
 
