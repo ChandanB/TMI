@@ -160,8 +160,50 @@ class DistrictDashboardViewModel {
 
   // MARK: - Computed Properties
 
+  static let priorityKPITitles = [
+    "Active Teachers",
+    "Active Plans",
+    "Engagement Rate",
+    "Needs Attention"
+  ]
+
+  struct PilotSummary: Equatable {
+    let activeTeachers: Int
+    let activePlans: Int
+    let engagementRate: String
+    let needsAttention: Int
+  }
+
   var hasData: Bool {
     metrics.totalStudents > 0
+  }
+
+  var activeTeacherCount: Int {
+    if metrics.totalStaff > 0 {
+      return metrics.totalStaff
+    }
+
+    return schoolMetrics.filter { $0.activePlansCount > 0 }.count
+  }
+
+  var pilotSummary: PilotSummary {
+    PilotSummary(
+      activeTeachers: activeTeacherCount,
+      activePlans: metrics.activePlansCount,
+      engagementRate: metrics.engagementPercentage,
+      needsAttention: metrics.flaggedStudentsCount
+    )
+  }
+
+  var pilotReadout: [String] {
+    let summary = pilotSummary
+
+    return [
+      "\(summary.activeTeachers) teachers are actively using TMI in this pilot.",
+      "\(summary.activePlans) active plans are giving teams observable intervention coverage.",
+      "\(summary.engagementRate) average student engagement across participating schools.",
+      "\(summary.needsAttention) students currently need follow-up."
+    ]
   }
 
   var criticalAlerts: [StudentNeedAlert] {

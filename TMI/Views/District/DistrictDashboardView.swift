@@ -34,6 +34,9 @@ struct DistrictDashboardView: View {
             // KPI Cards
             kpiSection
 
+            // Pilot evidence summary
+            pilotReadoutSection
+
             // Charts Section (Placeholder for now)
             // chartSection
 
@@ -111,12 +114,15 @@ struct DistrictDashboardView: View {
     VStack(alignment: .leading, spacing: 8) {
       HStack {
         VStack(alignment: .leading, spacing: 4) {
-          Text("District Overview")
+          Text("Pilot Evidence")
             .font(.title2)
             .fontWeight(.bold)
+          Text("Adoption and engagement proof points for the current rollout.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
           Text("Last updated: \(Date().formatted(date: .abbreviated, time: .shortened))")
             .font(.caption)
-            .foregroundColor(.secondary)
+            .foregroundStyle(.secondary)
         }
         Spacer()
       }
@@ -130,58 +136,61 @@ struct DistrictDashboardView: View {
   // MARK: - KPI Section
 
   private var kpiSection: some View {
-    VStack(spacing: 16) {
-      // Row 1: Primary metrics
-      LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-        DistrictKPICard(
-          title: "Total Students",
-          value: "\(viewModel.metrics.totalStudents)",
-          icon: "person.3.fill",
-          color: .blue
-        )
+    let summary = viewModel.pilotSummary
 
-        DistrictKPICard(
-          title: "Engagement Rate",
-          value: viewModel.metrics.engagementPercentage,
-          icon: "chart.line.uptrend.xyaxis",
-          color: .green
-        )
-      }
+    return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+      DistrictKPICard(
+        title: DistrictDashboardViewModel.priorityKPITitles[0],
+        value: "\(summary.activeTeachers)",
+        icon: "person.2.fill",
+        color: .blue
+      )
 
-      // Row 2: Plan metrics
-      LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-        DistrictKPICard(
-          title: "Active Plans",
-          value: "\(viewModel.metrics.activePlansCount)",
-          icon: "doc.text.fill",
-          color: .orange
-        )
+      DistrictKPICard(
+        title: DistrictDashboardViewModel.priorityKPITitles[1],
+        value: "\(summary.activePlans)",
+        icon: "doc.text.fill",
+        color: .orange
+      )
 
-        DistrictKPICard(
-          title: "Plan Completion",
-          value: viewModel.metrics.planCompletionPercentage,
-          icon: "checkmark.circle.fill",
-          color: .green
-        )
-      }
+      DistrictKPICard(
+        title: DistrictDashboardViewModel.priorityKPITitles[2],
+        value: summary.engagementRate,
+        icon: "chart.line.uptrend.xyaxis",
+        color: .green
+      )
 
-      // Row 3: Form & Alerts
-      LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-        DistrictKPICard(
-          title: "Form Completion",
-          value: viewModel.metrics.formCompletionPercentage,
-          icon: "list.clipboard.fill",
-          color: .purple
-        )
+      DistrictKPICard(
+        title: DistrictDashboardViewModel.priorityKPITitles[3],
+        value: "\(summary.needsAttention)",
+        icon: "exclamationmark.triangle.fill",
+        color: summary.needsAttention > 0 ? .red : .gray
+      )
+    }
+  }
 
-        DistrictKPICard(
-          title: "Needs Attention",
-          value: "\(viewModel.metrics.flaggedStudentsCount)",
-          icon: "exclamationmark.triangle.fill",
-          color: viewModel.metrics.flaggedStudentsCount > 0 ? .red : .gray
-        )
+  private var pilotReadoutSection: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Pilot Readout")
+        .font(.headline)
+
+      ForEach(viewModel.pilotReadout, id: \.self) { line in
+        HStack(alignment: .top, spacing: 10) {
+          Image(systemName: "checkmark.seal.fill")
+            .foregroundStyle(.blue)
+            .padding(.top, 2)
+
+          Text(line)
+            .font(.subheadline)
+            .foregroundStyle(.primary)
+        }
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding()
+    .background(Color(UIColor.systemBackground))
+    .cornerRadius(12)
+    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
   }
 
   // MARK: - School Breakdown Section
