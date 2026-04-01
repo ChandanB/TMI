@@ -39,6 +39,10 @@ struct PlanResourcesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            Text("Optional for MVP: add a resource only if it directly supports the student's next step.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             searchBar
             linkedResourcesList
             Divider()

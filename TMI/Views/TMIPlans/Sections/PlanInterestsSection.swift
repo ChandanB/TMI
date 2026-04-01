@@ -49,6 +49,10 @@ struct PlanInterestsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            Text("Recommended for MVP: pull in a few student interests to ground the plan in what already matters to them.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             // Search bar + New button
             HStack(spacing: 8) {
                 HStack {
@@ -162,6 +166,7 @@ struct PlanInterestsSection: View {
                         .textInputAutocapitalization(.words)
                 }
             }
+            .padding(.horizontal)
             .navigationTitle("New Interest")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
