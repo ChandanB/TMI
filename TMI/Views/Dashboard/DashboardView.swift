@@ -720,14 +720,6 @@ struct DashboardView: View {
                         .gridCellColumns(4)
                 }
 
-                // District Overview (admins only) - full width
-                if isDistrictAdminRole {
-                    GridRow {
-                        districtOverviewSection
-                            .gridCellColumns(4)
-                    }
-                }
-
                 GridRow { Spacer(minLength: TMISpacing.xxl).gridCellColumns(4) }
             }
             .padding(.horizontal, TMISpacing.screenPadding)

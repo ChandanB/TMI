@@ -16,4 +16,10 @@ struct MainTabViewTests {
 
         #expect(tabs == [.dashboard, .students, .tmiPlans, .district])
     }
+
+    @Test("Nil or unsupported role falls back to dashboard only")
+    func fallbackTabs() {
+        #expect(MainTabView.Tab.mvpTabs(for: nil) == [.dashboard])
+        #expect(MainTabView.Tab.mvpTabs(for: .student) == [.dashboard])
+    }
 }

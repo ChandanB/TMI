@@ -106,7 +106,7 @@ final class DeepLinkRouter {
             
         case .districtApprovals(let districtId):
             return NavigationAction(
-                targetTab: .dashboard,
+                targetTab: .district,
                 destination: destination,
                 studentId: nil,
                 planId: nil
@@ -114,7 +114,7 @@ final class DeepLinkRouter {
             
         case .districtCompliance(let districtId):
             return NavigationAction(
-                targetTab: .dashboard,
+                targetTab: .district,
                 destination: destination,
                 studentId: nil,
                 planId: nil
@@ -202,4 +202,3 @@ extension EnvironmentValues {
         set { self[DeepLinkRouterKey.self] = newValue }
     }
 }
-
