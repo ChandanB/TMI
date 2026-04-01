@@ -141,8 +141,8 @@ struct DistrictDashboardView: View {
     return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
       DistrictKPICard(
         title: DistrictDashboardViewModel.priorityKPITitles[0],
-        value: "\(summary.activeTeachers)",
-        icon: "person.2.fill",
+        value: "\(summary.participatingSchools)",
+        icon: "building.2.fill",
         color: .blue
       )
 
