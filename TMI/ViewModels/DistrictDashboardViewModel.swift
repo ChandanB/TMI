@@ -23,6 +23,7 @@ class DistrictDashboardViewModel {
   var schoolMetrics: [SchoolMetrics] = []
   var studentsNeedingAttention: [StudentNeedAlert] = []
   var insights: [String] = []
+  var lastUpdatedAt: Date?
 
   // UI State
   var isLoading = false
@@ -53,6 +54,7 @@ class DistrictDashboardViewModel {
         metrics = analytics.metrics
         schoolMetrics = Array(analytics.schoolMetrics.values)
         insights = analytics.topInsights
+        lastUpdatedAt = analytics.generatedAt
       } else {
         // Fetch metrics
         loadingMessage = "Computing metrics..."
@@ -65,6 +67,7 @@ class DistrictDashboardViewModel {
         // Generate insights
         loadingMessage = "Generating insights..."
         insights = await analyticsService.generateInsights(for: metrics, schoolMetrics: schoolMetrics)
+        lastUpdatedAt = Date()
       }
 
       // Fetch students needing attention
@@ -99,6 +102,7 @@ class DistrictDashboardViewModel {
     metrics = analyticsService.getSampleMetrics()
     schoolMetrics = analyticsService.getSampleSchoolMetrics()
     studentsNeedingAttention = analyticsService.getSampleAlerts()
+    lastUpdatedAt = DistrictAnalytics.sample.generatedAt
     insights = [
       "Jefferson High School shows 12% improvement in engagement over last month",
       "3 students across the district require immediate counselor attention",
@@ -179,25 +183,80 @@ class DistrictDashboardViewModel {
   }
 
   var participatingSchoolsCount: Int {
-    return schoolMetrics.filter { $0.activePlansCount > 0 }.count
+    visibleSchoolMetrics.filter { $0.activePlansCount > 0 }.count
+  }
+
+  var lastUpdatedDisplayText: String {
+    guard let lastUpdatedAt else {
+      return "Last updated: awaiting data"
+    }
+
+    return "Last updated: \(lastUpdatedAt.formatted(date: .abbreviated, time: .shortened))"
+  }
+
+  private var visibleSchoolMetrics: [SchoolMetrics] {
+    guard let schoolId = filter.schoolId else {
+      return schoolMetrics
+    }
+
+    return schoolMetrics.filter { $0.schoolId == schoolId }
+  }
+
+  private var summarySourceSchoolMetrics: [SchoolMetrics] {
+    let participatingSchools = visibleSchoolMetrics.filter { $0.activePlansCount > 0 }
+
+    return participatingSchools.isEmpty ? visibleSchoolMetrics : participatingSchools
+  }
+
+  private var engagementPopulationDescription: String {
+    if summarySourceSchoolMetrics.contains(where: { $0.activePlansCount > 0 }) {
+      return "participating schools with active plans"
+    }
+
+    return filter.schoolId == nil ? "the current district view" : "the filtered school view"
+  }
+
+  private var engagementSummaryPercentage: String {
+    let sourceSchools = summarySourceSchoolMetrics
+    let totalStudents = sourceSchools.reduce(0) { $0 + $1.studentCount }
+
+    guard totalStudents > 0 else {
+      return metrics.engagementPercentage
+    }
+
+    let weightedEngagement = sourceSchools.reduce(0.0) { partialResult, school in
+      partialResult + (school.engagementRate * Double(school.studentCount))
+    } / Double(totalStudents)
+
+    return String(format: "%.1f%%", weightedEngagement * 100)
   }
 
   var pilotSummary: PilotSummary {
+    if let selectedSchool = visibleSchoolMetrics.first, filter.schoolId != nil {
+      return PilotSummary(
+        participatingSchools: selectedSchool.activePlansCount > 0 ? 1 : 0,
+        activePlans: selectedSchool.activePlansCount,
+        engagementRate: engagementSummaryPercentage,
+        needsAttention: selectedSchool.flaggedStudentsCount
+      )
+    }
+
     PilotSummary(
       participatingSchools: participatingSchoolsCount,
       activePlans: metrics.activePlansCount,
-      engagementRate: metrics.engagementPercentage,
+      engagementRate: engagementSummaryPercentage,
       needsAttention: metrics.flaggedStudentsCount
     )
   }
 
   var pilotReadout: [String] {
     let summary = pilotSummary
+    let participationLabel = summary.participatingSchools == 1 ? "school is" : "schools are"
 
     return [
-      "\(summary.participatingSchools) schools are actively participating in the TMI pilot.",
+      "\(summary.participatingSchools) \(participationLabel) actively participating in the TMI pilot.",
       "\(summary.activePlans) active plans are giving teams observable intervention coverage.",
-      "\(summary.engagementRate) average student engagement across participating schools.",
+      "\(summary.engagementRate) average student engagement across \(engagementPopulationDescription).",
       "\(summary.needsAttention) students currently need follow-up."
     ]
   }

@@ -120,7 +120,7 @@ struct DistrictDashboardView: View {
           Text("Adoption and engagement proof points for the current rollout.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
-          Text("Last updated: \(Date().formatted(date: .abbreviated, time: .shortened))")
+          Text(viewModel.lastUpdatedDisplayText)
             .font(.caption)
             .foregroundStyle(.secondary)
         }
