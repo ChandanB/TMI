@@ -21,12 +21,26 @@ enum MVPEmptyStateCopy {
   static let dashboardActivityMessage = "Add a student, capture interests, and create the first TMI plan to start showing activity here."
   static let dashboardActivityAction = "Add Student"
 
+  static let studentInterestsTitle = "Discover what motivates this student"
+  static let studentInterestsMessage = "Run the interest survey or add a few interests so you can build a plan from real student signals."
   static let studentInterestsAction = "Take Survey"
+
+  static let studentPlansTitle = "Turn interests into a support plan"
+  static let studentPlansMessage = "Create the first TMI plan so the team has a concrete next step to review and track."
   static let studentPlansAction = "Create First Plan"
+
+  static let studentMeetingsTitle = "Keep the core loop moving"
+  static let studentMeetingsMessage = "Schedule a check-in once the plan is underway so the team can review progress and adjust support."
   static let studentMeetingsAction = "Schedule Meeting"
 
   static let districtPilotTitle = "Pilot data will appear here"
   static let districtPilotMessage = "Ask each school team to add students, capture interests, and launch plans so district proof points roll up here."
+  static let districtFollowUpTitle = "No follow-up signals yet"
+  static let districtFollowUpMessage = "Have schools add students, capture interests, and create plans before district follow-up trends appear."
+  static let districtInsightsTitle = "Insights unlock after schools use the core loop"
+  static let districtInsightsMessage = "Once schools add students, run surveys, and launch plans, this view will summarize adoption and engagement patterns."
+  static let districtSchoolsTitle = "School comparisons start with school-level activity"
+  static let districtSchoolsMessage = "When schools begin adding students and launching plans, their engagement and follow-up trends will appear here."
 }
 
 // MARK: - Dashboard Data Model

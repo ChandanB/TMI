@@ -42,8 +42,8 @@ struct DistrictDashboardView: View {
 
             if viewModel.studentsNeedingAttention.isEmpty {
               districtGuidanceCard(
-                title: "No follow-up signals yet",
-                message: "Have schools add students, capture interests, and create plans before district follow-up trends appear.",
+                title: MVPEmptyStateCopy.districtFollowUpTitle,
+                message: MVPEmptyStateCopy.districtFollowUpMessage,
                 systemImage: "person.3.sequence.fill"
               )
             } else {
@@ -52,8 +52,8 @@ struct DistrictDashboardView: View {
 
             if viewModel.insights.isEmpty {
               districtGuidanceCard(
-                title: "Insights unlock after schools use the core loop",
-                message: "Once schools add students, run surveys, and launch plans, this view will summarize adoption and engagement patterns.",
+                title: MVPEmptyStateCopy.districtInsightsTitle,
+                message: MVPEmptyStateCopy.districtInsightsMessage,
                 systemImage: "lightbulb.max.fill"
               )
             } else {
@@ -225,8 +225,8 @@ struct DistrictDashboardView: View {
 
       if viewModel.schoolMetrics.isEmpty {
         districtGuidanceCard(
-          title: "School comparisons start with school-level activity",
-          message: "When schools begin adding students and launching plans, their engagement and follow-up trends will appear here.",
+          title: MVPEmptyStateCopy.districtSchoolsTitle,
+          message: MVPEmptyStateCopy.districtSchoolsMessage,
           systemImage: "chart.bar.xaxis"
         )
       } else {

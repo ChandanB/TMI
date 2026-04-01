@@ -503,11 +503,11 @@ struct StudentDetailView: View {
                         .font(.system(size: 32))
                         .foregroundColor(.tmiTextTertiary)
 
-                    Text("Discover what motivates \(student.name)")
+                    Text(MVPEmptyStateCopy.studentInterestsTitle)
                         .font(.tmiBody)
                         .foregroundColor(.tmiTextPrimary)
 
-                    Text("Run the interest survey or add a few interests so you can build a plan from real student signals.")
+                    Text(MVPEmptyStateCopy.studentInterestsMessage)
                         .font(.tmiCaption)
                         .foregroundColor(.tmiTextTertiary)
                         .multilineTextAlignment(.center)
@@ -670,11 +670,11 @@ struct StudentDetailView: View {
                         .font(.system(size: 32))
                         .foregroundColor(.tmiTextTertiary)
 
-                    Text("Turn interests into a support plan")
+                    Text(MVPEmptyStateCopy.studentPlansTitle)
                         .font(.tmiBody)
                         .foregroundColor(.tmiTextPrimary)
 
-                    Text("Create the first TMI plan for \(student.name) so the team has a concrete next step to review and track.")
+                    Text(MVPEmptyStateCopy.studentPlansMessage)
                         .font(.tmiCaption)
                         .foregroundColor(.tmiTextTertiary)
                         .multilineTextAlignment(.center)
@@ -755,11 +755,11 @@ struct StudentDetailView: View {
                         .font(.system(size: 32))
                         .foregroundColor(.tmiTextTertiary)
 
-                    Text("Keep the core loop moving")
+                    Text(MVPEmptyStateCopy.studentMeetingsTitle)
                         .font(.tmiBody)
                         .foregroundColor(.tmiTextPrimary)
 
-                    Text("Schedule a check-in once the plan is underway so the team can review progress and adjust support.")
+                    Text(MVPEmptyStateCopy.studentMeetingsMessage)
                         .font(.tmiCaption)
                         .foregroundColor(.tmiTextTertiary)
                         .multilineTextAlignment(.center)

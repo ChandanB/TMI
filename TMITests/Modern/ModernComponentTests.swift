@@ -16,10 +16,23 @@ struct MVPEmptyStateCopyTests {
     func testMVPCopySupportsCoreWorkflow() {
         #expect(MVPEmptyStateCopy.dashboardActivityTitle == "Start the core loop")
         #expect(MVPEmptyStateCopy.dashboardActivityMessage.localizedCaseInsensitiveContains("add a student"))
+        #expect(MVPEmptyStateCopy.studentInterestsTitle == "Discover what motivates this student")
+        #expect(MVPEmptyStateCopy.studentInterestsMessage.localizedCaseInsensitiveContains("build a plan"))
+        #expect(MVPEmptyStateCopy.studentPlansTitle == "Turn interests into a support plan")
+        #expect(MVPEmptyStateCopy.studentPlansMessage.localizedCaseInsensitiveContains("concrete next step"))
+        #expect(MVPEmptyStateCopy.studentMeetingsTitle == "Keep the core loop moving")
+        #expect(MVPEmptyStateCopy.studentMeetingsMessage.localizedCaseInsensitiveContains("review progress"))
         #expect(MVPEmptyStateCopy.studentPlansAction == "Create First Plan")
         #expect(MVPEmptyStateCopy.studentInterestsAction == "Take Survey")
         #expect(MVPEmptyStateCopy.studentMeetingsAction == "Schedule Meeting")
         #expect(MVPEmptyStateCopy.districtPilotTitle == "Pilot data will appear here")
+        #expect(MVPEmptyStateCopy.districtPilotMessage.localizedCaseInsensitiveContains("proof points"))
+        #expect(MVPEmptyStateCopy.districtFollowUpTitle == "No follow-up signals yet")
+        #expect(MVPEmptyStateCopy.districtFollowUpMessage.localizedCaseInsensitiveContains("district follow-up trends"))
+        #expect(MVPEmptyStateCopy.districtInsightsTitle == "Insights unlock after schools use the core loop")
+        #expect(MVPEmptyStateCopy.districtInsightsMessage.localizedCaseInsensitiveContains("adoption and engagement patterns"))
+        #expect(MVPEmptyStateCopy.districtSchoolsTitle == "School comparisons start with school-level activity")
+        #expect(MVPEmptyStateCopy.districtSchoolsMessage.localizedCaseInsensitiveContains("engagement and follow-up trends"))
     }
 }
 
