@@ -48,10 +48,22 @@
 		11C813E02DB59A6D005477FC /* Apple_MCP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Apple_MCP.md; sourceTree = "<group>"; };
 		11E7D1222C93A2B60021AC20 /* TMI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TMI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		11E7D1292C93A2B70021AC20 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A1B2C3D4E5F6012345678902 /* TMITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TMITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		A1B2C3D4E5F6012345678910 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 11E7D11A2C93A2B60021AC20 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 11E7D1212C93A2B60021AC20;
+			remoteInfo = TMI;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		11C816A22DB5F5AC005477FC /* TMI */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = TMI; sourceTree = "<group>"; };
+		A1B2C3D4E5F6012345678901 /* TMITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = TMITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,6 +111,7 @@
 				11C813DE2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md */,
 				115B603B2EA6BD48003A033A /* IMPLEMENTATION_STATUS.md */,
 				11C816A22DB5F5AC005477FC /* TMI */,
+				A1B2C3D4E5F6012345678901 /* TMITests */,
 				1185DB0B2C93AA91004616D5 /* GoogleService-Info.plist */,
 				11E7D1292C93A2B70021AC20 /* Assets.xcassets */,
 				11E7D1232C93A2B60021AC20 /* Products */,
@@ -109,6 +122,7 @@
 			isa = PBXGroup;
 			children = (
 				11E7D1222C93A2B60021AC20 /* TMI.app */,
+				A1B2C3D4E5F6012345678902 /* TMITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -165,6 +179,27 @@
 			productReference = 11E7D1222C93A2B60021AC20 /* TMI.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A1B2C3D4E5F6012345678903 /* TMITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1B2C3D4E5F6012345678909 /* Build configuration list for PBXNativeTarget "TMITests" */;
+			buildPhases = (
+				A1B2C3D4E5F6012345678904 /* Sources */,
+				A1B2C3D4E5F6012345678905 /* Frameworks */,
+				A1B2C3D4E5F6012345678906 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A1B2C3D4E5F6012345678911 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A1B2C3D4E5F6012345678901 /* TMITests */,
+			);
+			name = TMITests;
+			productName = TMITests;
+			productReference = A1B2C3D4E5F6012345678902 /* TMITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -176,6 +211,10 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					11E7D1212C93A2B60021AC20 = {
+						CreatedOnToolsVersion = 15.4;
+						TestTargetID = A1B2C3D4E5F6012345678903;
+					};
+					A1B2C3D4E5F6012345678903 = {
 						CreatedOnToolsVersion = 15.4;
 					};
 				};
@@ -199,6 +238,7 @@
 			projectRoot = "";
 			targets = (
 				11E7D1212C93A2B60021AC20 /* TMI */,
+				A1B2C3D4E5F6012345678903 /* TMITests */,
 			);
 		};
 /* End PBXProject section */
@@ -218,9 +258,38 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A1B2C3D4E5F6012345678911 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 11E7D1212C93A2B60021AC20 /* TMI */;
+			targetProxy = A1B2C3D4E5F6012345678910 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin PBXSourcesBuildPhase section */
 		11E7D11E2C93A2B60021AC20 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1B2C3D4E5F6012345678904 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1B2C3D4E5F6012345678905 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1B2C3D4E5F6012345678906 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -361,9 +430,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "\"TMI/Preview Content\"";
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
@@ -381,7 +447,6 @@
 				MARKETING_VERSION = 1.51;
 				PRODUCT_BUNDLE_IDENTIFIER = ZLHN.TMI;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
@@ -428,6 +493,61 @@
 			};
 			name = Release;
 		};
+		A1B2C3D4E5F6012345678907 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = H3Z7K9ZZE8;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ZLHN.TMITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TMI.app/TMI";
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1B2C3D4E5F6012345678908 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = H3Z7K9ZZE8;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ZLHN.TMITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TMI.app/TMI";
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -445,6 +565,15 @@
 			buildConfigurations = (
 				11E7D1312C93A2B70021AC20 /* Debug */,
 				11E7D1322C93A2B70021AC20 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1B2C3D4E5F6012345678909 /* Build configuration list for PBXNativeTarget "TMITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1B2C3D4E5F6012345678907 /* Debug */,
+				A1B2C3D4E5F6012345678908 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
