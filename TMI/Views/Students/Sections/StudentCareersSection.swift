@@ -83,6 +83,10 @@ struct StudentCareersSection: View {
                 TextField("Search selected careers", text: $searchText)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .onSubmit {
+                        // Filtering is reactive via searchText binding — just dismiss keyboard
+                    }
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
