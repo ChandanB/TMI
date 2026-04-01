@@ -57,6 +57,10 @@ struct PlanInterestsSection: View {
                     TextField("Search interests…", text: $searchText)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .submitLabel(.search)
+                        .onSubmit {
+                            // Filtering is reactive via searchText binding — just dismiss keyboard
+                        }
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)

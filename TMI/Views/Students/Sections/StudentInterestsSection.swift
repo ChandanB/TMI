@@ -56,6 +56,10 @@ struct StudentInterestsSection: View {
                     TextField("Search interests…", text: $searchText)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .submitLabel(.search)
+                        .onSubmit {
+                            // Filtering is reactive via searchText binding — just dismiss keyboard
+                        }
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
@@ -150,6 +154,7 @@ struct StudentInterestsSection: View {
                         .textInputAutocapitalization(.words)
                 }
             }
+            .padding(.horizontal)
             .navigationTitle("New Interest")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
