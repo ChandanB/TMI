@@ -172,7 +172,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       let roleData = userRole != nil ? generateRoleSpecificData(role: userRole!, students: students, plans: plans) : nil
       
       // Generate next best action based on role and data
-      let nextAction = generateNextBestAction(role: userRole, students: students, plans: plans, surveysCompleted: surveysCompleted)
+      let nextAction = Self.prioritizedNextBestAction(role: userRole, students: students, plans: plans)
 
       let dashboardData = DashboardData(
         engagementData: engagementData,
@@ -236,67 +236,82 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   
   // MARK: - Next Best Action Generation
   
-  private func generateNextBestAction(role: UserRole?, students: [Student], plans: [TMIPlan], surveysCompleted: Int) -> NextBestAction? {
-    // Priority order for action suggestions
-    
-    // 1. Check for pending approvals (highest priority for counselors/admins)
+  static func prioritizedNextBestAction(role: UserRole?, students: [Student], plans: [TMIPlan]) -> NextBestAction? {
+    let studentsWithPlanIds = Set(plans.flatMap { $0.students.compactMap(\.id) })
     let pendingPlans = plans.filter { $0.approvalStatus == .pendingApproval }
-    if !pendingPlans.isEmpty && (role == .counselor || role == .administrator || role == .admin) {
-      return NextBestAction(
-        id: "pending_approval",
-        type: .pendingApproval,
-        title: "Plans Awaiting Approval",
-        description: "\(pendingPlans.count) plan\(pendingPlans.count == 1 ? "" : "s") need your review",
-        priority: .urgent,
-        targetStudentId: nil,
-        targetPlanId: pendingPlans.first?.id
-      )
+    let canReviewApprovals = role == .counselor || role == .administrator || role == .admin
+
+    let candidates: [NextBestAction] = [
+      canReviewApprovals ? approvalAction(for: pendingPlans) : nil,
+      lowEngagementAction(for: students),
+      missingPlanAction(for: students, studentsWithPlanIds: studentsWithPlanIds),
+      surveyFollowUpAction(for: students, role: role)
+    ]
+    .compactMap { $0 }
+
+    return candidates.max { lhs, rhs in
+      lhs.priority < rhs.priority
     }
-    
-    // 2. Check for students with low engagement (critical)
-    let lowEngagementStudents = students.filter { $0.engagementScore < 0.3 }
-    if let firstStudent = lowEngagementStudents.first {
-      return NextBestAction(
-        id: "check_progress_\(firstStudent.id ?? "")",
-        type: .checkProgress,
-        title: "Student Needs Attention",
-        description: "\(firstStudent.name) has low engagement - consider reaching out",
-        priority: .high,
-        targetStudentId: firstStudent.id,
-        targetPlanId: nil
-      )
-    }
-    
-    // 3. Check for students without plans (medium priority)
-    let studentsWithPlanIds = Set(plans.flatMap { $0.students.compactMap { $0.id } })
-    let studentsWithoutPlans = students.filter { !studentsWithPlanIds.contains($0.id ?? "") && !($0.surveyResults?.isEmpty ?? true) }
-    if let firstStudent = studentsWithoutPlans.first {
-      return NextBestAction(
-        id: "create_plan_\(firstStudent.id ?? "")",
-        type: .createPlan,
-        title: "Create TMI Plan",
-        description: "\(firstStudent.name) completed survey but has no plan",
-        priority: .medium,
-        targetStudentId: firstStudent.id,
-        targetPlanId: nil
-      )
-    }
-    
-    // 4. Check for students without surveys (low priority for teachers)
-    let studentsWithoutSurveys = students.filter { $0.surveyResults?.isEmpty ?? true }
-    if let firstStudent = studentsWithoutSurveys.first, (role == .teacher || role == .counselor) {
-      return NextBestAction(
-        id: "add_interests_\(firstStudent.id ?? "")",
-        type: .addInterests,
-        title: "Survey Pending",
-        description: "\(firstStudent.name) hasn't completed their interest survey",
-        priority: .low,
-        targetStudentId: firstStudent.id,
-        targetPlanId: nil
-      )
-    }
-    
-    return nil
+  }
+
+  private static func approvalAction(for pendingPlans: [TMIPlan]) -> NextBestAction? {
+    guard !pendingPlans.isEmpty else { return nil }
+
+    return NextBestAction(
+      id: "pending_approval",
+      type: .pendingApproval,
+      title: "Plans Awaiting Approval",
+      description: "\(pendingPlans.count) plan\(pendingPlans.count == 1 ? "" : "s") need your review",
+      priority: .urgent,
+      targetStudentId: nil,
+      targetPlanId: pendingPlans.first?.id
+    )
+  }
+
+  private static func lowEngagementAction(for students: [Student]) -> NextBestAction? {
+    guard let firstStudent = students.first(where: { $0.engagementScore < 0.3 }) else { return nil }
+
+    return NextBestAction(
+      id: "check_progress_\(firstStudent.id ?? "")",
+      type: .checkProgress,
+      title: "Student Needs Attention",
+      description: "\(firstStudent.name) has low engagement - consider reaching out",
+      priority: .high,
+      targetStudentId: firstStudent.id,
+      targetPlanId: nil
+    )
+  }
+
+  private static func missingPlanAction(for students: [Student], studentsWithPlanIds: Set<String>) -> NextBestAction? {
+    guard let firstStudent = students.first(where: {
+      guard let studentId = $0.id else { return false }
+      return !studentsWithPlanIds.contains(studentId) && !($0.surveyResults?.isEmpty ?? true)
+    }) else { return nil }
+
+    return NextBestAction(
+      id: "create_plan_\(firstStudent.id ?? "")",
+      type: .createPlan,
+      title: "Create TMI Plan",
+      description: "\(firstStudent.name) completed survey but has no plan",
+      priority: .medium,
+      targetStudentId: firstStudent.id,
+      targetPlanId: nil
+    )
+  }
+
+  private static func surveyFollowUpAction(for students: [Student], role: UserRole?) -> NextBestAction? {
+    guard role == .teacher || role == .counselor else { return nil }
+    guard let firstStudent = students.first(where: { $0.surveyResults?.isEmpty ?? true }) else { return nil }
+
+    return NextBestAction(
+      id: "add_interests_\(firstStudent.id ?? "")",
+      type: .addInterests,
+      title: "Survey Pending",
+      description: "\(firstStudent.name) hasn't completed their interest survey",
+      priority: .low,
+      targetStudentId: firstStudent.id,
+      targetPlanId: nil
+    )
   }
   
   private func generateEngagementData(from students: [Student]) -> [EngagementData] {
@@ -430,7 +445,9 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       interestsIdentified: data.interestsIdentified,
       surveysCompleted: data.surveysCompleted,
       plansAligned: data.plansAligned,
-      recentActivities: filteredActivities
+      recentActivities: filteredActivities,
+      nextBestAction: data.nextBestAction,
+      roleData: data.roleData
     )
   }
 
@@ -563,6 +580,10 @@ struct DashboardView: View {
         return [UserRole.superintendent, .districtAdmin, .administrator, .admin].contains(role)
     }
 
+    private var isTeacherRole: Bool {
+        authStateModel.currentUser?.role == .teacher
+    }
+
     var body: some View {
         ZStack {
             TMIBackgroundView(variant: .dashboard)
@@ -648,7 +669,10 @@ struct DashboardView: View {
     @ViewBuilder
     private func dashboardContent(_ data: DashboardData) -> some View {
         ScrollView {
-            Grid(alignment: .leading, horizontalSpacing: TMISpacing.md, verticalSpacing: TMISpacing.lg) {
+            if isTeacherRole {
+                teacherActionBoardContent(data)
+            } else {
+                Grid(alignment: .leading, horizontalSpacing: TMISpacing.md, verticalSpacing: TMISpacing.lg) {
                 // Header insight (1/2 width)
                 GridRow {
                     VStack(alignment: .leading, spacing: TMISpacing.md) {
@@ -721,6 +745,7 @@ struct DashboardView: View {
                 }
 
                 GridRow { Spacer(minLength: TMISpacing.xxl).gridCellColumns(4) }
+                }
             }
             .padding(.horizontal, TMISpacing.screenPadding)
             .padding(.top)
@@ -755,6 +780,30 @@ struct DashboardView: View {
 
 
     // MARK: - Recent Activity Section
+
+    private func teacherActionBoardContent(_ data: DashboardData) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.lg) {
+            if let action = data.nextBestAction {
+                NextBestActionCard(action: action) {
+                    handleNextAction(action)
+                }
+            }
+
+            if let readyToGrowCount = studentsNeedingAttention(data), readyToGrowCount > 0 {
+                StudentsReadyToGrowCard(count: readyToGrowCount) {
+                    navigateToStudents = true
+                }
+            }
+
+            QuickActionsGrid()
+
+            if let roleData = data.roleData {
+                roleSpecificSection(roleData)
+            }
+
+            recentActivitySection(data)
+        }
+    }
 
     private func recentActivitySection(_ data: DashboardData) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
@@ -898,7 +947,7 @@ struct DashboardView: View {
     private func roleSpecificSection(_ roleData: RoleSpecificData) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
-                Text(roleData.role.displayName + " Overview")
+                Text(roleData.role == .teacher ? "Teacher Action Board" : roleData.role.displayName + " Overview")
                     .font(.tmiTitle3)
                     .foregroundColor(.tmiTextPrimary)
                 Spacer()
@@ -908,7 +957,7 @@ struct DashboardView: View {
             case .counselor, .socialWorker:
                 counselorSummaryCard(roleData)
             case .teacher:
-                teacherSummaryCard(roleData)
+                teacherActionSummaryCard(roleData)
             case .administrator, .admin, .superintendent, .districtAdmin:
                 adminSummaryCard(roleData)
             default:
@@ -947,25 +996,25 @@ struct DashboardView: View {
         }
     }
     
-    private func teacherSummaryCard(_ data: RoleSpecificData) -> some View {
+    private func teacherActionSummaryCard(_ data: RoleSpecificData) -> some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: TMISpacing.md) {
             RoleSummaryItem(
-                icon: "studentdesk",
-                value: "\(data.classroomStudentCount)",
-                label: "Students",
-                color: .tmiPrimary
+                icon: "heart.text.square.fill",
+                value: "\(data.classroomSurveysPending)",
+                label: "Survey Follow-up",
+                color: data.classroomSurveysPending > 0 ? .orange : .green
             )
             RoleSummaryItem(
                 icon: "doc.text.fill",
-                value: "\(data.classroomPlansActive)",
-                label: "Active Plans",
+                value: "\(max(0, data.classroomStudentCount - data.classroomPlansActive))",
+                label: "Plans To Start",
                 color: .blue
             )
             RoleSummaryItem(
-                icon: "list.clipboard.fill",
-                value: "\(data.classroomSurveysPending)",
-                label: "Surveys Pending",
-                color: data.classroomSurveysPending > 0 ? .orange : .green
+                icon: "studentdesk",
+                value: "\(data.classroomStudentCount)",
+                label: "Students in View",
+                color: .tmiPrimary
             )
         }
     }
