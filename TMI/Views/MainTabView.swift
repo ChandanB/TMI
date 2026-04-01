@@ -40,7 +40,7 @@ struct MainTabView: View {
 
         static func mvpTabs(for role: UserRole?) -> [Tab] {
             switch role {
-            case .districtAdmin, .superintendent:
+            case .districtAdmin:
                 return [.dashboard, .students, .tmiPlans, .district]
             case .teacher, .counselor, .administrator, .admin, .socialWorker:
                 return [.dashboard, .students, .tmiPlans]
@@ -119,13 +119,13 @@ struct MainTabView: View {
                     destinationView(for: tab)
                         .navigationTitle(tab.label)
                         .toolbar {
-//                            ToolbarItem(placement: .automatic) {
-//                                if studentContext.hasActiveStudent {
-//                                    workspaceButton
-//                                }
-//                            }
+                            ToolbarItem(placement: .automatic) {
+                                if studentContext.hasActiveStudent {
+                                    workspaceButton
+                                }
+                            }
                             ToolbarItemGroup(placement: .automatic) {
-//                                NotificationBellButton()
+                                NotificationBellButton()
                                 profileMenu
                             }
                         }
