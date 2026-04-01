@@ -55,6 +55,9 @@ final class StudentContextStateModel {
     /// Whether student edges (interests, career state) are being prefetched
     private(set) var isPrefetchingEdges: Bool = false
     
+    /// Student ID currently being prefetched.
+    private(set) var prefetchingStudentId: String?
+    
     /// Prefetched student interests (from edge collection)
     private(set) var prefetchedInterests: [Interest] = []
     
@@ -68,6 +71,8 @@ final class StudentContextStateModel {
     
     /// Pending deep link to process after context is set
     private(set) var pendingDeepLink: DeepLinkDestination?
+    
+    private var prefetchTask: Task<Void, Never>?
     
     // MARK: - Computed Properties
     
@@ -119,8 +124,19 @@ final class StudentContextStateModel {
         scope: StudentContextScope = .staff,
         prefetchEdges: Bool = true
     ) async {
+        let shouldPrefetch = Self.shouldPrefetchEdges(
+            requested: prefetchEdges,
+            incomingStudentId: studentId,
+            currentStudentId: selectedStudentId,
+            incomingScope: scope,
+            currentScope: self.scope,
+            hasPrefetchedEdges: hasPrefetchedEdges,
+            isPrefetching: isPrefetchingEdges && prefetchingStudentId == studentId
+        )
+        
         // Clear plan when changing students
         if studentId != selectedStudentId {
+            prefetchTask?.cancel()
             selectedPlanId = nil
             cachedPlan = nil
             prefetchedInterests = []
@@ -134,7 +150,7 @@ final class StudentContextStateModel {
         lastContextChange = Date()
         
         // Prefetch edges if requested and we have a valid student ID
-        if prefetchEdges, let studentId = studentId {
+        if shouldPrefetch, let studentId = studentId {
             await prefetchStudentEdges(studentId: studentId)
         }
         
@@ -157,6 +173,8 @@ final class StudentContextStateModel {
     /// Clear all context (e.g., on sign out or tab change)
     @MainActor
     func clearContext() {
+        prefetchTask?.cancel()
+        prefetchTask = nil
         selectedStudentId = nil
         selectedPlanId = nil
         cachedStudent = nil
@@ -164,6 +182,8 @@ final class StudentContextStateModel {
         prefetchedInterests = []
         prefetchedCareerState = nil
         prefetchedPlans = []
+        isPrefetchingEdges = false
+        prefetchingStudentId = nil
         scope = .staff
         lastContextChange = Date()
         
@@ -204,12 +224,39 @@ final class StudentContextStateModel {
     /// Invalidate caches (forces re-fetch on next access)
     @MainActor
     func invalidateCaches() {
+        prefetchTask?.cancel()
+        prefetchTask = nil
         cachedStudent = nil
         cachedPlan = nil
         prefetchedInterests = []
         prefetchedCareerState = nil
         prefetchedPlans = []
+        isPrefetchingEdges = false
+        prefetchingStudentId = nil
         lastContextChange = Date()
+    }
+    
+    var hasPrefetchedEdges: Bool {
+        !prefetchedInterests.isEmpty || prefetchedCareerState != nil || !prefetchedPlans.isEmpty
+    }
+    
+    static func shouldPrefetchEdges(
+        requested: Bool,
+        incomingStudentId: String?,
+        currentStudentId: String?,
+        incomingScope: StudentContextScope,
+        currentScope: StudentContextScope,
+        hasPrefetchedEdges: Bool,
+        isPrefetching: Bool
+    ) -> Bool {
+        guard requested, let incomingStudentId else { return false }
+        
+        let isSameContext = incomingStudentId == currentStudentId && incomingScope == currentScope
+        if isSameContext && (hasPrefetchedEdges || isPrefetching) {
+            return false
+        }
+        
+        return true
     }
     
     // MARK: - Prefetch Operations
@@ -217,60 +264,80 @@ final class StudentContextStateModel {
     /// Prefetch student edges (interests, career state, plans) for better UX
     @MainActor
     private func prefetchStudentEdges(studentId: String) async {
+        prefetchTask?.cancel()
         isPrefetchingEdges = true
-        defer { isPrefetchingEdges = false }
+        prefetchingStudentId = studentId
         
-        print("[StudentContext] Prefetching edges for student: \(studentId)")
-        
-        // Fetch in parallel
-        await withTaskGroup(of: Void.self) { group in
-            // Fetch interests
-            group.addTask { @MainActor in
-                do {
-                    let edges = try await StudentInterestService.shared.getStudentInterests(studentId: studentId)
-                    let interestIds = edges.map { $0.interestId }
-                    
-                    // Fetch full interest objects from library
-                    let allInterests = try await InterestLibraryService.shared.fetchAllInterests()
-                    let interests = allInterests.filter { interestIds.contains($0.id ?? "") }
-                    self.prefetchedInterests = interests
-                    
-                    print("[StudentContext] Prefetched \(interests.count) interests")
-                } catch {
-                    print("[StudentContext] Failed to prefetch interests: \(error.localizedDescription)")
+        let task = Task { @MainActor in
+            defer {
+                if self.prefetchingStudentId == studentId {
+                    self.isPrefetchingEdges = false
+                    self.prefetchingStudentId = nil
+                    self.prefetchTask = nil
                 }
             }
-            
-            // Fetch career state
-            group.addTask { @MainActor in
-                do {
-                    let careers = try await StudentCareerService.shared.getStudentCareers(studentId: studentId)
-                    self.prefetchedCareerState = careers.first
-                    
-                    print("[StudentContext] Prefetched \(careers.count) career states")
-                } catch {
-                    print("[StudentContext] Failed to prefetch career state: \(error.localizedDescription)")
-                }
-            }
-            
-            // Fetch plans
-            group.addTask { @MainActor in
-                do {
-                    let planService = TMIPlanService.shared
-                    let allPlans = try await planService.fetchPlans()
-                    
-                    // Filter to plans containing this student
-                    let studentPlans = allPlans.filter { plan in
-                        plan.students.contains(where: { $0.id == studentId })
+        
+            print("[StudentContext] Prefetching edges for student: \(studentId)")
+        
+            // Fetch in parallel
+            await withTaskGroup(of: Void.self) { group in
+                // Fetch interests
+                group.addTask { @MainActor in
+                    do {
+                        let edges = try await StudentInterestService.shared.getStudentInterests(studentId: studentId)
+                        let interestIds = edges.map { $0.interestId }
+                        
+                        // Fetch full interest objects from library
+                        let allInterests = try await InterestLibraryService.shared.fetchAllInterests()
+                        let interests = allInterests.filter { interestIds.contains($0.id ?? "") }
+                        self.prefetchedInterests = interests
+                        
+                        print("[StudentContext] Prefetched \(interests.count) interests")
+                    } catch is CancellationError {
+                        print("[StudentContext] Interest prefetch cancelled for student: \(studentId)")
+                    } catch {
+                        print("[StudentContext] Failed to prefetch interests: \(error.localizedDescription)")
                     }
-                    self.prefetchedPlans = studentPlans
-                    
-                    print("[StudentContext] Prefetched \(studentPlans.count) plans")
-                } catch {
-                    print("[StudentContext] Failed to prefetch plans: \(error.localizedDescription)")
+                }
+                
+                // Fetch career state
+                group.addTask { @MainActor in
+                    do {
+                        let careers = try await StudentCareerService.shared.getStudentCareers(studentId: studentId)
+                        self.prefetchedCareerState = careers.first
+                        
+                        print("[StudentContext] Prefetched \(careers.count) career states")
+                    } catch is CancellationError {
+                        print("[StudentContext] Career prefetch cancelled for student: \(studentId)")
+                    } catch {
+                        print("[StudentContext] Failed to prefetch career state: \(error.localizedDescription)")
+                    }
+                }
+                
+                // Fetch plans
+                group.addTask { @MainActor in
+                    do {
+                        let planService = TMIPlanService.shared
+                        let allPlans = try await planService.fetchPlans()
+                        
+                        // Filter to plans containing this student
+                        let studentPlans = allPlans.filter { plan in
+                            plan.students.contains(where: { $0.id == studentId })
+                        }
+                        self.prefetchedPlans = studentPlans
+                        
+                        print("[StudentContext] Prefetched \(studentPlans.count) plans")
+                    } catch is CancellationError {
+                        print("[StudentContext] Plan prefetch cancelled for student: \(studentId)")
+                    } catch {
+                        print("[StudentContext] Failed to prefetch plans: \(error.localizedDescription)")
+                    }
                 }
             }
         }
+        
+        prefetchTask = task
+        await task.value
     }
     
     // MARK: - Deep Link Handling
@@ -410,4 +477,3 @@ private struct StudentContextModifier: ViewModifier {
             }
     }
 }
-

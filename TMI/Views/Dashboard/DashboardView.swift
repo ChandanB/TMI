@@ -187,6 +187,8 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       )
 
       updateState(.loaded(dashboardData))
+    } catch is CancellationError {
+      return
     } catch {
       print("[DashboardStateModel] Error fetching dashboard data: \(error)")
       handleError(error, userFriendlyMessage: "Failed to load dashboard data")
@@ -647,51 +649,49 @@ struct DashboardView: View {
     private func dashboardContent(_ data: DashboardData) -> some View {
         ScrollView {
             Grid(alignment: .leading, horizontalSpacing: TMISpacing.md, verticalSpacing: TMISpacing.lg) {
-                // Overview section title + stats (full width)
+                // Header insight (1/2 width)
                 GridRow {
-                    VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                    VStack(alignment: .leading, spacing: TMISpacing.md) {
+                        DashboardHeaderView(
+                            data: data,
+                            attentionCount: studentsNeedingAttention(data) ?? 0,
+                            onNavigateToStudents: { navigateToStudents = true },
+                            onNavigateToPlans: { navigateToPlans = true }
+                        )
+                        
                         DashboardStatsView(
                             data: data,
                             onNavigateToStudents: { navigateToStudents = true },
                             onNavigateToPlans: { navigateToPlans = true }
                         )
                     }
-                    .gridCellColumns(4)
-                }
-
-                // Header insight (1/2 width)
-                GridRow {
-                    DashboardHeaderView(
-                        data: data,
-                        attentionCount: studentsNeedingAttention(data) ?? 0,
-                        onNavigateToStudents: { navigateToStudents = true },
-                        onNavigateToPlans: { navigateToPlans = true }
-                    )
-                    .padding(.top, TMISpacing.md)
                     .gridCellColumns(2)
                     
-                    GridRow {
-                        // Quick Actions + Next Best Action (1/4 width)
-                        VStack(alignment: .leading, spacing: TMISpacing.md) {
-                            QuickActionsGrid()
-                        }
+                    // Quick Actions + Next Best Action (1/4 width)
+                    VStack(alignment: .leading, spacing: TMISpacing.md) {
+                        QuickActionsGrid()
+                        
+                        HStack {
+                            // Role-specific section (1/2 width) when present
+                            if let roleData = data.roleData {
+                                roleSpecificSection(roleData)
+                                 
+                            }
 
-                        .gridCellColumns(1)
-
-                        // Recent Activity (1/4 width)
-                        recentActivitySection(data)
-                            .gridCellColumns(1)
-                    }
-                    
-                    // Role-specific section (1/2 width) when present
-                    if let roleData = data.roleData {
-                        GridRow {
-                            roleSpecificSection(roleData)
-                                .gridCellColumns(2)
+                            VStack {
+                                // Recent Activity (1/4 width)
+                                recentActivitySection(data)
+                                    .padding()
+                                
+                                Spacer()
+                            }
                         }
+                        
+                       
                     }
+                    .gridCellColumns(2)
                 }
-
+            
                 // Actionable lists section (keep behavior, place full width if present)
                 if studentsNeedingAttention(data) != nil || (data.totalStudents - data.surveysCompleted) > 0 {
                     GridRow {
@@ -1261,4 +1261,3 @@ struct RoleSummaryItem: View {
 }
 
 // MARK: - Actionable Cards moved to Components/ActionableCards.swift
-

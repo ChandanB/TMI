@@ -60,6 +60,8 @@ final class StudentListStateModel: BaseStateModel<[Student], IdentifiableError> 
             self.activePlans = newActivePlans
             
             updateState(.loaded(students))
+        } catch is CancellationError {
+            return
         } catch {
             let identifiableError = ErrorHandlingHelper.handleRepositoryError(
                 error, 

@@ -8,7 +8,6 @@
 //
 
 import FirebaseAuth
-import FirebaseFirestore
 import Foundation
 import SwiftUI
 
@@ -22,12 +21,9 @@ struct SettingsView: View {
     @AppStorage("offlineModeEnabled") private var offlineModeEnabled = true
     
     @State private var showingLogoutAlert = false
-    @State private var showingDeleteAlert = false
     @State private var showingExportSheet = false
     @State private var showingImportSheet = false
-    @State private var isLoggedOut = false
     @State private var isLoaded = false
-    @State private var showingEditProfile = false
     
     // Role-based visibility
     private var currentRole: UserRole? {
@@ -63,13 +59,6 @@ struct SettingsView: View {
                         .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1), value: isLoaded)
                     
                     VStack(spacing: 16) {
-                        // Account Section - visible to all
-                        accountSection
-                            .opacity(isLoaded ? 1 : 0)
-                            .offset(y: isLoaded ? 0 : 20)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2), value: isLoaded)
-                        
-                        
                         // District admin-only sections
                         if isDistrictAdmin {
                             districtAdminSection
@@ -113,12 +102,6 @@ struct SettingsView: View {
             withAnimation(.easeInOut(duration: 0.5).delay(0.1)) {
                 isLoaded = true
             }
-        }
-        .sheet(isPresented: $showingEditProfile) {
-            NavigationStack {
-                UserProfileView()
-            }
-            .tmiSheetStyle()
         }
     }
     
@@ -242,17 +225,6 @@ struct SettingsView: View {
         } message: {
             Text("Are you sure you want to log out? Your data will remain safe and you can sign back in anytime.")
         }
-        .alert("Delete Account", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                deleteAccount()
-            }
-        } message: {
-            Text("This will permanently delete your account and all associated data. This action cannot be undone.")
-        }
-        .fullScreenCover(isPresented: $isLoggedOut) {
-            AuthenticationView()
-        }
         .sheet(isPresented: $showingExportSheet) {
             DataExportView()
                 .tmiSheetStyle()
@@ -312,41 +284,11 @@ private var headerView: some View {
             }
             
             Spacer()
-            
-            NavigationLink(destination: UserProfileView()) {
-                Image(systemName: "person.crop.circle.badge.plus")
-                    .font(.system(size: 24))
-                    .foregroundColor(.white.opacity(0.7))
-            }
         }
     }
 }
 
 // MARK: - Settings Sections
-
-extension SettingsView {
-    private var accountSection: some View {
-        SettingsSection(title: "Account", icon: "person.circle.fill") {
-            SettingsRow(
-                title: "Edit Profile",
-                subtitle: "Update your personal information",
-                icon: "person.badge.plus",
-                action: {
-                    showingEditProfile = true
-                }
-            )
-
-            //      SettingsRow(
-            //        title: "Notification Preferences",
-            //        subtitle: "Manage your notification settings",
-            //        icon: "bell.badge",
-            //        action: {
-            //          // Navigate to notification settings
-            //        }
-            //      )
-        }
-    }
-}
 
 extension SettingsView {
     private var tmiSettingsSection: some View {
@@ -444,63 +386,13 @@ extension SettingsView {
                     showingLogoutAlert = true
                 }
             )
-            
-            SettingsRow(
-                title: "Delete Account",
-                subtitle: "Permanently remove your account",
-                icon: "person.crop.circle.badge.xmark",
-                titleColor: .red,
-                action: {
-                    showingDeleteAlert = true
-                }
-            )
         }
     }
 
     // MARK: - Helper Functions
 
     private func logOut() {
-        do {
-            try FIREBASE_MANAGER.signOut()
-            isLoggedOut = true
-        } catch {
-            print("Error signing out: \(error.localizedDescription)")
-        }
-    }
-
-    private func deleteAccount() {
-        Task {
-            do {
-                // Delete user data from Firestore
-                if let user = Auth.auth().currentUser {
-                    let db = Firestore.firestore()
-                    let userDoc = db.collection("users").document(user.uid)
-                    
-                    // Delete all user subcollections
-                    let collections = ["students", "tmiPlans", "interests", "hobbies", "resources", "forms"]
-                    for collection in collections {
-                        let snapshot = try await userDoc.collection(collection).getDocuments()
-                        for document in snapshot.documents {
-                            try await document.reference.delete()
-                        }
-                    }
-                    
-                    // Delete user document
-                    try await userDoc.delete()
-                    
-                    // Delete Firebase Auth account
-                    try await user.delete()
-                    
-                    // Navigate to authentication
-                    await MainActor.run {
-                        isLoggedOut = true
-                    }
-                }
-            } catch {
-                print("Error deleting account: \(error.localizedDescription)")
-                // Could show an alert here for user feedback
-            }
-        }
+        authStateModel.signOut()
     }
 }
 

@@ -53,6 +53,9 @@ class StudentService {
         } catch let error as StudentServiceError {
             // Re-throw our custom error
             throw error
+        } catch is CancellationError {
+            print("[StudentService] Fetch students cancelled")
+            throw CancellationError()
         } catch {
             // Catch any other errors (e.g., network issues)
             print("[StudentService] Error fetching students: \(error)")
@@ -755,4 +758,3 @@ class MockStudentService: StudentService {
         return mockStudents.first { $0.id == id }
     }
 }
-

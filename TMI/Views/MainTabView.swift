@@ -35,7 +35,7 @@ struct MainTabView: View {
     @State private var plansPath = NavigationPath()
     
     enum Tab: String, CaseIterable, Identifiable {
-        case dashboard, students, tmiPlans, settings
+        case dashboard, students, tmiPlans
         var id: Self { self }
 
         // Define which roles can access each tab
@@ -47,8 +47,6 @@ struct MainTabView: View {
                 return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin]
             case .tmiPlans:
                 return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin]
-            case .settings:
-                return [.teacher, .counselor, .administrator, .admin, .socialWorker, .parent, .legalGuardian, .student, .superintendent, .districtAdmin]
             }
         }
 
@@ -62,7 +60,6 @@ struct MainTabView: View {
             case .dashboard: return "Dashboard"
             case .students: return "Students"
             case .tmiPlans: return "TMI Plans"
-            case .settings: return "Settings"
             }
         }
 
@@ -71,7 +68,6 @@ struct MainTabView: View {
             case .dashboard: return "chart.bar.fill"
             case .students: return "person.3.fill"
             case .tmiPlans: return "doc.text.fill"
-            case .settings: return "gearshape.fill"
             }
         }
     }
@@ -84,7 +80,7 @@ struct MainTabView: View {
     
     // Default tab - use first available or dashboard
     var defaultTab: Tab {
-        availableTabs.first ?? .settings
+        availableTabs.first ?? .dashboard
     }
     
     var body: some View {
@@ -255,8 +251,6 @@ struct MainTabView: View {
             StudentListView()
         case .tmiPlans:
             TMIPlanListView()
-        case .settings:
-            SettingsView()
         }
     }
 }

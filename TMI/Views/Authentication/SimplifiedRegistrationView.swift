@@ -179,7 +179,7 @@ struct SimplifiedRegistrationView: View {
                 }
             }
         }
-        .frame(minWidth: 600, minHeight: 900)
+        .frame(minWidth: 900, minHeight: 900)
     }
 
     private func register() {

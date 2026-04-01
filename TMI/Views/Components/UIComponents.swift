@@ -112,7 +112,6 @@ struct PremiumGlassTabBar: View {
     case .students: return "Students"
     case .tmiPlans: return "Plans"
     case .dashboard: return "Dashboard"
-    case .settings: return "Settings"
     }
   }
 
@@ -121,7 +120,6 @@ struct PremiumGlassTabBar: View {
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
     case .dashboard: return "chart.bar.fill"
-    case .settings: return "gearshape.fill"
     }
   }
 }
@@ -219,7 +217,6 @@ struct PremiumSidebarList: View {
     case .students: return "Students"
     case .tmiPlans: return "TMI Plans"
     case .dashboard: return "Dashboard"
-    case .settings: return "Settings"
     }
   }
 
@@ -228,7 +225,6 @@ struct PremiumSidebarList: View {
     case .students: return "person.3.fill"
     case .tmiPlans: return "doc.text.fill"
     case .dashboard: return "chart.bar.fill"
-    case .settings: return "gearshape.fill"
     }
   }
 }

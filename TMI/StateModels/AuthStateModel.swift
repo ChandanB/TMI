@@ -456,6 +456,14 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     return false
   }
 
+  /// True during the initial auth check — covers both `.idle` (before fetch runs) and `.loading`.
+  /// Use this in ContentView instead of `isLoading` to prevent flashing the auth screen.
+  var isCheckingAuth: Bool {
+    if case .idle = state { return true }
+    if case .loading = state { return true }
+    return false
+  }
+
   var isAuthenticating: Bool {
     if case .loaded(.authenticating) = state {
       return true
@@ -539,12 +547,14 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     // Initialize session
     sessionID = UUID().uuidString
 
-    // Set initial auth state
-    updateState(.loaded(.unauthenticated))
+    // Stay in loading state until Firebase auth check completes
+    updateState(.loading)
   }
 
   @MainActor
   private func setupAuthListener() async {
+    // Resolve auth state synchronously before installing the listener so state
+    // never stays in .loading if the listener fires late or is delayed.
     let currentFirebaseUser = Auth.auth().currentUser
 
     if let firebaseUser = currentFirebaseUser {
@@ -553,7 +563,10 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
       updateState(.loaded(.unauthenticated))
     }
 
-    // Set up Firebase auth state listener
+    // The listener handles subsequent auth changes (sign in / sign out).
+    // addStateDidChangeListener also fires immediately, which would call
+    // loadUserProfile a second time for the same user — deduplicated inside
+    // loadUserProfile via an early-return guard.
     let _ = Auth.auth().addStateDidChangeListener { [weak self] _, user in
       guard let self = self else { return }
 
@@ -583,6 +596,21 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
     @MainActor
     private func loadUserProfile(for userID: String) async {
+        // Deduplicate: if we're already authenticated as this exact user, skip the
+        // round-trip. Firebase fires addStateDidChangeListener on every token refresh,
+        // so without this guard every refresh triggers a full Firestore fetch and an
+        // @Observable assignment that cascades into view recreation.
+        if case .loaded(.authenticated(let existing)) = state, existing.id == userID {
+            return
+        }
+
+        // Sign-out safety: Firebase can queue multiple listener Tasks. If sign-out
+        // happened between scheduling and execution, bail out so we don't restore
+        // the authenticated state after it has already been cleared.
+        guard Auth.auth().currentUser?.uid == userID else {
+            return
+        }
+
         // Load user profile from Firestore
         let userDoc: DocumentSnapshot
         do {

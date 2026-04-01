@@ -14,29 +14,29 @@ import FirebaseAuth
 
 @main
 struct TMIApp: App {
+    @State private var authStateModel: AuthStateModel
+    @State private var studentContext: StudentContextStateModel
+    @State private var deepLinkRouter: DeepLinkRouter
+    @State private var dashboardStateModel: DashboardStateModel
+    @State private var interestsStateModel: InterestsAndHobbiesStateModel
+    @State private var meetingsStateModel: MeetingsStateModel
+    @State private var districtStateModel: DistrictStateModel
+    @State private var recommendationsStateModel: RecommendationsStateModel
+
     init() {
         if FirebaseApp.app() == nil {
             FirebaseApp.configure()
         }
+        
+        _authStateModel = State(initialValue: AuthStateModel())
+        _studentContext = State(initialValue: StudentContextStateModel())
+        _deepLinkRouter = State(initialValue: DeepLinkRouter())
+        _dashboardStateModel = State(initialValue: DashboardStateModel())
+        _interestsStateModel = State(initialValue: InterestsAndHobbiesStateModel())
+        _meetingsStateModel = State(initialValue: MeetingsStateModel())
+        _districtStateModel = State(initialValue: DistrictStateModel())
+        _recommendationsStateModel = State(initialValue: RecommendationsStateModel())
     }
-    
-    // MARK: - Shared State Models
-    
-    // Core authentication state
-    @State private var authStateModel = AuthStateModel()
-    
-    // Shared student context (the key new addition)
-    @State private var studentContext = StudentContextStateModel()
-    
-    // Deep link router
-    @State private var deepLinkRouter = DeepLinkRouter()
-    
-    // Domain state models
-    @State private var dashboardStateModel = DashboardStateModel()
-    @State private var interestsStateModel = InterestsAndHobbiesStateModel()
-    @State private var meetingsStateModel = MeetingsStateModel()
-    @State private var districtStateModel = DistrictStateModel()
-    @State private var recommendationsStateModel = RecommendationsStateModel()
     
     var body: some Scene {
         WindowGroup {
@@ -73,7 +73,7 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if authStateModel.isLoading {
+            if authStateModel.isCheckingAuth {
                 LoadingView()
             } else if authStateModel.isLoggedIn {
                 authenticatedContent
@@ -91,9 +91,11 @@ struct ContentView: View {
             } else {
                 // Clear state on logout
                 Task {
-                    studentContext.clearContext()
-                    districtStateModel.clearState()
-                    hasBootstrapped = false
+                    await MainActor.run {
+                        studentContext.clearContext()
+                        districtStateModel.clearState()
+                        hasBootstrapped = false
+                    }
                 }
             }
         }

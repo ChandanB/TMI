@@ -40,7 +40,9 @@ struct StudentModeView: View {
                 // Tab view - using StudentAccessPolicy
                 TabView(selection: $selectedTab) {
                     ForEach(allowedTabs) { tab in
-                        tabContent(for: tab)
+                        NavigationStack {
+                            tabContent(for: tab)
+                        }
                             .tag(tab)
                             .tabItem {
                                 Label(tab.title, systemImage: tab.icon)
@@ -198,35 +200,33 @@ struct StudentInterestsTab: View {
     @State private var showingInterestSurvey = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.tmiBackground
-                    .ignoresSafeArea()
+        ZStack {
+            Color.tmiBackground
+                .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: TMISpacing.xl) {
-                        if isLoading {
-                            ProgressView("Loading your interests...")
-                                .tint(.tmiPrimary)
-                                .padding(TMISpacing.xl)
-                        } else if interests.isEmpty {
-                            emptyState
-                        } else {
-                            interestsGrid
-                        }
+            ScrollView {
+                VStack(spacing: TMISpacing.xl) {
+                    if isLoading {
+                        ProgressView("Loading your interests...")
+                            .tint(.tmiPrimary)
+                            .padding(TMISpacing.xl)
+                    } else if interests.isEmpty {
+                        emptyState
+                    } else {
+                        interestsGrid
                     }
-                    .padding(TMISpacing.screenPadding)
                 }
+                .padding(TMISpacing.screenPadding)
             }
-            .sheet(isPresented: $showingInterestSurvey) {
-                if let studentId = student.id {
-                    StudentSurveyFlow(studentId: studentId)
-                        .tmiSheetStyle()
-                }
+        }
+        .sheet(isPresented: $showingInterestSurvey) {
+            if let studentId = student.id {
+                StudentSurveyFlow(studentId: studentId)
+                    .tmiSheetStyle()
             }
-            .task {
-                await loadInterests()
-            }
+        }
+        .task(id: student.id) {
+            await loadInterests()
         }
     }
 
@@ -291,10 +291,10 @@ struct StudentInterestsTab: View {
                 .buttonStyle(.plain)
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 280))], spacing: TMISpacing.md) {
+            VStack(spacing: TMISpacing.md) {
                 ForEach(interests) { interest in
                     NavigationLink(destination: StudentInterestDetailView(interest: interest, currentStudent: student)) {
-                        InterestCardView(interest: interest)
+                        StudentModeInterestCard(interest: interest)
                     }
                     .buttonStyle(.plain)
                 }
@@ -317,6 +317,59 @@ struct StudentInterestsTab: View {
     }
 }
 
+private struct StudentModeInterestCard: View {
+    let interest: Interest
+
+    var body: some View {
+        HStack(spacing: TMISpacing.md) {
+            ZStack {
+                RoundedRectangle(cornerRadius: TMIRadius.md)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                interest.color.opacity(0.28),
+                                interest.color.opacity(0.12)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 64, height: 64)
+
+                Image(systemName: interest.iconName)
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundColor(interest.color)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(interest.name)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.leading)
+
+                Text(interest.category.first?.rawValue ?? "General")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.65))
+            }
+
+            Spacer(minLength: 12)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white.opacity(0.35))
+        }
+        .padding(TMISpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .fill(Color.white.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.lg)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
+
 // MARK: - Student Careers Tab
 
 struct StudentCareersTab: View {
@@ -326,35 +379,33 @@ struct StudentCareersTab: View {
     @State private var isLoading = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.tmiBackground
-                    .ignoresSafeArea()
+        ZStack {
+            Color.tmiBackground
+                .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: TMISpacing.xl) {
-                        if isLoading {
-                            ProgressView("Finding careers for you...")
-                                .tint(.tmiPrimary)
-                                .padding(TMISpacing.xl)
-                        } else if careerMatches.isEmpty {
-                            emptyState
-                        } else {
-                            careersGrid
-                        }
+            ScrollView {
+                VStack(spacing: TMISpacing.xl) {
+                    if isLoading {
+                        ProgressView("Finding careers for you...")
+                            .tint(.tmiPrimary)
+                            .padding(TMISpacing.xl)
+                    } else if careerMatches.isEmpty {
+                        emptyState
+                    } else {
+                        careersGrid
                     }
-                    .padding(TMISpacing.screenPadding)
                 }
+                .padding(TMISpacing.screenPadding)
             }
-            .task {
-                await loadCareerMatches()
-            }
+        }
+        .task(id: student.id) {
+            await loadCareerMatches()
         }
     }
 
     private var emptyState: some View {
         VStack(spacing: TMISpacing.lg) {
-            Image(systemName: "briefcase.slash")
+            Image(systemName: "briefcase.fill")
                 .font(.system(size: 60))
                 .foregroundColor(.tmiTextTertiary)
 
@@ -483,29 +534,27 @@ struct StudentProgressTab: View {
     @State private var isLoading = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.tmiBackground
-                    .ignoresSafeArea()
+        ZStack {
+            Color.tmiBackground
+                .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: TMISpacing.xl) {
-                        if isLoading {
-                            ProgressView("Loading your progress...")
-                                .tint(.tmiPrimary)
-                                .padding(TMISpacing.xl)
-                        } else if plans.isEmpty {
-                            emptyState
-                        } else {
-                            progressView
-                        }
+            ScrollView {
+                VStack(spacing: TMISpacing.xl) {
+                    if isLoading {
+                        ProgressView("Loading your progress...")
+                            .tint(.tmiPrimary)
+                            .padding(TMISpacing.xl)
+                    } else if plans.isEmpty {
+                        emptyState
+                    } else {
+                        progressView
                     }
-                    .padding(TMISpacing.screenPadding)
                 }
+                .padding(TMISpacing.screenPadding)
             }
-            .task {
-                await loadPlans()
-            }
+        }
+        .task(id: student.id) {
+            await loadPlans()
         }
     }
 

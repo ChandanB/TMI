@@ -15,8 +15,11 @@ import FirebaseFirestore
 struct RecentActivity: Identifiable, Equatable, @unchecked Sendable {
     // MARK: - Properties
     
-    /// Firestore document ID
-    @DocumentID var id: String?
+    /// Firestore document ID when persisted, otherwise a generated in-memory ID.
+    @DocumentID private var documentID: String?
+    
+    /// Stable identifier for SwiftUI lists when no Firestore ID exists.
+    private let fallbackID: String
     
     /// Icon name for the activity (SF Symbol name)
     let icon: String
@@ -46,6 +49,10 @@ struct RecentActivity: Identifiable, Equatable, @unchecked Sendable {
         return date.timeAgoDisplay()
     }
     
+    var id: String {
+        documentID ?? fallbackID
+    }
+    
     /// Icon color converted from string to SwiftUI Color
     var iconColor: Color {
         return Color.fromString(iconColorName)
@@ -68,7 +75,8 @@ struct RecentActivity: Identifiable, Equatable, @unchecked Sendable {
         showProgress: Bool = false,
         progressValue: Double = 0.0
     ) {
-        self.id = id
+        self.documentID = id
+        self.fallbackID = id ?? UUID().uuidString
         self.icon = icon
         self.title = title
         self.description = description
@@ -89,7 +97,8 @@ struct RecentActivity: Identifiable, Equatable, @unchecked Sendable {
         showProgress: Bool = false,
         progressValue: Double = 0.0
     ) {
-        self.id = id
+        self.documentID = id
+        self.fallbackID = id ?? UUID().uuidString
         self.icon = icon
         self.title = title
         self.description = description
@@ -105,6 +114,7 @@ struct RecentActivity: Identifiable, Equatable, @unchecked Sendable {
 extension RecentActivity: Codable {
     enum CodingKeys: String, CodingKey {
         case id
+        case fallbackID
         case icon
         case title
         case description
@@ -116,7 +126,8 @@ extension RecentActivity: Codable {
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decodeIfPresent(String.self, forKey: .id)
+        documentID = try container.decodeIfPresent(String.self, forKey: .id)
+        fallbackID = try container.decodeIfPresent(String.self, forKey: .fallbackID) ?? UUID().uuidString
         icon = try container.decode(String.self, forKey: .icon)
         title = try container.decode(String.self, forKey: .title)
         description = try container.decode(String.self, forKey: .description)
@@ -128,7 +139,8 @@ extension RecentActivity: Codable {
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(id, forKey: .id)
+        try container.encodeIfPresent(documentID, forKey: .id)
+        try container.encode(fallbackID, forKey: .fallbackID)
         try container.encode(icon, forKey: .icon)
         try container.encode(title, forKey: .title)
         try container.encode(description, forKey: .description)
