@@ -799,6 +799,22 @@ struct ScaleButtonStyle: ButtonStyle {
   }
 }
 
+// MARK: - Sheet Style
+
+struct TMISheetStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .frame(minWidth: 500, minHeight: 400)
+            .presentationDragIndicator(.visible)
+    }
+}
+
+extension View {
+    func tmiSheetStyle() -> some View {
+        modifier(TMISheetStyle())
+    }
+}
+
 // MARK: - Extensions for View Modifiers
 
 extension View {
