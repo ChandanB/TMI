@@ -690,12 +690,6 @@ struct TMIPlanEditorView: View {
                     .padding(TMISpacing.md)
                     .background(Color.tmiSurface)
                     .cornerRadius(TMIRadius.sm)
-                    .onChange(of: studentNextStep) { _, newValue in
-                        let normalizedValue = Self.normalizedStudentNextStep(newValue)
-                        if normalizedValue != newValue {
-                            studentNextStep = normalizedValue
-                        }
-                    }
                 }
 
                 Text("Required before saving so the student leaves with one clear next action.")
