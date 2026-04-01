@@ -104,7 +104,7 @@ struct TMIPlanEditorView: View {
     }
 
     private var trimmedStudentNextStep: String {
-        studentNextStep.trimmingCharacters(in: .whitespacesAndNewlines)
+        Self.normalizedStudentNextStep(studentNextStep)
     }
 
     // MARK: - Init
@@ -683,15 +683,19 @@ struct TMIPlanEditorView: View {
                 fieldGroup(label: "Student Next Step") {
                     TextField(
                         "What should the student do next?",
-                        text: $studentNextStep,
-                        axis: .vertical
+                        text: $studentNextStep
                     )
-                    .lineLimit(2...4)
                     .font(.tmiBody)
                     .foregroundStyle(Color.tmiTextPrimary)
                     .padding(TMISpacing.md)
                     .background(Color.tmiSurface)
                     .cornerRadius(TMIRadius.sm)
+                    .onChange(of: studentNextStep) { _, newValue in
+                        let normalizedValue = Self.normalizedStudentNextStep(newValue)
+                        if normalizedValue != newValue {
+                            studentNextStep = normalizedValue
+                        }
+                    }
                 }
 
                 Text("Required before saving so the student leaves with one clear next action.")
@@ -1109,8 +1113,17 @@ struct TMIPlanEditorView: View {
         return primaryStudentName.isEmpty ? model.rawValue : "\(model.rawValue) - \(primaryStudentName)"
     }
 
-    private static func notes(withStudentNextStep nextStep: String, notes: String) -> String {
-        let trimmedNextStep = nextStep.trimmingCharacters(in: .whitespacesAndNewlines)
+    static func normalizedStudentNextStep(_ nextStep: String) -> String {
+        nextStep
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func notes(withStudentNextStep nextStep: String, notes: String) -> String {
+        let trimmedNextStep = normalizedStudentNextStep(nextStep)
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmedNextStep.isEmpty else {
@@ -1128,7 +1141,7 @@ struct TMIPlanEditorView: View {
         """
     }
 
-    private static func extractStudentNextStep(from storedNotes: String) -> (nextStep: String, notes: String) {
+    static func extractStudentNextStep(from storedNotes: String) -> (nextStep: String, notes: String) {
         let lines = storedNotes.components(separatedBy: .newlines)
 
         guard let nextStepIndex = lines.firstIndex(where: { $0.hasPrefix("Student Next Step:") }) else {
@@ -1136,9 +1149,9 @@ struct TMIPlanEditorView: View {
         }
 
         let nextStepLine = lines[nextStepIndex]
-        let nextStep = nextStepLine
-            .replacingOccurrences(of: "Student Next Step:", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let nextStep = normalizedStudentNextStep(
+            nextStepLine.replacingOccurrences(of: "Student Next Step:", with: "")
+        )
 
         var remainingLines = lines
         remainingLines.remove(at: nextStepIndex)
