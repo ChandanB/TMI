@@ -422,7 +422,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                                 .clipShape(Circle())
                         } else if let photoData = stateModel.selectedPhotoData,
                                   let uiImage = UIImage(data: photoData) {
-                            Image(nsImage: uiImage)
+                            Image(uiImage: uiImage)
                                 .resizable()
                                 .scaledToFill()
                                 .frame(width: 80, height: 80)
