@@ -117,7 +117,7 @@ struct AuthenticationView: View {
                     showingForgotPassword = true
                   }) {
                     Text("Forgot Password?")
-                      .font(.system(size: 15))
+                      .font(.system(size: 13, weight: .medium))
                       .foregroundColor(Color.tmiSecondary)
                   }
                   .padding(.top, 4)

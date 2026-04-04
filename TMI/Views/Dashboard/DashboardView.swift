@@ -914,12 +914,12 @@ struct DashboardView: View {
 
     private var emptyActivityState: some View {
         VStack(spacing: TMISpacing.sm) {
-            Image(systemName: "point.3.connected.trianglepath.dotted")
-                .font(.system(size: 32))
-                .foregroundColor(.tmiTextTertiary)
+            Text("👋")
+                .font(.system(size: 36))
 
-            Text(MVPEmptyStateCopy.dashboardActivityTitle)
+            Text("Welcome! Let's get started")
                 .font(.tmiBody)
+                .fontWeight(.semibold)
                 .foregroundColor(.tmiTextPrimary)
 
             Text(MVPEmptyStateCopy.dashboardActivityMessage)
@@ -937,6 +937,14 @@ struct DashboardView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, TMISpacing.xl)
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .strokeBorder(
+                    style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])
+                )
+                .foregroundColor(Color.tmiTextTertiary.opacity(0.4))
+        )
+        .padding(.horizontal, TMISpacing.sm)
     }
 
     // MARK: - All Activities Sheet
@@ -995,9 +1003,15 @@ struct DashboardView: View {
     private func roleSpecificSection(_ roleData: RoleSpecificData) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
-                Text(roleData.role == .teacher ? "Teacher Action Board" : roleData.role.displayName + " Overview")
-                    .font(.tmiTitle3)
-                    .foregroundColor(.tmiTextPrimary)
+                HStack(spacing: TMISpacing.sm) {
+                    Image(systemName: "building.columns")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(Color.tmiPrimary)
+                        .frame(width: 32, height: 32)
+                    Text(roleData.role == .teacher ? "Good morning!" : roleData.role.displayName + " Overview")
+                        .font(.tmiTitle3)
+                        .foregroundColor(.tmiTextPrimary)
+                }
                 Spacer()
             }
             

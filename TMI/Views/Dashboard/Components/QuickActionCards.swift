@@ -14,10 +14,29 @@ struct QuickActionCard: View {
     let subtitle: String
     let icon: String
     let iconColor: Color
+    let accentBorderColor: Color
     let badge: String?
     let action: () -> Void
 
     @State private var isPressed = false
+
+    init(
+        title: String,
+        subtitle: String,
+        icon: String,
+        iconColor: Color,
+        accentBorderColor: Color? = nil,
+        badge: String? = nil,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.iconColor = iconColor
+        self.accentBorderColor = accentBorderColor ?? iconColor
+        self.badge = badge
+        self.action = action
+    }
 
     var body: some View {
         Button(action: {
@@ -72,6 +91,12 @@ struct QuickActionCard: View {
             .frame(maxWidth: .infinity, minHeight: 140)
             .background(Color.tmiSurface)
             .cornerRadius(TMIRadius.md)
+            .overlay(alignment: .leading) {
+                // 3px left accent border
+                RoundedRectangle(cornerRadius: TMIRadius.md)
+                    .fill(accentBorderColor)
+                    .frame(width: 3)
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: TMIRadius.md)
                     .strokeBorder(iconColor.opacity(0.1), lineWidth: 1)
@@ -121,6 +146,7 @@ struct QuickActionsGrid: View {
                     subtitle: "Begin a new student profile",
                     icon: "person.badge.plus",
                     iconColor: .tmiPrimary,
+                    accentBorderColor: Color(hex: "#D4930D"),
                     badge: nil,
                     action: { showingAddStudent = true }
                 )
@@ -130,6 +156,7 @@ struct QuickActionsGrid: View {
                     subtitle: "Design a TMI intervention",
                     icon: "doc.badge.plus",
                     iconColor: .tmiSuccess,
+                    accentBorderColor: Color(hex: "#5B8C5A"),
                     badge: nil,
                     action: { showingCreatePlan = true }
                 )
@@ -139,6 +166,7 @@ struct QuickActionsGrid: View {
                     subtitle: "View students requiring attention",
                     icon: "heart.text.square",
                     iconColor: .tmiWarning,
+                    accentBorderColor: Color(hex: "#E07A5F"),
                     badge: studentsNeedingSupportCount,
                     action: { showingStudentsNeedingSupport = true }
                 )
@@ -148,6 +176,7 @@ struct QuickActionsGrid: View {
                     subtitle: "View complete student roster",
                     icon: "person.3.fill",
                     iconColor: .tmiSecondary,
+                    accentBorderColor: Color(hex: "#3B6FA0"),
                     badge: totalStudentsCount,
                     action: { showingViewAllStudents = true }
                 )

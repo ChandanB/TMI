@@ -15,9 +15,9 @@ struct StudentCard: View {
             case .empty:
               ZStack {
                 Circle()
-                  .fill(Color.tmiSecondary.opacity(0.3))
+                  .fill(avatarTintColor.opacity(0.15))
                 ProgressView()
-                  .tint(.white)
+                  .tint(avatarTintColor)
               }
               .frame(width: 80, height: 80)
             case .success(let image):
@@ -26,55 +26,31 @@ struct StudentCard: View {
                 .scaledToFill()
                 .frame(width: 80, height: 80)
                 .clipShape(Circle())
-                .overlay(Circle().stroke(Color.tmiPrimary, lineWidth: 2))
                 .shadow(radius: 3)
                 .transition(.opacity)
             case .failure:
-              Text(studentInitials)
-                .font(.system(size: 32, weight: .bold))
-                .foregroundColor(Color.tmiTextPrimary)
-                .frame(width: 80, height: 80)
-                .background(
-                  LinearGradient(
-                    colors: [Color.tmiSecondary, Color.tmiSecondary.opacity(0.8)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                  )
-                )
-                .clipShape(Circle())
-                .overlay(
-                  Circle()
-                    .stroke(Color.white.opacity(0.2), lineWidth: 2)
-                )
+              initialsAvatar
             @unknown default:
               EmptyView()
             }
           }
         } else {
-          Text(studentInitials)
-            .font(.system(size: 32, weight: .bold))
-            .foregroundColor(Color.tmiTextPrimary)
-            .frame(width: 80, height: 80)
-            .background(
-              LinearGradient(
-                colors: [Color.tmiSecondary, Color.tmiSecondary.opacity(0.8)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              )
-            )
-            .clipShape(Circle())
-            .overlay(
-              Circle()
-                .stroke(Color.white.opacity(0.2), lineWidth: 2)
-            )
+          initialsAvatar
         }
 
-        // Student Name
-        Text(student.name)
-          .font(.headline)
-          .foregroundColor(Color.tmiTextPrimary)
-          .lineLimit(1)
-          .minimumScaleFactor(0.8)
+        // Student Name and chevron row
+        HStack {
+          Spacer()
+          Text(student.name)
+            .font(.headline)
+            .foregroundColor(Color.tmiTextPrimary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+          Spacer()
+          Image(systemName: "chevron.right")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundColor(Color.tmiTextTertiary)
+        }
 
         // Grade
         Text("Grade \(student.grade)")
@@ -84,6 +60,27 @@ struct StudentCard: View {
         // Engagement Score Indicator
         EngagementBar(engagementScore: student.engagementScore)
       }
+    }
+  }
+
+  private var initialsAvatar: some View {
+    Text(studentInitials)
+      .font(.system(size: 32, weight: .bold))
+      .foregroundColor(avatarTintColor)
+      .frame(width: 80, height: 80)
+      .background(avatarTintColor.opacity(0.15))
+      .clipShape(Circle())
+  }
+
+  private var avatarTintColor: Color {
+    switch student.avatarColor {
+    case .blue: return .blue
+    case .green: return .green
+    case .orange: return .orange
+    case .purple: return .purple
+    case .teal: return .teal
+    case .pink: return .pink
+    case .indigo: return .indigo
     }
   }
 
