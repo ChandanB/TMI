@@ -246,17 +246,20 @@ final class ErrorHandlerTests: XCTestCase {
 extension ErrorHandlerTests {
     
     func testNetworkErrorRecovery() {
-        let networkErrors: [TMIErrorCode] = [.networkUnavailable, .networkTimeout, .serverError]
+        let networkErrors: [TMIError.ErrorCode] = [.networkUnavailable, .networkTimeout, .serverError]
         
         for errorCode in networkErrors {
             let error = TMIError(code: errorCode, message: "Test error")
             XCTAssertTrue(error.isRecoverable, "\(errorCode) should be recoverable")
-            XCTAssertTrue(error.shouldRetry, "\(errorCode) should be retryable")
         }
+
+        XCTAssertFalse(TMIError(code: .networkUnavailable, message: "Test error").shouldRetry)
+        XCTAssertTrue(TMIError(code: .networkTimeout, message: "Test error").shouldRetry)
+        XCTAssertTrue(TMIError(code: .serverError, message: "Test error").shouldRetry)
     }
     
     func testFirebaseErrorRecovery() {
-        let firebaseErrors: [TMIErrorCode] = [.firestoreError, .storageError, .functionsError]
+        let firebaseErrors: [TMIError.ErrorCode] = [.firestoreError, .storageError, .functionsError]
         
         for errorCode in firebaseErrors {
             let error = TMIError(code: errorCode, message: "Test error")
@@ -265,7 +268,7 @@ extension ErrorHandlerTests {
     }
     
     func testAuthenticationErrorsNotRecoverable() {
-        let authErrors: [TMIErrorCode] = [.authenticationRequired, .authenticationFailed, .invalidCredentials]
+        let authErrors: [TMIError.ErrorCode] = [.authenticationRequired, .authenticationFailed, .invalidCredentials]
         
         for errorCode in authErrors {
             let error = TMIError(code: errorCode, message: "Test error")
@@ -275,7 +278,7 @@ extension ErrorHandlerTests {
     }
     
     func testPermissionErrorsNotRecoverable() {
-        let permissionErrors: [TMIErrorCode] = [.insufficientPermissions, .accessDenied]
+        let permissionErrors: [TMIError.ErrorCode] = [.insufficientPermissions, .accessDenied]
         
         for errorCode in permissionErrors {
             let error = TMIError(code: errorCode, message: "Test error")

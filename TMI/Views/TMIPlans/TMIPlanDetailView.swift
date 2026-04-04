@@ -49,6 +49,8 @@ struct TMIPlanDetailView: View {
     @State private var isExporting = false
     @State private var exportedPDFURL: URL?
     @State private var showingShareSheet = false
+    @State private var exportErrorMessage: String?
+    @State private var showingExportError = false
     private let exportService = PlanExportService()
 
     // Plan-specific inputs
@@ -299,6 +301,11 @@ struct TMIPlanDetailView: View {
                 ActivityShareSheet(activityItems: [pdfURL])
                     .tmiSheetStyle()
             }
+        }
+        .alert("Export Failed", isPresented: $showingExportError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(exportErrorMessage ?? "An unexpected error occurred while exporting the plan.")
         }
         .refreshable {
             await refreshPlan()
@@ -2560,7 +2567,10 @@ struct TMIPlanDetailView: View {
                 print("[TMIPlanDetail] Exported plan to PDF: \(pdfURL.path)")
             } catch {
                 print("[TMIPlanDetail] Error exporting plan: \(error)")
-                // TODO: Show error alert to user
+                await MainActor.run {
+                    exportErrorMessage = error.localizedDescription
+                    showingExportError = true
+                }
             }
         }
     }
@@ -2579,6 +2589,10 @@ struct TMIPlanDetailView: View {
                 print("[TMIPlanDetail] Exported MTSS report: \(mtssURL.path)")
             } catch {
                 print("[TMIPlanDetail] Error exporting MTSS report: \(error)")
+                await MainActor.run {
+                    exportErrorMessage = error.localizedDescription
+                    showingExportError = true
+                }
             }
         }
     }

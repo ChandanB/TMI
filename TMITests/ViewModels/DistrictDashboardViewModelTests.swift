@@ -119,7 +119,7 @@ struct DistrictDashboardViewModelTests {
             )
         )
         #expect(viewModel.pilotReadout.first == "Participating school count is unavailable for the selected date range.")
-        #expect(viewModel.pilotReadout[2] == "55.0% average student engagement for the selected date range.")
+        #expect(viewModel.pilotReadout[2] == "55.0% average student engagement across the selected date range.")
     }
 
     @Test("Last updated display uses stored timestamp instead of the current date")

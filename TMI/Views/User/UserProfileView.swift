@@ -388,8 +388,8 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                                 .frame(width: 80, height: 80)
                                 .clipShape(Circle())
                         } else if let photoData = stateModel.selectedPhotoData,
-                                  let nsImage = NSImage(data: photoData) {
-                            Image(nsImage: nsImage)
+                                  let uiImage = UIImage(data: photoData) {
+                            Image(nsImage: uiImage)
                                 .resizable()
                                 .scaledToFill()
                                 .frame(width: 80, height: 80)

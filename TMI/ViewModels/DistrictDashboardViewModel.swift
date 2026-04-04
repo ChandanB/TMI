@@ -261,7 +261,7 @@ class DistrictDashboardViewModel {
       )
     }
 
-    PilotSummary(
+    return PilotSummary(
       participatingSchools: participationSummaryText,
       activePlans: metrics.activePlansCount,
       engagementRate: engagementSummaryPercentage,

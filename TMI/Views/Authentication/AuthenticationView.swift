@@ -168,19 +168,6 @@ struct AuthenticationView: View {
                         .fontWeight(.semibold)
                     }
                   }
-
-                  // Support Resources Button
-                  Button(action: {
-                    showingSupportResources = true
-                  }) {
-                    HStack(spacing: 6) {
-                      Image(systemName: "heart.circle")
-                        .font(.system(size: 14))
-                      Text("Need Help or Support?")
-                        .font(.system(size: 14))
-                    }
-                    .foregroundColor(Color.tmiSecondary.opacity(0.8))
-                  }
                 }
                 .padding(.top, 10)
                 .opacity(animateButtons ? 1.0 : 0)

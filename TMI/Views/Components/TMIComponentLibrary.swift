@@ -804,7 +804,7 @@ struct ScaleButtonStyle: ButtonStyle {
 struct TMISheetStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .frame(minWidth: 500, minHeight: 400)
+            .frame(minWidth: 600, minHeight: 400)
             .presentationDragIndicator(.visible)
     }
 }

@@ -45,6 +45,10 @@ enum AccountType: String, CaseIterable, Identifiable {
 }
 
 struct SimplifiedRegistrationView: View {
+    private enum Layout {
+        static let contentWidth: CGFloat = 720
+    }
+
     @State private var displayName = ""
     @State private var email = ""
     @State private var password = ""
@@ -62,7 +66,7 @@ struct SimplifiedRegistrationView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 TMIBackgroundView(variant: .auth)
                     .ignoresSafeArea()
@@ -165,6 +169,8 @@ struct SimplifiedRegistrationView: View {
 
                         Spacer(minLength: 40)
                     }
+                    .frame(maxWidth: Layout.contentWidth)
+                    .frame(maxWidth: .infinity)
                     .padding(.bottom, 100)
                 }
             }
@@ -179,7 +185,6 @@ struct SimplifiedRegistrationView: View {
                 }
             }
         }
-        .frame(minWidth: 900, minHeight: 900)
     }
 
     private func register() {

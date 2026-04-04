@@ -262,7 +262,7 @@ extension UserRole {
     }
 
     var canDeleteStudents: Bool {
-        return [.administrator, .admin, .superintendent, .districtAdmin].contains(self)
+        return [.teacher, .counselor, .administrator, .admin, .socialWorker, .superintendent, .districtAdmin].contains(self)
     }
 
     var canViewSensitiveData: Bool {

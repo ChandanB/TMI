@@ -166,6 +166,7 @@ struct AddGoalView: View {
                 )
             }
         }
+        .padding(.horizontal)
         .navigationTitle("Add Goal")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct StudentListView: View {
+    @Environment(\.authStateModel) private var authStateModel
     @State private var stateModel = StudentListStateModel()
     @State private var searchText = ""
     @State private var selectedGradeFilter: String? = nil
@@ -79,6 +80,10 @@ struct StudentListView: View {
     var availableGrades: [String] {
         let grades = Set(stateModel.filteredStudents.map { $0.grade })
         return grades.sorted()
+    }
+
+    private var canDeleteStudents: Bool {
+        authStateModel.currentUser.map { $0.role.canDeleteStudents } ?? false
     }
 
     var body: some View {
@@ -196,12 +201,13 @@ struct StudentListView: View {
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 6, leading: TMISpacing.screenPadding, bottom: 6, trailing: TMISpacing.screenPadding))
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        // Delete action
-                        Button(role: .destructive) {
-                            studentToDelete = student
-                            showingDeleteConfirmation = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        if canDeleteStudents {
+                            Button(role: .destructive) {
+                                studentToDelete = student
+                                showingDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                     .swipeActions(edge: .leading, allowsFullSwipe: false) {
@@ -412,11 +418,13 @@ struct StudentListView: View {
 
             Divider()
 
-            Button(role: .destructive) {
-                studentToDelete = student
-                showingDeleteConfirmation = true
-            } label: {
-                Label("Delete Student", systemImage: "trash")
+            if canDeleteStudents {
+                Button(role: .destructive) {
+                    studentToDelete = student
+                    showingDeleteConfirmation = true
+                } label: {
+                    Label("Delete Student", systemImage: "trash")
+                }
             }
         } label: {
             Image(systemName: "ellipsis.circle")
@@ -531,4 +539,3 @@ extension TMIPlanModel {
         StudentListView()
     }
 }
-

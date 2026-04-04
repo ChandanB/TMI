@@ -254,9 +254,14 @@ struct AccessibilityAnnouncement {
 }
 
 struct AccessibilityNotification {
-    let type: UIAccessibility.Announcement
+    let type: AccessibilityNotificationType
     let argument: Any?
     let timestamp: Date
+}
+
+enum AccessibilityNotificationType {
+    case announcement
+    case layoutChanged
 }
 
 // MARK: - Accessibility View Modifiers

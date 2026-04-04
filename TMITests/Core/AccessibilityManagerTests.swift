@@ -279,6 +279,18 @@ final class AccessibilityManagerTests: XCTestCase {
             }
         }
     }
+
+    func testAccessibilityNotificationUsesUIKitNotificationType() {
+        let notification = AccessibilityNotification(
+            type: .announcement,
+            argument: "Test announcement",
+            timestamp: Date(timeIntervalSince1970: 1_234)
+        )
+
+        XCTAssertEqual(notification.type, .announcement)
+        XCTAssertEqual(notification.argument as? String, "Test announcement")
+        XCTAssertEqual(notification.timestamp, Date(timeIntervalSince1970: 1_234))
+    }
 }
 
 // MARK: - AccessibleButton Tests

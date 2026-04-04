@@ -262,9 +262,10 @@ struct TMIPlanEditorView: View {
                     Spacer(minLength: 100)
                 }
                 .padding(.top, TMISpacing.md)
+                
+                bottomSaveBar
             }
-
-            bottomSaveBar
+            
         }
         .navigationTitle(isEditMode ? "Edit Plan" : "New TMI Plan")
         .navigationBarTitleDisplayMode(.inline)

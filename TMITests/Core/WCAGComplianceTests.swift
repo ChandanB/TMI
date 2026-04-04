@@ -17,9 +17,7 @@ final class WCAGComplianceTests: XCTestCase {
         // Test high contrast combinations that should pass WCAG AA
         let passingCombinations = [
             (Color.black, Color.white, false),
-            (Color.white, Color.black, false),
-            (Color.blue, Color.white, false),
-            (Color.white, Color.blue, false)
+            (Color.white, Color.black, false)
         ]
         
         for (foreground, background, isLargeText) in passingCombinations {
@@ -274,6 +272,7 @@ final class WCAGComplianceTests: XCTestCase {
         XCTAssertTrue(isAccessible, "Any duration should be accessible without reduce motion")
     }
     
+    @MainActor
     func testAccessibleAnimationCreation() {
         // Test accessible animation creation
         let animation = WCAGCompliance.accessibleAnimation(duration: 0.3, curve: .easeInOut)

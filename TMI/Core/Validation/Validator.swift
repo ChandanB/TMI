@@ -1005,18 +1005,18 @@ final class FormValidator {
 extension String {
     /// Quick validation using ValidationRules
     func validate(as rule: ValidationRule) -> ValidationResult {
-        switch rule {
-        case .email():
+        switch rule.ruleType {
+        case .email:
             return ValidationRules.email(self)
-        case .name():
+        case .name:
             return ValidationRules.name(self)
-        case .phone():
+        case .phone:
             return ValidationRules.phoneNumber(self)
-        case .url():
+        case .url:
             return ValidationRules.url(self)
-        case .required():
+        case .required:
             return self.isEmpty ? .error("Field is required") : .valid
-        case .schoolName():
+        case .schoolName:
             return ValidationRules.schoolName(self)
         default:
             return .valid
@@ -1042,4 +1042,3 @@ extension Array {
         return ValidationRules.collectionSize(self, min: min, max: max, fieldName: fieldName)
     }
 }
-
