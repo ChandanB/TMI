@@ -3062,18 +3062,8 @@ struct TMIPlanResourceCard: View {
     let interest: Interest
     let modelColor: Color
 
-    // Mock resources - in production, these would come from a resource service
-    private var mockResources: [(title: String, type: String)] {
-        [
-            ("Exploring \(interest.name): Beginner's Guide", "Article"),
-            ("Career Paths in \(interest.name)", "Video"),
-            ("\(interest.name) Workshop Opportunities", "Activity")
-        ]
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
-            // Interest header
             HStack(spacing: 8) {
                 Image(systemName: interest.iconName)
                     .font(.system(size: 16, weight: .semibold))
@@ -3084,45 +3074,15 @@ struct TMIPlanResourceCard: View {
                     .foregroundColor(.white)
 
                 Spacer()
-
-                Text("\(mockResources.count)")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(interest.color)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        Capsule()
-                            .fill(interest.color.opacity(0.2))
-                    )
             }
 
-            // Resources list
-            VStack(spacing: 6) {
-                ForEach(mockResources.indices, id: \.self) { index in
-                    HStack(spacing: 8) {
-                        Image(systemName: resourceIcon(for: mockResources[index].type))
-                            .font(.system(size: 12))
-                            .foregroundColor(modelColor.opacity(0.7))
-                            .frame(width: 20)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(mockResources[index].title)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-
-                            Text(mockResources[index].type)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
-                }
+            HStack(spacing: 8) {
+                Image(systemName: "tray")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.4))
+                Text("Resources coming soon")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.5))
             }
         }
         .padding(TMISpacing.md)
@@ -3132,17 +3092,8 @@ struct TMIPlanResourceCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.md)
-                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                .strokeBorder(interest.color.opacity(0.3), lineWidth: 1)
         )
-    }
-
-    private func resourceIcon(for type: String) -> String {
-        switch type {
-        case "Article": return "doc.text"
-        case "Video": return "play.rectangle"
-        case "Activity": return "figure.walk"
-        default: return "link"
-        }
     }
 }
 
