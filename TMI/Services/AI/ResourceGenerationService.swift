@@ -12,7 +12,7 @@ import FirebaseAuth
 
 // MARK: - Generable Structures for AI
 
-@available(iOS 18.0, macOS 15.0, *)
+@available(iOS 26.0, macOS 15.0, *)
 @Generable
 struct GeneratedResourceList {
     @Generable
@@ -27,7 +27,7 @@ struct GeneratedResourceList {
     let resources: [ResourceItem]
 }
 
-@available(iOS 18.0, macOS 15.0, *)
+@available(iOS 26.0, macOS 15.0, *)
 actor ResourceGenerationService {
     static let shared = ResourceGenerationService()
 
