@@ -114,7 +114,6 @@ struct DataExportView: View {
                     .foregroundColor(.white)
                 }
             }
-            .preferredColorScheme(.dark)
         }
     }
     

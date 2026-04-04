@@ -85,7 +85,6 @@ struct EditGoalView: View {
                 .disabled(goalDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
             }
         }
-        .preferredColorScheme(.dark)
     }
 
     // MARK: - Sections

@@ -168,7 +168,6 @@ struct BulkActionsView: View {
                     .foregroundColor(.white)
                 }
             }
-            .preferredColorScheme(.dark)
     }
 
     @MainActor

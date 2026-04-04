@@ -177,7 +177,6 @@ struct AddGoalView: View {
                 .foregroundColor(.white)
             }
         }
-        .preferredColorScheme(.dark)
     }
 
     private var modelColor: Color {

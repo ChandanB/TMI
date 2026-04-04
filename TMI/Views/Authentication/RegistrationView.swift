@@ -285,7 +285,6 @@ struct RegistrationView: View {
           }
         }
       }
-      .preferredColorScheme(.dark)
       .onChange(of: selectedRole) { _, newRole in
         if !newRole.requiresInstitutionalAffiliation {
           institutionCode = ""

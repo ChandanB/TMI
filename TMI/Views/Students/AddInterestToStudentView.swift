@@ -136,7 +136,6 @@ struct AddInterestToStudentView: View {
         }
         .navigationTitle("Add Interests")
         .navigationBarTitleDisplayMode(.inline)
-        .preferredColorScheme(.dark)
         .task {
             await loadInterests()
         }

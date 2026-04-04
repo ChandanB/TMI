@@ -78,7 +78,6 @@ struct FormBuilderView: View {
           .foregroundColor(.white)
         }
       }
-      .preferredColorScheme(.dark)
   }
 }
 

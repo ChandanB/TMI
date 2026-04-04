@@ -134,7 +134,6 @@ struct AddInterestToPlanView: View {
         }
         .navigationTitle("Add Interests to Plan")
         .navigationBarTitleDisplayMode(.inline)
-        .preferredColorScheme(.dark)
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {

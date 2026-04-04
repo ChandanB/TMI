@@ -149,9 +149,8 @@ struct ResourceDetailView: View {
                 animateContent = true
             }
         }
-        .preferredColorScheme(.dark)
     }
-    
+
     // MARK: - Hero Section
     
     private var heroSection: some View {

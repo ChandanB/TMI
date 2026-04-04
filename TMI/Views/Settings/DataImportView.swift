@@ -79,7 +79,6 @@ struct DataImportView: View {
                     .foregroundColor(.white)
                 }
             }
-            .preferredColorScheme(.dark)
             .fileImporter(
                 isPresented: $showingFilePicker,
                 allowedContentTypes: [.json, .commaSeparatedText, .data],

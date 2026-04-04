@@ -116,10 +116,9 @@ struct AddResourceView: View {
                     showAnimation = true
                 }
             }
-            .preferredColorScheme(.dark)
         }
     }
-    
+
     private var resourceBackgroundView: some View {
         TMIBackgroundView(variant: .default)
     }

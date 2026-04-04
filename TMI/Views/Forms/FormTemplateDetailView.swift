@@ -121,7 +121,6 @@ struct FormTemplateDetailView: View {
         animateContent = true
       }
     }
-    .preferredColorScheme(.dark)
     .sheet(isPresented: $showingPreview) {
       FormPreviewView(template: template)
         .tmiSheetStyle()

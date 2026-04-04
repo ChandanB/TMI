@@ -111,12 +111,10 @@ struct RoleSelectionView: View {
     .navigationBarBackButtonHidden(false)
     .sheet(isPresented: $showingInfoSheet) {
       RoleInformationSheet()
-        .preferredColorScheme(.dark)
         .tmiSheetStyle()
     }
     .sheet(isPresented: $showingAgeVerification) {
       AgeVerificationView(selectedRole: selectedRole!)
-        .preferredColorScheme(.dark)
         .tmiSheetStyle()
         .onDisappear {
           // After age verification, proceed to registration
@@ -128,7 +126,6 @@ struct RoleSelectionView: View {
     // Present the RegistrationView sheet with selected context
     .sheet(isPresented: $showingRegistrationView) {
       RegistrationView()
-        .preferredColorScheme(.dark)
         .tmiSheetStyle()
     }
     .onAppear {
@@ -145,7 +142,6 @@ struct RoleSelectionView: View {
         animateButtons = true
       }
     }
-    .preferredColorScheme(.dark)
   }
 
   private var continueButtonText: String {
@@ -463,7 +459,6 @@ struct InstitutionVerificationSection: View {
     .padding(.horizontal, 20)
     .sheet(isPresented: $showingInstitutionSearch) {
       InstitutionSearchView(selectedInstitution: $selectedInstitution)
-        .preferredColorScheme(.dark)
         .tmiSheetStyle()
         .onDisappear {
           // When institution is selected, update code accordingly
@@ -850,6 +845,5 @@ extension UserRole {
 
 #Preview {
   RoleSelectionView()
-    .preferredColorScheme(.dark)
 }
 

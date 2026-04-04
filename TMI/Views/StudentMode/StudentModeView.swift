@@ -62,7 +62,6 @@ struct StudentModeView: View {
             Text("Staff authentication required to exit student mode.")
         }
         .interactiveDismissDisabled(true)
-        .preferredColorScheme(.dark)
         .task {
             // Set student context for cross-module access
             await studentContext.setActiveStudent(

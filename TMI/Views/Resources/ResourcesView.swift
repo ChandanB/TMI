@@ -256,7 +256,6 @@ struct ResourcesView: View {
         .tmiSheetStyle()
       }
     }
-    .preferredColorScheme(.dark)
   }
 
   // MARK: - Background
@@ -923,7 +922,6 @@ struct AllStudentResourcesSheet: View {
         }
       }
     }
-    .preferredColorScheme(.dark)
   }
 }
 

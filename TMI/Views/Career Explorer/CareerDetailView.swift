@@ -2373,7 +2373,6 @@ struct CareerResourcesView: View {
           .foregroundColor(.white)
         }
       }
-      .preferredColorScheme(.dark)
   }
 }
 

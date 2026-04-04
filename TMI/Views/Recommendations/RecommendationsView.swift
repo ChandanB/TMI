@@ -75,9 +75,8 @@ struct RecommendationsView: View {
                 await loadRecommendations()
             }
         }
-        .preferredColorScheme(.dark)
     }
-    
+
     // MARK: - Loading View
     
     private var loadingView: some View {

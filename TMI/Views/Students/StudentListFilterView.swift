@@ -54,7 +54,6 @@ struct StudentListFilterView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
 }
 

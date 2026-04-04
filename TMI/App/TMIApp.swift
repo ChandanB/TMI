@@ -53,7 +53,7 @@ struct TMIApp: App {
                 .environment(\.districtStateModel, districtStateModel)
                 .environment(\.recommendationsStateModel, recommendationsStateModel)
                 
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
                 .onOpenURL { url in
                     // Handle deep links
                     Task {

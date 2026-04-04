@@ -320,7 +320,6 @@ struct TMIPlanDetailView: View {
             await loadPlanInputs()
             await loadPlanEvidence()
         }
-        .preferredColorScheme(.dark)
     }
 
     // MARK: - Plan Overview Section

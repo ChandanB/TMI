@@ -69,7 +69,6 @@ struct InterestsAndHobbiesView: View {
             AddItemSheet()
                 .tmiSheetStyle()
         }
-        .preferredColorScheme(.dark)
         .task {
             await stateModel.fetch()
             await loadActiveStudentCount()
@@ -1048,7 +1047,6 @@ struct PredefinedInterestsListView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
 }
 

@@ -69,7 +69,6 @@ struct StudentMainView: View {
             }
         }
         .tint(.tmiPrimary)
-        .preferredColorScheme(.dark)
         .confirmationDialog("Sign Out", isPresented: $showingSignOutConfirmation, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
                 Task {

@@ -201,12 +201,10 @@ struct AuthenticationView: View {
       .navigationBarTitleDisplayMode(.inline)
       .sheet(isPresented: $showingRegistration) {
         SimplifiedRegistrationView()
-          .preferredColorScheme(.dark)
           .tmiSheetStyle()
       }
       .sheet(isPresented: $showingSupportResources) {
         SupportResourcesView()
-          .preferredColorScheme(.dark)
           .tmiSheetStyle()
       }
       .alert("Reset Password", isPresented: $showingForgotPassword) {
@@ -232,7 +230,6 @@ struct AuthenticationView: View {
           dismiss()
         }
       }
-      .preferredColorScheme(.dark)
       .errorBoundary()
       .onAppear {
         // Set initial focus to email field after a slight delay

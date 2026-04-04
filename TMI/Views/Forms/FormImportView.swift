@@ -113,7 +113,6 @@ struct FormImportView: View {
           .foregroundColor(.white)
         }
       }
-      .preferredColorScheme(.dark)
       .fileImporter(
         isPresented: $showingFilePicker,
         allowedContentTypes: [.json, .data],

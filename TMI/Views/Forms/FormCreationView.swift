@@ -143,7 +143,6 @@ struct FormCreationView: View {
           .foregroundColor(.white)
         }
       }
-      .preferredColorScheme(.dark)
   }
 }
 

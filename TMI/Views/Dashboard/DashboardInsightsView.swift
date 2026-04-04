@@ -195,9 +195,8 @@ struct DashboardInsightsView: View {
       LegacyInsightsView(dashboardData: dashboardData)
         .tmiSheetStyle()
     }
-    .preferredColorScheme(.dark)
   }
-  
+
   // MARK: - Computed Properties
   
   private var surveyCompletionRate: Double {
@@ -371,9 +370,8 @@ struct LegacyInsightsView: View {
         .foregroundColor(.white)
       }
     }
-    .preferredColorScheme(.dark)
   }
-  
+
   private var legacyRecommendations: [InsightRecommendation] {
     // This would be the same logic as the original recommendations
     var recs: [InsightRecommendation] = []

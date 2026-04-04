@@ -235,7 +235,6 @@ struct CareerExplorerView: View {
       studentPickerSheet
         .tmiSheetStyle()
     }
-    .preferredColorScheme(.dark)
     .onAppear {
       performInitialAnimation()
       stateModel.fetch()
@@ -1563,7 +1562,6 @@ struct FilterSheet: View {
         }
       }
     }
-    .preferredColorScheme(.dark)
   }
 }
 
@@ -2153,7 +2151,6 @@ struct StudentPickerSheet: View {
         }
       }
     }
-    .preferredColorScheme(.dark)
     .task {
       isLoading = true
       do {

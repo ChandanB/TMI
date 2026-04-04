@@ -120,6 +120,5 @@ struct FormPreviewView: View {
           .foregroundColor(.white)
         }
       }
-      .preferredColorScheme(.dark)
   }
 }

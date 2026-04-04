@@ -1346,7 +1346,6 @@ struct RoleSummaryItem: View {
         DashboardView()
             .environment(\.dashboardStateModel, DashboardStateModel())
     }
-    .preferredColorScheme(.dark)
 }
 
 // MARK: - Actionable Cards moved to Components/ActionableCards.swift

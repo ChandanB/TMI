@@ -109,7 +109,6 @@ struct FormsAndSurveysView: View {
         isLoaded = true
       }
     }
-    .preferredColorScheme(.dark)
     .sheet(isPresented: $showingFormCreation) {
       FormCreationView()
         .tmiSheetStyle()

@@ -390,7 +390,6 @@ struct UserProfileView: View {
                     }
             }
         }
-        .preferredColorScheme(.dark)
         .onAppear {
             // Only fetch if we haven't loaded data yet
             if case .idle = stateModel.state {
@@ -685,7 +684,6 @@ struct ChangeEmailView: View {
                     )
                 }
             }
-            .preferredColorScheme(.dark)
         }
     }
 }

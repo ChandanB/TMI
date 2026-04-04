@@ -97,7 +97,6 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .preferredColorScheme(.dark)
         .onAppear {
             withAnimation(.easeInOut(duration: 0.5).delay(0.1)) {
                 isLoaded = true

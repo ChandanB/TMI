@@ -318,9 +318,8 @@ struct DynamicFormView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
-    
+
     // MARK: - Form Content
     
     private var formContent: some View {
