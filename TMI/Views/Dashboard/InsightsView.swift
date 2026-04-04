@@ -52,7 +52,7 @@ struct PerformanceInsightView: View {
                             .padding(.vertical, 4)
                             .background(
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(.ultraThinMaterial)
+                                    .fill(Color.tmiSurface)
                             )
                     }
             }
@@ -102,7 +102,7 @@ struct PerformanceInsightView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -213,7 +213,7 @@ struct InterestAlignmentInsightView: View {
                                 .padding(.horizontal, 8)
                                 .background(
                                     RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                        .fill(.ultraThinMaterial)
+                                        .fill(Color.tmiSurface)
                                 )
                                 .transition(.opacity.animation(.easeIn))
                         }
@@ -251,7 +251,7 @@ struct InterestAlignmentInsightView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -384,7 +384,7 @@ struct InterestsInsightView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -513,7 +513,7 @@ struct TMIEffectivenessView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)

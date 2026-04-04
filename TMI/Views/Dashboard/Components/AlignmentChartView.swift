@@ -41,7 +41,7 @@ struct LegacyAlignmentChartView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.thinMaterial)
+                .fill(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)

@@ -103,7 +103,7 @@ struct StudentListFilterOptionCard: View {
                     .fill(Color.white.opacity(isSelected ? 0.08 : 0.03))
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(.ultraThinMaterial)
+                            .fill(Color.tmiSurface)
                             .opacity(0.3)
                     )
             )

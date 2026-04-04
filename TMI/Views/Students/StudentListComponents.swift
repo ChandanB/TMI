@@ -44,7 +44,7 @@ struct StudentStatCard: View {
                 .fill(Color.white.opacity(0.05))
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.4)
                 )
         )

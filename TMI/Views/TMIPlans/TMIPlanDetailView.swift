@@ -437,7 +437,7 @@ struct TMIPlanDetailView: View {
         .background(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
                 .fill(Color.white.opacity(0.05))
-                .background(.ultraThinMaterial.opacity(0.3))
+                .background(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
@@ -496,7 +496,7 @@ struct TMIPlanDetailView: View {
         .background(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
                 .fill(Color.white.opacity(0.05))
-                .background(.ultraThinMaterial.opacity(0.3))
+                .background(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
@@ -1684,7 +1684,7 @@ struct TMIPlanDetailView: View {
         .background(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
                 .fill(Color.white.opacity(0.05))
-                .background(.ultraThinMaterial.opacity(0.3))
+                .background(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
@@ -1786,7 +1786,7 @@ struct TMIPlanDetailView: View {
         .background(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
                 .fill(Color.white.opacity(0.05))
-                .background(.ultraThinMaterial.opacity(0.3))
+                .background(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
@@ -1826,7 +1826,7 @@ struct TMIPlanDetailView: View {
         .background(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
                 .fill(Color.white.opacity(0.05))
-                .background(.ultraThinMaterial.opacity(0.3))
+                .background(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
@@ -1938,7 +1938,7 @@ struct TMIPlanDetailView: View {
         .background(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
                 .fill(Color.white.opacity(0.05))
-                .background(.ultraThinMaterial.opacity(0.3))
+                .background(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
@@ -2041,7 +2041,7 @@ struct TMIPlanDetailView: View {
         .background(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
                 .fill(Color.white.opacity(0.05))
-                .background(.ultraThinMaterial.opacity(0.3))
+                .background(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
@@ -2096,7 +2096,7 @@ struct TMIPlanDetailView: View {
         .background(
             RoundedRectangle(cornerRadius: TMIRadius.lg)
                 .fill(Color.white.opacity(0.05))
-                .background(.ultraThinMaterial.opacity(0.3))
+                .background(Color.tmiSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.lg)

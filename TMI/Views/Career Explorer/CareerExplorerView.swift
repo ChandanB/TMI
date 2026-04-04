@@ -160,7 +160,7 @@ struct CareerExplorerView: View {
       .fill(Color.white.opacity(0.05))
       .background(
         RoundedRectangle(cornerRadius: 28, style: .continuous)
-          .fill(.ultraThinMaterial)
+          .fill(Color.tmiSurface)
           .opacity(0.9)
       )
       .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: 10)
@@ -275,7 +275,7 @@ struct CareerExplorerView: View {
               .fill(Color.white.opacity(0.1))
               .background(
                 RoundedRectangle(cornerRadius: 24)
-                  .fill(.ultraThinMaterial)
+                  .fill(Color.tmiSurface)
                   .opacity(0.6)
               )
               .overlay(
@@ -351,7 +351,7 @@ struct CareerExplorerView: View {
               .fill(Color.white.opacity(0.1))
               .background(
                 RoundedRectangle(cornerRadius: 16)
-                  .fill(.ultraThinMaterial)
+                  .fill(Color.tmiSurface)
                   .opacity(0.3)
               )
               .frame(height: 44)
@@ -497,7 +497,7 @@ struct CareerExplorerView: View {
         .fill(Color.white.opacity(0.05))
         .background(
           RoundedRectangle(cornerRadius: 16)
-            .fill(.ultraThinMaterial)
+            .fill(Color.tmiSurface)
             .opacity(0.3)
         )
     )
@@ -564,7 +564,7 @@ struct CareerExplorerView: View {
           .fill((selectedStudent != nil) ? Color.tmiSecondary.opacity(0.3) : Color.white.opacity(0.1))
           .background(
             RoundedRectangle(cornerRadius: 18)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.3)
           )
       )
@@ -1177,7 +1177,7 @@ struct CareerCardBackground: View {
       .fill(Color.white.opacity(0.05))
       .background(
         RoundedRectangle(cornerRadius: 16)
-          .fill(.ultraThinMaterial)
+          .fill(Color.tmiSurface)
           .opacity(0.7)
       )
       .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
@@ -1312,7 +1312,7 @@ struct FilterSectionContainer<Content: View>: View {
           .fill(Color.white.opacity(0.05))
           .background(
             RoundedRectangle(cornerRadius: 16)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.3)
           )
       )
@@ -1361,10 +1361,10 @@ struct SkillSelectionButton: View {
             .background(
               isSelected
                 ? RoundedRectangle(cornerRadius: 18)
-                  .fill(.ultraThinMaterial)
+                  .fill(Color.tmiSurface)
                   .opacity(0)
                 : RoundedRectangle(cornerRadius: 18)
-                  .fill(.ultraThinMaterial)
+                  .fill(Color.tmiSurface)
                   .opacity(0.1)
             )
         )
@@ -1610,7 +1610,7 @@ struct SliderThumb: View {
         .frame(width: 24, height: 24)
         .background(
           Circle()
-            .fill(.ultraThinMaterial)
+            .fill(Color.tmiSurface)
             .opacity(0.9)
         )
         .shadow(color: Color.black.opacity(0.2), radius: 3, x: 0, y: 1)
@@ -1771,7 +1771,7 @@ struct RangeSlider: View {
             .frame(width: 24, height: 24)
             .background(
               Circle()
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
                 .opacity(0.9)
             )
             .shadow(color: Color.black.opacity(0.2), radius: 3, x: 0, y: 1)
@@ -1808,7 +1808,7 @@ struct RangeSlider: View {
             .frame(width: 24, height: 24)
             .background(
               Circle()
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
                 .opacity(0.9)
             )
             .shadow(color: Color.black.opacity(0.2), radius: 3, x: 0, y: 1)
@@ -1945,7 +1945,7 @@ struct TrendingCareerCard: View {
         .fill(Color.white.opacity(0.05))
         .background(
           RoundedRectangle(cornerRadius: 12)
-            .fill(.ultraThinMaterial)
+            .fill(Color.tmiSurface)
             .opacity(0.8)
         )
         .overlay(
@@ -2031,7 +2031,7 @@ struct PersonalizedCareerCard: View {
         .fill(Color.white.opacity(0.05))
         .background(
           RoundedRectangle(cornerRadius: 12)
-            .fill(.ultraThinMaterial)
+            .fill(Color.tmiSurface)
             .opacity(0.8)
         )
         .overlay(

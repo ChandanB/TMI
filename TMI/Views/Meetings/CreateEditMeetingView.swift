@@ -169,7 +169,7 @@ struct CreateEditMeetingView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(.ultraThinMaterial)
+                            .fill(Color.tmiSurface)
                     )
                     .foregroundColor(.white)
 
@@ -179,7 +179,7 @@ struct CreateEditMeetingView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(.ultraThinMaterial)
+                            .fill(Color.tmiSurface)
                     )
                     .foregroundColor(.white)
             }
@@ -205,7 +205,7 @@ struct CreateEditMeetingView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                 )
 
                 Picker("Duration", selection: $duration) {
@@ -220,7 +220,7 @@ struct CreateEditMeetingView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                 )
                 .foregroundColor(.white)
 
@@ -238,7 +238,7 @@ struct CreateEditMeetingView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                 )
             }
         }
@@ -262,7 +262,7 @@ struct CreateEditMeetingView: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.tmiSurface)
             )
         }
     }
@@ -299,7 +299,7 @@ struct CreateEditMeetingView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                 )
             } else {
                 VStack(spacing: 8) {
@@ -338,7 +338,7 @@ struct CreateEditMeetingView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
         )
     }
 

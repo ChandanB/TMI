@@ -99,7 +99,7 @@ struct InterestsSearchBar: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
                 .opacity(0.3)
         )
         .overlay(
@@ -147,7 +147,7 @@ struct TMISegmentedControl<T: CaseIterable & Identifiable & RawRepresentable>: V
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
                 .opacity(0.3)
         )
     }
@@ -164,7 +164,7 @@ struct InterestsCard<Content: View>: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
                 .opacity(0.3)
         )
         .overlay(
@@ -258,7 +258,7 @@ struct TMITextEditor: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
                 .opacity(0.3)
         )
         .overlay(

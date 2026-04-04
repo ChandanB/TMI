@@ -386,7 +386,7 @@ struct RecommendedCareerCard: View {
                 .fill(Color.white.opacity(0.05))
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.3)
                 )
         )
@@ -435,7 +435,7 @@ struct RecommendedResourceCard: View {
                 .fill(Color.white.opacity(0.05))
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.3)
                 )
         )
@@ -490,7 +490,7 @@ struct SuggestionCard: View {
     private var cardBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
                 .opacity(0.3)
             
             RoundedRectangle(cornerRadius: 12)
@@ -537,7 +537,7 @@ struct TrendingItemCard: View {
                 .fill(Color.white.opacity(0.05))
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.2)
                 )
         )

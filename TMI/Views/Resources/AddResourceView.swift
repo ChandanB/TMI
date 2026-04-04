@@ -203,7 +203,7 @@ struct CategoryPickerView: View {
                 .fill(Color.white.opacity(0.02))
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.3)
                 )
         )
@@ -241,7 +241,7 @@ struct FeatureToggleView: View {
                 .fill(Color.white.opacity(0.02))
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.3)
                 )
         )
@@ -296,7 +296,7 @@ struct ResourceFormField: View {
                 .fill(Color.white.opacity(0.02))
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.3)
                 )
         )
@@ -355,7 +355,7 @@ struct LongResourceFormField: View {
                 .fill(Color.white.opacity(0.02))
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.3)
                 )
         )

@@ -289,7 +289,7 @@ struct RecoveryOverlay: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule())
+        .background(Color.tmiSurface, in: Capsule())
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 }

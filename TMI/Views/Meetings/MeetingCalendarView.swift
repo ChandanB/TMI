@@ -69,7 +69,7 @@ struct MeetingCalendarView: View {
                 Image(systemName: "chevron.left")
                     .foregroundColor(.white)
                     .padding(8)
-                    .background(Circle().fill(.ultraThinMaterial))
+                    .background(Circle().fill(Color.tmiSurface))
             }
 
             Spacer()
@@ -84,7 +84,7 @@ struct MeetingCalendarView: View {
                 Image(systemName: "chevron.right")
                     .foregroundColor(.white)
                     .padding(8)
-                    .background(Circle().fill(.ultraThinMaterial))
+                    .background(Circle().fill(Color.tmiSurface))
             }
         }
         .padding()
@@ -197,7 +197,7 @@ struct MeetingCalendarView: View {
             }
         }
         .frame(maxHeight: 250)
-        .background(.ultraThinMaterial)
+        .background(Color.tmiSurface)
     }
 
     // MARK: - Helpers
@@ -281,7 +281,7 @@ private struct CalendarMeetingCard: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
         )
     }
 }

@@ -64,7 +64,7 @@ struct PendingApprovalsWidget: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
                 .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
         )
         .task {

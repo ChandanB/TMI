@@ -60,7 +60,7 @@ struct CareerDetailView: View {
               .fill(Color.white.opacity(0.05))
               .background(
                 RoundedRectangle(cornerRadius: 30)
-                  .fill(.ultraThinMaterial)
+                  .fill(Color.tmiSurface)
                   .opacity(0.3)
               )
               .overlay(
@@ -170,7 +170,7 @@ struct CareerDetailView: View {
         )
         .background(
           RoundedRectangle(cornerRadius: 0)
-            .fill(.ultraThinMaterial)
+            .fill(Color.tmiSurface)
             .opacity(0.8)
         )
 
@@ -279,7 +279,7 @@ struct CareerDetailView: View {
                 .fill(Color.white.opacity(0.15))
                 .background(
                   Capsule()
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.tmiSurface)
                     .opacity(0.6)
                 )
             )
@@ -393,7 +393,7 @@ struct CareerDetailView: View {
     .background(
       Rectangle()
         .fill(Color.black.opacity(0.2))
-        .background(.ultraThinMaterial.opacity(0.8))
+        .background(Color.tmiSurface)
     )
   }
 
@@ -419,7 +419,7 @@ struct CareerDetailView: View {
           .fill(Color.white.opacity(0.06))
           .background(
             RoundedRectangle(cornerRadius: 20)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.8)
           )
           .overlay(
@@ -499,7 +499,7 @@ struct CareerDetailView: View {
           .fill(Color.white.opacity(0.06))
           .background(
             RoundedRectangle(cornerRadius: 20)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.8)
           )
           .overlay(
@@ -618,7 +618,7 @@ struct CareerDetailView: View {
           .fill(Color.white.opacity(0.06))
           .background(
             RoundedRectangle(cornerRadius: 20)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.8)
           )
           .overlay(
@@ -662,7 +662,7 @@ struct CareerDetailView: View {
           .fill(Color.white.opacity(0.06))
           .background(
             RoundedRectangle(cornerRadius: 20)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.8)
           )
           .overlay(
@@ -715,7 +715,7 @@ struct CareerDetailView: View {
                 .fill(Color.white.opacity(0.06))
                 .background(
                   RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.tmiSurface)
                     .opacity(0.6)
                 )
                 .overlay(
@@ -789,7 +789,7 @@ struct CareerDetailView: View {
           .fill(Color.white.opacity(0.05))
           .background(
             RoundedRectangle(cornerRadius: 16)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.3)
           )
           .overlay(
@@ -867,7 +867,7 @@ struct CareerDetailView: View {
           .fill(Color.white.opacity(0.05))
           .background(
             RoundedRectangle(cornerRadius: 16)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.3)
           )
           .overlay(
@@ -947,7 +947,7 @@ struct CareerDetailView: View {
           .fill(Color.white.opacity(0.05))
           .background(
             RoundedRectangle(cornerRadius: 16)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.3)
           )
           .overlay(
@@ -1037,7 +1037,7 @@ struct CareerDetailView: View {
           .fill(Color.white.opacity(0.05))
           .background(
             RoundedRectangle(cornerRadius: 16)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.3)
           )
           .overlay(
@@ -1137,7 +1137,7 @@ struct CareerDetailView: View {
           .fill(Color.white.opacity(0.05))
           .background(
             RoundedRectangle(cornerRadius: 16)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.3)
           )
           .overlay(
@@ -1211,7 +1211,7 @@ struct CareerDetailView: View {
           .fill(Color.white.opacity(0.05))
           .background(
             RoundedRectangle(cornerRadius: 16)
-              .fill(.ultraThinMaterial)
+              .fill(Color.tmiSurface)
               .opacity(0.3)
           )
           .overlay(
@@ -1804,7 +1804,7 @@ struct CareerStatCard: View {
         .fill(Color.white.opacity(0.08))
         .background(
           RoundedRectangle(cornerRadius: 16)
-            .fill(.ultraThinMaterial)
+            .fill(Color.tmiSurface)
             .opacity(0.6)
         )
         .overlay(
@@ -1938,7 +1938,7 @@ struct SchoolFinderView: View {
                 .fill(Color.white.opacity(0.05))
                 .background(
                   RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.tmiSurface)
                     .opacity(0.3)
                 )
                 .overlay(
@@ -2059,7 +2059,7 @@ struct SchoolFinderView: View {
                 .fill(Color.white.opacity(0.05))
                 .background(
                   RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.tmiSurface)
                     .opacity(0.3)
                 )
                 .overlay(
@@ -2239,7 +2239,7 @@ struct CareerResourceCard: View {
         .fill(Color.white.opacity(0.05))
         .background(
           RoundedRectangle(cornerRadius: 12)
-            .fill(.ultraThinMaterial)
+            .fill(Color.tmiSurface)
             .opacity(0.8)
         )
         .overlay(
@@ -2321,7 +2321,7 @@ struct TMIModuleCard: View {
         .fill(Color.white.opacity(0.05))
         .background(
           RoundedRectangle(cornerRadius: 12)
-            .fill(.ultraThinMaterial)
+            .fill(Color.tmiSurface)
             .opacity(0.5)
         )
     )

@@ -270,6 +270,6 @@ struct ResourceRow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .background(Color.tmiSurface, in: RoundedRectangle(cornerRadius: 10))
     }
 }

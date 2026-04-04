@@ -46,7 +46,7 @@ struct ResourceDetailView: View {
                             .fill(Color.white.opacity(0.05))
                             .background(
                                 RoundedRectangle(cornerRadius: 30)
-                                    .fill(.ultraThinMaterial)
+                                    .fill(Color.tmiSurface)
                                     .opacity(0.9)
                             )
                             .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: -5)
@@ -526,7 +526,7 @@ struct CompactCareerCard: View {
                 .fill(Color.white.opacity(0.05))
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.8)
                 )
                 .overlay(

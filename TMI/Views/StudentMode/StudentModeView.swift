@@ -762,7 +762,7 @@ struct FeaturedCareerCard: View {
                 )
                 .background(
                     RoundedRectangle(cornerRadius: TMIRadius.lg)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.6)
                 )
         )

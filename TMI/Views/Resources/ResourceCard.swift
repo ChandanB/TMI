@@ -93,7 +93,7 @@ struct ResourceCard: View {
                 .fill(Color.white.opacity(0.02))
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
+                        .fill(Color.tmiSurface)
                         .opacity(0.3)
                 )
                 .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: 8)

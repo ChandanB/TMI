@@ -174,7 +174,7 @@ struct StudentInterestsSection: View {
                 if isCreating {
                     ProgressView("Creating…")
                         .padding()
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .background(Color.tmiSurface, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
         }

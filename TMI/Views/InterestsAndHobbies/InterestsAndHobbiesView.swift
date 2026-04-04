@@ -756,7 +756,7 @@ struct AddItemSheet: View {
             .padding(20)
             .background(
                 Rectangle()
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.tmiSurface)
                     .opacity(0.5)
                     .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: -5)
             )

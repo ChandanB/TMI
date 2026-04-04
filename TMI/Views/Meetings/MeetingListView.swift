@@ -101,7 +101,7 @@ struct MeetingListView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+                .fill(Color.tmiSurface)
         )
         .padding(.horizontal)
         .padding(.top)

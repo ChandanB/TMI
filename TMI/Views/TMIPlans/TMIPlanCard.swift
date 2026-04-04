@@ -137,7 +137,7 @@ struct TMIPlanCard: View {
         .fill(Color.black.opacity(0.2))
         .background(
           RoundedRectangle(cornerRadius: 16)
-            .fill(.ultraThinMaterial)
+            .fill(Color.tmiSurface)
             .opacity(0.7)
         )
         .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
