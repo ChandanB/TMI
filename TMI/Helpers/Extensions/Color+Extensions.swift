@@ -12,70 +12,54 @@ import SwiftUI
 // Note: These are programmatic definitions. In a real app, you'd define these in the asset catalog.
 
 extension Color {
-    // Gentle blue that works well in both light and dark modes
-    static let tmiPrimary = Color(red: 0.2901960784, green: 0.5647058824, blue: 0.8862745098)
-    static let tmiPrimaryDark = Color(red: 0.2196078431, green: 0.4431372549, blue: 0.7058823529)
-    static let tmiSecondary = Color(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529)
-    static let tmiBackground = Color(red: 0, green: 0, blue: 0)
-    static let tmiText = Color(red: 0.8498495817, green: 0.9484829307, blue: 0.9581733346)
-    static let backgroundTop = Color(red: 0.0, green: 0.47, blue: 0.75)
-    static let backgroundBottom = Color(red: 0.0, green: 0.35, blue: 0.65)
-    static let cardBackground = Color.black.opacity(0.5)
-}
+    // MARK: - Brand Colors
+    static let tmiPrimary = Color(hex: "#D4930D")         // Gold
+    static let tmiPrimaryDeep = Color(hex: "#B87A0A")     // Deep gold
+    static let tmiSecondary = Color(hex: "#3B6FA0")       // Warm blue
+    static let tmiBackground = Color(hex: "#FDF8F3")      // Warm cream
 
-#if DEBUG
-extension Color {
-    static let debugTMIPrimary = Color(red: 0.0653751418, green: 0.004413233139, blue: 0.238399297)
-    static let debugTMISecondary = Color(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529)
-    static let debugTMIBackground = Color(red: 1, green: 1, blue: 1)
-    static let debugTMIText = Color(red: 0.1019607857, green: 0.2784313858, blue: 0.400000006)
-}
-#endif
-
-extension Color {
+    // MARK: - Text Colors
+    static let tmiTextPrimary = Color(hex: "#2D3436")
+    static let tmiTextSecondary = Color(hex: "#636E72")
+    static let tmiTextTertiary = Color(hex: "#94908B")
+    static let tmiTextBrand = Color(hex: "#D4930D")
+    static let tmiTextOnPrimary = Color(hex: "#FFFFFF")
+    static let tmiTextOnSecondary = Color(hex: "#FFFFFF")
 
     // MARK: - Surface Colors
+    static let tmiSurface = Color(hex: "#FFFFFF")
+    static let tmiSurfaceElevated = Color(hex: "#FFFFFF")
+    static let tmiCardBackground = Color(hex: "#FFFFFF")
+    static let tmiInputBackground = Color(hex: "#F5F0EB")
 
-    /// Primary surface color - background for cards and elevated surfaces
-    static var tmiSurface: Color {
-        Color(light: Color(hex: "#F9FAFB"), dark: Color(hex: "#000f24"))
-    }
-
-    /// Secondary text color
-    static var tmiTextSecondary: Color {
-        Color(light: Color(hex: "#6B7280"), dark: Color(hex: "#9CA3AF"))
-    }
+    // MARK: - Border Colors
+    static let tmiBorder = Color(hex: "#E8E2DA")
+    static let tmiDivider = Color(hex: "#F0EBE4")
 
     // MARK: - Semantic Colors
-
-    /// Success color
-    static var tmiSuccess: Color {
-        Color(light: Color(hex: "#10B981"), dark: Color(hex: "#34D399"))
-    }
-
-    /// Warning color
-    static var tmiWarning: Color {
-        Color(light: Color(hex: "#F59E0B"), dark: Color(hex: "#FBBF24"))
-    }
-
-    /// Error color
-    static var tmiError: Color {
-        Color(light: Color(hex: "#EF4444"), dark: Color(hex: "#F87171"))
-    }
-
-    /// Info color
-    static var tmiInfo: Color {
-        Color(light: Color(hex: "#3B82F6"), dark: Color(hex: "#60A5FA"))
-    }
+    static let tmiSuccess = Color(hex: "#2D9F6F")
+    static let tmiWarning = Color(hex: "#E8A817")
+    static let tmiError = Color(hex: "#DC3545")
+    static let tmiInfo = Color(hex: "#3B6FA0")
 }
 
 extension ShapeStyle where Self == Color {
     static var tmiPrimary: Color { .tmiPrimary }
+    static var tmiPrimaryDeep: Color { .tmiPrimaryDeep }
     static var tmiSecondary: Color { .tmiSecondary }
-    static var tmiSurface: Color { .tmiSurface }
     static var tmiBackground: Color { .tmiBackground }
-    static var tmiText: Color { .tmiText }
+    static var tmiSurface: Color { .tmiSurface }
+    static var tmiSurfaceElevated: Color { .tmiSurfaceElevated }
+    static var tmiCardBackground: Color { .tmiCardBackground }
+    static var tmiInputBackground: Color { .tmiInputBackground }
+    static var tmiTextPrimary: Color { .tmiTextPrimary }
     static var tmiTextSecondary: Color { .tmiTextSecondary }
+    static var tmiTextTertiary: Color { .tmiTextTertiary }
+    static var tmiTextBrand: Color { .tmiTextBrand }
+    static var tmiTextOnPrimary: Color { .tmiTextOnPrimary }
+    static var tmiTextOnSecondary: Color { .tmiTextOnSecondary }
+    static var tmiBorder: Color { .tmiBorder }
+    static var tmiDivider: Color { .tmiDivider }
     static var tmiSuccess: Color { .tmiSuccess }
     static var tmiWarning: Color { .tmiWarning }
     static var tmiError: Color { .tmiError }

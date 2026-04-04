@@ -13,34 +13,8 @@ import AppKit
 // MARK: - Color Tokens (Additional)
 
 extension Color {
-    // MARK: - Additional UI Colors
-
-    // Surface variations
-    static let tmiSurfaceElevated = Color(light: .white, dark: Color(red: 0.18, green: 0.18, blue: 0.24))
-
-    // Text variations
-    static let tmiTextPrimary = Color(light: Color(hex: "#1A1A1A"), dark: Color(hex: "#F9FAFB"))
-    static let tmiTextTertiary = Color(light: Color(hex: "#6B7280"), dark: Color(hex: "#D1D5DB"))
-
-    // UI Elements
-    static let tmiBorder = Color(light: Color(hex: "#E5E7EB"), dark: Color(hex: "#374151"))
-    static let tmiDivider = Color(light: Color(hex: "#F3F4F6"), dark: Color(hex: "#1F2937"))
 
     // MARK: - Helper Initializers
-
-    init(light: Color, dark: Color) {
-        #if canImport(UIKit)
-        self.init(uiColor: UIColor { traitCollection in
-            traitCollection.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light)
-        })
-        #elseif canImport(AppKit)
-        self.init(nsColor: NSColor(name: nil) { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(dark) : NSColor(light)
-        })
-        #else
-        self = light
-        #endif
-    }
 
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -79,6 +53,10 @@ enum TMIElevation {
     case elevated
     case floating
 
+    var shadowColor: Color {
+        Color(hex: "#2D3436")
+    }
+
     var shadowRadius: CGFloat {
         switch self {
         case .flat: return 0
@@ -91,9 +69,9 @@ enum TMIElevation {
     var shadowOpacity: Double {
         switch self {
         case .flat: return 0
-        case .raised: return 0.08
-        case .elevated: return 0.12
-        case .floating: return 0.16
+        case .raised: return 0.05
+        case .elevated: return 0.08
+        case .floating: return 0.12
         }
     }
 
