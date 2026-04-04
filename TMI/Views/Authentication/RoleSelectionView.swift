@@ -314,7 +314,7 @@ struct RoleSelectionGrid: View {
   private let categories = SimplifiedRoleCategory.allCases
 
   var body: some View {
-    TMIGlassCard(style: .form) {
+    TMICard(style: .default) {
       VStack(spacing: 20) {
         Text("I am a...")
           .font(.system(size: 20, weight: .semibold))
@@ -406,7 +406,7 @@ struct InstitutionVerificationSection: View {
   @State private var showingInstitutionSearch = false
 
   var body: some View {
-    TMIGlassCard(style: .form) {
+    TMICard(style: .default) {
       VStack(spacing: 16) {
         HStack {
           Image(systemName: "building.2")
@@ -506,7 +506,7 @@ struct AgeVerificationView: View {
           }
 
           // Date picker in a glass card
-          TMIGlassCard(style: .form) {
+          TMICard(style: .default) {
             VStack(spacing: 20) {
               Text("What's your date of birth?")
                 .font(.system(size: 18, weight: .medium))
@@ -673,7 +673,7 @@ struct InstitutionCard: View {
 
   var body: some View {
     Button(action: onSelect) {
-      TMIGlassCard(style: .form) {
+      TMICard(style: .default) {
         HStack(spacing: 16) {
           Image(systemName: "building.2")
             .font(.system(size: 24))
@@ -786,7 +786,7 @@ struct InfoCard: View {
   let description: String
 
   var body: some View {
-    TMIGlassCard(style: .form) {
+    TMICard(style: .default) {
       HStack(spacing: 16) {
         Image(systemName: icon)
           .font(.system(size: 24))

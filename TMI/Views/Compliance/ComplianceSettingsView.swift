@@ -129,7 +129,7 @@ struct ComplianceSettingsView: View {
     // MARK: - Header Section
 
     private var headerSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "shield.checkered")
@@ -153,7 +153,7 @@ struct ComplianceSettingsView: View {
     // MARK: - COPPA Section
 
     private var coppaSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 sectionHeader(
                     title: "COPPA Compliance",
@@ -197,7 +197,7 @@ struct ComplianceSettingsView: View {
     // MARK: - FERPA Section
 
     private var ferpaSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 sectionHeader(
                     title: "FERPA Compliance",
@@ -276,7 +276,7 @@ struct ComplianceSettingsView: View {
     // MARK: - Data Retention Section
 
     private var dataRetentionSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 sectionHeader(
                     title: "Data Retention",
@@ -332,7 +332,7 @@ struct ComplianceSettingsView: View {
     // MARK: - Audit Logging Section
 
     private var auditLoggingSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 sectionHeader(
                     title: "Audit Logging",
@@ -388,7 +388,7 @@ struct ComplianceSettingsView: View {
     // MARK: - Privacy Section
 
     private var privacySection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 sectionHeader(
                     title: "Privacy Settings",
@@ -447,7 +447,7 @@ struct ComplianceSettingsView: View {
     // MARK: - Notification Section
 
     private var notificationSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 sectionHeader(
                     title: "Notification Settings",
@@ -512,7 +512,7 @@ struct ComplianceSettingsView: View {
     }
 
     private func errorMessageView(_ message: String) -> some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             HStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)

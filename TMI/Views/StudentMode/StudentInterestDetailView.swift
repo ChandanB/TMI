@@ -45,7 +45,7 @@ struct StudentInterestDetailView: View {
     // MARK: - Interest Header
 
     private var interestHeader: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: TMISpacing.lg) {
                 // Icon
                 ZStack {
@@ -142,7 +142,7 @@ struct StudentInterestDetailView: View {
     // MARK: - Empty Classmates Section
 
     private var emptyClassmatesSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: TMISpacing.md) {
                 Image(systemName: "person.crop.circle.badge.questionmark")
                     .font(.system(size: 50))
@@ -213,7 +213,7 @@ struct PeerRow: View {
     @State private var commonCount: Int = 0
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             HStack(spacing: TMISpacing.md) {
                 // Avatar
                 TMIAvatar(

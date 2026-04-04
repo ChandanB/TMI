@@ -58,7 +58,7 @@ struct StudentPeerProfileView: View {
     // MARK: - Peer Header
 
     private var peerHeader: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: TMISpacing.lg) {
                 // Avatar
                 TMIAvatar(
@@ -161,7 +161,7 @@ struct StudentPeerProfileView: View {
     // MARK: - Connection Message
 
     private var connectionMessage: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: TMISpacing.md) {
                 Image(systemName: "bubble.left.and.bubble.right.fill")
                     .font(.system(size: 40))

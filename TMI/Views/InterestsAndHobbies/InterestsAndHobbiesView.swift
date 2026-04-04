@@ -370,7 +370,7 @@ struct InterestsAndHobbiesView: View {
     // MARK: - Empty State
     
     private var emptyStateView: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: 20) {
                 Image(systemName: stateModel.selectedSegment == .all ? "heart.slash" : "gamecontroller.fill")
                     .font(.system(size: 50))
@@ -580,7 +580,7 @@ struct AddItemSheet: View {
     // MARK: - Browse Predefined Section
 
     private var browsePredefinedSection: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(spacing: 16) {
                 HStack(spacing: 12) {
                     Image(systemName: "sparkles")
@@ -613,7 +613,7 @@ struct AddItemSheet: View {
     // MARK: - Name Input
     
     private var nameInputSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Name")
                     .font(.headline)
@@ -632,7 +632,7 @@ struct AddItemSheet: View {
     // MARK: - Category Selection
     
     private var categorySelectionSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Category")
                     .font(.headline)
@@ -670,7 +670,7 @@ struct AddItemSheet: View {
     // MARK: - Icon Selection
     
     private var iconSelectionSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Icon")
                     .font(.headline)
@@ -704,7 +704,7 @@ struct AddItemSheet: View {
     // MARK: - Description Section
     
     private var descriptionSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Description (Optional)")
                     .font(.headline)
@@ -791,7 +791,7 @@ struct StatsCard: View {
     @State private var hasAppeared = false
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: 12) {
                 ZStack {
                     Circle()
@@ -846,7 +846,7 @@ struct InterestCardView: View {
     @State private var isHovered = false
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: 0) {
                 // Icon header with gradient background
                 ZStack {
@@ -1093,7 +1093,7 @@ struct PredefinedInterestRow: View {
     @State private var isExpanded = false
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 0) {
                 // Main content
                 HStack(spacing: 16) {

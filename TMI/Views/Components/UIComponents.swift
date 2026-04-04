@@ -286,7 +286,7 @@ struct DashboardAlignmentChartView: View {
   @State private var isAnimating = false
 
   var body: some View {
-    TMIGlassCard(style: .dashboard) {
+    TMICard(style: .default) {
       VStack(alignment: .leading, spacing: 16) {
         HStack {
           VStack(alignment: .leading, spacing: 4) {

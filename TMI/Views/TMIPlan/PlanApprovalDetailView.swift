@@ -84,7 +84,7 @@ struct PlanApprovalDetailView: View {
     // MARK: - Plan Header
 
     private var planHeader: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(plan.title)
                     .font(.title2.bold())
@@ -121,7 +121,7 @@ struct PlanApprovalDetailView: View {
                 .font(.title3.bold())
                 .foregroundColor(Color.tmiTextPrimary)
 
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 16) {
                     // Description
                     if let description = plan.description, !description.isEmpty {
@@ -204,7 +204,7 @@ struct PlanApprovalDetailView: View {
                 .font(.title3.bold())
                 .foregroundColor(Color.tmiTextPrimary)
 
-            TMIGlassCard(style: .elevated) {
+            TMICard(style: .elevated) {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(Array(plan.approvalHistory.enumerated()), id: \.offset) { index, entry in
                         VStack(alignment: .leading, spacing: 8) {
@@ -256,7 +256,7 @@ struct PlanApprovalDetailView: View {
                 .foregroundColor(Color.tmiTextPrimary)
 
             // Comment field
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Comment (Optional)")
                         .font(.subheadline.bold())

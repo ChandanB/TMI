@@ -44,7 +44,7 @@ struct AddGoalView: View {
                     .padding(.top, 20)
 
                     // Goal Description
-                    TMIGlassCard(style: .default) {
+                    TMICard(style: .default) {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Goal Description *")
                                 .font(.headline)
@@ -77,7 +77,7 @@ struct AddGoalView: View {
                     }
 
                     // Status
-                    TMIGlassCard(style: .default) {
+                    TMICard(style: .default) {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Status")
                                 .font(.headline)
@@ -109,7 +109,7 @@ struct AddGoalView: View {
                     }
 
                     // Due Date
-                    TMIGlassCard(style: .default) {
+                    TMICard(style: .default) {
                         VStack(alignment: .leading, spacing: 16) {
                             Toggle(isOn: $hasDueDate) {
                                 Text("Set Due Date")
@@ -127,7 +127,7 @@ struct AddGoalView: View {
                     }
 
                     // Notes
-                    TMIGlassCard(style: .default) {
+                    TMICard(style: .default) {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Notes (Optional)")
                                 .font(.headline)

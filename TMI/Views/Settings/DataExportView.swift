@@ -118,7 +118,7 @@ struct DataExportView: View {
     }
     
     private var headerView: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: 16) {
                 Image(systemName: "square.and.arrow.up.fill")
                     .font(.system(size: 40))
@@ -142,7 +142,7 @@ struct DataExportView: View {
                 .font(.headline.bold())
                 .foregroundColor(Color.tmiTextPrimary)
             
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(spacing: 0) {
                     ForEach(ExportFormat.allCases) { format in
                         ExportFormatRow(
@@ -167,7 +167,7 @@ struct DataExportView: View {
                 .font(.headline.bold())
                 .foregroundColor(Color.tmiTextPrimary)
             
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(spacing: 0) {
                     ForEach(DataType.allCases) { dataType in
                         DataTypeRow(
@@ -189,7 +189,7 @@ struct DataExportView: View {
     private var exportButtonSection: some View {
         VStack(spacing: 16) {
             if exportComplete {
-                TMIGlassCard(style: .default) {
+                TMICard(style: .default) {
                     HStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 24))

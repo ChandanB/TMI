@@ -366,7 +366,7 @@ struct PlanInterestRow: View {
     @State private var isExpanded = false
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 0) {
                 // Main content
                 HStack(spacing: 16) {

@@ -187,7 +187,7 @@ struct ConsentManagementView: View {
     private var statisticsSection: some View {
         let stats = overallStatistics
 
-        return TMIGlassCard(style: .elevated) {
+        return TMICard(style: .elevated) {
             VStack(spacing: 12) {
                 HStack {
                     Text("Consent Overview")
@@ -361,7 +361,7 @@ private struct StudentConsentCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 HStack(alignment: .top, spacing: 12) {
                     // Avatar
                     ZStack {
@@ -519,7 +519,7 @@ struct StudentConsentDetailView: View {
     }
 
     private var studentHeader: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
@@ -610,7 +610,7 @@ private struct ConsentTypeCard: View {
     }
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -712,7 +712,7 @@ private struct GrantConsentView: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
-                        TMIGlassCard(style: .elevated) {
+                        TMICard(style: .elevated) {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text(consentType.displayName)
                                     .font(.headline)
@@ -726,7 +726,7 @@ private struct GrantConsentView: View {
                             .padding()
                         }
 
-                        TMIGlassCard(style: .default) {
+                        TMICard(style: .default) {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("Granted By")
                                     .font(.subheadline.bold())
@@ -756,7 +756,7 @@ private struct GrantConsentView: View {
                         }
 
                         if let errorMessage = errorMessage {
-                            TMIGlassCard(style: .default) {
+                            TMICard(style: .default) {
                                 HStack(spacing: 12) {
                                     Image(systemName: "exclamationmark.triangle.fill")
                                         .foregroundColor(.orange)

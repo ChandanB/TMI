@@ -29,7 +29,7 @@ struct FormTemplateDetailView: View {
               .spring(response: 0.5, dampingFraction: 0.7).delay(0.1), value: animateContent)
 
           // Description
-          TMIGlassCard(style: .default) {
+          TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
               Text("Description")
                 .font(.system(size: 18, weight: .semibold))
@@ -128,7 +128,7 @@ struct FormTemplateDetailView: View {
   }
 
   private var formHeader: some View {
-    TMIGlassCard(style: .default) {
+    TMICard(style: .default) {
       VStack(spacing: 20) {
         // Icon
         ZStack {

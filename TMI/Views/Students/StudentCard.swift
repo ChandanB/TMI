@@ -6,7 +6,7 @@ struct StudentCard: View {
   let student: Student
 
   var body: some View {
-    TMIGlassCard(style: .default) {
+    TMICard(style: .default) {
       VStack(spacing: 10) {
         // Avatar Image with async loading
         if let photoURL = student.photoURL {

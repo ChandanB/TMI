@@ -58,7 +58,7 @@ struct DashboardInsightsView: View {
           .padding(.top, 20)
 
           // Insights content
-          TMIGlassCard(style: .dashboard) {
+          TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 20) {
               Text("Performance Overview")
                 .font(.title3.weight(.semibold))
@@ -91,7 +91,7 @@ struct DashboardInsightsView: View {
           }
 
           // Recommendations
-          TMIGlassCard(style: .dashboard) {
+          TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
               Text("Insights & Recommendations")
                 .font(.title3.weight(.semibold))
@@ -340,7 +340,7 @@ struct LegacyInsightsView: View {
         
         ScrollView {
           VStack(spacing: 20) {
-            TMIGlassCard(style: .dashboard) {
+            TMICard(style: .default) {
               VStack(alignment: .leading, spacing: 16) {
                 Text("Legacy Recommendations")
                   .font(.title3.weight(.semibold))

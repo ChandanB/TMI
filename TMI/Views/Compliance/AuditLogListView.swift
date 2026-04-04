@@ -211,7 +211,7 @@ struct AuditLogListView: View {
     // MARK: - Statistics
 
     private func statisticsSection(_ stats: AuditLogStatistics) -> some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(spacing: 12) {
                 HStack {
                     Text("Last \(stats.periodDays) Days")
@@ -358,7 +358,7 @@ private struct AuditLogCard: View {
     let log: AuditLog
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             HStack(alignment: .top, spacing: 12) {
                 // Icon
                 ZStack {

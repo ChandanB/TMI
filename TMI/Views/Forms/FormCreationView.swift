@@ -23,7 +23,7 @@ struct FormCreationView: View {
         ScrollView {
           VStack(spacing: 24) {
             // Header
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
               VStack(spacing: 16) {
                 Image(systemName: "square.and.pencil")
                   .font(.system(size: 40))
@@ -42,7 +42,7 @@ struct FormCreationView: View {
             .padding(.top, 20)
             
             // Form details
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
               VStack(spacing: 20) {
                 TMITextField(
                   icon: "doc.text",

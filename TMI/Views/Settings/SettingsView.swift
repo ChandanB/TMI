@@ -238,7 +238,7 @@ struct SettingsView: View {
 // MARK: - Header View
 
 private var headerView: some View {
-    TMIGlassCard(style: .default) {
+    TMICard(style: .default) {
         HStack(spacing: 16) {
             // Profile Avatar
             ZStack {
@@ -456,7 +456,7 @@ struct SettingsSection<Content: View>: View {
             }
             .padding(.horizontal, 4)
             
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(spacing: 0) {
                     content
                 }

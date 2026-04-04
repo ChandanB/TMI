@@ -20,7 +20,7 @@ struct FormImportView: View {
         ScrollView {
           VStack(spacing: 24) {
             // Header
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
               VStack(spacing: 16) {
                 Image(systemName: "square.and.arrow.down.fill")
                   .font(.system(size: 40))
@@ -39,7 +39,7 @@ struct FormImportView: View {
             .padding(.top, 20)
             
             // File selection
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
               VStack(spacing: 20) {
                 if let file = selectedFile {
                   HStack(spacing: 16) {

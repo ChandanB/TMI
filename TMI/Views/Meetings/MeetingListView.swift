@@ -216,7 +216,7 @@ struct MeetingListView: View {
     // MARK: - Statistics Header
 
     private var statisticsHeader: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             HStack(spacing: 20) {
                 StatBox(
                     title: "Upcoming",

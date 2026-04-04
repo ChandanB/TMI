@@ -13,7 +13,7 @@ struct FormStoreCardView: View {
   @State private var isHovered = false
 
   var body: some View {
-    TMIGlassCard(style: .default) {
+    TMICard(style: .default) {
       HStack(alignment: .top, spacing: 20) {
         // Icon with category color
         ZStack {

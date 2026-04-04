@@ -78,8 +78,8 @@ struct RegistrationView: View {
             value: appearAnimation
           )
 
-          // Registration Form - Using unified TMIGlassCard
-          TMIGlassCard(style: .auth) {
+          // Registration Form - Using unified TMICard
+          TMICard(style: .elevated) {
             VStack(spacing: 24) {
               // Display Name field
               TMITextField(

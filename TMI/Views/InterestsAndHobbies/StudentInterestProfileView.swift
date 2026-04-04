@@ -81,7 +81,7 @@ struct StudentInterestProfileView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "person.circle.fill")
@@ -118,7 +118,7 @@ struct StudentInterestProfileView: View {
                 .foregroundColor(Color.tmiTextPrimary)
 
             if interests.isEmpty {
-                TMIGlassCard(style: .default) {
+                TMICard(style: .default) {
                     VStack(spacing: 12) {
                         Image(systemName: "lightbulb.slash")
                             .font(.system(size: 40))
@@ -268,7 +268,7 @@ private struct StudentInterestCard: View {
     let interest: Interest
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: 8) {
                 Image(systemName: interest.iconName)
                     .font(.system(size: 24))
@@ -296,7 +296,7 @@ private struct CareerRecommendationCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         // Rank badge
@@ -398,7 +398,7 @@ private struct ResourceRecommendationCard: View {
     let onAssign: () -> Void
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             HStack(spacing: 12) {
                 // Category icon
                 Image(systemName: resource.category.icon)

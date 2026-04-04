@@ -406,7 +406,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
     ScrollView {
         VStack(spacing: 20) {
             // Profile Photo Section
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Profile Photo")
                         .font(.headline)
@@ -453,7 +453,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
             }
 
             // Profile Information Section
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Profile Information")
                         .font(.headline)
@@ -484,7 +484,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
             }
 
             // Role Section (read-only)
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Role")
                         .font(.headline)
@@ -496,7 +496,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
             }
 
             // Organization Section
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("School / Organization")
                         .font(.headline)
@@ -514,7 +514,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
             }
 
             // Account Settings Section
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Account Settings")
                         .font(.headline)
@@ -545,7 +545,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
             }
 
             // Legal Section
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Legal")
                         .font(.headline)
@@ -584,7 +584,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
             }
 
             // Sign Out Section
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 TMIButton(
                     text: "Sign Out",
                     icon: "rectangle.portrait.and.arrow.right",
@@ -616,7 +616,7 @@ struct ChangeEmailView: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
-                        TMIGlassCard(style: .default) {
+                        TMICard(style: .default) {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("Change Email")
                                     .font(.headline)

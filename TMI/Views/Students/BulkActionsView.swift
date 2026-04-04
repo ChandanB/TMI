@@ -40,7 +40,7 @@ struct BulkActionsView: View {
                     }
 
                     // Student selection
-                    TMIGlassCard(style: .default) {
+                    TMICard(style: .default) {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Select Students")
@@ -98,7 +98,7 @@ struct BulkActionsView: View {
 
                     // Available actions
                     if !selectedStudents.isEmpty {
-                        TMIGlassCard(style: .default) {
+                        TMICard(style: .default) {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("Available Actions")
                                     .font(.headline)

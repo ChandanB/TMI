@@ -66,7 +66,7 @@ struct AssignedResourcesView: View {
     // MARK: - Analytics Header
 
     private func analyticsHeader(_ analytics: ResourceAssignmentAnalytics) -> some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: 16) {
                 HStack(spacing: 24) {
                     AssignmentAnalyticsMetric(
@@ -331,7 +331,7 @@ private struct AssignmentCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 12) {
                     // Header
                     HStack {

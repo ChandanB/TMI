@@ -18,7 +18,7 @@ struct FormBuilderView: View {
         ScrollView {
           VStack(spacing: 24) {
             // Header
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
               VStack(spacing: 16) {
                 Image(systemName: "hammer.fill")
                   .font(.system(size: 40))
@@ -37,7 +37,7 @@ struct FormBuilderView: View {
             .padding(.top, 20)
             
             // Coming soon message
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
               VStack(spacing: 16) {
                 Image(systemName: "wrench.and.screwdriver.fill")
                   .font(.system(size: 60))

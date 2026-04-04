@@ -98,7 +98,7 @@ struct DataImportView: View {
     }
     
     private var headerView: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: 16) {
                 Image(systemName: "square.and.arrow.down.fill")
                     .font(.system(size: 40))
@@ -122,7 +122,7 @@ struct DataImportView: View {
                 .font(.headline.bold())
                 .foregroundColor(Color.tmiTextPrimary)
             
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(spacing: 16) {
                     if let file = selectedFile {
                         // Selected file display
@@ -185,7 +185,7 @@ struct DataImportView: View {
                 .font(.headline.bold())
                 .foregroundColor(Color.tmiTextPrimary)
             
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(spacing: 12) {
                     FormatSupportRow(
                         format: "JSON",
@@ -219,7 +219,7 @@ struct DataImportView: View {
     }
     
     private var progressSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: 16) {
                 Text("Importing Data...")
                     .font(.headline.bold())
@@ -241,7 +241,7 @@ struct DataImportView: View {
                 .font(.headline.bold())
                 .foregroundColor(Color.tmiTextPrimary)
             
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(spacing: 12) {
                     HStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
@@ -290,7 +290,7 @@ struct DataImportView: View {
     }
     
     private func errorSection(_ error: String) -> some View {
-        TMIGlassCard(style: .error) {
+        TMICard(style: .default) {
             HStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 24))

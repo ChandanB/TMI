@@ -76,7 +76,7 @@ struct MeetingDetailView: View {
     // MARK: - Meeting Header
 
     private var meetingHeader: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: currentMeeting.meetingType.icon)
@@ -111,7 +111,7 @@ struct MeetingDetailView: View {
     // MARK: - Meeting Details
 
     private var meetingDetails: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 DetailRow(
                     icon: "calendar",
@@ -153,7 +153,7 @@ struct MeetingDetailView: View {
                 .font(.title3.bold())
                 .foregroundColor(Color.tmiTextPrimary)
 
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(spacing: 12) {
                     ForEach(Array(currentMeeting.participants.enumerated()), id: \.element.id) { index, participant in
                         HStack {
@@ -195,7 +195,7 @@ struct MeetingDetailView: View {
                 .font(.title3.bold())
                 .foregroundColor(Color.tmiTextPrimary)
 
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 12) {
                     TextField("Add meeting notes...", text: $notes, axis: .vertical)
                         .textFieldStyle(.plain)
@@ -245,7 +245,7 @@ struct MeetingDetailView: View {
             }
 
             if currentMeeting.actionItems.isEmpty {
-                TMIGlassCard(style: .default) {
+                TMICard(style: .default) {
                     VStack(spacing: 8) {
                         Image(systemName: "list.bullet")
                             .font(.title2)
@@ -503,7 +503,7 @@ private struct ActionItemCard: View {
     let onDelete: () -> Void
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             HStack(alignment: .top) {
                 Button(action: onToggle) {
                     Image(systemName: actionItem.isCompleted ? "checkmark.circle.fill" : "circle")

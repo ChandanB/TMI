@@ -358,7 +358,7 @@ struct SurveyInterestRow: View {
     let interest: Interest
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             HStack(spacing: 16) {
                 // Icon
                 ZStack {
@@ -418,7 +418,7 @@ struct StudentInterestRow: View {
     @State private var isExpanded = false
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 0) {
                 // Main content
                 HStack(spacing: 16) {

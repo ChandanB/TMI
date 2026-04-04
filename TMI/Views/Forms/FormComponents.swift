@@ -15,7 +15,7 @@ struct SectionPreviewCard: View {
   @State private var isExpanded = false
 
   var body: some View {
-    TMIGlassCard(style: .minimal) {
+    TMICard(style: .outlined) {
       VStack(alignment: .leading, spacing: 0) {
         // Section Header
         Button {
@@ -121,7 +121,7 @@ struct DynamicFieldView: View {
   @State private var ratingValue = 0
 
   var body: some View {
-    TMIGlassCard(style: .minimal) {
+    TMICard(style: .outlined) {
       VStack(alignment: .leading, spacing: 12) {
         // Field label
         HStack(spacing: 4) {

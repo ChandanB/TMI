@@ -36,7 +36,7 @@ struct FormPreviewView: View {
                 let currentSection = template.sections[currentSectionIndex]
                 
                 // Section header
-                TMIGlassCard(style: .default) {
+                TMICard(style: .default) {
                   VStack(spacing: 12) {
                     Text(currentSection.title)
                       .font(.title2.bold())

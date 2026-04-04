@@ -63,8 +63,8 @@ struct AuthenticationView: View {
           HStack {
             Spacer()
 
-            // Login Card - Using unified TMIGlassCard
-            TMIGlassCard(style: .auth) {
+            // Login Card - Using unified TMICard
+            TMICard(style: .elevated) {
               VStack(spacing: 24) {
                 // Email field - Using unified TMITextField
                 TMITextField(
@@ -271,7 +271,7 @@ struct TraumaInformedErrorView: View {
   @Binding var showingSupportResources: Bool
 
   var body: some View {
-    TMIGlassCard(style: .error) {
+    TMICard(style: .default) {
       VStack(spacing: 16) {
         // Gentle, non-threatening icon
         Image(systemName: "heart.circle")
@@ -425,7 +425,7 @@ struct SupportResourceCard: View {
 
   var body: some View {
     Button(action: action) {
-      TMIGlassCard(style: .form) {
+      TMICard(style: .default) {
         HStack(spacing: 16) {
           Image(systemName: icon)
             .font(.system(size: 24))

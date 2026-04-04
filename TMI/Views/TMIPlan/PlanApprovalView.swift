@@ -64,7 +64,7 @@ struct PlanApprovalView: View {
     // MARK: - Statistics Header
 
     private func statisticsHeader(_ stats: PlanApprovalStatistics) -> some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(spacing: 12) {
                 HStack(spacing: 20) {
                     StatMetric(
@@ -207,7 +207,7 @@ private struct PendingPlanCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            TMIGlassCard(style: .default) {
+            TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 12) {
                     // Header
                     HStack {

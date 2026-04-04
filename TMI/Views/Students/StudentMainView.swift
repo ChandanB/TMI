@@ -132,7 +132,7 @@ struct MyProgressTabView: View {
                     .padding(.top, 20)
 
                     // Progress content placeholder
-                    TMIGlassCard(style: .default) {
+                    TMICard(style: .default) {
                         VStack(spacing: 16) {
                             Image(systemName: "chart.line.uptrend.xyaxis")
                                 .font(.system(size: 50))
@@ -180,7 +180,7 @@ struct MyActivitiesTabView: View {
                     .padding(.top, 20)
 
                     // Activities placeholder
-                    TMIGlassCard(style: .default) {
+                    TMICard(style: .default) {
                         VStack(spacing: 16) {
                             Image(systemName: "list.bullet.clipboard")
                                 .font(.system(size: 50))
@@ -235,7 +235,7 @@ struct MyProfileTabView: View {
                     .padding(.top, 40)
 
                     // Profile info cards
-                    TMIGlassCard(style: .default) {
+                    TMICard(style: .default) {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("About Me")
                                 .font(.headline)

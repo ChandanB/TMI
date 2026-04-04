@@ -150,7 +150,7 @@ struct FormSubmissionCard: View {
     let onTap: () -> Void
     
     var body: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(alignment: .leading, spacing: 16) {
                 // Header
                 HStack {
@@ -240,7 +240,7 @@ struct FormSubmissionDetailView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         // Header
-                        TMIGlassCard(style: .elevated) {
+                        TMICard(style: .elevated) {
                             VStack(alignment: .leading, spacing: 16) {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 8) {
@@ -279,7 +279,7 @@ struct FormSubmissionDetailView: View {
                             }
                         } else {
                             // Fallback for when template is not available
-                            TMIGlassCard(style: .elevated) {
+                            TMICard(style: .elevated) {
                                 VStack(alignment: .leading, spacing: 16) {
                                     Text("Raw Submission Data")
                                         .font(.system(size: 18, weight: .bold, design: .rounded))
@@ -327,7 +327,7 @@ struct FormSubmissionSectionView: View {
     let submissionData: [String: AnyCodable]
     
     var body: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(alignment: .leading, spacing: 16) {
                 Text(section.title)
                     .font(.system(size: 18, weight: .bold, design: .rounded))

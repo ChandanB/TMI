@@ -55,7 +55,7 @@ struct StudentTMIPlanDetailView: View {
     // MARK: - Header Card
 
     private var headerCard: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: TMISpacing.md) {
                 HStack {
                     ZStack {
@@ -94,7 +94,7 @@ struct StudentTMIPlanDetailView: View {
     // MARK: - Progress Section
 
     private var progressSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: TMISpacing.md) {
                 Text("My Progress")
                     .font(.system(size: 18, weight: .bold))
@@ -175,7 +175,7 @@ struct StudentTMIPlanDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(TMISpacing.lg)
             } else if scheduledMeetings.isEmpty {
-                TMIGlassCard(style: .default) {
+                TMICard(style: .default) {
                     VStack(spacing: TMISpacing.md) {
                         Image(systemName: "calendar.badge.clock")
                             .font(.system(size: 40))
@@ -265,7 +265,7 @@ struct StudentGoalCard: View {
     let goal: Goal
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             HStack(spacing: TMISpacing.md) {
                 // Completion Circle
                 ZStack {
@@ -350,7 +350,7 @@ struct StudentMeetingCard: View {
     let meeting: Meeting
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             HStack(spacing: TMISpacing.md) {
                 ZStack {
                     Circle()

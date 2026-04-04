@@ -216,7 +216,7 @@ struct ResourceDetailView: View {
     // MARK: - Description Section
     
     private var descriptionSection: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("About This Resource")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
@@ -239,7 +239,7 @@ struct ResourceDetailView: View {
     // MARK: - Enhanced Metadata Section
     
     private var enhancedMetadataSection: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Resource Details")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
@@ -276,7 +276,7 @@ struct ResourceDetailView: View {
     // MARK: - Tags Section
     
     private var tagsSection: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Tags")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
@@ -350,7 +350,7 @@ struct ResourceDetailView: View {
     // MARK: - Career Connections Section
     
     private var careerConnectionsSection: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text("Related Careers")
@@ -388,7 +388,7 @@ struct ResourceDetailView: View {
     // MARK: - Related Resources Section
     
     private var relatedResourcesSection: some View {
-        TMIGlassCard(style: .elevated) {
+        TMICard(style: .elevated) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Related Resources")
                     .font(.system(size: 18, weight: .bold, design: .rounded))

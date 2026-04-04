@@ -121,17 +121,7 @@ enum TMICardStyle {
     }
 }
 
-// Backward compatibility aliases
-typealias TMIGlassCardStyle = TMICardStyle
-extension TMICardStyle {
-    static var auth: TMICardStyle { .elevated }
-    static var dashboard: TMICardStyle { .default }
-    static var form: TMICardStyle { .default }
-    static var minimal: TMICardStyle { .outlined }
-    static var error: TMICardStyle { .default }
-}
-
-/// Unified solid card component — replaces TMIGlassCard
+/// Unified solid card component
 struct TMICard<Content: View>: View {
     let style: TMICardStyle
     let content: Content
@@ -160,8 +150,6 @@ struct TMICard<Content: View>: View {
             )
     }
 }
-
-typealias TMIGlassCard = TMICard
 
 // MARK: - Logo View
 
@@ -524,14 +512,6 @@ extension View {
 extension View {
     /// Apply TMI card styling
     func tmiCard(style: TMICardStyle = .default) -> some View {
-        TMICard(style: style) {
-            self
-        }
-    }
-
-    /// Deprecated: use tmiCard(style:) instead
-    @available(*, deprecated, renamed: "tmiCard(style:)")
-    func tmiGlassCard(style: TMIGlassCardStyle = .default) -> some View {
         TMICard(style: style) {
             self
         }

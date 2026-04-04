@@ -109,7 +109,7 @@ struct SimplifiedRegistrationView: View {
                         }
 
                         // Registration Form
-                        TMIGlassCard(style: .auth) {
+                        TMICard(style: .elevated) {
                             VStack(spacing: 20) {
                                 TMITextField(
                                     icon: "person.fill",

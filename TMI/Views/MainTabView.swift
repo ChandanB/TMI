@@ -301,7 +301,7 @@ struct WorkspacePanelView: View {
     }
     
     private func activeStudentSection(_ student: Student) -> some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: TMISpacing.md) {
                 HStack {
                     TMIAvatar(
@@ -353,7 +353,7 @@ struct WorkspacePanelView: View {
     }
     
     private var noStudentSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: TMISpacing.md) {
                 Image(systemName: "person.crop.circle.badge.questionmark")
                     .font(.system(size: 40))
@@ -373,7 +373,7 @@ struct WorkspacePanelView: View {
     }
     
     private func activePlanSection(_ plan: TMIPlan) -> some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: TMISpacing.sm) {
                 HStack {
                     Text("Active Plan")

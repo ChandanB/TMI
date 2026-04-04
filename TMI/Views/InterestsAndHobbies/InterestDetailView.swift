@@ -201,7 +201,7 @@ struct InterestDetailView: View {
     // MARK: - Associated Students Section
     
     private var associatedStudentsSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text("Associated Students")
@@ -310,7 +310,7 @@ struct InterestDetailView: View {
     // MARK: - Connected Plans Section
     
     private var connectedPlansSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text("Connected TMI Plans")
@@ -413,7 +413,7 @@ struct InterestDetailView: View {
     // MARK: - Insights Section
     
     private var insightsSection: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Interest Insights")
                     .font(.headline)
@@ -1076,7 +1076,7 @@ struct DetailStatsCard: View {
     @State private var hasAppeared = false
 
     var body: some View {
-        TMIGlassCard(style: .default) {
+        TMICard(style: .default) {
             VStack(spacing: 14) {
                 ZStack {
                     Circle()

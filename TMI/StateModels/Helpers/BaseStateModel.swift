@@ -396,7 +396,7 @@ struct TMIErrorBoundary<Content: View>: View {
     var body: some View {
         Group {
             if let error = error {
-                TMIGlassCard(style: .error) {
+                TMICard(style: .default) {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 40))
