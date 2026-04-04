@@ -520,7 +520,7 @@ struct TableEditorView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color.tmiBackground.ignoresSafeArea()
                 
                 VStack(spacing: 20) {
                     // Add new entry

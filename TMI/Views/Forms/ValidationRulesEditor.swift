@@ -181,8 +181,8 @@ struct ValidationRuleEditor: View {
                 .padding(.horizontal)
         }
         .padding()
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.tmiSurface))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.tmiTextTertiary.opacity(0.3), lineWidth: 1))
     }
 }
 

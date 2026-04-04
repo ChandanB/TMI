@@ -31,7 +31,7 @@ struct HelpTooltipButton: View {
                     .foregroundColor(Color.tmiTextPrimary)
                     .padding(10)
                     .background(
-                        RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.85))
+                        RoundedRectangle(cornerRadius: 8).fill(Color.tmiSurface)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)

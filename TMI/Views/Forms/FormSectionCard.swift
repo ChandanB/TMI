@@ -150,9 +150,9 @@ struct FormCardSectionFieldRow: View {
             CustomNavigationLink(destination: FormFieldEditorView(fieldIndex: fieldIndex, sectionIndex: sectionIndex, field: $fields[fieldIndex], viewModel: viewModel)) {
                 Text(field.label.isEmpty ? field.type.defaultLabel : field.label)
                     .title()
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.tmiTextPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.white)
+                    .background(Color.tmiSurface)
             }
             
             if viewModel.isEditing {
@@ -171,12 +171,12 @@ struct FormCardSectionFieldRow: View {
                 CustomNavigationLink(destination: FormFieldEditorView(fieldIndex: fieldIndex, sectionIndex: sectionIndex, field: $fields[fieldIndex], viewModel: viewModel)) {
                     Image(systemName: "chevron.right")
                         .padding(.leading)
-                        .foregroundColor(.black)
+                        .foregroundColor(Color.tmiTextTertiary)
                 }
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color.tmiSurface)
     }
 }
 
