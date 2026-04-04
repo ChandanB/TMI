@@ -55,7 +55,7 @@ struct MeetingDetailView: View {
             }
             .padding()
         }
-        .background(TMIBackgroundView(variant: .default).ignoresSafeArea())
+        .background(TMIBackgroundView(variant: .base).ignoresSafeArea())
         .navigationTitle("Meeting Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

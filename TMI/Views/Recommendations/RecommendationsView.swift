@@ -23,7 +23,7 @@ struct RecommendationsView: View {
         NavigationStack {
             ZStack {
                 // Background
-                TMIBackgroundView(variant: .default)
+                TMIBackgroundView(variant: .base)
                     .ignoresSafeArea()
                 
                 if isLoading {

@@ -49,7 +49,7 @@ struct PlanApprovalDetailView: View {
             }
             .padding()
         }
-        .background(TMIBackgroundView(variant: .default).ignoresSafeArea())
+        .background(TMIBackgroundView(variant: .base).ignoresSafeArea())
         .navigationTitle("Review Plan")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

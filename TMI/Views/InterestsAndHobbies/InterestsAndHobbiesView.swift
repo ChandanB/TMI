@@ -41,7 +41,7 @@ struct InterestsAndHobbiesView: View {
     var body: some View {
         ZStack {
             // Unified background
-            TMIBackgroundView(variant: .default)
+            TMIBackgroundView(variant: .base)
                 .ignoresSafeArea()
             
             ZStack(alignment: .bottomTrailing) {
@@ -526,7 +526,7 @@ struct AddItemSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                TMIBackgroundView(variant: .default)
+                TMIBackgroundView(variant: .base)
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -973,7 +973,7 @@ struct PredefinedInterestsListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                TMIBackgroundView(variant: .default)
+                TMIBackgroundView(variant: .base)
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {

@@ -2080,7 +2080,7 @@ struct StudentPickerSheet: View {
   var body: some View {
     NavigationView {
       ZStack {
-        TMIBackgroundView(variant: .default)
+        TMIBackgroundView(variant: .base)
         
         if isLoading {
           VStack {

@@ -74,7 +74,7 @@ struct AuditLogListView: View {
                 logsList
             }
         }
-        .background(TMIBackgroundView(variant: .default).ignoresSafeArea())
+        .background(TMIBackgroundView(variant: .base).ignoresSafeArea())
         .navigationTitle("Audit Logs")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {

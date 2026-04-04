@@ -12,7 +12,7 @@ struct FormBuilderView: View {
   
   var body: some View {
     ZStack {
-        TMIBackgroundView(variant: .default)
+        TMIBackgroundView(variant: .base)
           .ignoresSafeArea()
         
         ScrollView {

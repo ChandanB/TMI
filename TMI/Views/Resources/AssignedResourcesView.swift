@@ -40,7 +40,7 @@ struct AssignedResourcesView: View {
                 assignmentsList
             }
         }
-        .background(TMIBackgroundView(variant: .default).ignoresSafeArea())
+        .background(TMIBackgroundView(variant: .base).ignoresSafeArea())
         .navigationTitle("Assigned Resources")
         .navigationBarTitleDisplayMode(.inline)
         .task {

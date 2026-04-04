@@ -153,10 +153,10 @@ struct TMISegmentedControl<T: CaseIterable & Identifiable & RawRepresentable>: V
     }
 }
 
-struct TMICard<Content: View>: View {
+struct InterestsCard<Content: View>: View {
     let style: TMIComponentStyle
     @ViewBuilder let content: () -> Content
-    
+
     var body: some View {
         VStack(alignment: .leading) {
             content()

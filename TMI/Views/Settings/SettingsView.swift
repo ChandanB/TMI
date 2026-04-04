@@ -45,7 +45,7 @@ struct SettingsView: View {
     var body: some View {
         ZStack {
             // Background
-            TMIBackgroundView(variant: .default)
+            TMIBackgroundView(variant: .base)
                 .ignoresSafeArea()
             
             ScrollView {

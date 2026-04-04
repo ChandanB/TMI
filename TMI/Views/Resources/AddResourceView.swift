@@ -120,7 +120,7 @@ struct AddResourceView: View {
     }
 
     private var resourceBackgroundView: some View {
-        TMIBackgroundView(variant: .default)
+        TMIBackgroundView(variant: .base)
     }
     
     private var isFormValid: Bool {

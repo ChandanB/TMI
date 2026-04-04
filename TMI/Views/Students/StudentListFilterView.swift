@@ -21,7 +21,7 @@ struct StudentListFilterView: View {
         NavigationStack {
             ZStack {
                 // Background
-                TMIBackgroundView(variant: .default)
+                TMIBackgroundView(variant: .base)
                     .ignoresSafeArea()
 
                 // Content

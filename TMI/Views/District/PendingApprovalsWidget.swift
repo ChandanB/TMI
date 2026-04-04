@@ -233,6 +233,6 @@ struct PendingApprovalsWidget: View {
             PendingApprovalsWidget(districtId: "sample_district")
                 .padding()
         }
-        .background(TMIBackgroundView(variant: .default))
+        .background(TMIBackgroundView(variant: TMIBackgroundView.BackgroundVariant.base))
     }
 }

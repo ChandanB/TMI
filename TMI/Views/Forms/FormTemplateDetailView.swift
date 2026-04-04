@@ -17,7 +17,7 @@ struct FormTemplateDetailView: View {
   var body: some View {
     ZStack {
       // Unified Background
-      TMIBackgroundView(variant: .default)
+      TMIBackgroundView(variant: .base)
 
       ScrollView {
         VStack(spacing: 24) {

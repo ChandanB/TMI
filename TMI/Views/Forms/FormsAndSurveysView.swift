@@ -26,7 +26,7 @@ struct FormsAndSurveysView: View {
   var body: some View {
     ZStack {
       // Unified Background
-      TMIBackgroundView(variant: .default)
+      TMIBackgroundView(variant: .base)
 
       VStack(spacing: 0) {
         // Search and Filter - Using unified TMITextField

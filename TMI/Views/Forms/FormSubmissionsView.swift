@@ -78,7 +78,7 @@ struct FormSubmissionsView: View {
     
     var body: some View {
         ZStack {
-            TMIBackgroundView(variant: .default)
+            TMIBackgroundView(variant: .base)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -234,7 +234,7 @@ struct FormSubmissionDetailView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                TMIBackgroundView(variant: .default)
+                TMIBackgroundView(variant: .base)
                     .ignoresSafeArea()
                 
                 ScrollView {

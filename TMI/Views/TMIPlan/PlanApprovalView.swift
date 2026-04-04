@@ -36,7 +36,7 @@ struct PlanApprovalView: View {
                 plansList
             }
         }
-        .background(TMIBackgroundView(variant: .default).ignoresSafeArea())
+        .background(TMIBackgroundView(variant: .base).ignoresSafeArea())
         .navigationTitle("Plan Approvals")
         .navigationBarTitleDisplayMode(.inline)
         .task {

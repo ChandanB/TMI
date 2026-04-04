@@ -261,7 +261,7 @@ struct ResourcesView: View {
   // MARK: - Background
 
   private var resourceBackgroundView: some View {
-    TMIBackgroundView(variant: .default)
+    TMIBackgroundView(variant: .base)
   }
 
   // MARK: - Search Bar
@@ -880,7 +880,7 @@ struct AllStudentResourcesSheet: View {
   var body: some View {
     NavigationView {
       ZStack {
-        TMIBackgroundView(variant: .default)
+        TMIBackgroundView(variant: .base)
         
         if recommendations.isEmpty {
           VStack(spacing: 20) {

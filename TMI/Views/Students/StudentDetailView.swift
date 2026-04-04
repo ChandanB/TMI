@@ -50,7 +50,7 @@ struct StudentDetailView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            TMIBackgroundView(variant: .default)
+            TMIBackgroundView(variant: .base)
                 .ignoresSafeArea()
 
             contentView

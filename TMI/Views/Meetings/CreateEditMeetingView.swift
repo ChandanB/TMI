@@ -86,7 +86,7 @@ struct CreateEditMeetingView: View {
             }
             .padding()
         }
-        .background(TMIBackgroundView(variant: .default).ignoresSafeArea())
+        .background(TMIBackgroundView(variant: .base).ignoresSafeArea())
         .navigationTitle(existingMeeting == nil ? "New Meeting" : "Edit Meeting")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

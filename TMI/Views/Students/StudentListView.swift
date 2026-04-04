@@ -88,7 +88,7 @@ struct StudentListView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            TMIBackgroundView(variant: .default)
+            TMIBackgroundView(variant: .base)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {

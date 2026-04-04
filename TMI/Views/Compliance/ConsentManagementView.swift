@@ -116,7 +116,7 @@ struct ConsentManagementView: View {
                 studentsList
             }
         }
-        .background(TMIBackgroundView(variant: .default).ignoresSafeArea())
+        .background(TMIBackgroundView(variant: .base).ignoresSafeArea())
         .navigationTitle("Consent Management")
         .navigationBarTitleDisplayMode(.large)
         .task {
@@ -458,7 +458,7 @@ struct StudentConsentDetailView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                TMIBackgroundView(variant: .default)
+                TMIBackgroundView(variant: .base)
                     .ignoresSafeArea()
 
                 if isLoading {
@@ -707,7 +707,7 @@ private struct GrantConsentView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                TMIBackgroundView(variant: .default)
+                TMIBackgroundView(variant: .base)
                     .ignoresSafeArea()
 
                 ScrollView {

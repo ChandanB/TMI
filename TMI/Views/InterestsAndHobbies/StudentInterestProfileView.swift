@@ -52,7 +52,7 @@ struct StudentInterestProfileView: View {
             }
             .padding()
         }
-        .background(TMIBackgroundView(variant: .default).ignoresSafeArea())
+        .background(TMIBackgroundView(variant: .base).ignoresSafeArea())
         .navigationTitle("Interest Profile")
         .navigationBarTitleDisplayMode(.inline)
         .task {

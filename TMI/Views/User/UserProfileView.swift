@@ -287,7 +287,7 @@ struct UserProfileView: View {
     var body: some View {
         ZStack {
             // Unified Background
-            TMIBackgroundView(variant: .default)
+            TMIBackgroundView(variant: .base)
                 .ignoresSafeArea()
 
             Group {
@@ -611,7 +611,7 @@ struct ChangeEmailView: View {
         NavigationStack {
             ZStack {
                 // Unified Background
-                TMIBackgroundView(variant: .default)
+                TMIBackgroundView(variant: .base)
                     .ignoresSafeArea()
 
                 ScrollView {

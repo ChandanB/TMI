@@ -32,7 +32,7 @@ struct DataImportView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                TMIBackgroundView(variant: .default)
+                TMIBackgroundView(variant: .base)
                     .ignoresSafeArea()
                 
                 ScrollView {

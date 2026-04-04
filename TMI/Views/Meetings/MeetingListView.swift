@@ -31,7 +31,7 @@ struct MeetingListView: View {
                 meetingsList
             }
         }
-        .background(TMIBackgroundView(variant: .default).ignoresSafeArea())
+        .background(TMIBackgroundView(variant: .base).ignoresSafeArea())
         .navigationTitle("Meetings")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {

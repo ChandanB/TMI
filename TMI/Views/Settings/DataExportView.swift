@@ -82,7 +82,7 @@ struct DataExportView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                TMIBackgroundView(variant: TMIBackgroundView.BackgroundVariant.default)
+                TMIBackgroundView(variant: TMIBackgroundView.BackgroundVariant.base)
                     .ignoresSafeArea()
                 
                 ScrollView {
