@@ -46,7 +46,7 @@ struct TMIStatCard: View {
                 
                 Text(value)
                     .font(.tmiHeading2)
-                    .foregroundColor(.tmiText)
+                    .foregroundColor(.tmiTextPrimary)
                     .fontWeight(.bold)
                     .opacity(isAnimated ? 1.0 : 0.7)
             }
@@ -56,7 +56,7 @@ struct TMIStatCard: View {
         .padding(TMISpacing.md)
         .background(
             RoundedRectangle(cornerRadius: TMIRadius.md, style: .continuous)
-                .fill(.tmiSurface)
+                .fill(Color.tmiSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: TMIRadius.md, style: .continuous)
                         .strokeBorder(color.opacity(0.1), lineWidth: 1)
@@ -93,7 +93,7 @@ struct TMIActivityRow: View {
             VStack(alignment: .leading, spacing: TMISpacing.xxs) {
                 Text(activity.title)
                     .font(.tmiLabelLarge)
-                    .foregroundColor(.tmiText)
+                    .foregroundColor(.tmiTextPrimary)
                 
                 Text(activity.description)
                     .font(.tmiBodySmall)
@@ -196,7 +196,7 @@ struct TMIPageHeader: View {
                 
                 Text(title)
                     .font(.tmiDisplay2)
-                    .foregroundColor(.tmiText)
+                    .foregroundColor(.tmiTextPrimary)
                     .lineLimit(1)
                 
                 Text(subtitle)

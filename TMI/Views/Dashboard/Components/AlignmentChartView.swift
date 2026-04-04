@@ -19,7 +19,7 @@ struct LegacyAlignmentChartView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Interest Alignment Progress")
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(Color.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
             
             Divider()
                 .padding(.vertical, 4)
@@ -236,7 +236,7 @@ struct ChartTooltipView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(dataPoint.timePeriod)
                     .font(.caption.bold())
-                    .foregroundStyle(Color.tmiText)
+                    .foregroundStyle(Color.tmiTextPrimary)
                 
                 Text("\(Int(dataPoint.alignmentPercentage * 100))% Aligned")
                     .font(.caption)
@@ -269,7 +269,7 @@ struct ChartSummaryView: View {
                     .foregroundStyle(.secondary)
                 Text("\(stateModel.averageAlignment())%")
                     .font(.title3.bold())
-                    .foregroundStyle(Color.tmiText)
+                    .foregroundStyle(Color.tmiTextPrimary)
             }
             
             Spacer()
@@ -281,7 +281,7 @@ struct ChartSummaryView: View {
                 HStack(spacing: 4) {
                     Text(stateModel.alignmentTrend())
                         .font(.title3.bold())
-                        .foregroundStyle(Color.tmiText)
+                        .foregroundStyle(Color.tmiTextPrimary)
                     Image(systemName: stateModel.trendIcon())
                         .foregroundStyle(stateModel.trendColor())
                 }

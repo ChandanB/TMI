@@ -360,7 +360,7 @@ struct StudentDetailView: View {
             HStack(alignment: .top, spacing: TMISpacing.md) {
                 Image(systemName: summary.followUpStatus.symbolName)
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(summary.needsFollowUp ? .tmiPrimary : .tmiSuccess)
+                    .foregroundStyle(summary.needsFollowUp ? Color.tmiPrimary : Color.tmiSuccess)
                     .frame(width: 32, height: 32)
                     .background(
                         Circle()

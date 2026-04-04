@@ -17,11 +17,11 @@ struct PerformanceInsightView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Academic Performance")
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(.tmiText)
-            
+                .foregroundStyle(Color.tmiTextPrimary)
+
             Divider()
                 .padding(.vertical, 4)
-            
+
             Chart(performanceData) { dataPoint in
                 BarMark(
                     x: .value("Academic Subject", dataPoint.subject),
@@ -114,7 +114,7 @@ struct PerformanceInsightView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Key Observations")
                 .font(.headline)
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
             
             VStack(alignment: .leading, spacing: 12) {
                 ObservationRow(
@@ -160,7 +160,7 @@ struct InterestAlignmentInsightView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Interest Alignment Progress")
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
             
             Divider()
                 .padding(.vertical, 4)
@@ -208,7 +208,7 @@ struct InterestAlignmentInsightView: View {
                         if animateChart {
                             Text("\(Int(dataPoint.alignmentPercentage * 100))%")
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(.tmiPrimary)
+                                .foregroundStyle(Color.tmiPrimary)
                                 .padding(.vertical, 4)
                                 .padding(.horizontal, 8)
                                 .background(
@@ -263,7 +263,7 @@ struct InterestAlignmentInsightView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Key Observations")
                 .font(.headline)
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
             
             VStack(alignment: .leading, spacing: 12) {
                 ObservationRow(
@@ -303,7 +303,7 @@ struct InterestsInsightView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Student Interests")
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
             
             Divider()
                 .padding(.vertical, 4)
@@ -357,7 +357,7 @@ struct InterestsInsightView: View {
                                 
                                 Text(dataPoint.category)
                                     .font(.caption)
-                                    .foregroundStyle(selectedCategory == dataPoint.category ? .tmiText : .secondary)
+                                    .foregroundStyle(selectedCategory == dataPoint.category ? Color.tmiTextPrimary : Color(UIColor.secondaryLabel))
                                     .fontWeight(selectedCategory == dataPoint.category ? .bold : .regular)
                             }
                             .padding(.vertical, 4)
@@ -396,7 +396,7 @@ struct InterestsInsightView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Key Observations")
                 .font(.headline)
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
             
             VStack(alignment: .leading, spacing: 12) {
                 ObservationRow(
@@ -434,7 +434,7 @@ struct TMIEffectivenessView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("TMI Program Effectiveness")
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
             
             Divider()
                 .padding(.vertical, 4)
@@ -525,7 +525,7 @@ struct TMIEffectivenessView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Key Observations")
                 .font(.headline)
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
             
             VStack(alignment: .leading, spacing: 12) {
                 ObservationRow(
@@ -560,7 +560,7 @@ struct ObservationRow: View {
             
             Text(text)
                 .font(.subheadline)
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

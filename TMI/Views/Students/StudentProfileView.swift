@@ -199,7 +199,7 @@ struct StudentProfileView: View {
                     if let errorMessage {
                         Text(errorMessage)
                             .font(.tmiCaption)
-                            .foregroundStyle(.tmiError)
+                            .foregroundStyle(Color.tmiError)
                             .padding(TMISpacing.md)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.tmiError.opacity(0.1))
@@ -222,12 +222,12 @@ struct StudentProfileView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
-                    .foregroundStyle(.tmiPrimary)
+                    .foregroundStyle(Color.tmiPrimary)
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button(saveButtonTitle) { saveStudent() }
                     .fontWeight(.semibold)
-                    .foregroundStyle(isValid ? .tmiPrimary : .tmiTextSecondary)
+                    .foregroundStyle(isValid ? Color.tmiPrimary : Color.tmiTextSecondary)
                     .disabled(!isValid || isSaving)
             }
         }
@@ -243,13 +243,13 @@ struct StudentProfileView: View {
         VStack(spacing: TMISpacing.md) {
             Text(isEditMode ? "Edit Student Profile" : "New Student Intake")
                 .font(.tmiTitle1)
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
 
             Text(isEditMode
                  ? "Update \(existingStudent?.name ?? "student") information"
                  : "Complete student profile for comprehensive support")
                 .font(.tmiBody)
-                .foregroundStyle(.tmiTextSecondary)
+                .foregroundStyle(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .padding(.top, TMISpacing.lg)
@@ -263,13 +263,13 @@ struct StudentProfileView: View {
             HStack(spacing: TMISpacing.md) {
                 labeledField(label: "First Name *", placeholder: "First") {
                     TextField("", text: $firstName,
-                              prompt: Text("First").foregroundStyle(.tmiTextSecondary))
+                              prompt: Text("First").foregroundStyle(Color.tmiTextSecondary))
                         .textInputAutocapitalization(.words)
                 }
 
                 labeledField(label: "Last Name *", placeholder: "Last") {
                     TextField("", text: $lastName,
-                              prompt: Text("Last").foregroundStyle(.tmiTextSecondary))
+                              prompt: Text("Last").foregroundStyle(Color.tmiTextSecondary))
                         .textInputAutocapitalization(.words)
                 }
             }
@@ -278,7 +278,7 @@ struct StudentProfileView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Grade Level *")
                     .font(.tmiCaption)
-                    .foregroundStyle(.tmiTextSecondary)
+                    .foregroundStyle(Color.tmiTextSecondary)
 
                 Picker("Grade", selection: $selectedGrade) {
                     ForEach(grades, id: \.self) { grade in
@@ -295,7 +295,7 @@ struct StudentProfileView: View {
             // School
             labeledField(label: "School *", placeholder: "School name") {
                 TextField("", text: $school,
-                          prompt: Text("School name").foregroundStyle(.tmiTextSecondary))
+                          prompt: Text("School name").foregroundStyle(Color.tmiTextSecondary))
                     .textInputAutocapitalization(.words)
             }
 
@@ -303,7 +303,7 @@ struct StudentProfileView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Date of Birth")
                     .font(.tmiCaption)
-                    .foregroundStyle(.tmiTextSecondary)
+                    .foregroundStyle(Color.tmiTextSecondary)
 
                 DatePicker("", selection: $dateOfBirth, in: ...Date(), displayedComponents: .date)
                     .datePickerStyle(.compact)
@@ -316,7 +316,7 @@ struct StudentProfileView: View {
             // Student ID
             labeledField(label: "Student ID", placeholder: "School-issued ID (optional)") {
                 TextField("", text: $studentID,
-                          prompt: Text("School-issued ID (optional)").foregroundStyle(.tmiTextSecondary))
+                          prompt: Text("School-issued ID (optional)").foregroundStyle(Color.tmiTextSecondary))
                     .autocorrectionDisabled()
             }
         }
@@ -328,7 +328,7 @@ struct StudentProfileView: View {
         VStack(spacing: TMISpacing.md) {
             labeledField(label: "Guardian / Parent Name", placeholder: "Full name") {
                 TextField("", text: $guardianName,
-                          prompt: Text("Full name").foregroundStyle(.tmiTextSecondary))
+                          prompt: Text("Full name").foregroundStyle(Color.tmiTextSecondary))
                     .textInputAutocapitalization(.words)
             }
 
@@ -336,7 +336,7 @@ struct StudentProfileView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Relationship")
                     .font(.tmiCaption)
-                    .foregroundStyle(.tmiTextSecondary)
+                    .foregroundStyle(Color.tmiTextSecondary)
 
                 Picker("Relationship", selection: $relationship) {
                     ForEach(relationshipOptions, id: \.self) { option in
@@ -353,13 +353,13 @@ struct StudentProfileView: View {
             HStack(spacing: TMISpacing.md) {
                 labeledField(label: "Phone", placeholder: "(555) 123-4567") {
                     TextField("", text: $guardianPhone,
-                              prompt: Text("(555) 123-4567").foregroundStyle(.tmiTextSecondary))
+                              prompt: Text("(555) 123-4567").foregroundStyle(Color.tmiTextSecondary))
                         .keyboardType(.phonePad)
                 }
 
                 labeledField(label: "Email", placeholder: "email@example.com") {
                     TextField("", text: $guardianEmail,
-                              prompt: Text("email@example.com").foregroundStyle(.tmiTextSecondary))
+                              prompt: Text("email@example.com").foregroundStyle(Color.tmiTextSecondary))
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -368,14 +368,14 @@ struct StudentProfileView: View {
 
             labeledField(label: "Emergency Contact (if different)", placeholder: "Name") {
                 TextField("", text: $emergencyContact,
-                          prompt: Text("Name").foregroundStyle(.tmiTextSecondary))
+                          prompt: Text("Name").foregroundStyle(Color.tmiTextSecondary))
                     .textInputAutocapitalization(.words)
             }
 
             if !emergencyContact.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 labeledField(label: "Emergency Phone", placeholder: "(555) 123-4567") {
                     TextField("", text: $emergencyPhone,
-                              prompt: Text("(555) 123-4567").foregroundStyle(.tmiTextSecondary))
+                              prompt: Text("(555) 123-4567").foregroundStyle(Color.tmiTextSecondary))
                         .keyboardType(.phonePad)
                 }
             }
@@ -388,13 +388,13 @@ struct StudentProfileView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Behavioral Notes or Support Needs")
                 .font(.tmiCaption)
-                .foregroundStyle(.tmiTextSecondary)
+                .foregroundStyle(Color.tmiTextSecondary)
 
             TextEditor(text: $behavioralNotes)
                 .frame(minHeight: 100)
                 .scrollContentBackground(.hidden)
                 .font(.tmiBody)
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
                 .padding(TMISpacing.sm)
                 .background(Color.tmiSurface)
                 .cornerRadius(TMIRadius.sm)
@@ -406,7 +406,7 @@ struct StudentProfileView: View {
                     if behavioralNotes.isEmpty {
                         Text("Add notes about the student's needs, behaviors, or other relevant context…")
                             .font(.tmiBody)
-                            .foregroundStyle(.tmiTextSecondary)
+                            .foregroundStyle(Color.tmiTextSecondary)
                             .padding(.top, TMISpacing.sm + 4)
                             .padding(.leading, TMISpacing.sm + 4)
                             .allowsHitTesting(false)
@@ -447,11 +447,11 @@ struct StudentProfileView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
                 .font(.tmiCaption)
-                .foregroundStyle(.tmiTextSecondary)
+                .foregroundStyle(Color.tmiTextSecondary)
 
             field()
                 .font(.tmiBody)
-                .foregroundStyle(.tmiText)
+                .foregroundStyle(Color.tmiTextPrimary)
                 .padding(TMISpacing.md)
                 .background(Color.tmiSurface)
                 .cornerRadius(TMIRadius.sm)

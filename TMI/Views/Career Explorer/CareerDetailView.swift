@@ -920,7 +920,7 @@ struct CareerDetailView: View {
               VStack(alignment: .leading, spacing: 6) {
                 Text(path.level)
                   .font(.headline)
-                  .foregroundColor(path.isRequired ? .tmiPrimary : .tmiText)
+                  .foregroundColor(path.isRequired ? .tmiPrimary : .tmiTextPrimary)
 
                 Text(path.description)
                   .font(.subheadline)
@@ -1099,7 +1099,7 @@ struct CareerDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                   Text(path.title)
                     .font(.headline)
-                    .foregroundColor(path.isCurrent ? .tmiPrimary : .tmiText)
+                    .foregroundColor(path.isCurrent ? .tmiPrimary : .tmiTextPrimary)
 
                   Text(path.description)
                     .font(.subheadline)
@@ -2169,7 +2169,7 @@ struct CareerDetailFilterButton: View {
           RoundedRectangle(cornerRadius: 20)
             .fill(isSelected ? Color.tmiPrimary : Color.tmiSecondary.opacity(0.1))
         )
-        .foregroundColor(isSelected ? .white : .tmiText)
+        .foregroundColor(isSelected ? .white : .tmiTextPrimary)
     }
   }
 }
