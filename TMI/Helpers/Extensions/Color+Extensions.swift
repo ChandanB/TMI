@@ -43,25 +43,3 @@ extension Color {
     static let tmiInfo = Color(hex: "#3B6FA0")
 }
 
-extension ShapeStyle where Self == Color {
-    static var tmiPrimary: Color { .tmiPrimary }
-    static var tmiPrimaryDeep: Color { .tmiPrimaryDeep }
-    static var tmiSecondary: Color { .tmiSecondary }
-    static var tmiBackground: Color { .tmiBackground }
-    static var tmiSurface: Color { .tmiSurface }
-    static var tmiSurfaceElevated: Color { .tmiSurfaceElevated }
-    static var tmiCardBackground: Color { .tmiCardBackground }
-    static var tmiInputBackground: Color { .tmiInputBackground }
-    static var tmiTextPrimary: Color { .tmiTextPrimary }
-    static var tmiTextSecondary: Color { .tmiTextSecondary }
-    static var tmiTextTertiary: Color { .tmiTextTertiary }
-    static var tmiTextBrand: Color { .tmiTextBrand }
-    static var tmiTextOnPrimary: Color { .tmiTextOnPrimary }
-    static var tmiTextOnSecondary: Color { .tmiTextOnSecondary }
-    static var tmiBorder: Color { .tmiBorder }
-    static var tmiDivider: Color { .tmiDivider }
-    static var tmiSuccess: Color { .tmiSuccess }
-    static var tmiWarning: Color { .tmiWarning }
-    static var tmiError: Color { .tmiError }
-    static var tmiInfo: Color { .tmiInfo }
-}
