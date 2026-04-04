@@ -32,7 +32,7 @@ struct FormStoreCardView: View {
           HStack(alignment: .top) {
             Text(template.name)
               .font(.system(size: 18, weight: .semibold))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
               .lineLimit(2)
               .multilineTextAlignment(.leading)
 
@@ -55,7 +55,7 @@ struct FormStoreCardView: View {
           if !template.templateDescription.isEmpty {
             Text(template.templateDescription)
               .font(.system(size: 15))
-              .foregroundColor(.white.opacity(0.8))
+              .foregroundColor(Color.tmiTextSecondary)
               .lineLimit(3)
               .multilineTextAlignment(.leading)
           }
@@ -66,13 +66,13 @@ struct FormStoreCardView: View {
               // Sections
               Label("\(template.sections.count) sections", systemImage: "list.bullet")
                 .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
 
               // Category
               if let category = template.category {
                 Label(category, systemImage: "tag")
                   .font(.system(size: 13))
-                  .foregroundColor(.white.opacity(0.6))
+                  .foregroundColor(Color.tmiTextSecondary)
               }
               
               Spacer()
@@ -82,7 +82,7 @@ struct FormStoreCardView: View {
               // Date
               Text((template.updatedAt ?? template.createdAt) ?? Date(), style: .date)
                 .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
               
               Spacer()
             }

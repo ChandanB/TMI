@@ -86,11 +86,11 @@ struct MeetingDetailView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(currentMeeting.title)
                             .font(.title2.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text(currentMeeting.meetingType.rawValue)
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
 
                     Spacer()
@@ -101,7 +101,7 @@ struct MeetingDetailView: View {
                 if let description = currentMeeting.description {
                     Text(description)
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
             }
             .padding()
@@ -151,7 +151,7 @@ struct MeetingDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Participants (\(currentMeeting.participants.count))")
                 .font(.title3.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             TMIGlassCard(style: .default) {
                 VStack(spacing: 12) {
@@ -163,11 +163,11 @@ struct MeetingDetailView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(participant.name)
                                     .font(.subheadline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
 
                                 Text(participant.role.rawValue)
                                     .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.6))
+                                    .foregroundColor(Color.tmiTextSecondary)
                             }
 
                             Spacer()
@@ -193,13 +193,13 @@ struct MeetingDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Notes")
                 .font(.title3.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             TMIGlassCard(style: .default) {
                 VStack(alignment: .leading, spacing: 12) {
                     TextField("Add meeting notes...", text: $notes, axis: .vertical)
                         .textFieldStyle(.plain)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .lineLimit(5...10)
 
                     if notes != (currentMeeting.notes ?? "") {
@@ -209,7 +209,7 @@ struct MeetingDetailView: View {
                                 Text("Save Notes")
                             }
                             .font(.caption.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(Color.cyan.gradient)
@@ -230,7 +230,7 @@ struct MeetingDetailView: View {
             HStack {
                 Text("Action Items (\(currentMeeting.actionItems.count))")
                     .font(.title3.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
@@ -249,11 +249,11 @@ struct MeetingDetailView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "list.bullet")
                             .font(.title2)
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(Color.tmiTextTertiary)
 
                         Text("No action items yet")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -284,7 +284,7 @@ struct MeetingDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color.green.gradient)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .cornerRadius(12)
                 .font(.headline)
             }
@@ -299,7 +299,7 @@ struct MeetingDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.orange.gradient)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .cornerRadius(12)
                     .font(.subheadline.bold())
                 }
@@ -313,7 +313,7 @@ struct MeetingDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.red.gradient)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .cornerRadius(12)
                     .font(.subheadline.bold())
                 }
@@ -461,11 +461,11 @@ private struct DetailRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                 Text(value)
                     .font(.subheadline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
 
             Spacer()
@@ -507,14 +507,14 @@ private struct ActionItemCard: View {
             HStack(alignment: .top) {
                 Button(action: onToggle) {
                     Image(systemName: actionItem.isCompleted ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(actionItem.isCompleted ? .green : .white.opacity(0.5))
+                        .foregroundColor(actionItem.isCompleted ? .green : Color.tmiTextTertiary)
                         .font(.title3)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(actionItem.description)
                         .font(.subheadline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .strikethrough(actionItem.isCompleted)
 
                     HStack(spacing: 12) {
@@ -531,7 +531,7 @@ private struct ActionItemCard: View {
                                 Text(dueDate.formatted(date: .abbreviated, time: .omitted))
                             }
                             .font(.caption2)
-                            .foregroundColor(actionItem.isOverdue ? .orange : .white.opacity(0.6))
+                            .foregroundColor(actionItem.isOverdue ? .orange : Color.tmiTextSecondary)
                         }
 
                         if actionItem.isCompleted, let completedAt = actionItem.completedAt {

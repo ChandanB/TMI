@@ -89,10 +89,10 @@ struct InterestsSearchBar: View {
     var body: some View {
         HStack {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
             
             TextField(placeholder, text: $text)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .autocorrectionDisabled()
         }
         .padding(.horizontal, 16)
@@ -126,7 +126,7 @@ struct TMISegmentedControl<T: CaseIterable & Identifiable & RawRepresentable>: V
                     VStack(spacing: 8) {
                         Text(option.rawValue)
                             .font(.system(size: 16, weight: selection == option ? .semibold : .medium))
-                            .foregroundColor(selection == option ? .white : .white.opacity(0.6))
+                            .foregroundColor(selection == option ? Color.tmiTextPrimary : Color.tmiTextSecondary)
                         
                         if selection == option {
                             RoundedRectangle(cornerRadius: 2)
@@ -195,17 +195,17 @@ struct InterestsEmptyState: View {
         VStack(spacing: 24) {
             Image(systemName: icon)
                 .font(.system(size: style == .compact ? 40 : 60))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
                 .symbolEffect(.pulse, options: .repeating.speed(0.5))
             
             VStack(spacing: 8) {
                 Text(title)
                     .font(style == .compact ? .headline : .title2.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text(message)
                     .font(.body)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, style == .compact ? 20 : 40)
             }
@@ -245,13 +245,13 @@ struct TMITextEditor: View {
         ZStack(alignment: .topLeading) {
             if text.isEmpty {
                 Text(placeholder)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
             }
             
             TextEditor(text: $text)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -283,17 +283,17 @@ struct TMITagSelector<T: CaseIterable & Identifiable & RawRepresentable>: View w
                     } label: {
                         Text(option.rawValue)
                             .font(.system(size: 14, weight: selection == option ? .semibold : .regular))
-                            .foregroundColor(selection == option ? .white : .white.opacity(0.7))
+                            .foregroundColor(selection == option ? color : Color.tmiTextSecondary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .background(
                                 Capsule()
-                                    .fill(selection == option ? color.opacity(0.3) : Color.white.opacity(0.05))
+                                    .fill(selection == option ? color.opacity(0.1) : Color.tmiInputBackground)
                             )
                             .overlay(
                                 Capsule()
                                     .stroke(
-                                        selection == option ? color.opacity(0.5) : Color.white.opacity(0.2),
+                                        selection == option ? color.opacity(0.5) : Color.tmiBorder,
                                         lineWidth: 1
                                     )
                             )
@@ -321,17 +321,17 @@ struct TMIIconSelector: View {
                     } label: {
                         ZStack {
                             Circle()
-                                .fill(selection == icon ? color.opacity(0.15) : Color.white.opacity(0.05))
+                                .fill(selection == icon ? color.opacity(0.15) : Color.tmiInputBackground)
                                 .frame(width: 50, height: 50)
-                            
+
                             Image(systemName: icon)
                                 .font(.system(size: 22))
-                                .foregroundColor(selection == icon ? color : .white.opacity(0.7))
+                                .foregroundColor(selection == icon ? color : Color.tmiTextTertiary)
                         }
                         .overlay(
                             Circle()
                                 .stroke(
-                                    selection == icon ? color.opacity(0.5) : Color.white.opacity(0.2),
+                                    selection == icon ? color.opacity(0.5) : Color.tmiBorder,
                                     lineWidth: 1
                                 )
                         )
@@ -354,7 +354,7 @@ struct TMIStudentCard: View {
             // Avatar
             Text(String(student.name.prefix(1)))
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .frame(width: 32, height: 32)
                 .background(color.opacity(0.3))
                 .clipShape(Circle())
@@ -362,11 +362,11 @@ struct TMIStudentCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(student.name)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text("Grade \(student.grade) • \(Int(student.engagementScore * 100))% engaged")
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             
             Spacer()

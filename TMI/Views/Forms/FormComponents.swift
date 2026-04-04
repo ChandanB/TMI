@@ -26,17 +26,17 @@ struct SectionPreviewCard: View {
           HStack {
             Text(section.title)
               .font(.system(size: 16, weight: .semibold))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
 
             Spacer()
 
             Text("\(section.fields.count) fields")
               .font(.system(size: 14))
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
 
             Image(systemName: "chevron.right")
               .font(.system(size: 14, weight: .medium))
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
               .rotationEffect(Angle(degrees: isExpanded ? 90 : 0))
           }
           .padding(16)
@@ -73,19 +73,19 @@ struct FieldPreviewRow: View {
 
         Image(systemName: field.type.iconName)
           .font(.system(size: 16))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(Color.tmiTextSecondary)
       }
 
       // Field label and type
       VStack(alignment: .leading, spacing: 4) {
         Text(field.label)
           .font(.system(size: 15))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
 
         HStack(spacing: 8) {
           Text(field.type.rawValue)
             .font(.system(size: 12))
-            .foregroundColor(.white.opacity(0.6))
+            .foregroundColor(Color.tmiTextSecondary)
 
           if field.isRequired {
             Text("Required")
@@ -127,7 +127,7 @@ struct DynamicFieldView: View {
         HStack(spacing: 4) {
           Text(field.label)
             .font(.system(size: 16, weight: .semibold))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
 
           if field.isRequired {
             Text("*")
@@ -164,7 +164,7 @@ struct DynamicFieldView: View {
           RoundedRectangle(cornerRadius: 8)
             .fill(Color.white.opacity(0.05))
         )
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
         .frame(height: 120)
         .onChange(of: textValue) { _, newValue in
           onValueChange(newValue)
@@ -213,7 +213,7 @@ struct DynamicFieldView: View {
                     selectedOption == option ? Color.tmiSecondary : .white.opacity(0.6))
 
                 Text(option)
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
               }
@@ -224,7 +224,7 @@ struct DynamicFieldView: View {
         }
       } else {
         Text("No options available")
-          .foregroundColor(.white.opacity(0.5))
+          .foregroundColor(Color.tmiTextTertiary)
       }
 
     case .checkbox:
@@ -247,7 +247,7 @@ struct DynamicFieldView: View {
                   selectedOptions.contains(option) ? Color.tmiSecondary : .white.opacity(0.6))
 
                 Text(option)
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
               }
@@ -258,7 +258,7 @@ struct DynamicFieldView: View {
         }
       } else {
         Text("No options available")
-          .foregroundColor(.white.opacity(0.5))
+          .foregroundColor(Color.tmiTextTertiary)
       }
 
     case .dropdown:
@@ -273,22 +273,22 @@ struct DynamicFieldView: View {
         } label: {
           HStack {
             Text(selectedOption.isEmpty ? "Select an option" : selectedOption)
-              .foregroundColor(selectedOption.isEmpty ? .white.opacity(0.5) : .white)
+              .foregroundColor(selectedOption.isEmpty ? Color.tmiTextTertiary : Color.tmiTextPrimary)
 
             Spacer()
 
             Image(systemName: "chevron.down")
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
           }
           .padding(12)
           .background(
             RoundedRectangle(cornerRadius: 8)
-              .fill(Color.white.opacity(0.05))
+              .fill(Color.tmiInputBackground)
           )
         }
       } else {
         Text("No options available")
-          .foregroundColor(.white.opacity(0.5))
+          .foregroundColor(Color.tmiTextTertiary)
       }
 
     case .rating:
@@ -300,7 +300,7 @@ struct DynamicFieldView: View {
           } label: {
             Image(systemName: rating <= ratingValue ? "star.fill" : "star")
               .font(.system(size: 24))
-              .foregroundColor(rating <= ratingValue ? .yellow : .white.opacity(0.3))
+              .foregroundColor(rating <= ratingValue ? .yellow : Color.tmiTextTertiary)
           }
           .buttonStyle(.plain)
         }
@@ -318,7 +318,7 @@ struct DynamicFieldView: View {
 
     case .table, .signature:
       Text("This field type is only available in the full version")
-        .foregroundColor(.white.opacity(0.5))
+        .foregroundColor(Color.tmiTextTertiary)
         .padding(12)
         .frame(maxWidth: .infinity)
         .background(
@@ -389,13 +389,13 @@ struct FormsProgressIndicator: View {
       HStack {
         Text("Section \(current) of \(total)")
           .font(.system(size: 14))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(Color.tmiTextSecondary)
 
         Spacer()
 
         Text("\(Int(progress * 100))%")
           .font(.system(size: 14, weight: .medium))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
       }
     }
   }
@@ -445,7 +445,7 @@ struct FormLoadingIndicator: View {
       // Form icon
       Image(systemName: "doc.text.fill")
         .font(.system(size: 24, weight: .medium))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
     }
     .onAppear {
       isAnimating = true

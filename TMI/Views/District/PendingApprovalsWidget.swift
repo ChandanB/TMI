@@ -27,7 +27,7 @@ struct PendingApprovalsWidget: View {
 
                     Text("Pending Approvals")
                         .font(.title3.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
 
                 Spacer()
@@ -35,7 +35,7 @@ struct PendingApprovalsWidget: View {
                 if !pendingPlans.isEmpty {
                     Text("\(pendingPlans.count)")
                         .font(.caption.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Color.orange)
@@ -97,7 +97,7 @@ struct PendingApprovalsWidget: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(plan.title)
                                 .font(.subheadline.bold())
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                                 .lineLimit(1)
 
                             HStack(spacing: 4) {
@@ -112,14 +112,14 @@ struct PendingApprovalsWidget: View {
                                         .font(.caption2)
                                 }
                             }
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         Spacer()
 
                         Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.3))
+                            .foregroundColor(Color.tmiTextTertiary)
                     }
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
@@ -157,7 +157,7 @@ struct PendingApprovalsWidget: View {
 
                 Text("No pending approvals")
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             .padding(.vertical, 20)
             Spacer()
@@ -173,7 +173,7 @@ struct PendingApprovalsWidget: View {
                 .tint(.white)
             Text("Loading...")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
             Spacer()
         }
         .padding(.vertical, 20)

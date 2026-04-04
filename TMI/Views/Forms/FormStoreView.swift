@@ -83,10 +83,10 @@ struct StatItem: View {
                 .foregroundColor(.tmiSecondary)
             Text(value)
                 .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             Text(label)
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
         }
     }
 }
@@ -105,18 +105,18 @@ struct SectionPreviewRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(section.title)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text("\(section.fields.count) fields")
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             
             Spacer()
             
             Image(systemName: "chevron.right")
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(Color.tmiTextTertiary)
         }
         .padding(.vertical, 8)
     }

@@ -113,7 +113,7 @@ struct CreateEditMeetingView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Meeting Type")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             LazyVGrid(columns: [
                 GridItem(.flexible()),
@@ -141,7 +141,7 @@ struct CreateEditMeetingView: View {
                 Text(type.rawValue)
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundColor(meetingType == type ? .white : .white.opacity(0.8))
+                    .foregroundColor(meetingType == type ? Color.tmiTextOnPrimary : Color.tmiTextPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
             }
@@ -149,7 +149,7 @@ struct CreateEditMeetingView: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(meetingType == type ? Color(hex: type.color) : Color.white.opacity(0.1))
+                    .fill(meetingType == type ? Color(hex: type.color) : Color.tmiInputBackground)
             )
         }
         .buttonStyle(.plain)
@@ -161,7 +161,7 @@ struct CreateEditMeetingView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Details")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             VStack(spacing: 12) {
                 TextField("Meeting title", text: $title)
@@ -171,7 +171,7 @@ struct CreateEditMeetingView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.tmiSurface)
                     )
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 TextField("Description (optional)", text: $description, axis: .vertical)
                     .font(.body)
@@ -181,7 +181,7 @@ struct CreateEditMeetingView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.tmiSurface)
                     )
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
         }
     }
@@ -192,7 +192,7 @@ struct CreateEditMeetingView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("When")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             VStack(spacing: 12) {
                 HStack {
@@ -200,7 +200,7 @@ struct CreateEditMeetingView: View {
                         .foregroundColor(.cyan)
 
                     DatePicker("Start", selection: $startDate, displayedComponents: [.date, .hourAndMinute])
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
                 .padding()
                 .background(
@@ -222,17 +222,17 @@ struct CreateEditMeetingView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.tmiSurface)
                 )
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
                 HStack {
                     Image(systemName: "clock")
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
                     Text("Ends at")
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
                     Spacer()
                     Text(endDate, style: .time)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
                 .font(.caption)
                 .padding()
@@ -250,14 +250,14 @@ struct CreateEditMeetingView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Location")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             HStack {
                 Image(systemName: "location")
                     .foregroundColor(.cyan)
 
                 TextField("Room number, Zoom link, etc.", text: $location)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             .padding()
             .background(
@@ -274,7 +274,7 @@ struct CreateEditMeetingView: View {
             HStack {
                 Text("Participants")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
@@ -291,9 +291,9 @@ struct CreateEditMeetingView: View {
             if participants.isEmpty {
                 HStack {
                     Image(systemName: "person.2")
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(Color.tmiTextTertiary)
                     Text("No participants added")
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                     Spacer()
                 }
                 .padding()
@@ -319,11 +319,11 @@ struct CreateEditMeetingView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(participant.name)
                     .font(.subheadline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Text(participant.role.rawValue)
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
 
             Spacer()
@@ -332,7 +332,7 @@ struct CreateEditMeetingView: View {
                 participants.removeAll { $0.id == participant.id }
             }) {
                 Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(Color.tmiTextTertiary)
             }
         }
         .padding()
@@ -356,7 +356,7 @@ struct CreateEditMeetingView: View {
                 }
             }
             .font(.headline)
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .frame(maxWidth: .infinity)
             .padding()
             .background(

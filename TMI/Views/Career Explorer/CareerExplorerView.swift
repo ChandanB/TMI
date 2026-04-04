@@ -203,7 +203,7 @@ struct CareerExplorerView: View {
     }
     .navigationTitle("Career Explorer")
     .navigationBarTitleDisplayMode(.large)
-    .foregroundColor(.white)
+    .foregroundColor(Color.tmiTextPrimary)
     .toolbar {
       ToolbarItem(placement: .navigationBarLeading) {
         studentPickerButton
@@ -216,7 +216,7 @@ struct CareerExplorerView: View {
               resetSearch()
             }
           }
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
       }
 
@@ -227,7 +227,7 @@ struct CareerExplorerView: View {
           Image(systemName: "xmark.circle.fill")
             .font(.system(size: 20))
             .symbolRenderingMode(.hierarchical)
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(Color.tmiTextSecondary)
         }
       }
     }
@@ -252,7 +252,7 @@ struct CareerExplorerView: View {
         VStack(spacing: 16) {
           Text("Discover Your Career Path")
             .font(.system(size: 32, weight: .bold, design: .rounded))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .multilineTextAlignment(.center)
             .opacity(headerAppeared ? 1 : 0)
             .offset(y: headerAppeared ? 0 : -20)
@@ -260,7 +260,7 @@ struct CareerExplorerView: View {
           
           Text("Search for any career, field, or subject to explore your options")
             .font(.system(size: 18))
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(Color.tmiTextSecondary)
             .multilineTextAlignment(.center)
             .opacity(headerAppeared ? 1 : 0)
             .offset(y: headerAppeared ? 0 : -15)
@@ -294,11 +294,11 @@ struct CareerExplorerView: View {
             HStack(spacing: 16) {
               Image(systemName: "magnifyingglass")
                 .font(.system(size: 20))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
               
               TextField("Search careers, fields, or subjects...", text: searchTextBinding)
                 .font(.system(size: 18))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .onSubmit {
                   performSearch()
                 }
@@ -359,11 +359,11 @@ struct CareerExplorerView: View {
             HStack(spacing: 12) {
               Image(systemName: "magnifyingglass")
                 .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
               
               TextField("Search careers...", text: searchTextBinding)
                 .font(.system(size: 16))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .onSubmit {
                   performSearch()
                 }
@@ -390,7 +390,7 @@ struct CareerExplorerView: View {
               endPoint: .bottomTrailing
             )
           )
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .cornerRadius(16)
           .disabled(isSearching)
         }
@@ -403,11 +403,11 @@ struct CareerExplorerView: View {
             VStack(alignment: .leading, spacing: 4) {
               Text("Results for \"\(lastSearchQuery)\"")
                 .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               Text("\(searchResults.count) careers found")
                 .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
             }
 
             Spacer()
@@ -425,7 +425,7 @@ struct CareerExplorerView: View {
             .tint(.white)
           Text("Loading careers for \"\(searchText)\"...")
             .font(.headline)
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
         }
         Spacer()
       } else if searchResults.isEmpty && hasSearched {
@@ -464,7 +464,7 @@ struct CareerExplorerView: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Popular Searches")
         .font(.system(size: 16, weight: .semibold))
-        .foregroundColor(.white.opacity(0.8))
+        .foregroundColor(Color.tmiTextSecondary)
         .padding(.horizontal, 20)
       
       LazyVGrid(columns: [
@@ -484,7 +484,7 @@ struct CareerExplorerView: View {
                 RoundedRectangle(cornerRadius: 12)
                   .fill(Color.white.opacity(0.1))
               )
-              .foregroundColor(.white.opacity(0.9))
+              .foregroundColor(Color.tmiTextSecondary)
           }
           .buttonStyle(ScaleButtonStyle())
         }
@@ -510,15 +510,15 @@ struct CareerExplorerView: View {
       
       Image(systemName: "magnifyingglass")
         .font(.system(size: 60))
-        .foregroundColor(.white.opacity(0.5))
+        .foregroundColor(Color.tmiTextTertiary)
       
       Text("No careers found")
         .font(.system(size: 22, weight: .semibold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
       
       Text("Try searching for a different career, field, or subject")
         .font(.system(size: 16))
-        .foregroundColor(.white.opacity(0.7))
+        .foregroundColor(Color.tmiTextSecondary)
         .multilineTextAlignment(.center)
         .padding(.horizontal, 40)
       
@@ -536,7 +536,7 @@ struct CareerExplorerView: View {
           endPoint: .bottomTrailing
         )
       )
-      .foregroundColor(.white)
+      .foregroundColor(Color.tmiTextPrimary)
       .cornerRadius(14)
       
       Spacer()
@@ -550,11 +550,11 @@ struct CareerExplorerView: View {
       HStack(spacing: 6) {
         Image(systemName: "person.circle")
           .font(.system(size: 16, weight: .semibold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         if let student = selectedStudent {
           Text(student.name.components(separatedBy: " ").first ?? "Student")
             .font(.system(size: 12))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
         }
       }
       .frame(height: 36)
@@ -643,7 +643,7 @@ struct CareerExplorerView: View {
 
         Text("For \((selectedStudent?.name.components(separatedBy: " ").first) ?? "You")")
           .font(.system(size: 18, weight: .bold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
 
         Spacer()
       }
@@ -672,7 +672,7 @@ struct CareerExplorerView: View {
 
       Text("Loading careers...")
         .font(.headline)
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .padding(.top, 60)
@@ -687,7 +687,7 @@ struct CareerExplorerView: View {
 
         Text("Trending Careers")
           .font(.system(size: 18, weight: .bold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
 
         Spacer()
 
@@ -787,7 +787,7 @@ struct CareerExplorerView: View {
         VStack(alignment: .leading, spacing: 4) {
           Text("Exploring \(filteredCareers.count) careers")
             .font(.system(size: 20, weight: .bold))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
 
           if let selectedField = selectedField {
             HStack(spacing: 6) {
@@ -820,19 +820,19 @@ struct CareerExplorerView: View {
               VStack(alignment: .leading, spacing: 2) {
                 Text("\(stats.uniqueFields)")
                   .font(.system(size: 16, weight: .semibold))
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
                 Text("Fields")
                   .font(.system(size: 12))
-                  .foregroundColor(.white.opacity(0.7))
+                  .foregroundColor(Color.tmiTextSecondary)
               }
 
               VStack(alignment: .leading, spacing: 2) {
                 Text("$\(Int(stats.averageSalary/1000))k")
                   .font(.system(size: 16, weight: .semibold))
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
                 Text("Avg Salary")
                   .font(.system(size: 12))
-                  .foregroundColor(.white.opacity(0.7))
+                  .foregroundColor(Color.tmiTextSecondary)
               }
 
               VStack(alignment: .leading, spacing: 2) {
@@ -841,7 +841,7 @@ struct CareerExplorerView: View {
                   .foregroundColor(.green)
                 Text("High Growth")
                   .font(.system(size: 12))
-                  .foregroundColor(.white.opacity(0.7))
+                  .foregroundColor(Color.tmiTextSecondary)
               }
             }
             .padding(.top, 4)
@@ -878,17 +878,17 @@ struct CareerExplorerView: View {
 
         Image(systemName: "briefcase.fill")
           .font(.system(size: 60))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(Color.tmiTextSecondary)
       }
       .padding(.top, 40)
 
       Text("No matching careers found")
         .font(.system(size: 22, weight: .semibold, design: .rounded))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
 
       Text("Try adjusting your search terms or filters to explore more career options")
         .font(.system(size: 16))
-        .foregroundColor(.white.opacity(0.7))
+        .foregroundColor(Color.tmiTextSecondary)
         .multilineTextAlignment(.center)
         .padding(.horizontal, 40)
 
@@ -913,7 +913,7 @@ struct CareerExplorerView: View {
             endPoint: .bottomTrailing
           )
         )
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
         .cornerRadius(14)
         .shadow(color: Color.tmiSecondary.opacity(0.4), radius: 8, x: 0, y: 4)
       }
@@ -965,7 +965,7 @@ struct CareerCardHeader: View {
       // Career title
       Text(title)
         .font(.system(size: 16, weight: .semibold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
         .lineLimit(1)
     }
     .padding(16)
@@ -986,7 +986,7 @@ struct FieldIconView: View {
   var body: some View {
     Image(systemName: iconName)
       .font(.system(size: 20))
-      .foregroundColor(.white)
+      .foregroundColor(Color.tmiTextPrimary)
       .frame(width: 36, height: 36)
       .background(
         Circle()
@@ -1002,7 +1002,7 @@ struct FieldBadgeView: View {
   var body: some View {
     Text(field)
       .font(.system(size: 12, weight: .medium))
-      .foregroundColor(.white.opacity(0.8))
+      .foregroundColor(Color.tmiTextSecondary)
       .padding(.horizontal, 10)
       .padding(.vertical, 5)
       .background(
@@ -1019,7 +1019,7 @@ struct CareerDescriptionView: View {
   var body: some View {
     Text(description)
       .font(.system(size: 13))
-      .foregroundColor(.white.opacity(0.8))
+      .foregroundColor(Color.tmiTextSecondary)
       .lineLimit(3)
       .frame(height: 60, alignment: .top)
   }
@@ -1059,7 +1059,7 @@ struct SkillBadgeView: View {
         Capsule()
           .fill(Color.white.opacity(0.1))
       )
-      .foregroundColor(.white.opacity(0.9))
+      .foregroundColor(Color.tmiTextSecondary)
   }
 }
 
@@ -1075,7 +1075,7 @@ struct SalaryView: View {
       Text("$\(salaryRange.lowerBound/1000)k - $\(salaryRange.upperBound/1000)k")
         .font(.system(size: 12, weight: .medium))
     }
-    .foregroundColor(.white.opacity(0.8))
+    .foregroundColor(Color.tmiTextSecondary)
   }
 }
 
@@ -1255,11 +1255,11 @@ struct FilterSectionHeader: View {
     HStack(spacing: 8) {
       Image(systemName: iconName)
         .font(.system(size: 18))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
 
       Text(title)
         .font(.system(size: 18, weight: .semibold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
     }
   }
 }
@@ -1274,11 +1274,11 @@ struct SalaryRangeDisplay: View {
       VStack(alignment: .leading, spacing: 4) {
         Text("Min")
           .font(.system(size: 12))
-          .foregroundColor(.white.opacity(0.6))
+          .foregroundColor(Color.tmiTextSecondary)
 
         Text("$\(Int(lowerBound))")
           .font(.system(size: 18, weight: .semibold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
       }
 
       Spacer()
@@ -1286,11 +1286,11 @@ struct SalaryRangeDisplay: View {
       VStack(alignment: .trailing, spacing: 4) {
         Text("Max")
           .font(.system(size: 12))
-          .foregroundColor(.white.opacity(0.6))
+          .foregroundColor(Color.tmiTextSecondary)
 
         Text("$\(Int(upperBound))")
           .font(.system(size: 18, weight: .semibold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
       }
     }
   }
@@ -1385,7 +1385,7 @@ struct SkillSelectionButton: View {
               lineWidth: 1
             )
         )
-        .foregroundColor(isSelected ? .white : .white.opacity(0.8))
+        .foregroundColor(isSelected ? Color.tmiTextOnPrimary : Color.tmiTextSecondary)
     }
     .buttonStyle(ScaleButtonStyle())
   }
@@ -1437,7 +1437,7 @@ struct FilterActionButton: View {
           }
         }
       )
-      .foregroundColor(.white)
+      .foregroundColor(Color.tmiTextPrimary)
       .cornerRadius(isPrimary ? 16 : 0)
       .shadow(
         color: isPrimary ? Color.tmiSecondary.opacity(0.4) : Color.clear, radius: 8, x: 0,
@@ -1558,7 +1558,7 @@ struct FilterSheet: View {
           Button("Done") {
             dismiss()
           }
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
       }
     }
@@ -1664,20 +1664,20 @@ struct SalaryAndGrowthRow: View {
       VStack(alignment: .leading, spacing: 4) {
         Text("Salary")
           .font(.system(size: 12))
-          .foregroundColor(.white.opacity(0.6))
+          .foregroundColor(Color.tmiTextSecondary)
 
         HStack(alignment: .firstTextBaseline, spacing: 2) {
           Text("$\(Int(career.salaryRange.lowerBound)/1000)k")
             .font(.system(size: 15, weight: .semibold))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
 
           Text("-")
             .font(.system(size: 15))
-            .foregroundColor(.white.opacity(0.7))
+            .foregroundColor(Color.tmiTextSecondary)
 
           Text("$\(Int(career.salaryRange.upperBound)/1000)k")
             .font(.system(size: 15, weight: .semibold))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -1691,7 +1691,7 @@ struct SalaryAndGrowthRow: View {
       VStack(alignment: .leading, spacing: 4) {
         Text("Growth")
           .font(.system(size: 12))
-          .foregroundColor(.white.opacity(0.6))
+          .foregroundColor(Color.tmiTextSecondary)
 
         HStack(spacing: 4) {
           Text("\(Int(career.growthRate * 100))%")
@@ -1918,13 +1918,13 @@ struct TrendingCareerCard: View {
 
       Text(career.title)
         .font(.system(size: 14, weight: .semibold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
         .lineLimit(2)
         .multilineTextAlignment(.leading)
 
       Text(career.field)
         .font(.system(size: 12))
-        .foregroundColor(.white.opacity(0.7))
+        .foregroundColor(Color.tmiTextSecondary)
 
       HStack {
         Text("$\(Int(career.salaryRange.lowerBound/1000))k+")
@@ -1935,7 +1935,7 @@ struct TrendingCareerCard: View {
 
         Image(systemName: "arrow.right")
           .font(.system(size: 10))
-          .foregroundColor(.white.opacity(0.5))
+          .foregroundColor(Color.tmiTextTertiary)
       }
     }
     .padding(12)
@@ -2004,13 +2004,13 @@ struct PersonalizedCareerCard: View {
 
       Text(career.title)
         .font(.system(size: 14, weight: .semibold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
         .lineLimit(2)
         .multilineTextAlignment(.leading)
 
       Text(career.field)
         .font(.system(size: 12))
-        .foregroundColor(.white.opacity(0.7))
+        .foregroundColor(Color.tmiTextSecondary)
 
       HStack {
         Text("$\(Int(career.salaryRange.lowerBound/1000))k+")
@@ -2021,7 +2021,7 @@ struct PersonalizedCareerCard: View {
 
         Image(systemName: "arrow.right")
           .font(.system(size: 10))
-          .foregroundColor(.white.opacity(0.5))
+          .foregroundColor(Color.tmiTextTertiary)
       }
     }
     .padding(12)
@@ -2086,24 +2086,24 @@ struct StudentPickerSheet: View {
           VStack {
             ProgressView()
               .scaleEffect(1.5)
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
             Text("Loading Students...")
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
               .padding(.top)
           }
         } else if students.isEmpty {
           VStack(spacing: 20) {
             Image(systemName: "person.3")
               .font(.system(size: 50))
-              .foregroundColor(.white.opacity(0.3))
+              .foregroundColor(Color.tmiTextTertiary)
             
             Text("No Students Available")
               .font(.title2)
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
             
             Text("Add students first to get personalized career recommendations")
               .font(.body)
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
               .multilineTextAlignment(.center)
               .padding(.horizontal)
           }
@@ -2118,10 +2118,10 @@ struct StudentPickerSheet: View {
                     VStack(alignment: .leading) {
                       Text(student.name)
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                       Text(student.grade)
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                     }
                     Spacer()
                     Image(systemName: "arrow.right.circle")
@@ -2147,7 +2147,7 @@ struct StudentPickerSheet: View {
           Button("Cancel") {
             dismiss()
           }
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
       }
     }

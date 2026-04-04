@@ -28,11 +28,11 @@ struct StudentStatCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                 Text(value)
                     .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .contentTransition(.numericText())
             }
 
@@ -97,7 +97,7 @@ struct StudentListActionButton: View {
                 Text(title)
                     .font(.system(size: 12, weight: .medium))
             }
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
         }

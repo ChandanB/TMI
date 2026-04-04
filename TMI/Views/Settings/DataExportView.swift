@@ -111,7 +111,7 @@ struct DataExportView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 }
             }
         }
@@ -126,11 +126,11 @@ struct DataExportView: View {
                 
                 Text("Export Your TMI Data")
                     .font(.title2.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text("Download your data in various formats for backup, analysis, or migration to other systems.")
                     .font(.body)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .multilineTextAlignment(.center)
             }
         }
@@ -140,7 +140,7 @@ struct DataExportView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Export Formats")
                 .font(.headline.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             TMIGlassCard(style: .default) {
                 VStack(spacing: 0) {
@@ -165,7 +165,7 @@ struct DataExportView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Data to Export")
                 .font(.headline.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             TMIGlassCard(style: .default) {
                 VStack(spacing: 0) {
@@ -198,11 +198,11 @@ struct DataExportView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Export Complete")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             
                             Text("Your data has been successfully exported")
                                 .font(.body)
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                         
                         Spacer()
@@ -226,7 +226,7 @@ struct DataExportView: View {
             if !selectedFormats.isEmpty && !selectedDataTypes.isEmpty {
                 Text("This will export \(selectedDataTypes.count) data types in \(selectedFormats.count) format\(selectedFormats.count == 1 ? "" : "s")")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .multilineTextAlignment(.center)
             }
         }
@@ -380,11 +380,11 @@ struct ExportFormatRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(format.rawValue)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     
                     Text(format.description)
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .lineLimit(2)
                 }
                 
@@ -392,7 +392,7 @@ struct ExportFormatRow: View {
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20))
-                    .foregroundColor(isSelected ? .tmiSecondary : .white.opacity(0.3))
+                    .foregroundColor(isSelected ? .tmiSecondary : Color.tmiTextTertiary)
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
@@ -418,11 +418,11 @@ struct DataTypeRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(dataType.rawValue)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     
                     Text(dataType.description)
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .lineLimit(2)
                 }
                 
@@ -430,7 +430,7 @@ struct DataTypeRow: View {
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20))
-                    .foregroundColor(isSelected ? .tmiSecondary : .white.opacity(0.3))
+                    .foregroundColor(isSelected ? .tmiSecondary : Color.tmiTextTertiary)
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)

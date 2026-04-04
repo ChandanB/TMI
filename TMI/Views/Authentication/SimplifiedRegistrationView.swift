@@ -81,11 +81,11 @@ struct SimplifiedRegistrationView: View {
 
                             Text("Create Account")
                                 .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             Text("Join the TMI community")
                                 .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                         .padding(.top, 20)
 
@@ -93,7 +93,7 @@ struct SimplifiedRegistrationView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("I am a...")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Color.tmiTextSecondary)
                                 .padding(.horizontal, 20)
 
                             HStack(spacing: 12) {
@@ -181,7 +181,7 @@ struct SimplifiedRegistrationView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 }
             }
         }
@@ -281,18 +281,18 @@ struct AccountTypeButton: View {
 
                     Image(systemName: type.icon)
                         .font(.system(size: 24))
-                        .foregroundColor(isSelected ? type.color : .white.opacity(0.7))
+                        .foregroundColor(isSelected ? type.color : Color.tmiTextTertiary)
                 }
 
                 Text(type.rawValue)
                     .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .white : .white.opacity(0.7))
+                    .foregroundColor(isSelected ? Color.tmiTextPrimary : Color.tmiTextSecondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.white.opacity(0.08) : Color.clear)
+                    .fill(isSelected ? type.color.opacity(0.08) : Color.tmiInputBackground.opacity(0.5))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

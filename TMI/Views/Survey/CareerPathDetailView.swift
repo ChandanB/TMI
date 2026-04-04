@@ -203,7 +203,7 @@ struct CareerPathDetailView: View {
                 }
             }
             .font(.tmiBody)
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, TMISpacing.md)
             .background(

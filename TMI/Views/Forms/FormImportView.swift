@@ -28,11 +28,11 @@ struct FormImportView: View {
                 
                 Text("Import Form")
                   .font(.title2.bold())
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
                 
                 Text("Import existing forms from JSON files or other compatible formats")
                   .font(.body)
-                  .foregroundColor(.white.opacity(0.8))
+                  .foregroundColor(Color.tmiTextSecondary)
                   .multilineTextAlignment(.center)
               }
             }
@@ -50,11 +50,11 @@ struct FormImportView: View {
                     VStack(alignment: .leading, spacing: 4) {
                       Text(file.lastPathComponent)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                       
                       Text("Ready to import")
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                     }
                     
                     Spacer()
@@ -68,11 +68,11 @@ struct FormImportView: View {
                   VStack(spacing: 16) {
                     Image(systemName: "doc.badge.plus")
                       .font(.system(size: 40))
-                      .foregroundColor(.white.opacity(0.3))
+                      .foregroundColor(Color.tmiTextTertiary)
                     
                     Text("No file selected")
                       .font(.system(size: 18, weight: .medium))
-                      .foregroundColor(.white.opacity(0.7))
+                      .foregroundColor(Color.tmiTextSecondary)
                   }
                 }
                 
@@ -110,7 +110,7 @@ struct FormImportView: View {
           Button("Cancel") {
             dismiss()
           }
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
       }
       .fileImporter(

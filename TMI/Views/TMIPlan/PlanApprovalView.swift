@@ -127,11 +127,11 @@ struct PlanApprovalView: View {
 
             Text("All caught up!")
                 .font(.title2.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text("No plans pending approval")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
@@ -147,7 +147,7 @@ struct PlanApprovalView: View {
 
             Text("Loading plans...")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
@@ -191,11 +191,11 @@ private struct StatMetric: View {
 
             Text(value)
                 .font(.title2.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -214,17 +214,17 @@ private struct PendingPlanCard: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(plan.title)
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             Text(plan.model.rawValue)
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         Spacer()
 
                         Image(systemName: "chevron.right")
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(Color.tmiTextTertiary)
                     }
 
                     // Students
@@ -235,7 +235,7 @@ private struct PendingPlanCard: View {
                             .font(.caption)
                             .lineLimit(1)
                     }
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                     // Submitted date
                     if let submittedAt = plan.submittedForApprovalAt {
@@ -252,13 +252,13 @@ private struct PendingPlanCard: View {
                     HStack {
                         Text("Created by: \(plan.createdBy)")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(Color.tmiTextTertiary)
 
                         Spacer()
 
                         Text("\(plan.goals.count) goals")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(Color.tmiTextTertiary)
                     }
                 }
                 .padding()

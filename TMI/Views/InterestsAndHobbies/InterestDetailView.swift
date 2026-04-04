@@ -115,7 +115,7 @@ struct InterestDetailView: View {
                 VStack(spacing: 8) {
                     Text(interest.name)
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .multilineTextAlignment(.center)
                     
                     if let category = interest.category.first {
@@ -137,7 +137,7 @@ struct InterestDetailView: View {
                     if let description = interest.description {
                         Text(description)
                             .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(Color.tmiTextSecondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 20)
                     }
@@ -206,7 +206,7 @@ struct InterestDetailView: View {
                 HStack {
                     Text("Associated Students")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     
                     Spacer()
                     
@@ -223,7 +223,7 @@ struct InterestDetailView: View {
                                 Capsule()
                                     .fill(interest.color)
                             )
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                     }
                 }
                 
@@ -292,15 +292,15 @@ struct InterestDetailView: View {
         VStack(spacing: 12) {
             Image(systemName: "person.2.slash")
                 .font(.system(size: 32))
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundColor(Color.tmiTextTertiary)
             
             Text("No Associated Students")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             Text("No students have expressed this interest yet. Connect students or add this interest to student profiles.")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -315,7 +315,7 @@ struct InterestDetailView: View {
                 HStack {
                     Text("Connected TMI Plans")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     
                     Spacer()
                     
@@ -328,7 +328,7 @@ struct InterestDetailView: View {
                                 Capsule()
                                     .fill(interest.color)
                             )
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                     }
                 }
                 
@@ -395,15 +395,15 @@ struct InterestDetailView: View {
         VStack(spacing: 12) {
             Image(systemName: "doc.text.slash")
                 .font(.system(size: 32))
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundColor(Color.tmiTextTertiary)
             
             Text("No Connected Plans")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             Text("No TMI plans currently use this interest. Create new plans or connect existing ones to track student progress.")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -417,7 +417,7 @@ struct InterestDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Interest Insights")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 VStack(alignment: .leading, spacing: 12) {
                     insightRow(
@@ -463,13 +463,13 @@ struct InterestDetailView: View {
             
             Text(title)
                 .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(Color.tmiTextSecondary)
             
             Spacer()
             
             Text(value)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .multilineTextAlignment(.trailing)
         }
     }
@@ -494,7 +494,7 @@ struct InterestDetailView: View {
             
             Text(message)
                 .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .padding(.vertical, 20)
@@ -507,7 +507,7 @@ struct InterestDetailView: View {
         ToolbarItem(placement: .principal) {
             Text("Interest Details")
                 .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         
         ToolbarItem(placement: .navigationBarTrailing) {
@@ -534,7 +534,7 @@ struct InterestDetailView: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.system(size: 22))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             .accessibilityLabel("Interest options")
         }
@@ -913,7 +913,7 @@ struct ConnectStudentSheet: View {
 
                                     Text(student.initials)
                                         .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Color.tmiTextPrimary)
                                 }
 
                                 VStack(alignment: .leading, spacing: 4) {
@@ -1094,12 +1094,12 @@ struct DetailStatsCard: View {
                 VStack(spacing: 4) {
                     Text(value)
                         .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .contentTransition(.numericText())
 
                     Text(label)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
@@ -1159,7 +1159,7 @@ struct StudentRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(student.name)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 HStack(spacing: 6) {
                     Image(systemName: "graduationcap.fill")
@@ -1168,7 +1168,7 @@ struct StudentRowView: View {
 
                     Text("Grade \(student.grade)")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
             }
 
@@ -1176,7 +1176,7 @@ struct StudentRowView: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundColor(Color.tmiTextTertiary)
                 .offset(x: isHovered ? 4 : 0)
         }
         .padding(.vertical, 12)
@@ -1244,7 +1244,7 @@ struct PlanRowView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(plan.model.rawValue)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
@@ -1268,7 +1268,7 @@ struct PlanRowView: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundColor(Color.tmiTextTertiary)
                 .offset(x: isHovered ? 4 : 0)
         }
         .padding(.vertical, 12)

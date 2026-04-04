@@ -80,7 +80,7 @@ struct PlanInterestsSection: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(Color.pink)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.tmiTextPrimary)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 .buttonStyle(.plain)

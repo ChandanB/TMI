@@ -55,7 +55,7 @@ struct DistrictInsightsSummary: View {
       Text("\(number)")
         .font(.caption)
         .fontWeight(.bold)
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
         .frame(width: 24, height: 24)
         .background(Color.blue)
         .clipShape(Circle())

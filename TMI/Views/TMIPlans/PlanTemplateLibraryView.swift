@@ -284,7 +284,7 @@ struct PlanTemplateCard: View {
                 HStack {
                     Text(template.model.rawValue)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextOnPrimary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.tmiPrimary)

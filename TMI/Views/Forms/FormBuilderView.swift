@@ -26,11 +26,11 @@ struct FormBuilderView: View {
                 
                 Text("Form Builder")
                   .font(.title2.bold())
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
                 
                 Text("Drag and drop fields to create your custom form")
                   .font(.body)
-                  .foregroundColor(.white.opacity(0.8))
+                  .foregroundColor(Color.tmiTextSecondary)
                   .multilineTextAlignment(.center)
               }
             }
@@ -45,11 +45,11 @@ struct FormBuilderView: View {
                 
                 Text("Coming Soon")
                   .font(.title.bold())
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
                 
                 Text("The drag-and-drop form builder is currently under development. For now, you can use our pre-built templates from the Forms library.")
                   .font(.body)
-                  .foregroundColor(.white.opacity(0.8))
+                  .foregroundColor(Color.tmiTextSecondary)
                   .multilineTextAlignment(.center)
                   .padding(.horizontal)
               }
@@ -75,7 +75,7 @@ struct FormBuilderView: View {
           Button("Cancel") {
             dismiss()
           }
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
       }
   }

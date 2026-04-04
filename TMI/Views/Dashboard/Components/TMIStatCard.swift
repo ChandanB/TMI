@@ -287,7 +287,7 @@ struct TMIPrimaryButtonStyle: ButtonStyle {
                         Color.tmiPrimary.opacity(configuration.isPressed ? 0.8 : 1.0)
                     )
             )
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .tmiShadowSmall()
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)

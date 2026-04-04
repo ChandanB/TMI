@@ -31,11 +31,11 @@ struct FormCreationView: View {
                 
                 Text("Create New Form")
                   .font(.title2.bold())
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
                 
                 Text("Start building your custom form from scratch")
                   .font(.body)
-                  .foregroundColor(.white.opacity(0.8))
+                  .foregroundColor(Color.tmiTextSecondary)
                   .multilineTextAlignment(.center)
               }
             }
@@ -57,7 +57,7 @@ struct FormCreationView: View {
                       .foregroundColor(.tmiSecondary)
                     Text("Description")
                       .font(.system(size: 16, weight: .medium))
-                      .foregroundColor(.white)
+                      .foregroundColor(Color.tmiTextPrimary)
                   }
                   
                   TextEditor(text: $formDescription)
@@ -67,7 +67,7 @@ struct FormCreationView: View {
                       RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.05))
                     )
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .frame(height: 100)
                 }
                 
@@ -78,7 +78,7 @@ struct FormCreationView: View {
                       .foregroundColor(.tmiSecondary)
                     Text("Category")
                       .font(.system(size: 16, weight: .medium))
-                      .foregroundColor(.white)
+                      .foregroundColor(Color.tmiTextPrimary)
                   }
                   
                   Menu {
@@ -90,10 +90,10 @@ struct FormCreationView: View {
                   } label: {
                     HStack {
                       Text(selectedCategory)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                       Spacer()
                       Image(systemName: "chevron.down")
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                     }
                     .padding(12)
                     .background(
@@ -140,7 +140,7 @@ struct FormCreationView: View {
           Button("Cancel") {
             dismiss()
           }
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
       }
   }

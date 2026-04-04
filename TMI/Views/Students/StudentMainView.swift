@@ -57,7 +57,7 @@ struct StudentMainView: View {
                                 } label: {
                                     Image(systemName: "person.crop.circle.fill")
                                         .font(.system(size: 22))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Color.tmiTextPrimary)
                                 }
                             }
                         }
@@ -121,11 +121,11 @@ struct MyProgressTabView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("My Progress")
                             .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text("Track your growth and achievements")
                             .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
@@ -140,11 +140,11 @@ struct MyProgressTabView: View {
 
                             Text("Your Progress")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             Text("View your achievements and track your goals here.")
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Color.tmiTextSecondary)
                                 .multilineTextAlignment(.center)
                         }
                         .padding(40)
@@ -169,11 +169,11 @@ struct MyActivitiesTabView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("My Activities")
                             .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text("Recommended activities based on your interests")
                             .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
@@ -188,11 +188,11 @@ struct MyActivitiesTabView: View {
 
                             Text("Your Activities")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             Text("Discover activities tailored to your interests.")
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Color.tmiTextSecondary)
                                 .multilineTextAlignment(.center)
                         }
                         .padding(40)
@@ -226,11 +226,11 @@ struct MyProfileTabView: View {
 
                         Text(authStateModel.currentUser?.displayName ?? "Student")
                             .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text(authStateModel.currentUser?.email ?? "")
                             .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     .padding(.top, 40)
 
@@ -239,13 +239,13 @@ struct MyProfileTabView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("About Me")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             HStack {
                                 Image(systemName: "person.fill")
                                     .foregroundColor(.tmiPrimary)
                                 Text("Student")
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Color.tmiTextSecondary)
                             }
 
                             if let email = authStateModel.currentUser?.email {
@@ -253,7 +253,7 @@ struct MyProfileTabView: View {
                                     Image(systemName: "envelope.fill")
                                         .foregroundColor(.tmiPrimary)
                                     Text(email)
-                                        .foregroundColor(.white.opacity(0.7))
+                                        .foregroundColor(Color.tmiTextSecondary)
                                 }
                             }
                         }

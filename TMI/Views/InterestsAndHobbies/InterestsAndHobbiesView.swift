@@ -113,7 +113,7 @@ struct InterestsAndHobbiesView: View {
             
             Text("Loading \(stateModel.selectedSegment.rawValue.lowercased())...")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -127,11 +127,11 @@ struct InterestsAndHobbiesView: View {
             
             Text("Unable to Load Data")
                 .font(.title2.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             Text(error.message)
                 .multilineTextAlignment(.center)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .padding(.horizontal, 40)
             
             TMIButton(
@@ -188,11 +188,11 @@ struct InterestsAndHobbiesView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Your \(stateModel.selectedSegment.rawValue)")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text(headerSubtitle)
                     .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             
             Spacer()
@@ -200,11 +200,11 @@ struct InterestsAndHobbiesView: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Text(Date(), style: .date)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                 
                 Text("\(stateModel.totalItems) items")
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(Color.tmiTextTertiary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -240,11 +240,11 @@ struct InterestsAndHobbiesView: View {
                     HStack(spacing: 6) {
                         Image(systemName: segment.iconName)
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(stateModel.selectedSegment == segment ? segmentColor : .white.opacity(0.5))
+                            .foregroundColor(stateModel.selectedSegment == segment ? segmentColor : Color.tmiTextTertiary)
 
                         Text(segment.rawValue)
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(stateModel.selectedSegment == segment ? .white : .white.opacity(0.6))
+                            .foregroundColor(stateModel.selectedSegment == segment ? Color.tmiTextPrimary : Color.tmiTextSecondary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
@@ -374,16 +374,16 @@ struct InterestsAndHobbiesView: View {
             VStack(spacing: 20) {
                 Image(systemName: stateModel.selectedSegment == .all ? "heart.slash" : "gamecontroller.fill")
                     .font(.system(size: 50))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(Color.tmiTextTertiary)
                 
                 VStack(spacing: 8) {
                     Text("No \(stateModel.selectedSegment.rawValue) Found")
                         .font(.title2.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     
                     Text(emptyStateMessage)
                         .multilineTextAlignment(.center)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .padding(.horizontal, 20)
                 }
                 
@@ -420,7 +420,7 @@ struct InterestsAndHobbiesView: View {
         ToolbarItem(placement: .principal) {
             Text("Interests & Hobbies")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         
         ToolbarItem(placement: .navigationBarTrailing) {
@@ -431,7 +431,7 @@ struct InterestsAndHobbiesView: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.system(size: 22))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             .accessibilityLabel("More options")
         }
@@ -541,7 +541,7 @@ struct AddItemSheet: View {
                                 .frame(height: 1)
                             Text("OR")
                                 .font(.caption.bold())
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                                 .padding(.horizontal, 12)
                             Rectangle()
                                 .fill(Color.white.opacity(0.2))
@@ -567,7 +567,7 @@ struct AddItemSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 }
             }
             .sheet(isPresented: $showingPredefinedList) {
@@ -590,11 +590,11 @@ struct AddItemSheet: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Browse 200+ Interests")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text("Choose from our curated catalog")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
 
                     Spacer()
@@ -617,7 +617,7 @@ struct AddItemSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Name")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 TMITextField(
                     icon: "pencil",
@@ -636,7 +636,7 @@ struct AddItemSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Category")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
@@ -646,15 +646,15 @@ struct AddItemSheet: View {
                             } label: {
                                 Text(category.rawValue)
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(selectedCategory == category ? .white : .white.opacity(0.7))
+                                    .foregroundColor(selectedCategory == category ? Color.pink : Color.tmiTextSecondary)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
                                     .background(
                                         Capsule()
-                                            .fill(selectedCategory == category ? Color.pink.opacity(0.3) : Color.white.opacity(0.1))
+                                            .fill(selectedCategory == category ? Color.pink.opacity(0.1) : Color.tmiInputBackground)
                                             .overlay(
                                                 Capsule()
-                                                    .stroke(selectedCategory == category ? Color.pink : Color.white.opacity(0.2), lineWidth: 1)
+                                                    .stroke(selectedCategory == category ? Color.pink : Color.tmiBorder, lineWidth: 1)
                                             )
                                     )
                             }
@@ -674,7 +674,7 @@ struct AddItemSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Icon")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
                     ForEach(interestIcons, id: \.self) { icon in
@@ -683,14 +683,14 @@ struct AddItemSheet: View {
                         } label: {
                             Image(systemName: icon)
                                 .font(.system(size: 24))
-                                .foregroundColor(selectedIcon == icon ? .white : .white.opacity(0.6))
+                                .foregroundColor(selectedIcon == icon ? Color.pink : Color.tmiTextTertiary)
                                 .frame(width: 50, height: 50)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .fill(selectedIcon == icon ? Color.pink.opacity(0.3) : Color.white.opacity(0.1))
+                                        .fill(selectedIcon == icon ? Color.pink.opacity(0.1) : Color.tmiInputBackground)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 12)
-                                                .stroke(selectedIcon == icon ? Color.pink : Color.white.opacity(0.2), lineWidth: 1)
+                                                .stroke(selectedIcon == icon ? Color.pink : Color.tmiBorder, lineWidth: 1)
                                         )
                                 )
                         }
@@ -708,10 +708,10 @@ struct AddItemSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Description (Optional)")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 TextEditor(text: $description)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .scrollContentBackground(.hidden)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
@@ -726,7 +726,7 @@ struct AddItemSheet: View {
                         VStack {
                             HStack {
                                 Text("Add a description to help identify this interest...")
-                                    .foregroundColor(.white.opacity(0.5))
+                                    .foregroundColor(Color.tmiTextTertiary)
                                     .allowsHitTesting(false)
                                 Spacer()
                             }
@@ -807,12 +807,12 @@ struct StatsCard: View {
 
                 Text(value)
                     .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .contentTransition(.numericText(value: Double(value) ?? 0))
 
                 Text(label)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -894,7 +894,7 @@ struct InterestCardView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(interest.name)
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -906,13 +906,13 @@ struct InterestCardView: View {
 
                         Text(interest.category.first?.rawValue ?? "General")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
 
                         Spacer()
 
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(Color.tmiTextTertiary)
                             .offset(x: isHovered ? 4 : 0)
                     }
                 }
@@ -1013,7 +1013,7 @@ struct PredefinedInterestsListView: View {
                     HStack {
                         Text("\(filteredInterests.count) interests")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                         Spacer()
                     }
                     .padding(.horizontal, 20)
@@ -1043,7 +1043,7 @@ struct PredefinedInterestsListView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 }
             }
         }
@@ -1068,15 +1068,15 @@ struct CategoryFilterChip: View {
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
             }
-            .foregroundColor(isSelected ? .white : .white.opacity(0.7))
+            .foregroundColor(isSelected ? Color.pink : Color.tmiTextSecondary)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(isSelected ? Color.pink.opacity(0.3) : Color.white.opacity(0.1))
+                    .fill(isSelected ? Color.pink.opacity(0.1) : Color.tmiInputBackground)
                     .overlay(
                         Capsule()
-                            .stroke(isSelected ? Color.pink : Color.white.opacity(0.2), lineWidth: 1)
+                            .stroke(isSelected ? Color.pink : Color.tmiBorder, lineWidth: 1)
                     )
             )
         }
@@ -1113,7 +1113,7 @@ struct PredefinedInterestRow: View {
                         HStack(spacing: 8) {
                             Text(interest.name)
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             if interest.isFeatured {
                                 Image(systemName: "star.fill")
@@ -1128,7 +1128,7 @@ struct PredefinedInterestRow: View {
                             Text(interest.category.first?.rawValue ?? "General")
                                 .font(.system(size: 13))
                         }
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                         if let score = interest.popularityScore {
                             HStack(spacing: 4) {
@@ -1137,7 +1137,7 @@ struct PredefinedInterestRow: View {
                                 Text("\(score)% popular")
                                     .font(.system(size: 11))
                             }
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(Color.tmiTextTertiary)
                         }
                     }
 
@@ -1165,14 +1165,14 @@ struct PredefinedInterestRow: View {
                         if let description = interest.description {
                             Text(description)
                                 .font(.system(size: 14))
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         if !interest.academicRelevance.isEmpty {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Academic Relevance")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Color.tmiTextSecondary)
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 6) {
@@ -1196,7 +1196,7 @@ struct PredefinedInterestRow: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Skills Developed")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Color.tmiTextSecondary)
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 6) {
@@ -1220,7 +1220,7 @@ struct PredefinedInterestRow: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Career Pathways")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Color.tmiTextSecondary)
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 6) {

@@ -109,16 +109,16 @@ struct AuditLogListView: View {
     private var searchBar: some View {
         HStack {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
 
             TextField("Search logs...", text: $searchText)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .autocorrectionDisabled()
 
             if !searchText.isEmpty {
                 Button(action: { searchText = "" }) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
             }
         }
@@ -216,13 +216,13 @@ struct AuditLogListView: View {
                 HStack {
                     Text("Last \(stats.periodDays) Days")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Spacer()
 
                     Text("\(stats.totalLogs) total")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
 
                 HStack(spacing: 20) {
@@ -274,15 +274,15 @@ struct AuditLogListView: View {
         VStack(spacing: 16) {
             Image(systemName: "doc.text.magnifyingglass")
                 .font(.system(size: 60))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(Color.tmiTextTertiary)
 
             Text(searchText.isEmpty ? "No audit logs" : "No results")
                 .font(.title2.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text(searchText.isEmpty ? "Audit logs will appear here" : "Try adjusting your search or filters")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -299,7 +299,7 @@ struct AuditLogListView: View {
 
             Text("Loading audit logs...")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
@@ -375,14 +375,14 @@ private struct AuditLogCard: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(log.action.displayName)
                         .font(.subheadline.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     HStack(spacing: 4) {
                         Image(systemName: "folder")
                         Text(log.entityType.displayName)
                     }
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                     if let userName = log.userName {
                         HStack(spacing: 4) {
@@ -394,12 +394,12 @@ private struct AuditLogCard: View {
                             }
                         }
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
                     }
 
                     Text(log.timestamp.formatted(.relative(presentation: .named)))
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(Color.tmiTextTertiary)
                 }
 
                 Spacer()
@@ -407,7 +407,7 @@ private struct AuditLogCard: View {
                 // Severity badge
                 Text(log.action.severity.rawValue.uppercased())
                     .font(.caption2.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextOnPrimary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color(hex: log.action.severity.color))
@@ -429,7 +429,7 @@ private struct FilterChip: View {
             Text(title)
         }
         .font(.caption.bold())
-        .foregroundColor(isSelected ? .white : .white.opacity(0.7))
+        .foregroundColor(isSelected ? Color.tmiTextOnPrimary : Color.tmiTextSecondary)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(isSelected ? Color.cyan : Color.white.opacity(0.1))
@@ -450,7 +450,7 @@ private struct StatBox: View {
 
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
         }
         .frame(maxWidth: .infinity)
     }

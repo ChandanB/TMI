@@ -81,8 +81,8 @@ struct ContentView: View {
                 AuthenticationView()
             }
         }
-        .foregroundColor(.white)
-        .foregroundStyle(.white)
+        .foregroundColor(Color.tmiTextPrimary)
+        .foregroundStyle(Color.tmiTextPrimary)
         .onChange(of: authStateModel.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
                 Task {
@@ -159,7 +159,7 @@ struct LoadingView: View {
                 
                 ProgressView("Loading...")
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
         }
     }

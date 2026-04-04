@@ -266,7 +266,7 @@ struct RestrictedAccessPlaceholder: View {
             
             Text("Access Restricted")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             Text(restrictionMessage)
                 .font(.caption)

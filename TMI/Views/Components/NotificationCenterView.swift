@@ -148,7 +148,7 @@ struct NotificationBadge: View {
         if notificationService.unreadCount > 0 {
             Text("\(min(notificationService.unreadCount, 99))")
                 .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(Color.red)
@@ -179,7 +179,7 @@ struct NotificationBellButton: View {
                         .overlay(
                             Text("\(min(notificationService.unreadCount, 9))")
                                 .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                         )
                         .offset(x: 4, y: -4)
                 }

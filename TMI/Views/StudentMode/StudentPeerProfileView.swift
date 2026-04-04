@@ -70,7 +70,7 @@ struct StudentPeerProfileView: View {
                 VStack(spacing: 4) {
                     Text(peerStudent.firstName)
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text("Grade \(peerStudent.grade)")
                         .font(.system(size: 16, weight: .medium))
@@ -123,7 +123,7 @@ struct StudentPeerProfileView: View {
 
                 Text("You Both Like")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             .padding(.horizontal, TMISpacing.xs)
 
@@ -146,7 +146,7 @@ struct StudentPeerProfileView: View {
 
                 Text("\(peerStudent.firstName)'s Other Interests")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             .padding(.horizontal, TMISpacing.xs)
 
@@ -170,7 +170,7 @@ struct StudentPeerProfileView: View {
                 VStack(spacing: 8) {
                     Text("Connect Over Shared Interests")
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     if !commonInterests.isEmpty {
                         Text("You and \(peerStudent.firstName) both love \(commonInterests.first?.name ?? "similar things")! Why not chat about it?")
@@ -257,7 +257,7 @@ struct CommonInterestCard: View {
             VStack(spacing: 4) {
                 Text(interest.name)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
 
@@ -312,7 +312,7 @@ struct PeerInterestCard: View {
             VStack(spacing: 4) {
                 Text(interest.name)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
 

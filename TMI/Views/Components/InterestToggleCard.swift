@@ -21,7 +21,7 @@ struct InterestToggleCard: View {
                 
                 Text(interest.name)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .white.opacity(0.8))
+                    .foregroundColor(isSelected ? Color.tmiTextOnPrimary : Color.tmiTextSecondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
             }
@@ -30,11 +30,11 @@ struct InterestToggleCard: View {
             .padding(8)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? interest.color : Color.white.opacity(0.05))
+                    .fill(isSelected ? interest.color : Color.tmiSurface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.white.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
+                    .stroke(isSelected ? interest.color.opacity(0.3) : Color.tmiBorder, lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())

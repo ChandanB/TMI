@@ -88,12 +88,12 @@ struct PlanApprovalDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(plan.title)
                     .font(.title2.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 HStack {
                     Label(plan.model.rawValue, systemImage: "star.fill")
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     Spacer()
 
@@ -119,7 +119,7 @@ struct PlanApprovalDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Plan Details")
                 .font(.title3.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             TMIGlassCard(style: .default) {
                 VStack(alignment: .leading, spacing: 16) {
@@ -138,7 +138,7 @@ struct PlanApprovalDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Goals (\(plan.goals.count))")
                             .font(.subheadline.bold())
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(Color.tmiTextSecondary)
 
                         ForEach(plan.goals) { goal in
                             HStack {
@@ -147,13 +147,13 @@ struct PlanApprovalDetailView: View {
 
                                 Text(goal.description)
                                     .font(.caption)
-                                    .foregroundColor(.white.opacity(0.9))
+                                    .foregroundColor(Color.tmiTextSecondary)
 
                                 Spacer()
 
                                 Text("\(Int(goal.progress * 100))%")
                                     .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.6))
+                                    .foregroundColor(Color.tmiTextSecondary)
                             }
                         }
                     }
@@ -171,10 +171,10 @@ struct PlanApprovalDetailView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Created")
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                             Text(plan.creationDate.formatted(date: .abbreviated, time: .omitted))
                                 .font(.caption2)
-                                .foregroundColor(.white.opacity(0.9))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         Spacer()
@@ -183,10 +183,10 @@ struct PlanApprovalDetailView: View {
                             VStack(alignment: .trailing, spacing: 4) {
                                 Text("Submitted")
                                     .font(.caption)
-                                    .foregroundColor(.white.opacity(0.6))
+                                    .foregroundColor(Color.tmiTextSecondary)
                                 Text(submittedAt.formatted(date: .abbreviated, time: .omitted))
                                     .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.9))
+                                    .foregroundColor(Color.tmiTextSecondary)
                             }
                         }
                     }
@@ -202,7 +202,7 @@ struct PlanApprovalDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Approval History")
                 .font(.title3.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             TMIGlassCard(style: .elevated) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -214,26 +214,26 @@ struct PlanApprovalDetailView: View {
 
                                 Text(entry.action.displayName)
                                     .font(.subheadline.bold())
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
 
                                 Spacer()
 
                                 Text(entry.timestamp.formatted(.relative(presentation: .named)))
                                     .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.6))
+                                    .foregroundColor(Color.tmiTextSecondary)
                             }
 
                             if let comment = entry.comment, !comment.isEmpty {
                                 Text("\"\(comment)\"")
                                     .font(.caption)
                                     .italic()
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .foregroundColor(Color.tmiTextSecondary)
                                     .padding(.leading, 8)
                             }
 
                             Text("By: \(entry.actionBy)")
                                 .font(.caption2)
-                                .foregroundColor(.white.opacity(0.5))
+                                .foregroundColor(Color.tmiTextTertiary)
                         }
                         .padding(.bottom, index < plan.approvalHistory.count - 1 ? 12 : 0)
 
@@ -253,14 +253,14 @@ struct PlanApprovalDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Review Actions")
                 .font(.title3.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             // Comment field
             TMIGlassCard(style: .default) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Comment (Optional)")
                         .font(.subheadline.bold())
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     TextField("Add your feedback here...", text: $comment, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
@@ -280,7 +280,7 @@ struct PlanApprovalDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.green.gradient)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .cornerRadius(12)
                     .font(.headline)
                 }
@@ -296,7 +296,7 @@ struct PlanApprovalDetailView: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.orange.gradient)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .cornerRadius(12)
                         .font(.subheadline.bold())
                     }
@@ -311,7 +311,7 @@ struct PlanApprovalDetailView: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.red.gradient)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .cornerRadius(12)
                         .font(.subheadline.bold())
                     }
@@ -325,7 +325,7 @@ struct PlanApprovalDetailView: View {
                     ProgressView()
                         .tint(.white)
                     Text("Processing...")
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     Spacer()
                 }
                 .padding()
@@ -343,11 +343,11 @@ struct PlanApprovalDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                 Text(value)
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
         }
     }

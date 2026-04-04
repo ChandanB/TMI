@@ -96,13 +96,13 @@ struct AssignedResourcesView: View {
                     HStack {
                         Text("Completion Rate")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
 
                         Spacer()
 
                         Text("\(Int(analytics.completionRate * 100))%")
                             .font(.caption.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                     }
 
                     GeometryReader { geometry in
@@ -177,15 +177,15 @@ struct AssignedResourcesView: View {
         VStack(spacing: 16) {
             Image(systemName: emptyStateIcon)
                 .font(.system(size: 60))
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundColor(Color.tmiTextTertiary)
 
             Text(emptyStateMessage)
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text(emptyStateSubtitle)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .padding(40)
@@ -227,7 +227,7 @@ struct AssignedResourcesView: View {
 
             Text("Loading assignments...")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
@@ -279,11 +279,11 @@ private struct AssignmentAnalyticsMetric: View {
 
             Text(value)
                 .font(.title2.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -305,20 +305,20 @@ private struct FilterTab: View {
                     .font(.caption)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Color.white.opacity(isSelected ? 0.3 : 0.2))
+                    .background(isSelected ? Color.white.opacity(0.3) : Color.tmiInputBackground)
                     .cornerRadius(8)
             }
-            .foregroundColor(isSelected ? .white : .white.opacity(0.6))
+            .foregroundColor(isSelected ? Color.tmiTextOnPrimary : Color.tmiTextSecondary)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(
                 isSelected
                     ? LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing)
-                    : LinearGradient(colors: [.clear], startPoint: .leading, endPoint: .trailing)
+                    : LinearGradient(colors: [Color.tmiInputBackground], startPoint: .leading, endPoint: .trailing)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(isSelected ? 0 : 0.2), lineWidth: 1)
+                    .stroke(isSelected ? Color.clear : Color.tmiBorder, lineWidth: 1)
             )
             .cornerRadius(20)
         }
@@ -343,12 +343,12 @@ private struct AssignmentCard: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(assignment.resourceTitle)
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                                 .lineLimit(2)
 
                             Text(assignment.resourceCategory.capitalized)
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         Spacer()
@@ -361,20 +361,20 @@ private struct AssignmentCard: View {
                     if let relatedCareer = assignment.relatedCareer {
                         Label(relatedCareer, systemImage: "briefcase.fill")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
 
                     if let relatedInterest = assignment.relatedInterest {
                         Label(relatedInterest, systemImage: "lightbulb.fill")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
 
                     // Metadata
                     HStack {
                         Text("Assigned \(assignment.assignedAt.formatted(.relative(presentation: .named)))")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(Color.tmiTextTertiary)
 
                         Spacer()
 

@@ -176,7 +176,7 @@ struct SettingsView: View {
                 
                 Text(title)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
@@ -205,7 +205,7 @@ struct SettingsView: View {
                 
                 Text(title)
                     .font(.system(size: 15))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Spacer()
                 
@@ -264,11 +264,11 @@ private var headerView: some View {
                 if let user = Auth.auth().currentUser {
                     Text(user.displayName ?? "TMI Educator")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     
                     Text(user.email ?? "Not available")
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
                 
                 Text("TMI Professional")
@@ -452,7 +452,7 @@ struct SettingsSection<Content: View>: View {
                 
                 Text(title)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             .padding(.horizontal, 4)
             
@@ -503,14 +503,14 @@ struct SettingsRow: View {
                     
                     Text(subtitle)
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
                 
                 Spacer()
                 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(Color.tmiTextTertiary)
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
@@ -542,11 +542,11 @@ struct SettingsToggleRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text(subtitle)
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             
             Spacer()

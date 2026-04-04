@@ -33,11 +33,11 @@ struct TMIPlanCard: View {
             VStack(alignment: .leading, spacing: 2) {
               Text(plan.model.rawValue)
                 .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               Text("Updated \(timeAgo(from: plan.lastUpdated))")
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
             }
           }
 
@@ -63,7 +63,7 @@ struct TMIPlanCard: View {
 
             Text("\(plan.progressPercentage)%")
               .font(.system(size: 12, weight: .bold))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
           }
         }
 
@@ -81,7 +81,7 @@ struct TMIPlanCard: View {
         // Description
         Text(plan.model.description)
           .font(.system(size: 14))
-          .foregroundColor(.white.opacity(0.8))
+          .foregroundColor(Color.tmiTextSecondary)
           .lineLimit(2)
           .padding(.horizontal, 20)
 
@@ -89,7 +89,7 @@ struct TMIPlanCard: View {
         HStack(spacing: 0) {
           Text("Students:")
             .font(.system(size: 13, weight: .medium))
-            .foregroundColor(.white.opacity(0.7))
+            .foregroundColor(Color.tmiTextSecondary)
             .padding(.trailing, 8)
 
           // Avatar stack
@@ -106,7 +106,7 @@ struct TMIPlanCard: View {
 
                 Text("+\(plan.students.count - 3)")
                   .font(.system(size: 10, weight: .bold))
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
               }
             }
           }
@@ -288,7 +288,7 @@ struct StudentAvatarView: View {
 
       Text(student.initials)
         .font(.system(size: size * 0.4, weight: .bold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
     }
   }
 }
@@ -306,7 +306,7 @@ struct StatIcon: View {
 
       Text("\(count)")
         .font(.system(size: 12, weight: .semibold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
     }
   }
 }

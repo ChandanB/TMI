@@ -265,7 +265,7 @@ struct InsightsButtonView: View {
             color: Color.tmiSecondary.opacity(isHovered ? 0.5 : 0.3), radius: isHovered ? 12 : 8,
             x: 0, y: isHovered ? 8 : 5)
       )
-      .foregroundStyle(.white)
+      .foregroundStyle(Color.tmiTextPrimary)
       .scaleEffect(isPressed ? 0.98 : 1.0)
       .animation(.easeInOut(duration: 0.2), value: isPressed)
     }
@@ -393,7 +393,7 @@ struct DashboardAlignmentChartView: View {
       y: .value("Alignment Percentage", data.alignmentPercentage)
     )
     .symbolSize(selectedDataPoint?.id == data.id ? 120 : 80)
-    .foregroundStyle(selectedDataPoint?.id == data.id ? Color.white : Color.tmiSecondary)
+    .foregroundStyle(selectedDataPoint?.id == data.id ? Color.tmiSurface : Color.tmiSecondary)
     .opacity(selectedDataPoint?.id == data.id ? 1.0 : 0.8)
   }
   
@@ -415,7 +415,7 @@ struct DashboardAlignmentChartView: View {
   private func createAnnotationLabel(for data: AlignmentData) -> some View {
     Text("\(Int(data.alignmentPercentage * 100))%")
       .font(.caption.weight(.semibold))
-      .foregroundStyle(.white)
+      .foregroundStyle(Color.tmiTextPrimary)
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
       .background(

@@ -91,7 +91,7 @@ struct AddResourceView: View {
                                     RoundedRectangle(cornerRadius: 12)
                                         .fill(isFormValid ? Color.tmiSecondary : Color.gray.opacity(0.3))
                                 )
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                         }
                         .disabled(!isFormValid)
                         .padding(.top, 20)
@@ -108,7 +108,7 @@ struct AddResourceView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 }
             }
             .onAppear {
@@ -158,7 +158,7 @@ struct CategoryPickerView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Category")
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
@@ -171,24 +171,24 @@ struct CategoryPickerView: View {
                             VStack(spacing: 8) {
                                 ZStack {
                                     Circle()
-                                        .fill(category == cat ? cat.color.opacity(0.3) : Color.white.opacity(0.05))
+                                        .fill(category == cat ? cat.color.opacity(0.15) : Color.tmiInputBackground)
                                         .frame(width: 60, height: 60)
-                                    
+
                                     Image(systemName: cat.icon)
                                         .font(.system(size: 24))
-                                        .foregroundColor(category == cat ? cat.color : .white.opacity(0.6))
+                                        .foregroundColor(category == cat ? cat.color : Color.tmiTextTertiary)
                                 }
                                 .overlay(
                                     Circle()
                                         .stroke(
-                                            category == cat ? cat.color : Color.clear,
+                                            category == cat ? cat.color : Color.tmiBorder,
                                             lineWidth: 2
                                         )
                                 )
-                                
+
                                 Text(cat.rawValue.capitalized)
                                     .font(.system(size: 14))
-                                    .foregroundColor(category == cat ? .white : .white.opacity(0.7))
+                                    .foregroundColor(category == cat ? Color.tmiTextPrimary : Color.tmiTextSecondary)
                             }
                         }
                         .buttonStyle(.plain)
@@ -228,7 +228,7 @@ struct FeatureToggleView: View {
         HStack {
             Text("Featured Resource")
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             Spacer()
             
@@ -269,16 +269,16 @@ struct ResourceFormField: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             HStack {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
                 
                 TextField(placeholder, text: $text)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             .padding(12)
             .background(
@@ -323,12 +323,12 @@ struct LongResourceFormField: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             ZStack(alignment: .topLeading) {
                 if text.isEmpty {
                     Text(placeholder)
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(Color.tmiTextTertiary)
                         .padding(.top, 16)
                         .padding(.leading, 16)
                 }
@@ -336,7 +336,7 @@ struct LongResourceFormField: View {
                 TextEditor(text: $text)
                     .scrollContentBackground(.hidden)
                     .background(Color.clear)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .frame(height: 120)
                     .padding(12)
             }

@@ -202,7 +202,7 @@ struct InterestAlignmentInsightView: View {
                         y: .value("Alignment %", animateChart ? dataPoint.alignmentPercentage : 0)
                     )
                     .symbolSize(animateChart ? 100 : 0)
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(Color.tmiSurface)
                     .shadow(color: .tmiPrimary.opacity(0.5), radius: 2, x: 0, y: 1)
                     .annotation(position: .top) {
                         if animateChart {
@@ -324,11 +324,11 @@ struct InterestsInsightView: View {
                                 Text(dataPoint.category)
                                     .font(.caption.weight(.bold))
                                     .multilineTextAlignment(.center)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color.tmiTextPrimary)
                                 
                                 Text("\(Int(dataPoint.value))%")
                                     .font(.caption2)
-                                    .foregroundStyle(.white.opacity(0.8))
+                                    .foregroundStyle(Color.tmiTextSecondary)
                             }
                             .padding(4)
                             .fixedSize(horizontal: false, vertical: true)

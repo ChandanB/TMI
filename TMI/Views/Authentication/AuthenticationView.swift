@@ -45,11 +45,11 @@ struct AuthenticationView: View {
           VStack(spacing: 8) {
             Text("Welcome to TMI")
               .font(.system(size: 28, weight: .bold, design: .rounded))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
 
             Text("Tangible Modification Intervention")
               .font(.system(size: 16))
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
           }
           .padding(.bottom, 20)
           .opacity(appearAnimation ? 1.0 : 0)
@@ -162,7 +162,7 @@ struct AuthenticationView: View {
                   }) {
                     HStack(spacing: 0) {
                       Text("Don't have an account? ")
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                       Text("Create Account")
                         .foregroundColor(Color.tmiSecondary)
                         .fontWeight(.semibold)
@@ -281,7 +281,7 @@ struct TraumaInformedErrorView: View {
         // Gentle error message
         Text(message)
           .font(.system(size: 14))
-          .foregroundColor(.white.opacity(0.9))
+          .foregroundColor(Color.tmiTextSecondary)
           .multilineTextAlignment(.center)
 
         // Support options
@@ -302,7 +302,7 @@ struct TraumaInformedErrorView: View {
           }) {
             Text("I'm Ready to Try Again")
               .font(.system(size: 12))
-              .foregroundColor(.white.opacity(0.8))
+              .foregroundColor(Color.tmiTextSecondary)
           }
         }
         .padding(.top, 8)
@@ -333,13 +333,13 @@ struct SupportResourcesView: View {
 
               Text("We're Here to Help")
                 .font(.system(size: 24, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               Text(
                 "Your safety and wellbeing are our top priorities. Here are some resources that might help."
               )
               .font(.system(size: 16))
-              .foregroundColor(.white.opacity(0.8))
+              .foregroundColor(Color.tmiTextSecondary)
               .multilineTextAlignment(.center)
               .padding(.horizontal, 30)
             }
@@ -435,7 +435,7 @@ struct SupportResourceCard: View {
             HStack {
               Text(title)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               if isEmergency {
                 Text("URGENT")
@@ -443,7 +443,7 @@ struct SupportResourceCard: View {
                   .padding(.horizontal, 6)
                   .padding(.vertical, 2)
                   .background(Color.red)
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
                   .cornerRadius(4)
               }
 
@@ -452,13 +452,13 @@ struct SupportResourceCard: View {
 
             Text(description)
               .font(.system(size: 14))
-              .foregroundColor(.white.opacity(0.8))
+              .foregroundColor(Color.tmiTextSecondary)
               .multilineTextAlignment(.leading)
           }
 
           Image(systemName: "arrow.right")
             .font(.system(size: 14))
-            .foregroundColor(.white.opacity(0.6))
+            .foregroundColor(Color.tmiTextSecondary)
         }
         .padding(.horizontal, 4)
       }

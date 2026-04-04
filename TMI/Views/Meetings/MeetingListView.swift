@@ -39,7 +39,7 @@ struct MeetingListView: View {
                 HStack(spacing: 12) {
                     Button(action: { showingCalendarView = true }) {
                         Image(systemName: "calendar")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                     }
 
                     Button(action: { showingCreateMeeting = true }) {
@@ -85,16 +85,16 @@ struct MeetingListView: View {
     private var searchBar: some View {
         HStack {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
 
             TextField("Search meetings...", text: $viewModel.searchText)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .autocorrectionDisabled()
 
             if !viewModel.searchText.isEmpty {
                 Button(action: { viewModel.searchText = "" }) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
             }
         }
@@ -278,15 +278,15 @@ struct MeetingListView: View {
         VStack(spacing: 16) {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.system(size: 60))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(Color.tmiTextTertiary)
 
             Text(viewModel.searchText.isEmpty ? "No meetings" : "No results")
                 .font(.title2.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text(viewModel.searchText.isEmpty ? "Create your first meeting to get started" : "Try adjusting your search or filters")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
 
             if viewModel.searchText.isEmpty {
@@ -296,7 +296,7 @@ struct MeetingListView: View {
                         Text("Create Meeting")
                     }
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .padding()
                     .background(Color.cyan.gradient)
                     .cornerRadius(12)
@@ -318,7 +318,7 @@ struct MeetingListView: View {
 
             Text("Loading meetings...")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
@@ -340,10 +340,10 @@ private struct FilterChip: View {
                 Text(title)
             }
             .font(.caption.bold())
-            .foregroundColor(isSelected ? .white : .white.opacity(0.7))
+            .foregroundColor(isSelected ? Color.tmiTextOnPrimary : Color.tmiTextSecondary)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.cyan : Color.white.opacity(0.1))
+            .background(isSelected ? Color.cyan : Color.tmiInputBackground)
             .cornerRadius(20)
         }
     }
@@ -363,11 +363,11 @@ private struct StatBox: View {
 
             Text(value)
                 .font(.title2.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
         }
         .frame(maxWidth: .infinity)
     }

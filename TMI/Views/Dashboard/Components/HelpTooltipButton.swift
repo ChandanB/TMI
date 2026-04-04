@@ -28,7 +28,7 @@ struct HelpTooltipButton: View {
             if showTooltip {
                 Text(message)
                     .font(.system(size: 13))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .padding(10)
                     .background(
                         RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.85))

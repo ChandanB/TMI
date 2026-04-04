@@ -404,11 +404,11 @@ struct TMIErrorBoundary<Content: View>: View {
 
                         Text("Something went wrong")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text(error.message)
                             .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(Color.tmiTextSecondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
 

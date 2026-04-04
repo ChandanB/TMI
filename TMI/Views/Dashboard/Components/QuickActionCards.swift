@@ -42,7 +42,7 @@ struct QuickActionCard: View {
                     if let badge = badge {
                         Text(badge)
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(

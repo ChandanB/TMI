@@ -50,7 +50,7 @@ struct StudentListFilterView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 }
             }
         }
@@ -79,11 +79,11 @@ struct StudentListFilterOptionCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(option.rawValue)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text(filterDescription)
                         .font(.system(size: 13))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .lineLimit(1)
                 }
 

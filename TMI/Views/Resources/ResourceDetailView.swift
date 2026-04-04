@@ -94,14 +94,14 @@ struct ResourceDetailView: View {
                         }
                     }) {
                         Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                     }
 
                     Button(action: {
                         showShareSheet = true
                     }) {
                         Image(systemName: "square.and.arrow.up")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                     }
 
                     if onDelete != nil {
@@ -113,7 +113,7 @@ struct ResourceDetailView: View {
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                         }
                     }
                 }
@@ -169,7 +169,7 @@ struct ResourceDetailView: View {
             // Category icon (watermarked)
             Image(systemName: resource.category.icon)
                 .font(.system(size: 120))
-                .foregroundColor(.white.opacity(0.1))
+                .foregroundColor(Color.tmiTextTertiary)
                 .offset(x: 50, y: -30)
                 .rotationEffect(.degrees(-15))
             
@@ -184,19 +184,19 @@ struct ResourceDetailView: View {
                         Capsule()
                             .fill(Color.white.opacity(0.2))
                     )
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 // Title
                 Text(resource.title)
                     .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .lineLimit(3)
                 
                 // Quick metadata
                 HStack(spacing: 16) {
                     Label(formatDate(resource.createdAt), systemImage: "calendar")
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(Color.tmiTextSecondary)
                     
                     if resource.isFeatured {
                         Label("Featured", systemImage: "star.fill")
@@ -220,11 +220,11 @@ struct ResourceDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("About This Resource")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text(resource.description)
                     .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .lineSpacing(4)
             }
@@ -243,7 +243,7 @@ struct ResourceDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Resource Details")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 VStack(alignment: .leading, spacing: 12) {
                     MetadataRow(icon: "calendar", label: "Published", value: formatDate(resource.createdAt))
@@ -260,7 +260,7 @@ struct ResourceDetailView: View {
                                 .foregroundColor(.yellow)
                             Text("Featured Resource")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                         }
                     }
                 }
@@ -280,7 +280,7 @@ struct ResourceDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Tags")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -355,7 +355,7 @@ struct ResourceDetailView: View {
                 HStack {
                     Text("Related Careers")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     
                     Spacer()
                     
@@ -392,7 +392,7 @@ struct ResourceDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Related Resources")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 VStack(spacing: 12) {
                     ForEach(relatedResources.prefix(3), id: \.id) { relatedResource in
@@ -474,17 +474,17 @@ struct MetadataRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .frame(width: 20)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
                 
                 Text(value)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             
             Spacer()
@@ -506,12 +506,12 @@ struct CompactCareerCard: View {
                 
                 Text(career.field)
                     .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             
             Text(career.title)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
             
@@ -570,12 +570,12 @@ struct CompactResourceRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(resource.title)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .lineLimit(1)
                 
                 Text(resource.description)
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .lineLimit(2)
             }
             
@@ -583,7 +583,7 @@ struct CompactResourceRow: View {
             
             Image(systemName: "chevron.right")
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(Color.tmiTextTertiary)
         }
         .padding(.vertical, 8)
     }

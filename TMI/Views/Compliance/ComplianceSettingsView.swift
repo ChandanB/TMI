@@ -138,12 +138,12 @@ struct ComplianceSettingsView: View {
 
                     Text("Compliance Configuration")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
 
                 Text("Configure COPPA, FERPA, data retention, and audit logging settings for your district. These settings help ensure compliance with federal regulations.")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding()
@@ -164,10 +164,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $coppaEnabled.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Enable COPPA Compliance")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Require parental consent for students under minimum age")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 .tint(.cyan)
@@ -176,16 +176,16 @@ struct ComplianceSettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Minimum Age")
                             .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Stepper(value: $coppaMinimumAge.onChange { hasUnsavedChanges = true }, in: 10...18) {
                             Text("\(coppaMinimumAge) years")
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         Text("Students under this age require parental consent")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     .padding(.leading)
                 }
@@ -208,10 +208,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $ferpaEnabled.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Enable FERPA Compliance")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Protect student education records")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 .tint(.cyan)
@@ -220,10 +220,10 @@ struct ComplianceSettingsView: View {
                     Toggle(isOn: $requireParentalConsent.onChange { hasUnsavedChanges = true }) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Require Parental Consent")
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             Text("Require explicit consent for data collection")
                                 .font(.caption2)
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                     }
                     .tint(.cyan)
@@ -233,7 +233,7 @@ struct ComplianceSettingsView: View {
                         HStack {
                             Text("Consent Expiration")
                                 .font(.subheadline.bold())
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             Spacer()
 
@@ -258,13 +258,13 @@ struct ComplianceSettingsView: View {
                                 set: { consentExpirationDays = $0; hasUnsavedChanges = true }
                             ), in: 30...1825, step: 30) {
                                 Text("\(expirationDays) days (\(expirationDays / 365) year\(expirationDays / 365 == 1 ? "" : "s"))")
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .foregroundColor(Color.tmiTextSecondary)
                             }
                         }
 
                         Text(consentExpirationDays == nil ? "Consent never expires" : "Consent must be renewed periodically")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     .padding(.leading)
                 }
@@ -287,10 +287,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $dataRetentionEnabled.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Enable Data Retention Policy")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Automatically manage student data lifecycle")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 .tint(.cyan)
@@ -299,26 +299,26 @@ struct ComplianceSettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Retention Period")
                             .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Stepper(value: $retentionPolicyDays.onChange { hasUnsavedChanges = true }, in: 365...3650, step: 365) {
                             Text("\(retentionPolicyDays) days (\(retentionPolicyDays / 365) years)")
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         Text("Student data will be retained for this period after graduation/exit")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     .padding(.leading)
 
                     Toggle(isOn: $autoDeleteEnabled.onChange { hasUnsavedChanges = true }) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Auto-Delete After Retention Period")
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             Text(autoDeleteEnabled ? "⚠️ Data will be permanently deleted" : "Data will be flagged but not deleted")
                                 .font(.caption2)
-                                .foregroundColor(autoDeleteEnabled ? .orange : .white.opacity(0.6))
+                                .foregroundColor(autoDeleteEnabled ? .orange : Color.tmiTextSecondary)
                         }
                     }
                     .tint(.orange)
@@ -343,10 +343,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $auditLoggingEnabled.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Enable Audit Logging")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Track all sensitive operations")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 .tint(.cyan)
@@ -355,26 +355,26 @@ struct ComplianceSettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Audit Log Retention")
                             .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Stepper(value: $auditRetentionDays.onChange { hasUnsavedChanges = true }, in: 365...3650, step: 365) {
                             Text("\(auditRetentionDays) days (\(auditRetentionDays / 365) years)")
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         Text("Audit logs will be retained for compliance purposes")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     .padding(.leading)
 
                     Toggle(isOn: $logSensitiveOperations.onChange { hasUnsavedChanges = true }) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Log Sensitive Operations")
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             Text("Track data exports, deletions, and access")
                                 .font(.caption2)
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                     }
                     .tint(.cyan)
@@ -399,10 +399,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $requireConsentForSurveys.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Require Consent for Surveys")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Students must have consent to participate in surveys")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 .tint(.cyan)
@@ -410,10 +410,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $requireConsentForDataSharing.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Require Consent for Data Sharing")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Explicit consent needed to share data with partners")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 .tint(.cyan)
@@ -421,10 +421,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $allowDataExport.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Allow Data Export")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Users can export their student data")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 .tint(.cyan)
@@ -432,10 +432,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $allowThirdPartyIntegrations.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Allow Third-Party Integrations")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text(allowThirdPartyIntegrations ? "⚠️ May share data with external services" : "Third-party integrations disabled")
                             .font(.caption2)
-                            .foregroundColor(allowThirdPartyIntegrations ? .orange : .white.opacity(0.6))
+                            .foregroundColor(allowThirdPartyIntegrations ? .orange : Color.tmiTextSecondary)
                     }
                 }
                 .tint(.orange)
@@ -458,10 +458,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $notifyOnDataAccess.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Notify on Data Access")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Alert when student records are viewed")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 .tint(.cyan)
@@ -469,10 +469,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $notifyOnDataExport.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Notify on Data Export")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Alert when student data is exported")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 .tint(.cyan)
@@ -480,10 +480,10 @@ struct ComplianceSettingsView: View {
                 Toggle(isOn: $notifyParentsOnMajorChanges.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Notify Parents on Major Changes")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Alert parents when significant changes are made")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 .tint(.cyan)
@@ -501,12 +501,12 @@ struct ComplianceSettingsView: View {
                     .foregroundColor(.cyan)
                 Text(title)
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
 
             Text(description)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -519,7 +519,7 @@ struct ComplianceSettingsView: View {
 
                 Text(message)
                     .font(.caption)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
             }
@@ -535,7 +535,7 @@ struct ComplianceSettingsView: View {
 
             Text("Loading compliance settings...")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
     }
 

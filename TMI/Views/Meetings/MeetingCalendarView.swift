@@ -67,7 +67,7 @@ struct MeetingCalendarView: View {
         HStack {
             Button(action: previousMonth) {
                 Image(systemName: "chevron.left")
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .padding(8)
                     .background(Circle().fill(Color.tmiSurface))
             }
@@ -76,13 +76,13 @@ struct MeetingCalendarView: View {
 
             Text(currentMonth.formatted(.dateTime.month(.wide).year()))
                 .font(.title2.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Spacer()
 
             Button(action: nextMonth) {
                 Image(systemName: "chevron.right")
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .padding(8)
                     .background(Circle().fill(Color.tmiSurface))
             }
@@ -97,7 +97,7 @@ struct MeetingCalendarView: View {
             ForEach(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], id: \.self) { day in
                 Text(day)
                     .font(.caption.bold())
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .frame(height: 30)
             }
         }
@@ -131,7 +131,7 @@ struct MeetingCalendarView: View {
             VStack(spacing: 4) {
                 Text("\(calendar.component(.day, from: date))")
                     .font(.subheadline.bold())
-                    .foregroundColor(isToday ? .cyan : .white)
+                    .foregroundColor(isToday ? .cyan : Color.tmiTextPrimary)
 
                 if !meetingsForDate.isEmpty {
                     HStack(spacing: 2) {
@@ -166,20 +166,20 @@ struct MeetingCalendarView: View {
             HStack {
                 Text(date.formatted(date: .complete, time: .omitted))
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
                 Text("\(dayMeetings.count) \(dayMeetings.count == 1 ? "meeting" : "meetings")")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             .padding(.horizontal)
 
             if dayMeetings.isEmpty {
                 Text("No meetings scheduled")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(Color.tmiTextTertiary)
                     .frame(maxWidth: .infinity)
                     .padding()
             } else {
@@ -260,7 +260,7 @@ private struct CalendarMeetingCard: View {
 
                 Text(meeting.title)
                     .font(.subheadline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .lineLimit(1)
 
                 if let location = meeting.location {
@@ -269,7 +269,7 @@ private struct CalendarMeetingCard: View {
                         Text(location)
                     }
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
                 }
             }
 

@@ -142,11 +142,11 @@ struct TMIPlanDetailView: View {
                 VStack(spacing: 2) {
                     Text(plan.model.shortDisplayName)
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text("\(plan.students.count) student\(plan.students.count == 1 ? "" : "s")")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
             }
 
@@ -183,7 +183,7 @@ struct TMIPlanDetailView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 22))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
             }
         }
@@ -346,11 +346,11 @@ struct TMIPlanDetailView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(plan.model.rawValue)
                         .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text(plan.model.description)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -372,7 +372,7 @@ struct TMIPlanDetailView: View {
                         .foregroundColor(.tmiWarning)
                     Text("Next Action")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .textCase(.uppercase)
                         .tracking(0.5)
                 }
@@ -380,7 +380,7 @@ struct TMIPlanDetailView: View {
                 VStack(alignment: .leading, spacing: TMISpacing.sm) {
                     Text(nextActionText)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     // Show action button if relevant
@@ -392,7 +392,7 @@ struct TMIPlanDetailView: View {
                                 Text("Schedule Check-In")
                                     .font(.system(size: 15, weight: .semibold))
                             }
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                             .padding(.horizontal, TMISpacing.md)
                             .padding(.vertical, TMISpacing.sm)
                             .background(
@@ -419,7 +419,7 @@ struct TMIPlanDetailView: View {
             VStack(alignment: .leading, spacing: TMISpacing.sm) {
                 Text("Students in this plan")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: TMISpacing.sm) {
@@ -481,10 +481,10 @@ struct TMIPlanDetailView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(section.title)
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     Text(section.description)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
 
                 Spacer()
@@ -644,7 +644,7 @@ struct TMIPlanDetailView: View {
                 }
                 Text("Add updates and evidence for this section.")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
         }
     }
@@ -655,7 +655,7 @@ struct TMIPlanDetailView: View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
             Text("Plan Inputs")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(Color.tmiTextSecondary)
                 .textCase(.uppercase)
                 .tracking(0.5)
 
@@ -663,7 +663,7 @@ struct TMIPlanDetailView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(field)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     if shouldUseMultilineField(field) {
                         TextEditor(text: bindingForInput(field))
@@ -714,12 +714,12 @@ struct TMIPlanDetailView: View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
             Text(title)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             if items.wrappedValue.isEmpty {
                 Text("No items yet.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
 
             ForEach(items) { item in
@@ -739,13 +739,13 @@ struct TMIPlanDetailView: View {
                         }
                     }) {
                         Image(systemName: item.isComplete.wrappedValue ? "checkmark.circle.fill" : "circle")
-                            .foregroundColor(item.isComplete.wrappedValue ? .tmiSuccess : .white.opacity(0.6))
+                            .foregroundColor(item.isComplete.wrappedValue ? .tmiSuccess : Color.tmiTextTertiary)
                     }
                     .buttonStyle(.plain)
 
                     TextField("Item", text: item.title)
                         .textInputAutocapitalization(.sentences)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Spacer()
 
@@ -754,7 +754,7 @@ struct TMIPlanDetailView: View {
                         items.wrappedValue.removeAll { $0.id == itemId }
                     }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(Color.tmiTextTertiary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -809,19 +809,19 @@ struct TMIPlanDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Current streak")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                     Text("\(streakCount) days")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Best streak")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                     Text("\(bestStreak) days")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
 
                 Spacer()
@@ -830,7 +830,7 @@ struct TMIPlanDetailView: View {
             if let lastStreakDate {
                 Text("Last completed: \(formattedDate(lastStreakDate))")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
 
             HStack(spacing: 12) {
@@ -844,7 +844,7 @@ struct TMIPlanDetailView: View {
                         Text("Mark Today Complete")
                     }
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(Capsule().fill(modelColor))
@@ -856,7 +856,7 @@ struct TMIPlanDetailView: View {
                 }) {
                     Text("Reset")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
                 .buttonStyle(.plain)
             }
@@ -868,11 +868,11 @@ struct TMIPlanDetailView: View {
             if plan.notes.isEmpty {
                 Text("No notes yet. Add key observations for the team.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             } else {
                 Text(plan.notes)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
 
             Button(action: { showingEditSheet = true }) {
@@ -896,7 +896,7 @@ struct TMIPlanDetailView: View {
                         .tint(.tmiPrimary)
                     Text("Loading interests...")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                     Spacer()
                 }
                 .padding(.vertical, TMISpacing.md)
@@ -916,7 +916,7 @@ struct TMIPlanDetailView: View {
                 VStack(alignment: .leading, spacing: TMISpacing.sm) {
                     Text("No interests captured yet.")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     Button(action: { showingCompleteSurvey = true }) {
                         HStack(spacing: 6) {
@@ -955,7 +955,7 @@ struct TMIPlanDetailView: View {
         return VStack(alignment: .leading, spacing: TMISpacing.sm) {
             Text(title)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             HStack(spacing: 12) {
                 Slider(value: valueBinding, in: 1...5, step: 1)
@@ -963,7 +963,7 @@ struct TMIPlanDetailView: View {
 
                 Text("\(Int(valueBinding.wrappedValue))/5")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .frame(width: 46)
             }
 
@@ -1009,12 +1009,12 @@ struct TMIPlanDetailView: View {
         return VStack(alignment: .leading, spacing: TMISpacing.sm) {
             Text(title)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             if entries.isEmpty {
                 Text("No ratings logged yet.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             } else {
                 Chart(entries) { entry in
                     LineMark(
@@ -1037,27 +1037,27 @@ struct TMIPlanDetailView: View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
             Text(title)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             if incidentLogs.isEmpty {
                 Text("No incidents logged yet.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             } else {
                 ForEach(incidentLogs) { entry in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(entry.summary)
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             Spacer()
                             Text(formattedDate(entry.date))
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                         Text(entry.details)
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                         Text("Severity: \(entry.severity)/5")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.tmiWarning)
@@ -1086,7 +1086,7 @@ struct TMIPlanDetailView: View {
                         .tint(.tmiWarning)
                     Text("\(Int(newIncidentSeverity))/5")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .frame(width: 40)
                 }
 
@@ -1131,7 +1131,7 @@ struct TMIPlanDetailView: View {
             if thoughtLogs.isEmpty {
                 Text("No thought logs yet.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             } else {
                 ForEach(thoughtLogs) { entry in
                     VStack(alignment: .leading, spacing: 4) {
@@ -1140,13 +1140,13 @@ struct TMIPlanDetailView: View {
                             .foregroundColor(.tmiWarning)
                         Text(entry.thought)
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Text("Reframe: \(entry.reframe)")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                         Text("Action: \(entry.action)")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     .padding(10)
                     .background(Color.white.opacity(0.05))
@@ -1224,12 +1224,12 @@ struct TMIPlanDetailView: View {
             if reframeBank.isEmpty {
                 Text("No replacement thoughts added yet.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             } else {
                 ForEach(reframeBank) { entry in
                     Text(entry.text)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .padding(8)
                         .background(Color.white.opacity(0.05))
                         .cornerRadius(TMIRadius.sm)
@@ -1262,7 +1262,7 @@ struct TMIPlanDetailView: View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
             Text(title)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             HStack(spacing: 16) {
                 Button(action: { teacherTallyCount = max(0, teacherTallyCount - 1) }) {
@@ -1274,7 +1274,7 @@ struct TMIPlanDetailView: View {
 
                 Text("\(teacherTallyCount)")
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Button(action: { teacherTallyCount += 1 }) {
                     Image(systemName: "plus.circle.fill")
@@ -1291,12 +1291,12 @@ struct TMIPlanDetailView: View {
             if ifThenRules.isEmpty {
                 Text("No If-Then rules added yet.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             } else {
                 ForEach(ifThenRules) { rule in
                     Text(rule.text)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .padding(8)
                         .background(Color.white.opacity(0.05))
                         .cornerRadius(TMIRadius.sm)
@@ -1329,7 +1329,7 @@ struct TMIPlanDetailView: View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
             Text("Coach scripts")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .textCase(.uppercase)
 
             ForEach(modelStrategies, id: \.self) { strategy in
@@ -1343,7 +1343,7 @@ struct TMIPlanDetailView: View {
             HStack {
                 Text("Progress")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(Color.tmiTextSecondary)
                 Spacer()
                 Text("\(plan.progressPercentage)%")
                     .font(.system(size: 14, weight: .bold))
@@ -1378,22 +1378,22 @@ struct TMIPlanDetailView: View {
             if feedbackEntries.isEmpty {
                 Text("No feedback yet.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             } else {
                 ForEach(feedbackEntries) { entry in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(entry.from)
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             Spacer()
                             Text(formattedDate(entry.date))
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                         Text(entry.note)
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     .padding(10)
                     .background(Color.white.opacity(0.05))
@@ -1447,17 +1447,17 @@ struct TMIPlanDetailView: View {
             if incidentLogs.isEmpty {
                 Text("No history logged yet.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             } else {
                 ForEach(incidentLogs) { entry in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(entry.summary)
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             Text(formattedDate(entry.date))
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                         Spacer()
                         Text("S\(entry.severity)")
@@ -1480,12 +1480,12 @@ struct TMIPlanDetailView: View {
             if scripts.isEmpty {
                 Text("No scripts added yet.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             } else {
                 ForEach(scripts) { script in
                     Text(script.text)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .padding(8)
                         .background(Color.white.opacity(0.05))
                         .cornerRadius(TMIRadius.sm)
@@ -1519,17 +1519,17 @@ struct TMIPlanDetailView: View {
             if allies.isEmpty {
                 Text("No allies added yet.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             } else {
                 ForEach(allies) { ally in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(ally.name)
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             Text(ally.role)
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                         Spacer()
                     }
@@ -1580,7 +1580,7 @@ struct TMIPlanDetailView: View {
 
                 Text("What They Care About")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
@@ -1615,7 +1615,7 @@ struct TMIPlanDetailView: View {
                         .tint(.tmiPrimary)
                     Text("Loading interests...")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                     Spacer()
                 }
                 .padding(TMISpacing.lg)
@@ -1652,11 +1652,11 @@ struct TMIPlanDetailView: View {
 
                     Text("No Interests Identified")
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text("This plan needs student interests to be effective. Complete the interest survey with \(plan.primaryStudent?.name ?? "the student") to personalize their pathway.")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -1666,7 +1666,7 @@ struct TMIPlanDetailView: View {
                             Text("Complete Interest Survey")
                         }
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .padding(.horizontal, TMISpacing.lg)
                         .padding(.vertical, TMISpacing.md)
                         .background(
@@ -1705,7 +1705,7 @@ struct TMIPlanDetailView: View {
 
                 Text("Resources")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
@@ -1737,11 +1737,11 @@ struct TMIPlanDetailView: View {
 
                     Text("No Resources Added")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text("Add resources to support this plan.")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     Button(action: { showingAddResource = true }) {
                         HStack(spacing: 8) {
@@ -1805,14 +1805,14 @@ struct TMIPlanDetailView: View {
 
                 Text("Intervention Strategies")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
             }
 
             Text("For Educators")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .textCase(.uppercase)
                 .tracking(0.5)
 
@@ -1845,7 +1845,7 @@ struct TMIPlanDetailView: View {
 
                 Text("Goals & Milestones")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
@@ -1857,7 +1857,7 @@ struct TMIPlanDetailView: View {
 
                     Text("Complete")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -1871,11 +1871,11 @@ struct TMIPlanDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Measuring: Behavioral Engagement & Academic Progress")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                 Text("Tracking on-task behavior, assignment completion, and positive peer interactions")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             .padding(TMISpacing.md)
             .background(
@@ -1888,7 +1888,7 @@ struct TMIPlanDetailView: View {
                 VStack(spacing: TMISpacing.sm) {
                     Text("No goals set for this plan")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     Button(action: { showingAddGoal = true }) {
                         HStack(spacing: 6) {
@@ -1957,7 +1957,7 @@ struct TMIPlanDetailView: View {
 
                 Text("Scheduled Meetings")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
@@ -1987,7 +1987,7 @@ struct TMIPlanDetailView: View {
                         .tint(.white)
                     Text("Loading meetings...")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
                 .padding(TMISpacing.lg)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -1995,7 +1995,7 @@ struct TMIPlanDetailView: View {
                 VStack(spacing: TMISpacing.sm) {
                     Text("No meetings scheduled")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     Button(action: { showingScheduleMeeting = true }) {
                         HStack(spacing: 6) {
@@ -2060,7 +2060,7 @@ struct TMIPlanDetailView: View {
 
                 Text("Team Collaboration")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
             }
@@ -2068,12 +2068,12 @@ struct TMIPlanDetailView: View {
             if plan.notes.isEmpty {
                 Text("No collaboration notes yet")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .padding(TMISpacing.lg)
             } else {
                 Text(plan.notes)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .lineSpacing(4)
                     .padding(TMISpacing.md)
                     .background(
@@ -2226,7 +2226,7 @@ struct TMIPlanDetailView: View {
                     .foregroundColor(.tmiSecondary)
                 Text("Plan Identity")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .textCase(.uppercase)
             }
 
@@ -2243,7 +2243,7 @@ struct TMIPlanDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Sections")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
                     ForEach(rules.sections, id: \.title) { section in
                         HStack(spacing: 6) {
@@ -2252,7 +2252,7 @@ struct TMIPlanDetailView: View {
                                 .foregroundColor(.tmiSecondary)
                             Text(section.title)
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                                 .lineLimit(1)
                         }
                         .padding(.horizontal, 10)
@@ -2272,10 +2272,10 @@ struct TMIPlanDetailView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title.uppercased())
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
             Text(value)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2881,7 +2881,7 @@ struct MeetingCard: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(meeting.title)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 4) {
@@ -2890,7 +2890,7 @@ struct MeetingCard: View {
                         Text(formattedDate(meeting.startTime))
                             .font(.system(size: 12, weight: .medium))
                     }
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
@@ -2898,7 +2898,7 @@ struct MeetingCard: View {
                         Text("\(formattedTime(meeting.startTime)) - \(formattedTime(meeting.endTime))")
                             .font(.system(size: 12, weight: .medium))
                     }
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                     if let location = meeting.location {
                         HStack(spacing: 4) {
@@ -2907,7 +2907,7 @@ struct MeetingCard: View {
                             Text(location)
                                 .font(.system(size: 12, weight: .medium))
                         }
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
 
@@ -2930,7 +2930,7 @@ struct MeetingCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Participants:")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     HStack(spacing: 6) {
                         ForEach(meeting.participants.prefix(3)) { participant in
@@ -2940,7 +2940,7 @@ struct MeetingCard: View {
                                 Text(participant.name)
                                     .font(.system(size: 11))
                             }
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(Color.tmiTextSecondary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .background(
@@ -2952,7 +2952,7 @@ struct MeetingCard: View {
                         if meeting.participants.count > 3 {
                             Text("+\(meeting.participants.count - 3)")
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                     }
                 }
@@ -2999,11 +2999,11 @@ struct StudentMiniCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(student.name)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Text("Grade \(student.grade)")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
         }
         .padding(.horizontal, 12)
@@ -3041,7 +3041,7 @@ struct InterestCard: View {
 
             Text(interest.name)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -3070,7 +3070,7 @@ struct TMIPlanResourceCard: View {
 
                 Text(interest.name)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
             }
@@ -3078,10 +3078,10 @@ struct TMIPlanResourceCard: View {
             HStack(spacing: 8) {
                 Image(systemName: "tray")
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(Color.tmiTextTertiary)
                 Text("Resources coming soon")
                     .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(Color.tmiTextTertiary)
             }
         }
         .padding(TMISpacing.md)
@@ -3110,7 +3110,7 @@ struct StrategyRow: View {
 
             Text(strategy)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(Color.tmiTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer()
@@ -3133,13 +3133,13 @@ struct GoalCard: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(goal.description)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let dueDate = goal.dueDate {
                         Text("Due: \(formattedDate(dueDate))")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
 
@@ -3153,7 +3153,7 @@ struct GoalCard: View {
                 HStack {
                     Text("Progress")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     Spacer()
 

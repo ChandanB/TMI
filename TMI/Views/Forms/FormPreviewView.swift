@@ -40,12 +40,12 @@ struct FormPreviewView: View {
                   VStack(spacing: 12) {
                     Text(currentSection.title)
                       .font(.title2.bold())
-                      .foregroundColor(.white)
+                      .foregroundColor(Color.tmiTextPrimary)
                     
                     if let description = currentSection.description, !description.isEmpty {
                       Text(description)
                         .font(.body)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .multilineTextAlignment(.center)
                     }
                   }
@@ -117,7 +117,7 @@ struct FormPreviewView: View {
           Button("Close") {
             dismiss()
           }
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
       }
   }

@@ -135,16 +135,16 @@ struct ConsentManagementView: View {
     private var searchBar: some View {
         HStack {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
 
             TextField("Search students...", text: $searchText)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .autocorrectionDisabled()
 
             if !searchText.isEmpty {
                 Button(action: { searchText = "" }) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
             }
         }
@@ -169,10 +169,10 @@ struct ConsentManagementView: View {
                             Text(filter.rawValue)
                         }
                         .font(.caption.bold())
-                        .foregroundColor(selectedFilter == filter ? .white : .white.opacity(0.7))
+                        .foregroundColor(selectedFilter == filter ? Color.tmiTextOnPrimary : Color.tmiTextSecondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(selectedFilter == filter ? Color.cyan : Color.white.opacity(0.1))
+                        .background(selectedFilter == filter ? Color.cyan : Color.tmiInputBackground)
                         .cornerRadius(20)
                     }
                 }
@@ -192,13 +192,13 @@ struct ConsentManagementView: View {
                 HStack {
                     Text("Consent Overview")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Spacer()
 
                     Text("\(stats.total) students")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
 
                 HStack(spacing: 20) {
@@ -257,15 +257,15 @@ struct ConsentManagementView: View {
         VStack(spacing: 16) {
             Image(systemName: "person.crop.circle.badge.questionmark")
                 .font(.system(size: 60))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(Color.tmiTextTertiary)
 
             Text(searchText.isEmpty ? "No students found" : "No results")
                 .font(.title2.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text(searchText.isEmpty ? "Students will appear here" : "Try adjusting your search or filters")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -282,7 +282,7 @@ struct ConsentManagementView: View {
 
             Text("Loading consent records...")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
@@ -378,7 +378,7 @@ private struct StudentConsentCard: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(student.name)
                             .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         HStack(spacing: 4) {
                             Image(systemName: "graduationcap")
@@ -387,7 +387,7 @@ private struct StudentConsentCard: View {
                             Text("\(student.age) years old")
                         }
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                         if let summary = consentSummary {
                             HStack(spacing: 4) {
@@ -395,7 +395,7 @@ private struct StudentConsentCard: View {
                                 Text("\(summary.activeConsents) of \(StudentConsent.ConsentType.allCases.count) active")
                             }
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                         }
                     }
 
@@ -405,7 +405,7 @@ private struct StudentConsentCard: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         Text(statusText)
                             .font(.caption2.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(statusColor)
@@ -413,7 +413,7 @@ private struct StudentConsentCard: View {
 
                         Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(Color.tmiTextTertiary)
                     }
                 }
                 .padding()
@@ -436,7 +436,7 @@ private struct StatBox: View {
 
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -534,16 +534,16 @@ struct StudentConsentDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(student.name)
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text("Grade \(student.grade) • \(student.age) years old")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     if let summary = consentSummary {
                         Text("\(summary.activeConsents) of \(StudentConsent.ConsentType.allCases.count) consents active")
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
 
@@ -616,11 +616,11 @@ private struct ConsentTypeCard: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(consentType.displayName)
                             .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text(consentType.description)
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
@@ -633,7 +633,7 @@ private struct ConsentTypeCard: View {
 
                 Text(statusText)
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                 if let consent = consent {
                     HStack(spacing: 12) {
@@ -643,7 +643,7 @@ private struct ConsentTypeCard: View {
                                 Text(grantedByName)
                             }
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         if let grantedAt = consent.grantedAt {
@@ -652,7 +652,7 @@ private struct ConsentTypeCard: View {
                                 Text(grantedAt.formatted(date: .abbreviated, time: .omitted))
                             }
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                         }
                     }
                 }
@@ -662,7 +662,7 @@ private struct ConsentTypeCard: View {
                         Button(action: onRevoke) {
                             Text("Revoke")
                                 .font(.caption.bold())
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
                                 .background(Color.red.opacity(0.8))
@@ -672,7 +672,7 @@ private struct ConsentTypeCard: View {
                         Button(action: onGrant) {
                             Text("Grant Consent")
                                 .font(.caption.bold())
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
                                 .background(Color.green.opacity(0.8))
@@ -716,11 +716,11 @@ private struct GrantConsentView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text(consentType.displayName)
                                     .font(.headline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
 
                                 Text(consentType.description)
                                     .font(.caption)
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Color.tmiTextSecondary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             .padding()
@@ -730,25 +730,25 @@ private struct GrantConsentView: View {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("Granted By")
                                     .font(.subheadline.bold())
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
 
                                 TextField("Parent/Guardian Name", text: $grantedByName)
                                     .textFieldStyle(.plain)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
                                     .padding()
                                     .background(Color.white.opacity(0.1))
                                     .cornerRadius(8)
 
                                 Toggle(isOn: $expirationEnabled) {
                                     Text("Set Expiration Date")
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Color.tmiTextPrimary)
                                 }
                                 .tint(.cyan)
 
                                 if expirationEnabled {
                                     Stepper(value: $expirationDays, in: 30...1825, step: 30) {
                                         Text("\(expirationDays) days (\(expirationDays / 365) year\(expirationDays / 365 == 1 ? "" : "s"))")
-                                            .foregroundColor(.white.opacity(0.8))
+                                            .foregroundColor(Color.tmiTextSecondary)
                                     }
                                 }
                             }
@@ -762,7 +762,7 @@ private struct GrantConsentView: View {
                                         .foregroundColor(.orange)
                                     Text(errorMessage)
                                         .font(.caption)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Color.tmiTextPrimary)
                                 }
                                 .padding()
                             }

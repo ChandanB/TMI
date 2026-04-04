@@ -32,7 +32,7 @@ struct StudentCard: View {
             case .failure:
               Text(studentInitials)
                 .font(.system(size: 32, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .frame(width: 80, height: 80)
                 .background(
                   LinearGradient(
@@ -53,7 +53,7 @@ struct StudentCard: View {
         } else {
           Text(studentInitials)
             .font(.system(size: 32, weight: .bold))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .frame(width: 80, height: 80)
             .background(
               LinearGradient(
@@ -72,14 +72,14 @@ struct StudentCard: View {
         // Student Name
         Text(student.name)
           .font(.headline)
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .lineLimit(1)
           .minimumScaleFactor(0.8)
 
         // Grade
         Text("Grade \(student.grade)")
           .font(.subheadline)
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(Color.tmiTextSecondary)
 
         // Engagement Score Indicator
         EngagementBar(engagementScore: student.engagementScore)
@@ -102,7 +102,7 @@ struct EngagementBar: View {
     HStack {
       Text("Engagement")
         .font(.caption)
-        .foregroundColor(.white.opacity(0.7))
+        .foregroundColor(Color.tmiTextSecondary)
       Spacer()
 
       ProgressView(value: engagementScore)

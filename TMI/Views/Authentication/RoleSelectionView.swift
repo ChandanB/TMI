@@ -223,12 +223,12 @@ struct TraumaInformedWelcomeSection: View {
 
       Text("Welcome to TMI")
         .font(.system(size: 28, weight: .bold, design: .rounded))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
         .multilineTextAlignment(.center)
 
       Text("A safe space for learning and growth")
         .font(.system(size: 16))
-        .foregroundColor(.white.opacity(0.8))
+        .foregroundColor(Color.tmiTextSecondary)
         .multilineTextAlignment(.center)
 
       VStack(spacing: 8) {
@@ -236,7 +236,7 @@ struct TraumaInformedWelcomeSection: View {
           "Help us understand how you'll be using TMI so we can provide the right protections and support for you."
         )
         .font(.system(size: 14))
-        .foregroundColor(.white.opacity(0.7))
+        .foregroundColor(Color.tmiTextSecondary)
         .multilineTextAlignment(.center)
         .padding(.horizontal, 20)
 
@@ -318,7 +318,7 @@ struct RoleSelectionGrid: View {
       VStack(spacing: 20) {
         Text("I am a...")
           .font(.system(size: 20, weight: .semibold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
 
         LazyVGrid(
           columns: [
@@ -360,18 +360,18 @@ struct SimplifiedRoleSelectionCard: View {
         // Role icon
         Image(systemName: category.iconName)
           .font(.system(size: 28))
-          .foregroundColor(isSelected ? Color.tmiPrimary : .white.opacity(0.8))
+          .foregroundColor(isSelected ? Color.tmiPrimary : Color.tmiTextTertiary)
 
         // Role name
         Text(category.displayName)
           .font(.system(size: 14, weight: .medium))
-          .foregroundColor(isSelected ? .white : .white.opacity(0.9))
+          .foregroundColor(isSelected ? Color.tmiTextPrimary : Color.tmiTextSecondary)
           .multilineTextAlignment(.center)
 
         // Role description
         Text(category.shortDescription)
           .font(.system(size: 11))
-          .foregroundColor(.white.opacity(0.6))
+          .foregroundColor(Color.tmiTextSecondary)
           .multilineTextAlignment(.center)
           .lineLimit(2)
       }
@@ -382,12 +382,12 @@ struct SimplifiedRoleSelectionCard: View {
       .background(
         RoundedRectangle(cornerRadius: 16)
           .fill(
-            isSelected ? Color.tmiSecondary.opacity(0.3) : Color.white.opacity(0.1)
+            isSelected ? Color.tmiSecondary.opacity(0.1) : Color.tmiSurface
           )
           .overlay(
             RoundedRectangle(cornerRadius: 16)
               .stroke(
-                isSelected ? Color.tmiSecondary : Color.white.opacity(0.2),
+                isSelected ? Color.tmiSecondary : Color.tmiBorder,
                 lineWidth: isSelected ? 2 : 1
               )
           )
@@ -415,7 +415,7 @@ struct InstitutionVerificationSection: View {
 
           Text("Connect with your institution")
             .font(.system(size: 16, weight: .medium))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
 
           Spacer()
         }
@@ -424,7 +424,7 @@ struct InstitutionVerificationSection: View {
           "To verify your role and provide appropriate access, we need to connect you with your educational institution."
         )
         .font(.system(size: 14))
-        .foregroundColor(.white.opacity(0.7))
+        .foregroundColor(Color.tmiTextSecondary)
         .multilineTextAlignment(.leading)
 
         TMITextField(
@@ -494,13 +494,13 @@ struct AgeVerificationView: View {
 
             Text("Age Verification")
               .font(.system(size: 24, weight: .bold))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
 
             Text(
               "We need to verify your age to ensure we provide the right protections and follow important privacy laws that keep you safe."
             )
             .font(.system(size: 16))
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(Color.tmiTextSecondary)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 30)
           }
@@ -510,7 +510,7 @@ struct AgeVerificationView: View {
             VStack(spacing: 20) {
               Text("What's your date of birth?")
                 .font(.system(size: 18, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               DatePicker(
                 "Date of Birth",
@@ -682,12 +682,12 @@ struct InstitutionCard: View {
           VStack(alignment: .leading, spacing: 4) {
             Text(institution.name)
               .font(.system(size: 16, weight: .medium))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
               .multilineTextAlignment(.leading)
 
             Text(institution.domain)
               .font(.system(size: 14))
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
 
             if institution.supportsSSOIntegration {
               HStack {
@@ -704,7 +704,7 @@ struct InstitutionCard: View {
 
           Image(systemName: "arrow.right")
             .font(.system(size: 14))
-            .foregroundColor(.white.opacity(0.6))
+            .foregroundColor(Color.tmiTextSecondary)
         }
         .padding(.horizontal, 4)
       }
@@ -726,7 +726,7 @@ struct RoleInformationSheet: View {
           VStack(spacing: 24) {
             Text("Why We Ask About Your Role")
               .font(.system(size: 24, weight: .bold))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
               .padding(.top, 20)
 
             VStack(spacing: 20) {
@@ -796,11 +796,11 @@ struct InfoCard: View {
         VStack(alignment: .leading, spacing: 8) {
           Text(title)
             .font(.system(size: 16, weight: .semibold))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
 
           Text(description)
             .font(.system(size: 14))
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(Color.tmiTextSecondary)
             .multilineTextAlignment(.leading)
         }
 

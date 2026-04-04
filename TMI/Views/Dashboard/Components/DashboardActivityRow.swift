@@ -28,11 +28,11 @@ struct DashboardActivityRow: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(activity.title)
           .font(.system(size: 15, weight: .semibold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
 
         Text(activity.description)
           .font(.system(size: 13))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(Color.tmiTextSecondary)
           .lineLimit(2)
       }
 
@@ -41,7 +41,7 @@ struct DashboardActivityRow: View {
       VStack(alignment: .trailing, spacing: 2) {
         Text(activity.timeAgo)
           .font(.system(size: 12, weight: .medium))
-          .foregroundColor(.white.opacity(0.5))
+          .foregroundColor(Color.tmiTextTertiary)
 
         if activity.showProgress {
           ProgressView(value: activity.progressValue)

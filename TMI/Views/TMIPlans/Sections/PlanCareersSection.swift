@@ -115,7 +115,7 @@ struct PlanCareersSection: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(.tint, in: RoundedRectangle(cornerRadius: 10))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.tmiTextPrimary)
             }
             .buttonStyle(.plain)
         }

@@ -142,11 +142,11 @@ struct ResourcesView: View {
       HStack(spacing: 6) {
         Image(systemName: "person.circle")
           .font(.system(size: 16, weight: .semibold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         if selectedStudent != nil {
           Text((selectedStudent?.name.components(separatedBy: " ").first) ?? "Student")
             .font(.system(size: 12))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
         }
       }
       .frame(height: 36)
@@ -178,7 +178,7 @@ struct ResourcesView: View {
         floatingAddButton
       }
       .navigationTitle("Resource Library")
-      .foregroundColor(.white)
+      .foregroundColor(Color.tmiTextPrimary)
       .navigationBarTitleDisplayMode(.large)
       .toolbarBackground(.hidden, for: .navigationBar)
       .toolbar {
@@ -208,7 +208,7 @@ struct ResourcesView: View {
           } label: {
             Image(systemName: "ellipsis.circle")
               .font(.system(size: 20))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
           }
         }
       }
@@ -282,7 +282,7 @@ struct ResourcesView: View {
     VStack(alignment: .leading, spacing: 16) {
       Text("Categories")
         .font(.system(size: 18, weight: .semibold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
 
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 12) {
@@ -325,7 +325,7 @@ struct ResourcesView: View {
     VStack(alignment: .leading, spacing: 16) {
       Text("Featured")
         .font(.system(size: 18, weight: .semibold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
         .padding(.horizontal, 20)
 
       ScrollView(.horizontal, showsIndicators: false) {
@@ -402,18 +402,18 @@ struct ResourcesView: View {
 
         Image(systemName: "books.vertical.fill")
           .font(.system(size: 80))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(Color.tmiTextSecondary)
       }
       .padding(.top, 40)
 
       Text("No Resources Found")
         .font(.system(size: 22, weight: .semibold, design: .rounded))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
 
       if stateModel.searchText.isEmpty && stateModel.selectedCategory == nil {
         Text("Add your first resource to build your library")
           .font(.system(size: 16))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(Color.tmiTextSecondary)
           .multilineTextAlignment(.center)
           .padding(.horizontal, 40)
 
@@ -433,13 +433,13 @@ struct ResourcesView: View {
             RoundedRectangle(cornerRadius: 12)
               .fill(Color.tmiSecondary)
           )
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
         .padding(.top, 10)
       } else {
         Text("Try changing your search or filter")
           .font(.system(size: 16))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(Color.tmiTextSecondary)
           .multilineTextAlignment(.center)
           .padding(.horizontal, 40)
 
@@ -460,7 +460,7 @@ struct ResourcesView: View {
             RoundedRectangle(cornerRadius: 12)
               .fill(Color.tmiSecondary)
           )
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
         .padding(.top, 10)
       }
@@ -479,7 +479,7 @@ struct ResourcesView: View {
 
         Text("For \((selectedStudent?.name.components(separatedBy: " ").first) ?? "You")")
           .font(.system(size: 18, weight: .semibold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
 
         Spacer()
 
@@ -545,16 +545,16 @@ struct CategoryButton: View {
       .padding(.vertical, 10)
       .background(
         RoundedRectangle(cornerRadius: 12)
-          .fill(isSelected ? color.opacity(0.2) : Color.white.opacity(0.05))
+          .fill(isSelected ? color.opacity(0.1) : Color.tmiInputBackground)
       )
       .overlay(
         RoundedRectangle(cornerRadius: 12)
           .stroke(
-            isSelected ? color.opacity(0.5) : Color.white.opacity(0.1),
+            isSelected ? color.opacity(0.5) : Color.tmiBorder,
             lineWidth: 1
           )
       )
-      .foregroundColor(isSelected ? color : .white.opacity(0.7))
+      .foregroundColor(isSelected ? color : Color.tmiTextSecondary)
     }
     .buttonStyle(.plain)
   }
@@ -585,7 +585,7 @@ struct FeaturedResourceCard: View {
       // Category icon (watermarked)
       Image(systemName: resource.category.icon)
         .font(.system(size: 80))
-        .foregroundColor(.white.opacity(0.1))
+        .foregroundColor(Color.tmiTextTertiary)
         .offset(x: -20, y: -20)
         .rotationEffect(.degrees(-15))
 
@@ -605,12 +605,12 @@ struct FeaturedResourceCard: View {
         // Title
         Text(resource.title)
           .font(.system(size: 20, weight: .bold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
 
         // Description
         Text(resource.description)
           .font(.system(size: 14))
-          .foregroundColor(.white.opacity(0.8))
+          .foregroundColor(Color.tmiTextSecondary)
           .lineLimit(2)
 
         // Tags
@@ -625,7 +625,7 @@ struct FeaturedResourceCard: View {
                   RoundedRectangle(cornerRadius: 6)
                     .fill(Color.white.opacity(0.1))
                 )
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(Color.tmiTextSecondary)
             }
 
             if resource.tags.count > 3 {
@@ -637,7 +637,7 @@ struct FeaturedResourceCard: View {
                   RoundedRectangle(cornerRadius: 6)
                     .fill(Color.white.opacity(0.1))
                 )
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(Color.tmiTextSecondary)
             }
           }
         }
@@ -753,7 +753,7 @@ struct PersonalizedResourceCard: View {
       // Category icon (watermarked)
       Image(systemName: resource.category.icon)
         .font(.system(size: 60))
-        .foregroundColor(.white.opacity(0.1))
+        .foregroundColor(Color.tmiTextTertiary)
         .offset(x: -15, y: -15)
         .rotationEffect(.degrees(-10))
 
@@ -773,13 +773,13 @@ struct PersonalizedResourceCard: View {
         // Title
         Text(resource.title)
           .font(.system(size: 16, weight: .bold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .lineLimit(2)
 
         // Description
         Text(resource.description)
           .font(.system(size: 13))
-          .foregroundColor(.white.opacity(0.8))
+          .foregroundColor(Color.tmiTextSecondary)
           .lineLimit(2)
 
         // Tags (top 2)
@@ -793,7 +793,7 @@ struct PersonalizedResourceCard: View {
                 RoundedRectangle(cornerRadius: 4)
                   .fill(Color.white.opacity(0.15))
               )
-              .foregroundColor(.white.opacity(0.9))
+              .foregroundColor(Color.tmiTextSecondary)
           }
 
           if resource.tags.count > 2 {
@@ -805,7 +805,7 @@ struct PersonalizedResourceCard: View {
                 RoundedRectangle(cornerRadius: 4)
                   .fill(Color.white.opacity(0.15))
               )
-              .foregroundColor(.white.opacity(0.9))
+              .foregroundColor(Color.tmiTextSecondary)
           }
         }
       }
@@ -886,15 +886,15 @@ struct AllStudentResourcesSheet: View {
           VStack(spacing: 20) {
             Image(systemName: "books.vertical")
               .font(.system(size: 50))
-              .foregroundColor(.white.opacity(0.3))
+              .foregroundColor(Color.tmiTextTertiary)
             
             Text("No Recommendations")
               .font(.title2)
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
             
             Text("We haven't found specific resource recommendations for \(student.name) yet. Check back after adding more student interests and assessment data.")
               .font(.body)
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
               .multilineTextAlignment(.center)
               .padding(.horizontal)
           }
@@ -918,7 +918,7 @@ struct AllStudentResourcesSheet: View {
           Button("Done") {
             dismiss()
           }
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
       }
     }

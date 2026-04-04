@@ -85,7 +85,7 @@ struct FormSubmissionsView: View {
                 if viewModel.isLoading {
                     Spacer()
                     ProgressView("Loading submissions...")
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     Spacer()
                 } else if let errorMessage = viewModel.errorMessage {
                     Spacer()
@@ -157,12 +157,12 @@ struct FormSubmissionCard: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(template?.name ?? "Unknown Form")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         
                         if let category = template?.category {
                             Text(category)
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Color.tmiTextSecondary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(
@@ -181,7 +181,7 @@ struct FormSubmissionCard: View {
                         
                         Text(submissionDate)
                             .font(.system(size: 10))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
                 
@@ -190,10 +190,10 @@ struct FormSubmissionCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.square")
                             .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                         Text("\(submissionDataCount) responses")
                             .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     
                     Spacer()
@@ -201,7 +201,7 @@ struct FormSubmissionCard: View {
                     if let submitterRole = submission.data["submitterRole"]?.value as? String {
                         Text(submitterRole.capitalized)
                             .font(.system(size: 10))
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(Color.tmiTextTertiary)
                     }
                 }
                 
@@ -246,11 +246,11 @@ struct FormSubmissionDetailView: View {
                                     VStack(alignment: .leading, spacing: 8) {
                                         Text(template?.name ?? "Form Submission")
                                             .font(.system(size: 20, weight: .bold, design: .rounded))
-                                            .foregroundColor(.white)
+                                            .foregroundColor(Color.tmiTextPrimary)
                                         
                                         Text("Submitted \(submissionDateFormatted)")
                                             .font(.system(size: 14))
-                                            .foregroundColor(.white.opacity(0.7))
+                                            .foregroundColor(Color.tmiTextSecondary)
                                     }
                                     
                                     Spacer()
@@ -263,7 +263,7 @@ struct FormSubmissionDetailView: View {
                                 if let template = template {
                                     Text(template.templateDescription)
                                         .font(.system(size: 14))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .foregroundColor(Color.tmiTextSecondary)
                                 }
                             }
                             .padding(20)
@@ -283,7 +283,7 @@ struct FormSubmissionDetailView: View {
                                 VStack(alignment: .leading, spacing: 16) {
                                     Text("Raw Submission Data")
                                         .font(.system(size: 18, weight: .bold, design: .rounded))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Color.tmiTextPrimary)
                                     
                                     ForEach(Array(submission.data.keys.sorted()), id: \.self) { key in
                                         if !["submittedBy", "submitterRole"].contains(key) {
@@ -308,7 +308,7 @@ struct FormSubmissionDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
             }
         }
@@ -331,7 +331,7 @@ struct FormSubmissionSectionView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text(section.title)
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 ForEach(section.fields, id: \.id) { field in
                     if let fieldId = field.id, 
@@ -353,11 +353,11 @@ struct SubmissionFieldView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(field.label)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(Color.tmiTextSecondary)
             
             Text(formattedValue)
                 .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(Color.tmiTextSecondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
@@ -404,13 +404,13 @@ struct SubmissionDataRow: View {
         HStack {
             Text(key)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(Color.tmiTextSecondary)
             
             Spacer()
             
             Text(String(describing: value ?? ""))
                 .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(Color.tmiTextSecondary)
         }
         .padding(.vertical, 4)
     }
@@ -421,15 +421,15 @@ struct EmptySubmissionsView: View {
         VStack(spacing: 16) {
             Image(systemName: "doc.text")
                 .font(.system(size: 48))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
             
             Text("No Form Submissions")
                 .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             Text("Form submissions will appear here once they are created.")
                 .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .padding()
@@ -448,11 +448,11 @@ struct ErrorView: View {
             
             Text("Error")
                 .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             Text(message)
                 .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
             
             TMIButton(text: "Retry", style: .secondary) {

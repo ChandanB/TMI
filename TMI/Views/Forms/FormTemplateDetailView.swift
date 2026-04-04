@@ -33,11 +33,11 @@ struct FormTemplateDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
               Text("Description")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               Text(template.templateDescription)
                 .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(Color.tmiTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
           }
@@ -111,7 +111,7 @@ struct FormTemplateDetailView: View {
         } label: {
           Image(systemName: "ellipsis")
             .font(.system(size: 20))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .frame(width: 40, height: 40)
         }
       }
@@ -147,33 +147,33 @@ struct FormTemplateDetailView: View {
           VStack(spacing: 4) {
             Text("\(template.sections.count)")
               .font(.system(size: 24, weight: .bold, design: .rounded))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
 
             Text("Sections")
               .font(.system(size: 14))
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
           }
 
           // Fields
           VStack(spacing: 4) {
             Text("\(template.sections.flatMap { $0.fields }.count)")
               .font(.system(size: 24, weight: .bold, design: .rounded))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
 
             Text("Fields")
               .font(.system(size: 14))
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
           }
 
           // Created
           VStack(spacing: 4) {
             Text(template.createdAt ?? Date(), style: .date)
               .font(.system(size: 16, weight: .medium))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
 
             Text("Created")
               .font(.system(size: 14))
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
           }
         }
       }
@@ -185,7 +185,7 @@ struct FormTemplateDetailView: View {
     VStack(alignment: .leading, spacing: 20) {
       Text("Form Structure")
         .font(.system(size: 20, weight: .semibold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
 
       ForEach(template.sections) { section in
         SectionPreviewCard(section: section)

@@ -32,11 +32,11 @@ struct DashboardInsightsView: View {
             VStack(alignment: .leading, spacing: 4) {
               Text("Student Insights")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               Text("Advanced analytics and recommendations")
                 .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
             }
 
             Spacer()
@@ -47,7 +47,7 @@ struct DashboardInsightsView: View {
               Image(systemName: "xmark")
                 .font(.system(size: 16, weight: .semibold))
                 .padding(8)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .background(
                   Circle()
                     .fill(Color.white.opacity(0.1))
@@ -62,7 +62,7 @@ struct DashboardInsightsView: View {
             VStack(alignment: .leading, spacing: 20) {
               Text("Performance Overview")
                 .font(.title3.weight(.semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               HStack(spacing: 16) {
                 StatCircle(
@@ -95,7 +95,7 @@ struct DashboardInsightsView: View {
             VStack(alignment: .leading, spacing: 16) {
               Text("Insights & Recommendations")
                 .font(.title3.weight(.semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               ForEach(recommendations) { recommendation in
                 RecommendationRow(recommendation: recommendation)
@@ -140,7 +140,7 @@ struct DashboardInsightsView: View {
                       .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
                   )
               )
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
             }
             .buttonStyle(ScaleButtonStyle())
 
@@ -182,7 +182,7 @@ struct DashboardInsightsView: View {
                     )
                   )
               )
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
             }
             .buttonStyle(ScaleButtonStyle())
           }
@@ -344,7 +344,7 @@ struct LegacyInsightsView: View {
               VStack(alignment: .leading, spacing: 16) {
                 Text("Legacy Recommendations")
                   .font(.title3.weight(.semibold))
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
 
                 ForEach(legacyRecommendations) { recommendation in
                   RecommendationRow(recommendation: recommendation)
@@ -367,7 +367,7 @@ struct LegacyInsightsView: View {
         Button("Done") {
           dismiss()
         }
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
       }
     }
   }

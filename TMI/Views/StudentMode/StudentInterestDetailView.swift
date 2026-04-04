@@ -70,7 +70,7 @@ struct StudentInterestDetailView: View {
                 VStack(spacing: 8) {
                     Text(interest.name)
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     if let description = interest.description {
                         Text(description)
@@ -112,13 +112,13 @@ struct StudentInterestDetailView: View {
 
                 Text("Classmates Who Like This Too")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
                 Text("\(peersWithInterest.count)")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(
@@ -151,7 +151,7 @@ struct StudentInterestDetailView: View {
                 VStack(spacing: 8) {
                     Text("You're the First!")
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text("None of your classmates have shared this interest yet. You're a pioneer!")
                         .font(.system(size: 14))
@@ -225,7 +225,7 @@ struct PeerRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(peer.firstName)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text("Grade \(peer.grade)")
                         .font(.system(size: 14))

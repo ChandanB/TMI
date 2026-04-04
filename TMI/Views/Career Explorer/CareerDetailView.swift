@@ -114,7 +114,7 @@ struct CareerDetailView: View {
         ToolbarItem(placement: .principal) {
           Text(career.title)
             .font(.headline)
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
         }
 
         ToolbarItem(placement: .navigationBarTrailing) {
@@ -124,7 +124,7 @@ struct CareerDetailView: View {
             }
           }) {
             Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
           }
         }
       }
@@ -247,7 +247,7 @@ struct CareerDetailView: View {
 
             Image(systemName: getCareerIcon(field: career.field))
               .font(.system(size: 32, weight: .medium))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
           }
           .opacity(animateContent ? 1 : 0)
           .scaleEffect(animateContent ? 1 : 0.6)
@@ -257,7 +257,7 @@ struct CareerDetailView: View {
             // Career title with enhanced typography
             Text(career.title)
               .font(.system(size: 32, weight: .bold, design: .rounded))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
               .opacity(animateContent ? 1 : 0)
               .offset(y: animateContent ? 0 : 30)
               .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.2), value: animateContent)
@@ -270,7 +270,7 @@ struct CareerDetailView: View {
               
               Text(career.field)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(Color.tmiTextSecondary)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -347,11 +347,11 @@ struct CareerDetailView: View {
             HStack(spacing: 8) {
               Image(systemName: icon)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(selectedTab == index ? .white : .white.opacity(0.6))
-              
+                .foregroundColor(selectedTab == index ? Color.tmiTextOnPrimary : Color.tmiTextSecondary)
+
               Text(tab)
                 .font(.system(size: 16, weight: selectedTab == index ? .semibold : .medium))
-                .foregroundColor(selectedTab == index ? .white : .white.opacity(0.7))
+                .foregroundColor(selectedTab == index ? Color.tmiTextOnPrimary : Color.tmiTextSecondary)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -406,7 +406,7 @@ struct CareerDetailView: View {
         
         Text(career.description)
           .font(.system(size: 16, weight: .regular))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .fixedSize(horizontal: false, vertical: true)
           .lineSpacing(6)
           .opacity(animateContent ? 1 : 0)
@@ -442,7 +442,7 @@ struct CareerDetailView: View {
         
         Text(career.jobOutlook)
           .font(.system(size: 16, weight: .regular))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .fixedSize(horizontal: false, vertical: true)
           .lineSpacing(6)
           .opacity(animateContent ? 1 : 0)
@@ -454,7 +454,7 @@ struct CareerDetailView: View {
           VStack(alignment: .leading, spacing: 4) {
             Text("Growth Potential")
               .font(.system(size: 14, weight: .medium))
-              .foregroundColor(.white.opacity(0.8))
+              .foregroundColor(Color.tmiTextSecondary)
             
             HStack(spacing: 4) {
               ForEach(0..<5) { i in
@@ -477,7 +477,7 @@ struct CareerDetailView: View {
           // Growth category badge
           Text(getGrowthCategory(outlook: career.jobOutlook))
             .font(.system(size: 14, weight: .semibold))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
@@ -526,7 +526,7 @@ struct CareerDetailView: View {
               HStack {
                 Text(item.0)
                   .font(.system(size: 16, weight: .medium))
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
                 
                 Spacer()
                 
@@ -591,7 +591,7 @@ struct CareerDetailView: View {
             Text("Create Personalized Plan")
               .font(.system(size: 16, weight: .semibold))
           }
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .frame(maxWidth: .infinity)
           .padding(.vertical, 16)
           .background(
@@ -641,7 +641,7 @@ struct CareerDetailView: View {
         
         Text("These intervention models can help students build skills for this career:")
           .font(.system(size: 14, weight: .regular))
-          .foregroundColor(.white.opacity(0.8))
+          .foregroundColor(Color.tmiTextSecondary)
           .fixedSize(horizontal: false, vertical: true)
         
         VStack(spacing: 12) {
@@ -704,7 +704,7 @@ struct CareerDetailView: View {
               
               Text(skill)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .lineLimit(2)
             }
             .padding(.vertical, 12)
@@ -761,7 +761,7 @@ struct CareerDetailView: View {
               Text(resource.name)
                 .font(.subheadline)
                 .fontWeight(.medium)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               Text(resource.description)
                 .font(.caption)
@@ -821,7 +821,7 @@ struct CareerDetailView: View {
                 VStack(spacing: 2) {
                   Text(trait.score)
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                   Text(trait.label)
                     .font(.caption2)
@@ -831,7 +831,7 @@ struct CareerDetailView: View {
 
               Text(trait.trait)
                 .font(.caption)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
@@ -850,7 +850,7 @@ struct CareerDetailView: View {
             Text("Take Full Assessment")
           }
           .font(.subheadline)
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .padding(.vertical, 12)
           .padding(.horizontal, 16)
           .background(
@@ -896,7 +896,7 @@ struct CareerDetailView: View {
 
         Text(career.education)
           .font(.body)
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .fixedSize(horizontal: false, vertical: true)
           .lineSpacing(4)
 
@@ -979,13 +979,13 @@ struct CareerDetailView: View {
 
                 Text(program.initials)
                   .font(.system(size: 20, weight: .bold))
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
               }
 
               VStack(alignment: .leading, spacing: 4) {
                 Text(program.name)
                   .font(.headline)
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
 
                 Text(program.institution)
                   .font(.subheadline)
@@ -1021,7 +1021,7 @@ struct CareerDetailView: View {
         }) {
           Text("Find More Schools")
             .font(.headline)
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .frame(maxWidth: .infinity)
             .padding()
             .background(
@@ -1173,7 +1173,7 @@ struct CareerDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
               Text(milestone.title)
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               Text(milestone.description)
                 .font(.subheadline)
@@ -1195,7 +1195,7 @@ struct CareerDetailView: View {
         }) {
           Text("Create Your Career Roadmap")
             .font(.headline)
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .frame(maxWidth: .infinity)
             .padding()
             .background(
@@ -1237,7 +1237,7 @@ struct CareerDetailView: View {
       HStack {
         Text("Related Careers")
           .font(.headline)
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
 
         Spacer()
 
@@ -1282,7 +1282,7 @@ struct CareerDetailView: View {
       HStack {
         Text("Helpful Resources")
           .font(.headline)
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
 
         Spacer()
 
@@ -1318,13 +1318,13 @@ struct CareerDetailView: View {
           .frame(width: 32, height: 32)
         
         Image(systemName: icon)
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .font(.system(size: 16, weight: .semibold))
       }
       
       Text(title)
         .font(.system(size: 20, weight: .bold, design: .rounded))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
       
       Spacer()
     }
@@ -1786,13 +1786,13 @@ struct CareerStatCard: View {
       VStack(spacing: 2) {
         Text(title)
           .font(.system(size: 16, weight: .bold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .lineLimit(1)
           .minimumScaleFactor(0.8)
         
         Text(subtitle)
           .font(.system(size: 12, weight: .medium))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(Color.tmiTextSecondary)
           .lineLimit(1)
       }
     }
@@ -1859,7 +1859,7 @@ struct RelatedCareerCard: View {
       Text(career.title)
         .font(.headline)
         .fontWeight(.semibold)
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
 
       Divider()
 
@@ -1877,7 +1877,7 @@ struct RelatedCareerCard: View {
         Spacer()
 
         Image(systemName: "arrow.right")
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
           .padding(8)
           .background(
             Circle()
@@ -1959,14 +1959,14 @@ struct SchoolFinderView: View {
                   Text("Find Your Perfect School")
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .opacity(animateContent ? 1 : 0)
                     .offset(y: animateContent ? 0 : 20)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8), value: animateContent)
 
                   Text("\(careerField) Programs")
                     .font(.headline)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .opacity(animateContent ? 1 : 0)
                     .offset(y: animateContent ? 0 : 20)
                     .animation(
@@ -1978,7 +1978,7 @@ struct SchoolFinderView: View {
 
                 Image(systemName: "building.columns.fill")
                   .font(.system(size: 60))
-                  .foregroundColor(.white.opacity(0.2))
+                  .foregroundColor(Color.tmiTextTertiary)
               }
               .padding(.horizontal, 20)
               .padding(.bottom, 20)
@@ -1988,7 +1988,7 @@ struct SchoolFinderView: View {
             VStack(alignment: .leading, spacing: 16) {
               Text("Search Programs")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
               HStack {
                 Image(systemName: "magnifyingglass")
@@ -2007,13 +2007,13 @@ struct SchoolFinderView: View {
               VStack(alignment: .leading, spacing: 16) {
                 Text("Filter Options")
                   .font(.headline)
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
 
                 // Program type filter
                 VStack(alignment: .leading, spacing: 8) {
                   Text("Program Type")
                     .font(.subheadline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                   programTypeFilterList
                 }
@@ -2022,7 +2022,7 @@ struct SchoolFinderView: View {
                 VStack(alignment: .leading, spacing: 8) {
                   Text("Location")
                     .font(.subheadline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                   locationFilterList
                 }
@@ -2031,7 +2031,7 @@ struct SchoolFinderView: View {
                 VStack(alignment: .leading, spacing: 8) {
                   Text("Format")
                     .font(.subheadline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                   formatFilterList
                 }
@@ -2043,7 +2043,7 @@ struct SchoolFinderView: View {
               }) {
                 Text("Search Programs")
                   .font(.headline)
-                  .foregroundColor(.white)
+                  .foregroundColor(Color.tmiTextPrimary)
                   .frame(maxWidth: .infinity)
                   .padding()
                   .background(
@@ -2092,7 +2092,7 @@ struct SchoolFinderView: View {
             presentationMode.wrappedValue.dismiss()
           }) {
             Image(systemName: "xmark")
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
           }
         }
       }
@@ -2208,13 +2208,13 @@ struct CareerResourceCard: View {
 
       Text(resource.title)
         .font(.system(size: 14, weight: .semibold))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
         .lineLimit(2)
         .multilineTextAlignment(.leading)
 
       Text(resource.description)
         .font(.system(size: 12))
-        .foregroundColor(.white.opacity(0.7))
+        .foregroundColor(Color.tmiTextSecondary)
         .lineLimit(2)
 
       HStack {
@@ -2227,7 +2227,7 @@ struct CareerResourceCard: View {
               Capsule()
                 .fill(Color.white.opacity(0.1))
             )
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(Color.tmiTextSecondary)
         }
         Spacer()
       }
@@ -2305,11 +2305,11 @@ struct TMIModuleCard: View {
       VStack(alignment: .leading, spacing: 6) {
         Text(model.model.rawValue)
           .font(.system(size: 16, weight: .semibold))
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         
         Text(model.reason)
           .font(.system(size: 14, weight: .regular))
-          .foregroundColor(.white.opacity(0.8))
+          .foregroundColor(Color.tmiTextSecondary)
           .fixedSize(horizontal: false, vertical: true)
       }
       
@@ -2370,7 +2370,7 @@ struct CareerResourcesView: View {
           Button("Done") {
             dismiss()
           }
-          .foregroundColor(.white)
+          .foregroundColor(Color.tmiTextPrimary)
         }
       }
   }

@@ -34,11 +34,11 @@ struct AddGoalView: View {
 
                         Text("Add Goal")
                             .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text("Set a specific, measurable goal for this TMI plan")
                             .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                             .multilineTextAlignment(.center)
                     }
                     .padding(.top, 20)
@@ -48,13 +48,13 @@ struct AddGoalView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Goal Description *")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             TextEditor(text: $goalDescription)
                                 .frame(minHeight: 100)
                                 .scrollContentBackground(.hidden)
                                 .background(Color.white.opacity(0.05))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                                 .font(.system(size: 16))
                                 .cornerRadius(8)
                                 .overlay(
@@ -62,7 +62,7 @@ struct AddGoalView: View {
                                     VStack {
                                         HStack {
                                             Text("e.g., Increase on-task behavior to 80% during independent work")
-                                                .foregroundColor(.white.opacity(0.5))
+                                                .foregroundColor(Color.tmiTextTertiary)
                                                 .font(.system(size: 16))
                                                 .allowsHitTesting(false)
                                             Spacer()
@@ -81,7 +81,7 @@ struct AddGoalView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Status")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             HStack(spacing: 12) {
                                 ForEach(GoalStatus.allCases, id: \.self) { status in
@@ -90,16 +90,16 @@ struct AddGoalView: View {
                                     }) {
                                         Text(status.rawValue)
                                             .font(.system(size: 14, weight: .medium))
-                                            .foregroundColor(selectedStatus == status ? .white : .white.opacity(0.7))
+                                            .foregroundColor(selectedStatus == status ? modelColor : Color.tmiTextSecondary)
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 10)
                                             .background(
                                                 Capsule()
-                                                    .fill(selectedStatus == status ? modelColor.opacity(0.3) : Color.white.opacity(0.1))
+                                                    .fill(selectedStatus == status ? modelColor.opacity(0.1) : Color.tmiInputBackground)
                                             )
                                             .overlay(
                                                 Capsule()
-                                                    .stroke(selectedStatus == status ? modelColor : Color.white.opacity(0.2), lineWidth: 1)
+                                                    .stroke(selectedStatus == status ? modelColor : Color.tmiBorder, lineWidth: 1)
                                             )
                                     }
                                     .buttonStyle(.plain)
@@ -114,13 +114,13 @@ struct AddGoalView: View {
                             Toggle(isOn: $hasDueDate) {
                                 Text("Set Due Date")
                                     .font(.headline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
                             }
                             .tint(modelColor)
 
                             if hasDueDate {
                                 DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
                                     .tint(modelColor)
                             }
                         }
@@ -131,13 +131,13 @@ struct AddGoalView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Notes (Optional)")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             TextEditor(text: $notes)
                                 .frame(minHeight: 80)
                                 .scrollContentBackground(.hidden)
                                 .background(Color.white.opacity(0.05))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                                 .font(.system(size: 15))
                                 .cornerRadius(8)
                         }
@@ -174,7 +174,7 @@ struct AddGoalView: View {
                 Button("Cancel") {
                     dismiss()
                 }
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             }
         }
     }

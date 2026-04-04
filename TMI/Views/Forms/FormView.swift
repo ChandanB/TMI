@@ -299,7 +299,7 @@ struct DynamicFormView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") { dismiss() }
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
             }
             .alert("Submit Form?", isPresented: $showingSubmitConfirmation) {
@@ -332,13 +332,13 @@ struct DynamicFormView: View {
                         // Section title
                         Text(section.title)
                             .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         // Section description
                         if let desc = section.description {
                             Text(desc)
                                 .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         // Fields
@@ -351,7 +351,7 @@ struct DynamicFormView: View {
             } else {
                 Spacer()
                 Text("No form sections available")
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                 Spacer()
             }
         }
@@ -382,7 +382,7 @@ struct DynamicFormView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.white.opacity(0.05))
                     )
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 }
             }
 
@@ -400,7 +400,7 @@ struct DynamicFormView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.tmiSecondary)
                         )
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
             } else {
                 Button {
@@ -413,7 +413,7 @@ struct DynamicFormView: View {
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(Color.tmiSecondary)
                         )
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
             }
         }
@@ -451,7 +451,7 @@ struct RatingField: View {
                     } label: {
                         Image(systemName: star <= rating ? "star.fill" : "star")
                             .font(.system(size: 20))
-                            .foregroundColor(star <= rating ? .yellow : .white.opacity(0.4))
+                            .foregroundColor(star <= rating ? .yellow : Color.tmiTextTertiary)
                     }
                 }
                 
@@ -460,7 +460,7 @@ struct RatingField: View {
                 if rating > 0 {
                     Text("\(rating)/\(maxRating)")
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
             }
         }
@@ -481,11 +481,11 @@ struct TableField: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Edit \(label)")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         
                         Text("\(data.count) entries")
                             .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     
                     Spacer()
@@ -552,13 +552,13 @@ struct TableEditorView: View {
                                 HStack {
                                     Text(key)
                                         .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Color.tmiTextPrimary)
                                     
                                     Spacer()
                                     
                                     Text(data[key] ?? "")
                                         .font(.system(size: 14))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .foregroundColor(Color.tmiTextSecondary)
                                     
                                     Button {
                                         data.removeValue(forKey: key)
@@ -585,7 +585,7 @@ struct TableEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
             }
         }
@@ -601,13 +601,13 @@ struct ProgressIndicator: View {
             HStack {
                 Text("Step \(current) of \(total)")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                 
                 Spacer()
                 
                 Text("\(Int(Double(current) / Double(total) * 100))%")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             
             ProgressView(value: Double(current), total: Double(total))

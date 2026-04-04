@@ -77,7 +77,7 @@ struct FormsAndSurveysView: View {
       }
     }
     .navigationTitle("Forms")
-    .foregroundColor(.white)
+    .foregroundColor(Color.tmiTextPrimary)
     .navigationBarTitleDisplayMode(.large)
     .toolbarBackground(.hidden, for: .navigationBar)
     .toolbar {
@@ -97,7 +97,7 @@ struct FormsAndSurveysView: View {
         } label: {
           Image(systemName: "ellipsis.circle")
             .font(.system(size: 20))
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
         }
       }
     }
@@ -191,7 +191,7 @@ struct FormsAndSurveysView: View {
 
       Text("Loading Forms")
         .font(.headline)
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
@@ -215,17 +215,17 @@ struct FormsAndSurveysView: View {
 
         Image(systemName: "doc.text.magnifyingglass")
           .font(.system(size: 80))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(Color.tmiTextSecondary)
       }
       .padding(.top, 80)
 
       Text("No Forms Found")
         .font(.system(size: 22, weight: .semibold, design: .rounded))
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
 
       Text("Create your first form to start collecting data for TMI")
         .font(.system(size: 16))
-        .foregroundColor(.white.opacity(0.7))
+        .foregroundColor(Color.tmiTextSecondary)
         .multilineTextAlignment(.center)
         .padding(.horizontal, 40)
 

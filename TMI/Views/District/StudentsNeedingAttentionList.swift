@@ -20,7 +20,7 @@ struct StudentsNeedingAttentionList: View {
           Text("\(alerts.count)")
             .font(.caption)
             .fontWeight(.semibold)
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(Color.red)

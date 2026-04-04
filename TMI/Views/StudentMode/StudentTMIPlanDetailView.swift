@@ -71,7 +71,7 @@ struct StudentTMIPlanDetailView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(plan.model.rawValue)
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text("Your personalized plan")
                             .font(.system(size: 14))
@@ -98,7 +98,7 @@ struct StudentTMIPlanDetailView: View {
             VStack(alignment: .leading, spacing: TMISpacing.md) {
                 Text("My Progress")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 VStack(spacing: TMISpacing.sm) {
                     HStack {
@@ -111,7 +111,7 @@ struct StudentTMIPlanDetailView: View {
                         VStack(alignment: .trailing, spacing: 4) {
                             Text("\(completedGoalsCount) of \(plan.goals.count)")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             Text("goals completed")
                                 .font(.system(size: 14))
@@ -149,7 +149,7 @@ struct StudentTMIPlanDetailView: View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             Text("My Goals")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .padding(.horizontal, TMISpacing.xs)
 
             VStack(spacing: TMISpacing.sm) {
@@ -166,7 +166,7 @@ struct StudentTMIPlanDetailView: View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             Text("Upcoming Meetings")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .padding(.horizontal, TMISpacing.xs)
 
             if isLoadingMeetings {
@@ -204,7 +204,7 @@ struct StudentTMIPlanDetailView: View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             Text("My Interests")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .padding(.horizontal, TMISpacing.xs)
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: TMISpacing.sm) {
@@ -280,14 +280,14 @@ struct StudentGoalCard: View {
 
                         Image(systemName: "checkmark")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                     }
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(goal.description)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     if let dueDate = goal.dueDate {
                         HStack(spacing: 4) {
@@ -365,7 +365,7 @@ struct StudentMeetingCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(meeting.title)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     HStack(spacing: 12) {
                         HStack(spacing: 4) {
@@ -402,7 +402,7 @@ struct StudentInterestChip: View {
 
             Text(interest.name)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

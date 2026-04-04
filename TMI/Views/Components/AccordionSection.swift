@@ -29,7 +29,7 @@ struct AccordionSection<Content: View>: View {
                     if isRequired {
                         Text("REQUIRED")
                             .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.tmiTextPrimary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(.red, in: RoundedRectangle(cornerRadius: 4))
@@ -38,7 +38,7 @@ struct AccordionSection<Content: View>: View {
                     if let badge {
                         Text(badge)
                             .font(.caption2.weight(.medium))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.tmiTextPrimary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(badgeColor, in: Capsule())

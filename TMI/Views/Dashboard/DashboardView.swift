@@ -1267,7 +1267,7 @@ struct NextBestActionCard: View {
                 Button(action: onAction) {
                     Text("Go")
                         .font(.tmiCaption.weight(.semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .padding(.horizontal, TMISpacing.md)
                         .padding(.vertical, TMISpacing.xs)
                         .background(priorityColor)

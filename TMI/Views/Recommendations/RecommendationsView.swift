@@ -61,7 +61,7 @@ struct RecommendationsView: View {
             }
             .navigationTitle("Recommendations")
             .navigationBarTitleDisplayMode(.large)
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .task {
                 await loadRecommendations()
                 await loadInterests()
@@ -87,7 +87,7 @@ struct RecommendationsView: View {
             
             Text("Generating personalized recommendations...")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -98,7 +98,7 @@ struct RecommendationsView: View {
         VStack(spacing: 16) {
             Text("Personalized for \(student.displayName)")
                 .font(.system(size: 24, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .opacity(animateContent ? 1 : 0)
                 .offset(y: animateContent ? 0 : 20)
                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: animateContent)
@@ -126,7 +126,7 @@ struct RecommendationsView: View {
             HStack {
                 Text("Recommended Careers")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Spacer()
                 
@@ -162,7 +162,7 @@ struct RecommendationsView: View {
             HStack {
                 Text("Recommended Resources")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Spacer()
                 
@@ -197,7 +197,7 @@ struct RecommendationsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Smart Suggestions")
                 .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .padding(.horizontal, 20)
             
             LazyVStack(spacing: 12) {
@@ -218,7 +218,7 @@ struct RecommendationsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Trending Now")
                 .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .padding(.horizontal, 20)
             
             VStack(spacing: 16) {
@@ -226,7 +226,7 @@ struct RecommendationsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Trending Careers")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(Color.tmiTextSecondary)
                             .padding(.horizontal, 20)
                         
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -252,7 +252,7 @@ struct RecommendationsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Featured Resources")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(Color.tmiTextSecondary)
                             .padding(.horizontal, 20)
                         
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -369,13 +369,13 @@ struct RecommendedCareerCard: View {
             
             Text(career.title)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
             
             Text(career.field)
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
             
             Spacer()
         }
@@ -418,13 +418,13 @@ struct RecommendedResourceCard: View {
             
             Text(resource.title)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
             
             Text(resource.category.rawValue.capitalized)
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
             
             Spacer()
         }
@@ -472,18 +472,18 @@ struct SuggestionCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(suggestion.title)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text(suggestion.description)
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             
             Spacer()
             
             Image(systemName: "chevron.right")
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(Color.tmiTextTertiary)
         }
     }
     
@@ -522,12 +522,12 @@ struct TrendingItemCard: View {
             
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .lineLimit(2)
             
             Text(subtitle)
                 .font(.system(size: 10))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .lineLimit(1)
         }
         .padding(12)

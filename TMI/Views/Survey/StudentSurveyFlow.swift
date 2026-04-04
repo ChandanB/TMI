@@ -213,7 +213,7 @@ struct StudentSurveyFlow: View {
                             .font(.system(size: 14, weight: .semibold))
                     }
                 }
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, TMISpacing.md)
                 .background(

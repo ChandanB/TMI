@@ -44,14 +44,14 @@ struct ResourceCard: View {
             // Title
             Text(resource.title)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .lineLimit(2)
                 .frame(height: 44, alignment: .top)
             
             // Description
             Text(resource.description)
                 .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .lineLimit(3)
                 .frame(height: 60, alignment: .top)
             
@@ -69,7 +69,7 @@ struct ResourceCard: View {
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(Color.white.opacity(0.1))
                             )
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                     
                     if resource.tags.count > 2 {
@@ -81,7 +81,7 @@ struct ResourceCard: View {
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(Color.white.opacity(0.1))
                             )
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
             }

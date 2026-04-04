@@ -200,7 +200,7 @@ struct MainTabView: View {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .semibold))
             }
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
@@ -231,7 +231,7 @@ struct MainTabView: View {
         } label: {
             Image(systemName: "person.crop.circle.fill")
                 .font(.system(size: 22))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
     }
     
@@ -313,7 +313,7 @@ struct WorkspacePanelView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(student.displayName)
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         
                         Text("Grade \(student.grade)")
                             .font(.subheadline)
@@ -361,7 +361,7 @@ struct WorkspacePanelView: View {
                 
                 Text("No Student Selected")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text("Select a student from the Students tab to start working")
                     .font(.caption)
@@ -389,7 +389,7 @@ struct WorkspacePanelView: View {
                 
                 Text(plan.title.isEmpty ? plan.model.rawValue : plan.title)
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 ProgressView(value: plan.progress)
                     .tint(.tmiSuccess)
@@ -433,7 +433,7 @@ struct WorkspacePanelView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.tmiPrimary)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextOnPrimary)
                     .cornerRadius(TMIRadius.md)
                 }
                 .buttonStyle(.plain)
@@ -476,7 +476,7 @@ private struct QuickStatCard: View {
                 
                 Text(value)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             
             Text(label)

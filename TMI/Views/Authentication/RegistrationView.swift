@@ -50,7 +50,7 @@ struct RegistrationView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 50, height: 50)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             }
             .scaleEffect(appearAnimation ? 1.0 : 0.7)
             .opacity(appearAnimation ? 1.0 : 0)
@@ -62,12 +62,12 @@ struct RegistrationView: View {
 
             Text("Create Account")
               .font(.system(size: 28, weight: .bold, design: .rounded))
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
               .padding(.top, 10)
 
             Text("Join the TMI community")
               .font(.system(size: 16))
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(Color.tmiTextSecondary)
           }
           .padding(.top, 30)
           .opacity(appearAnimation ? 1.0 : 0)
@@ -164,7 +164,7 @@ struct RegistrationView: View {
               VStack(alignment: .leading, spacing: 12) {
                 Text("I am a...")
                   .font(.system(size: 14, weight: .medium))
-                  .foregroundColor(.white.opacity(0.7))
+                  .foregroundColor(Color.tmiTextSecondary)
 
                 Picker("Role", selection: $selectedRole) {
                   ForEach(UserRole.allCases) { role in
@@ -202,7 +202,7 @@ struct RegistrationView: View {
 
                 Text("Enter the code provided by your school or district.")
                   .font(.system(size: 12))
-                  .foregroundColor(.white.opacity(0.6))
+                  .foregroundColor(Color.tmiTextSecondary)
                   .frame(maxWidth: .infinity, alignment: .leading)
               }
 
@@ -251,7 +251,7 @@ struct RegistrationView: View {
               Text("Back to Login")
                 .font(.system(size: 16))
             }
-            .foregroundColor(Color.white.opacity(0.8))
+            .foregroundColor(Color.tmiTextSecondary)
             .padding(.vertical, 15)
           }
           .padding(.top, 10)
@@ -275,7 +275,7 @@ struct RegistrationView: View {
             dismiss()
           }) {
             Image(systemName: "xmark")
-              .foregroundColor(.white)
+              .foregroundColor(Color.tmiTextPrimary)
               .font(.system(size: 17, weight: .medium))
               .padding(8)
               .background(

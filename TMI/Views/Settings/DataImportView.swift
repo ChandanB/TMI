@@ -76,7 +76,7 @@ struct DataImportView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 }
             }
             .fileImporter(
@@ -106,11 +106,11 @@ struct DataImportView: View {
                 
                 Text("Import TMI Data")
                     .font(.title2.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text("Upload data from other TMI systems, CSV files, or JSON exports to get started quickly.")
                     .font(.body)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .multilineTextAlignment(.center)
             }
         }
@@ -120,7 +120,7 @@ struct DataImportView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Select Import File")
                 .font(.headline.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             TMIGlassCard(style: .default) {
                 VStack(spacing: 16) {
@@ -134,11 +134,11 @@ struct DataImportView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(file.lastPathComponent)
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
                                 
                                 Text("File selected and ready for import")
                                     .font(.system(size: 14))
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Color.tmiTextSecondary)
                             }
                             
                             Spacer()
@@ -153,15 +153,15 @@ struct DataImportView: View {
                         VStack(spacing: 16) {
                             Image(systemName: "doc.badge.plus")
                                 .font(.system(size: 40))
-                                .foregroundColor(.white.opacity(0.3))
+                                .foregroundColor(Color.tmiTextTertiary)
                             
                             Text("No file selected")
                                 .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Color.tmiTextSecondary)
                             
                             Text("Choose a JSON, CSV, or other compatible file to import your TMI data")
                                 .font(.system(size: 14))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                                 .multilineTextAlignment(.center)
                         }
                     }
@@ -183,7 +183,7 @@ struct DataImportView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Supported Formats")
                 .font(.headline.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             TMIGlassCard(style: .default) {
                 VStack(spacing: 12) {
@@ -223,14 +223,14 @@ struct DataImportView: View {
             VStack(spacing: 16) {
                 Text("Importing Data...")
                     .font(.headline.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 ProgressView(value: importProgress, total: 1.0)
                     .tmiProgressStyle()
                 
                 Text("\(Int(importProgress * 100))% Complete")
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
         }
     }
@@ -239,7 +239,7 @@ struct DataImportView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Import Results")
                 .font(.headline.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             TMIGlassCard(style: .default) {
                 VStack(spacing: 12) {
@@ -251,11 +251,11 @@ struct DataImportView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Import Successful")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             
                             Text("Your data has been successfully imported")
                                 .font(.body)
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                         
                         Spacer()
@@ -299,11 +299,11 @@ struct DataImportView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Import Error")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     
                     Text(error)
                         .font(.body)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
                 
                 Spacer()
@@ -329,7 +329,7 @@ struct DataImportView: View {
             if selectedFile == nil {
                 Text("Please select a file to import")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
         }
     }
@@ -456,17 +456,17 @@ struct FormatSupportRow: View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 18))
-                .foregroundColor(supported ? .tmiSecondary : .white.opacity(0.3))
+                .foregroundColor(supported ? .tmiSecondary : Color.tmiTextTertiary)
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(format)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 
                 Text(description)
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
             
             Spacer()
@@ -504,7 +504,7 @@ struct ImportResultRow: View {
             
             Text(label)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
             
             Spacer()
             

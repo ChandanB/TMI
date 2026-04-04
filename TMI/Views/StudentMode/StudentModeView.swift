@@ -102,7 +102,7 @@ struct StudentModeView: View {
         HStack {
             Text("Student Mode")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Spacer()
 
@@ -142,11 +142,11 @@ struct StudentModeView: View {
             VStack(spacing: 4) {
                 Text("Welcome, \(student.name.split(separator: " ").first ?? "")")
                     .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Text("Grade \(student.grade)")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
         }
         .frame(maxWidth: .infinity)
@@ -237,7 +237,7 @@ struct StudentInterestsTab: View {
 
             Text("No Interests Yet")
                 .font(.tmiTitle2)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text("Take the interest survey to discover what you love!")
                 .font(.tmiBody)
@@ -250,7 +250,7 @@ struct StudentInterestsTab: View {
                     Text("Take Survey")
                 }
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
                 .background(
@@ -269,7 +269,7 @@ struct StudentInterestsTab: View {
             HStack {
                 Text("My Interests")
                     .font(.tmiTitle2)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
@@ -343,19 +343,19 @@ private struct StudentModeInterestCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(interest.name)
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .multilineTextAlignment(.leading)
 
                 Text(interest.category.first?.rawValue ?? "General")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.65))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
 
             Spacer(minLength: 12)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.35))
+                .foregroundColor(Color.tmiTextTertiary)
         }
         .padding(TMISpacing.md)
         .background(
@@ -410,7 +410,7 @@ struct StudentCareersTab: View {
 
             Text("No Career Matches Yet")
                 .font(.tmiTitle2)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text("Complete the interest survey to discover careers that match your interests!")
                 .font(.tmiBody)
@@ -441,7 +441,7 @@ struct StudentCareersTab: View {
             // All career matches
             Text(careerMatches.count > 1 ? "All Matches" : "Careers For You")
                 .font(.tmiTitle2)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .padding(.top, careerMatches.count > 1 ? TMISpacing.md : 0)
 
             VStack(spacing: TMISpacing.md) {
@@ -565,7 +565,7 @@ struct StudentProgressTab: View {
 
             Text("No Plans Yet")
                 .font(.tmiTitle2)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             Text("Your teacher will create a personalized plan for you!")
                 .font(.tmiBody)
@@ -579,7 +579,7 @@ struct StudentProgressTab: View {
         VStack(alignment: .leading, spacing: TMISpacing.lg) {
             Text("My Plans")
                 .font(.tmiTitle2)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             VStack(spacing: TMISpacing.md) {
                 ForEach(plans) { plan in
@@ -622,7 +622,7 @@ struct StudentPlanCard: View {
             HStack {
                 Text(plan.model.rawValue)
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
@@ -671,7 +671,7 @@ struct FeaturedCareerCard: View {
                     // Career title
                     Text(match.career.title)
                         .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     
                     // Category
                     Text(match.career.category)
@@ -688,7 +688,7 @@ struct FeaturedCareerCard: View {
                     Text("\(Int(match.score * 100))%")
                         .font(.system(size: 16, weight: .bold))
                 }
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
@@ -718,11 +718,11 @@ struct FeaturedCareerCard: View {
                     if let salary = match.career.estimatedSalary {
                         Text("$\(salary.min/1000)k-$\(salary.max/1000)k")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                     } else {
                         Text("Varies")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                     }
                 }
                 
@@ -741,7 +741,7 @@ struct FeaturedCareerCard: View {
                     }
                     Text(match.career.educationLevel.rawValue)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .lineLimit(1)
                 }
             }
@@ -800,7 +800,7 @@ struct CareerMatchCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(match.career.title)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Text("\(Int(match.score * 100))% match")
                     .font(.system(size: 14))

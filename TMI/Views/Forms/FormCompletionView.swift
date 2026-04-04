@@ -123,7 +123,7 @@ struct FormCompletionView: View {
         } label: {
           Text("Submit Form")
             .font(.headline)
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .frame(maxWidth: .infinity)
             .padding()
             .background(isFormValid ? Color.blue : Color.gray)

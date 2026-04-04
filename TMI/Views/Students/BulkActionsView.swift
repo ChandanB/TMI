@@ -30,11 +30,11 @@ struct BulkActionsView: View {
 
                         Text("Bulk Actions")
                             .font(.title.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text("Select students and choose an action to apply to all selected students.")
                             .font(.body)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 20)
                     }
@@ -45,7 +45,7 @@ struct BulkActionsView: View {
                             HStack {
                                 Text("Select Students")
                                     .font(.headline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
 
                                 Spacer()
 
@@ -77,10 +77,10 @@ struct BulkActionsView: View {
                                             } label: {
                                                 HStack {
                                                     Image(systemName: selectedStudents.contains(student.id ?? "") ? "checkmark.circle.fill" : "circle")
-                                                        .foregroundColor(selectedStudents.contains(student.id ?? "") ? .tmiSecondary : .white.opacity(0.5))
+                                                        .foregroundColor(selectedStudents.contains(student.id ?? "") ? .tmiSecondary : Color.tmiTextTertiary)
 
                                                     Text(student.name)
-                                                        .foregroundColor(.white)
+                                                        .foregroundColor(Color.tmiTextPrimary)
 
                                                     Spacer()
                                                 }
@@ -102,7 +102,7 @@ struct BulkActionsView: View {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("Available Actions")
                                     .font(.headline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
 
                                 LazyVStack(spacing: 12) {
                                     BulkActionButton(
@@ -165,7 +165,7 @@ struct BulkActionsView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 }
             }
     }
@@ -256,11 +256,11 @@ struct BulkActionButton: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text(description)
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                         .multilineTextAlignment(.leading)
                 }
 
@@ -268,7 +268,7 @@ struct BulkActionButton: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(Color.tmiTextTertiary)
             }
             .padding()
             .background(

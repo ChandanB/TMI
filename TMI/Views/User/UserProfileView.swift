@@ -310,7 +310,7 @@ struct UserProfileView: View {
                     VStack(spacing: 16) {
                         Text("Error loading profile")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text(error.message)
                             .foregroundColor(.red)
@@ -331,7 +331,7 @@ struct UserProfileView: View {
             }
         }
         .navigationTitle("Profile")
-        .foregroundColor(.white)
+        .foregroundColor(Color.tmiTextPrimary)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if case .loaded = stateModel.state {
@@ -410,7 +410,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Profile Photo")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     HStack(spacing: 16) {
                         if let photoURLString = stateModel.photoURL, let url = URL(string: photoURLString) {
@@ -457,19 +457,19 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Profile Information")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     HStack {
                         Text("Email")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
                         Spacer()
                         Text(profileData.email)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Display Name")
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         TMITextField(
                             icon: "person",
@@ -488,7 +488,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Role")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Text(profileData.role.isEmpty ? "Unknown" : profileData.role)
                         .foregroundStyle(.secondary)
@@ -500,7 +500,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                 VStack(alignment: .leading, spacing: 8) {
                     Text("School / Organization")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     TMITextField(
                         icon: "building.2",
@@ -518,7 +518,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Account Settings")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     TMIButton(
                         text: "Change Email",
@@ -534,10 +534,10 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                             Image(systemName: "lock")
                                 .foregroundColor(Color.tmiPrimary)
                             Text("Change Password")
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                         .padding(.vertical, 8)
                     }
@@ -549,7 +549,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Legal")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
 
                     Button {
                         showingPrivacyPolicy.wrappedValue = true
@@ -558,10 +558,10 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                             Image(systemName: "hand.raised")
                                 .foregroundColor(Color.tmiPrimary)
                             Text("Privacy Policy")
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                         .padding(.vertical, 8)
                     }
@@ -573,10 +573,10 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                             Image(systemName: "doc.text")
                                 .foregroundColor(Color.tmiPrimary)
                             Text("Terms of Service")
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
                         .padding(.vertical, 8)
                     }
@@ -620,7 +620,7 @@ struct ChangeEmailView: View {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("Change Email")
                                     .font(.headline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.tmiTextPrimary)
 
                                 TMITextField(
                                     icon: "envelope",
@@ -644,7 +644,7 @@ struct ChangeEmailView: View {
 
                                 Text("You'll need to verify your new email after changing it.")
                                     .font(.caption)
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Color.tmiTextSecondary)
                                     .padding(.top, 8)
                             }
                         }
@@ -661,13 +661,13 @@ struct ChangeEmailView: View {
             }
             .navigationTitle("Change Email")
             .navigationBarTitleDisplayMode(.inline)
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextPrimary)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {

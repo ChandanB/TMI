@@ -246,7 +246,7 @@ struct TMIFAB: View {
                         .font(.tmiButton)
                 }
             }
-            .foregroundColor(.white)
+            .foregroundColor(Color.tmiTextOnPrimary)
             .padding(.horizontal, label != nil ? TMISpacing.large : 0)
             .frame(width: label != nil ? nil : TMISizing.fabSize, height: TMISizing.fabSize)
             .background(Color.tmiPrimary)

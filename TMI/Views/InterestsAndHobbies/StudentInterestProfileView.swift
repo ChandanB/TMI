@@ -95,11 +95,11 @@ struct StudentInterestProfileView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(student.name)
                             .font(.title2.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text("\(interestCount) Interests")
                             .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                     }
 
                     Spacer()
@@ -115,7 +115,7 @@ struct StudentInterestProfileView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("My Interests")
                 .font(.title3.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             if interests.isEmpty {
                 TMIGlassCard(style: .default) {
@@ -126,11 +126,11 @@ struct StudentInterestProfileView: View {
 
                         Text("No interests added yet")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.tmiTextPrimary)
 
                         Text("Add interests to get personalized career recommendations")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color.tmiTextSecondary)
                             .multilineTextAlignment(.center)
                     }
                     .padding()
@@ -155,18 +155,18 @@ struct StudentInterestProfileView: View {
             HStack {
                 Text("Recommended Careers")
                     .font(.title3.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
                 Text("\(careerRecommendations.count) matches")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
 
             Text("Based on your interests and strengths")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
 
             ForEach(Array(careerRecommendations.prefix(5).enumerated()), id: \.element.title) { index, career in
                 CareerRecommendationCard(
@@ -194,18 +194,18 @@ struct StudentInterestProfileView: View {
             HStack {
                 Text("Recommended Resources")
                     .font(.title3.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Spacer()
 
                 Text("\(recommendedResources.count) resources")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
 
             Text("Resources to help you explore these career paths")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
 
             ForEach(recommendedResources.prefix(6)) { resource in
                 ResourceRecommendationCard(
@@ -229,7 +229,7 @@ struct StudentInterestProfileView: View {
 
             Text("Analyzing your interests...")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         .frame(maxWidth: .infinity)
         .padding(40)
@@ -276,7 +276,7 @@ private struct StudentInterestCard: View {
 
                 Text(interest.name)
                     .font(.caption.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
             }
@@ -307,23 +307,23 @@ private struct CareerRecommendationCard: View {
 
                             Text("#\(rank)")
                                 .font(.caption.bold())
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(career.title)
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             Text(career.field)
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         Spacer()
 
                         Image(systemName: "chevron.right")
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(Color.tmiTextTertiary)
                     }
 
                     // Match explanation
@@ -354,7 +354,7 @@ private struct MatchExplanationView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Why this matches:")
                 .font(.caption2.bold())
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(Color.tmiTextSecondary)
 
             // Show matching interests
             let matchingInterests = interests.filter { interest in
@@ -373,7 +373,7 @@ private struct MatchExplanationView: View {
 
                     Text("Matches your interests: \(matchingInterests.map { $0.name }.prefix(2).joined(separator: ", "))")
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
             }
 
@@ -386,7 +386,7 @@ private struct MatchExplanationView: View {
 
                     Text("High growth field (\(Int(career.growthRate * 100))% growth)")
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
             }
         }
@@ -409,12 +409,12 @@ private struct ResourceRecommendationCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(resource.title)
                         .font(.subheadline.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                         .lineLimit(2)
 
                     Text(resource.category.rawValue.capitalized)
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
                 }
 
                 Spacer()
@@ -445,11 +445,11 @@ private struct InsightRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
 
                 Text(value)
                     .font(.subheadline.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
 
             Spacer()

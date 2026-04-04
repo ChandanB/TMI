@@ -118,7 +118,7 @@ struct AddInterestToPlanView: View {
                 HStack {
                     Text("\(availableInterests.count) available interests")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
                     Spacer()
                 }
                 .padding(.horizontal, 20)
@@ -162,11 +162,11 @@ struct AddInterestToPlanView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Adding interests to")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                     Text(plan.model.shortDisplayName)
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                 }
 
                 Spacer()
@@ -175,7 +175,7 @@ struct AddInterestToPlanView: View {
             if !plan.interests.isEmpty {
                 Text("Current interests: \(plan.interests.count)")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(Color.tmiTextSecondary)
             }
 
             if !plan.students.isEmpty {
@@ -189,7 +189,7 @@ struct AddInterestToPlanView: View {
                     }
                 }
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
             }
         }
         .padding(16)
@@ -230,19 +230,19 @@ struct AddInterestToPlanView: View {
         VStack(spacing: 20) {
             Image(systemName: searchText.isEmpty ? "checkmark.circle.fill" : "magnifyingglass")
                 .font(.system(size: 50))
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundColor(Color.tmiTextTertiary)
 
             VStack(spacing: 8) {
                 Text(searchText.isEmpty ? "All Set!" : "No Results")
                     .font(.title2.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
 
                 Text(searchText.isEmpty
                      ? "This plan has all available interests!"
                      : "No interests match '\(searchText)'"
                 )
                 .multilineTextAlignment(.center)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.tmiTextSecondary)
                 .padding(.horizontal, 40)
             }
         }
@@ -386,7 +386,7 @@ struct PlanInterestRow: View {
                         HStack(spacing: 8) {
                             Text(interest.name)
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextPrimary)
 
                             if isStudentInterest {
                                 HStack(spacing: 4) {
@@ -395,7 +395,7 @@ struct PlanInterestRow: View {
                                     Text("Student")
                                         .font(.system(size: 10, weight: .semibold))
                                 }
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.tmiTextOnPrimary)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Color.tmiPrimary)
@@ -415,7 +415,7 @@ struct PlanInterestRow: View {
                             Text(interest.category.first?.rawValue ?? "General")
                                 .font(.system(size: 13))
                         }
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color.tmiTextSecondary)
 
                         if let score = interest.popularityScore {
                             HStack(spacing: 4) {
@@ -424,7 +424,7 @@ struct PlanInterestRow: View {
                                 Text("\(score)% popular")
                                     .font(.system(size: 11))
                             }
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(Color.tmiTextTertiary)
                         }
                     }
 
@@ -459,14 +459,14 @@ struct PlanInterestRow: View {
                         if let description = interest.description {
                             Text(description)
                                 .font(.system(size: 14))
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(Color.tmiTextSecondary)
                         }
 
                         if !interest.academicRelevance.isEmpty {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Academic Relevance")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Color.tmiTextSecondary)
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 6) {
@@ -490,7 +490,7 @@ struct PlanInterestRow: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Skills Developed")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Color.tmiTextSecondary)
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 6) {
@@ -514,7 +514,7 @@ struct PlanInterestRow: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Career Pathways")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(Color.tmiTextSecondary)
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 6) {

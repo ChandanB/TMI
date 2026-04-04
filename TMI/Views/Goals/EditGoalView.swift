@@ -103,7 +103,7 @@ struct EditGoalView: View {
 
             Text("Edit Goal")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
         .frame(maxWidth: .infinity)
         .padding(.bottom, 10)
@@ -113,12 +113,12 @@ struct EditGoalView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Current Progress")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             VStack(spacing: 12) {
                 HStack {
                     Text("Progress")
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(Color.tmiTextSecondary)
                     Spacer()
                     Text("\(Int(goalProgress * 100))%")
                         .font(.title2)
@@ -135,7 +135,7 @@ struct EditGoalView: View {
                     Text("100%")
                 }
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(Color.tmiTextSecondary)
             }
             .padding()
             .background(Color.white.opacity(0.1))
@@ -147,12 +147,12 @@ struct EditGoalView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Goal Details")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Description")
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(Color.tmiTextSecondary)
                     .padding(.leading, 4)
 
                 TextEditor(text: $goalDescription)
@@ -161,7 +161,7 @@ struct EditGoalView: View {
                     .scrollContentBackground(.hidden)
                     .background(Color.white.opacity(0.1))
                     .cornerRadius(12)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
         }
     }
@@ -170,23 +170,23 @@ struct EditGoalView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Status")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             HStack(spacing: 12) {
                 ForEach(GoalStatus.allCases, id: \.self) { status in
                     Button(action: { selectedStatus = status }) {
                         Text(status.rawValue)
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(selectedStatus == status ? .white : .white.opacity(0.7))
+                            .foregroundColor(selectedStatus == status ? modelColor : Color.tmiTextSecondary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
                             .background(
                                 Capsule()
-                                    .fill(selectedStatus == status ? modelColor.opacity(0.3) : Color.white.opacity(0.1))
+                                    .fill(selectedStatus == status ? modelColor.opacity(0.1) : Color.tmiInputBackground)
                             )
                             .overlay(
                                 Capsule()
-                                    .stroke(selectedStatus == status ? modelColor : Color.white.opacity(0.2), lineWidth: 1)
+                                    .stroke(selectedStatus == status ? modelColor : Color.tmiBorder, lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
@@ -200,14 +200,14 @@ struct EditGoalView: View {
             Toggle(isOn: $hasDueDate) {
                 Text("Set Due Date")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.tmiTextPrimary)
             }
             .tint(modelColor)
 
             if hasDueDate {
                 HStack {
                     Text("Target Date")
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.tmiTextPrimary)
                     Spacer()
                     DatePicker("", selection: $dueDate, displayedComponents: .date)
                         .labelsHidden()
@@ -224,7 +224,7 @@ struct EditGoalView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Notes")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
 
             TextEditor(text: $notes)
                 .frame(height: 80)
@@ -232,7 +232,7 @@ struct EditGoalView: View {
                 .scrollContentBackground(.hidden)
                 .background(Color.white.opacity(0.1))
                 .cornerRadius(12)
-                .foregroundColor(.white)
+                .foregroundColor(Color.tmiTextPrimary)
         }
     }
 
