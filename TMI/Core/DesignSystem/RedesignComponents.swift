@@ -214,7 +214,7 @@ struct TMIFilterChip: View {
                 .foregroundColor(isSelected ? .white : .tmiTextPrimary)
                 .padding(.horizontal, TMISpacing.medium)
                 .padding(.vertical, TMISpacing.small)
-                .background(isSelected ? Color.tmiPrimary : Color.tmiSurface)
+                .background(isSelected ? Color.tmiSecondary : Color.tmiSurface)
                 .cornerRadius(TMIRadius.pill)
                 .overlay(
                     !isSelected ?
