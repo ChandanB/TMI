@@ -112,7 +112,7 @@ final class ScheduleMeetingCoordinator {
         isSaving = true
         defer { isSaving = false }
         
-        let meeting = draft.toMeeting()
+        let meeting = try draft.toMeeting()
         
         let savedMeeting: Meeting
         if let existingId = draft.existingId {
@@ -223,9 +223,9 @@ struct DraftMeeting {
         }
     }
     
-    func toMeeting() -> Meeting {
+    func toMeeting() throws -> Meeting {
         guard let currentUserId = Auth.auth().currentUser?.uid else {
-            fatalError("User must be authenticated to create a meeting")
+            throw MeetingCreationError.notAuthenticated
         }
         
         return Meeting(
@@ -247,6 +247,18 @@ struct DraftMeeting {
             createdAt: Date(),
             lastUpdated: Date()
         )
+    }
+}
+
+// MARK: - Meeting Creation Errors
+
+enum MeetingCreationError: Error, LocalizedError {
+    case notAuthenticated
+    var errorDescription: String? {
+        switch self {
+        case .notAuthenticated:
+            return "You must be signed in to create a meeting"
+        }
     }
 }
 

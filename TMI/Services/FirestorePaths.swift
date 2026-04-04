@@ -7,6 +7,17 @@
 
 import Foundation
 
+/// Errors for missing identifiers when building Firestore paths
+enum FirestorePathError: Error, LocalizedError {
+    case missingIdentifier(String)
+    var errorDescription: String? {
+        switch self {
+        case .missingIdentifier(let context):
+            return "Missing required identifier: \(context)"
+        }
+    }
+}
+
 /// Centralized path builder for consistent Firestore collection access
 enum FirestorePaths {
 
@@ -239,13 +250,13 @@ enum FirestorePaths {
     ///   - districtId: Optional district ID for district-scoped access
     ///   - userId: Optional user ID for user-scoped fallback
     /// - Returns: The collection path to use
-    static func students(districtId: String?, userId: String?) -> String {
+    static func students(districtId: String?, userId: String?) throws -> String {
         if let districtId = districtId {
             return districtStudents(districtId: districtId)
         } else if let userId = userId {
             return userStudents(userId: userId)
         } else {
-            fatalError("Either districtId or userId must be provided")
+            throw FirestorePathError.missingIdentifier("Either districtId or userId must be provided for students path")
         }
     }
 
@@ -254,13 +265,13 @@ enum FirestorePaths {
     ///   - districtId: Optional district ID for district-scoped access
     ///   - userId: Optional user ID for user-scoped fallback
     /// - Returns: The collection path to use
-    static func plans(districtId: String?, userId: String?) -> String {
+    static func plans(districtId: String?, userId: String?) throws -> String {
         if let districtId = districtId {
             return districtPlans(districtId: districtId)
         } else if let userId = userId {
             return userPlans(userId: userId)
         } else {
-            fatalError("Either districtId or userId must be provided")
+            throw FirestorePathError.missingIdentifier("Either districtId or userId must be provided for plans path")
         }
     }
 }
