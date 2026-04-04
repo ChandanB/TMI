@@ -12,6 +12,7 @@ import Observation
 import PhotosUI
 import SDWebImageSwiftUI
 import SwiftUI
+import WebKit
 
 
 // MARK: - State Model
@@ -279,6 +280,8 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
 
 struct UserProfileView: View {
     @State private var stateModel = UserProfileStateModel()
+    @State private var showingPrivacyPolicy = false
+    @State private var showingTermsOfService = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -295,7 +298,13 @@ struct UserProfileView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 case .loaded(let profileData):
-                    userProfileForm(profileData, stateModel: stateModel, dismiss: dismiss)
+                    userProfileForm(
+                        profileData,
+                        stateModel: stateModel,
+                        dismiss: dismiss,
+                        showingPrivacyPolicy: $showingPrivacyPolicy,
+                        showingTermsOfService: $showingTermsOfService
+                    )
 
                 case .error(let error):
                     VStack(spacing: 16) {
@@ -357,6 +366,30 @@ struct UserProfileView: View {
                     .tmiSheetStyle()
             }
         }
+        .sheet(isPresented: $showingPrivacyPolicy) {
+            NavigationStack {
+                LegalDocumentView(fileName: "privacy-policy")
+                    .navigationTitle("Privacy Policy")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showingPrivacyPolicy = false }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showingTermsOfService) {
+            NavigationStack {
+                LegalDocumentView(fileName: "terms-of-service")
+                    .navigationTitle("Terms of Service")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showingTermsOfService = false }
+                        }
+                    }
+            }
+        }
         .preferredColorScheme(.dark)
         .onAppear {
             // Only fetch if we haven't loaded data yet
@@ -370,7 +403,7 @@ struct UserProfileView: View {
 }
 
 @ViewBuilder
-private func userProfileForm(_ profileData: UserProfileData, stateModel: UserProfileStateModel, dismiss: DismissAction) -> some View {
+private func userProfileForm(_ profileData: UserProfileData, stateModel: UserProfileStateModel, dismiss: DismissAction, showingPrivacyPolicy: Binding<Bool>, showingTermsOfService: Binding<Bool>) -> some View {
     ScrollView {
         VStack(spacing: 20) {
             // Profile Photo Section
@@ -512,6 +545,45 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                 }
             }
 
+            // Legal Section
+            TMIGlassCard(style: .default) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Legal")
+                        .font(.headline)
+                        .foregroundColor(.white)
+
+                    Button {
+                        showingPrivacyPolicy.wrappedValue = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "hand.raised")
+                                .foregroundColor(Color.tmiPrimary)
+                            Text("Privacy Policy")
+                                .foregroundColor(.white)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        .padding(.vertical, 8)
+                    }
+
+                    Button {
+                        showingTermsOfService.wrappedValue = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "doc.text")
+                                .foregroundColor(Color.tmiPrimary)
+                            Text("Terms of Service")
+                                .foregroundColor(.white)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+            }
+
             // Sign Out Section
             TMIGlassCard(style: .default) {
                 TMIButton(
@@ -614,6 +686,25 @@ struct ChangeEmailView: View {
                 }
             }
             .preferredColorScheme(.dark)
+        }
+    }
+}
+
+// MARK: - Legal Document View
+
+struct LegalDocumentView: UIViewRepresentable {
+    let fileName: String
+
+    func makeUIView(context: Context) -> WKWebView {
+        let webView = WKWebView()
+        webView.isOpaque = false
+        webView.backgroundColor = .systemBackground
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        if let url = Bundle.main.url(forResource: fileName, withExtension: "html") {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         }
     }
 }
