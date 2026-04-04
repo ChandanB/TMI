@@ -137,7 +137,7 @@ struct MainTabView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .accentColor(.tmiSecondary)
+        .tint(.tmiPrimary)
         .sheet(isPresented: $showingUserProfile) {
             UserProfileView()
                 .tmiSheetStyle()

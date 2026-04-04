@@ -10,229 +10,6 @@ import Combine
 import Foundation
 import SwiftUI
 
-// MARK: - Premium Glass Tab Bar
-
-struct PremiumGlassTabBar: View {
-  @Binding var selectedTab: MainTabView.Tab
-  @Binding var previousTab: MainTabView.Tab
-  let availableTabs: [MainTabView.Tab]
-  @Namespace private var tabAnimation
-
-  // Tabs are provided by the current MVP navigation model.
-  private var displayedTabs: [MainTabView.Tab] {
-    return availableTabs
-  }
-
-  var body: some View {
-    HStack(spacing: 0) {
-      ForEach(displayedTabs) { tab in
-        tabButton(for: tab)
-      }
-    }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 12)
-    .background(
-      RoundedRectangle(cornerRadius: 30)
-        .fill(Color.black.opacity(0.2))
-        .background(
-          RoundedRectangle(cornerRadius: 30)
-            .fill(.ultraThinMaterial)
-            .opacity(0.8)
-        )
-        .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 30)
-        .stroke(
-          LinearGradient(
-            colors: [.white.opacity(0.5), .clear, .white.opacity(0.2)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          ),
-          lineWidth: 0.5
-        )
-    )
-    .padding(.horizontal, 20)
-    .padding(.bottom, 8)
-  }
-
-  private func tabButton(for tab: MainTabView.Tab) -> some View {
-    Button {
-      withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-        previousTab = selectedTab
-        selectedTab = tab
-      }
-    } label: {
-      VStack(spacing: 4) {
-        ZStack {
-          if selectedTab == tab {
-            RoundedRectangle(cornerRadius: 16)
-              .fill(
-                LinearGradient(
-                  colors: [
-                    Color.tmiSecondary.opacity(0.4),
-                    Color.tmiSecondary.opacity(0.2),
-                  ],
-                  startPoint: .top,
-                  endPoint: .bottom
-                )
-              )
-              .matchedGeometryEffect(id: "TabBackground", in: tabAnimation)
-              .frame(height: 40)
-          }
-
-          HStack(spacing: 8) {
-            Image(systemName: iconName(for: tab))
-              .font(.system(size: 16, weight: selectedTab == tab ? .semibold : .regular))
-              .symbolEffect(
-                .bounce,
-                options: .speed(1.5),
-                value: selectedTab == tab && previousTab != tab
-              )
-
-            if selectedTab == tab {
-              Text(shortTabLabel(for: tab))
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
-                .transition(.opacity.combined(with: .move(edge: .trailing)))
-            }
-          }
-          .foregroundStyle(selectedTab == tab ? Color.white : Color.white.opacity(0.6))
-          .frame(height: 40)
-          .padding(.horizontal, selectedTab == tab ? 14 : 0)
-        }
-      }
-      .frame(maxWidth: selectedTab == tab ? .infinity : 50)
-    }
-    .buttonStyle(.plain)
-  }
-
-  private func shortTabLabel(for tab: MainTabView.Tab) -> String {
-    switch tab {
-    case .students: return "Students"
-    case .tmiPlans: return "Plans"
-    case .dashboard: return "Dashboard"
-    case .district: return "District"
-    }
-  }
-
-  private func iconName(for tab: MainTabView.Tab) -> String {
-    switch tab {
-    case .students: return "person.3.fill"
-    case .tmiPlans: return "doc.text.fill"
-    case .dashboard: return "chart.bar.fill"
-    case .district: return "building.2.fill"
-    }
-  }
-}
-
-// MARK: - Premium Sidebar List
-
-struct PremiumSidebarList: View {
-  @Binding var selectedTab: MainTabView.Tab
-  let availableTabs: [MainTabView.Tab]
-  @Namespace private var sidebarAnimation
-
-  var body: some View {
-    ScrollView {
-      VStack(spacing: 8) {
-        ForEach(availableTabs, id: \.id) { tab in
-          sidebarButton(for: tab)
-            .padding(.horizontal, 16)
-        }
-      }
-      .padding(.bottom, 20)
-    }
-  }
-
-  private func sidebarButton(for tab: MainTabView.Tab) -> some View {
-    Button {
-      withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-        selectedTab = tab
-      }
-    } label: {
-      HStack(spacing: 16) {
-        // Icon
-        ZStack {
-          Circle()
-            .fill(selectedTab == tab ? Color.tmiSecondary.opacity(0.2) : Color.clear)
-            .frame(width: 36, height: 36)
-
-          Image(systemName: iconName(for: tab))
-            .font(.system(size: 16, weight: selectedTab == tab ? .semibold : .regular))
-            .foregroundColor(selectedTab == tab ? Color.tmiSecondary : Color.white.opacity(0.6))
-        }
-
-        // Label
-        Text(tabLabel(for: tab))
-          .font(.system(size: 16, weight: selectedTab == tab ? .semibold : .regular))
-          .foregroundColor(selectedTab == tab ? Color.white : Color.white.opacity(0.7))
-
-        Spacer()
-
-        // Selection indicator
-        if selectedTab == tab {
-          Circle()
-            .fill(Color.tmiSecondary)
-            .frame(width: 6, height: 6)
-            .matchedGeometryEffect(id: "SidebarSelection", in: sidebarAnimation)
-        }
-      }
-      .padding(.vertical, 12)
-      .padding(.horizontal, 16)
-      .background(
-        RoundedRectangle(cornerRadius: 14)
-          .fill(selectedTab == tab ? Color.white.opacity(0.05) : Color.clear)
-          .background(
-            selectedTab == tab
-              ? RoundedRectangle(cornerRadius: 14)
-                .fill(.ultraThinMaterial)
-                .opacity(0.1)
-              : RoundedRectangle(cornerRadius: 14)
-                .fill(.ultraThinMaterial)
-                .opacity(0)
-          )
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: 14)
-          .stroke(
-            selectedTab == tab
-              ? LinearGradient(
-                colors: [Color.white.opacity(0.3), Color.clear, Color.white.opacity(0.1)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              )
-              : LinearGradient(
-                colors: [Color.clear],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              ),
-            lineWidth: 1
-          )
-      )
-    }
-    .buttonStyle(SidebarButtonStyle())
-  }
-
-  private func tabLabel(for tab: MainTabView.Tab) -> String {
-    switch tab {
-    case .students: return "Students"
-    case .tmiPlans: return "TMI Plans"
-    case .dashboard: return "Dashboard"
-    case .district: return "District"
-    }
-  }
-
-  private func iconName(for tab: MainTabView.Tab) -> String {
-    switch tab {
-    case .students: return "person.3.fill"
-    case .tmiPlans: return "doc.text.fill"
-    case .dashboard: return "chart.bar.fill"
-    case .district: return "building.2.fill"
-    }
-  }
-}
-
 struct StatCircle: View {
   var value: String
   var title: String
@@ -261,7 +38,7 @@ struct StatCircle: View {
         VStack(spacing: 2) {
           Text(value)
             .font(.system(size: 18, weight: .bold, design: .rounded))
-            .foregroundColor(.white)
+            .foregroundColor(.tmiTextPrimary)
 
           Image(systemName: icon)
             .font(.system(size: 12, weight: .semibold))
@@ -271,7 +48,7 @@ struct StatCircle: View {
 
       Text(title)
         .font(.system(size: 12, weight: .medium))
-        .foregroundColor(.white.opacity(0.8))
+        .foregroundColor(.tmiTextSecondary)
         .multilineTextAlignment(.center)
     }
     .frame(maxWidth: .infinity)
@@ -338,7 +115,7 @@ struct LottieLoadingView: View {
       // TMI logo
       Image(systemName: "brain.head.profile")
         .font(.system(size: 24, weight: .medium))
-        .foregroundColor(.white)
+        .foregroundColor(.tmiTextPrimary)
     }
     .onAppear {
       isAnimating = true
@@ -366,11 +143,11 @@ struct RecommendationRow: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(recommendation.title)
           .font(.system(size: 16, weight: .semibold))
-          .foregroundColor(.white)
+          .foregroundColor(.tmiTextPrimary)
 
         Text(recommendation.description)
           .font(.system(size: 14))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(.tmiTextSecondary)
           .lineLimit(isHovered ? nil : 2)
       }
 
@@ -405,7 +182,7 @@ struct TimeFrameSelector: View {
             .font(.system(size: 13, weight: selection == timeFrame ? .semibold : .medium))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .foregroundStyle(selection == timeFrame ? .white : .white.opacity(0.6))
+            .foregroundStyle(selection == timeFrame ? Color.tmiTextPrimary : Color.tmiTextSecondary)
             .background(
               ZStack {
                 if selection == timeFrame {
@@ -428,7 +205,7 @@ struct TimeFrameSelector: View {
     .padding(3)
     .background(
       RoundedRectangle(cornerRadius: 10)
-        .fill(Color.white.opacity(0.05))
+        .fill(Color.tmiSurface)
     )
   }
 }
@@ -515,11 +292,11 @@ struct DashboardAlignmentChartView: View {
           VStack(alignment: .leading, spacing: 4) {
             Text("Alignment Performance")
               .font(.title2.weight(.semibold))
-              .foregroundColor(.white)
+              .foregroundColor(.tmiTextPrimary)
 
             Text("Student-Interest alignment trends")
               .font(.subheadline)
-              .foregroundColor(.white.opacity(0.7))
+              .foregroundColor(.tmiTextSecondary)
           }
 
           Spacer()
@@ -544,7 +321,7 @@ struct DashboardAlignmentChartView: View {
         }
 
         Divider()
-          .background(Color.white.opacity(0.2))
+          .background(Color.tmiDivider)
 
         chart
           .frame(height: 250)
@@ -660,13 +437,13 @@ struct ChartAxisModifier: ViewModifier {
             centered: true,
             stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 4])
           )
-          .foregroundStyle(Color.white.opacity(0.2))
-          
+          .foregroundStyle(Color.tmiDivider)
+
           AxisValueLabel {
             if let doubleValue = value.as(Double.self) {
               Text("\(Int(doubleValue * 100))%")
                 .font(.caption)
-                .foregroundStyle(Color.white.opacity(0.8))
+                .foregroundStyle(Color.tmiTextSecondary)
             }
           }
         }
@@ -677,13 +454,13 @@ struct ChartAxisModifier: ViewModifier {
             centered: true,
             stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 4])
           )
-          .foregroundStyle(Color.white.opacity(0.1))
+          .foregroundStyle(Color.tmiDivider)
 
           AxisValueLabel {
             if let stringValue = value.as(String.self) {
               Text(stringValue)
                 .font(.caption)
-                .foregroundStyle(Color.white.opacity(0.8))
+                .foregroundStyle(Color.tmiTextSecondary)
             }
           }
         }
@@ -746,12 +523,12 @@ struct ChartStatistic: View {
     VStack(alignment: .leading, spacing: 4) {
       Text(title)
         .font(.caption)
-        .foregroundColor(.white.opacity(0.6))
+        .foregroundColor(.tmiTextSecondary)
 
       HStack(alignment: .bottom, spacing: 4) {
         Text(value)
           .font(.system(size: 16, weight: .bold, design: .rounded))
-          .foregroundColor(.white)
+          .foregroundColor(.tmiTextPrimary)
 
         Image(systemName: trendIcon)
           .font(.system(size: 10, weight: .bold))
@@ -764,7 +541,7 @@ struct ChartStatistic: View {
     .padding(10)
     .background(
       RoundedRectangle(cornerRadius: 12)
-        .fill(Color.white.opacity(0.05))
+        .fill(Color.tmiSurface)
     )
   }
 
@@ -823,11 +600,11 @@ struct StatCard: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(title)
           .font(.system(size: 15, weight: .medium))
-          .foregroundColor(.white.opacity(0.7))
+          .foregroundColor(.tmiTextSecondary)
 
         Text(value)
           .font(.system(size: 24, weight: .bold, design: .rounded))
-          .foregroundColor(.white)
+          .foregroundColor(.tmiTextPrimary)
           .contentTransition(.numericText())
       }
 
@@ -836,11 +613,7 @@ struct StatCard: View {
     .padding(16)
     .background(
       RoundedRectangle(cornerRadius: 16)
-        .fill(color.opacity(0.05))
-        .background(
-          RoundedRectangle(cornerRadius: 16)
-            .fill(.ultraThinMaterial.opacity(0.4))
-        )
+        .fill(Color.tmiSurface)
     )
     .overlay(
       RoundedRectangle(cornerRadius: 16)
@@ -864,31 +637,3 @@ struct StatCard: View {
   }
 }
 
-
-//struct StatCard: View {
-//    let title: String
-//    let value: String
-//    let icon: String
-//    let color: Color
-//    
-//    var body: some View {
-//        VStack(spacing: 8) {
-//            HStack {
-//                Image(systemName: icon)
-//                    .foregroundColor(color)
-//                Spacer()
-//            }
-//            Text(value)
-//                .font(.title2)
-//                .fontWeight(.bold)
-//                .frame(maxWidth: .infinity, alignment: .leading)
-//            Text(title)
-//                .font(.caption)
-//                .foregroundColor(.secondary)
-//                .frame(maxWidth: .infinity, alignment: .leading)
-//        }
-//        .padding()
-//        .background(Color(UIColor.secondarySystemBackground))
-//        .cornerRadius(12)
-//    }
-//}
