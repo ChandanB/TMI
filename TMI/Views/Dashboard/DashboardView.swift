@@ -231,27 +231,27 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     
     switch role {
     case .counselor:
-      // Counselor sees their assigned caseload
-      roleData.caseloadCount = students.count // TODO: Filter by assigned counselor
+      // MVP: Show all students as caseload (filtering by assigned counselor is post-MVP)
+      roleData.caseloadCount = students.count
       roleData.pendingApprovals = plans.filter { $0.approvalStatus == .pendingApproval }.count
-      roleData.upcomingMeetings = 0 // TODO: Fetch from meeting service
+      roleData.upcomingMeetings = 0
       roleData.criticalAlerts = students.filter { $0.engagementScore < 0.3 }.count
       roleData.caseloadStudentIds = students.compactMap { $0.id }
       
     case .teacher:
-      // Teacher sees their classroom
-      roleData.classroomStudentCount = students.count // TODO: Filter by classroom/teacher
+      // MVP: Show all students (classroom filtering is post-MVP)
+      roleData.classroomStudentCount = students.count
       roleData.classroomPlansActive = plans.filter { $0.approvalStatus == .approved }.count
       roleData.classroomSurveysPending = students.filter { $0.surveyResults?.isEmpty ?? true }.count
-      roleData.classroomAttentionCount = urgentAttentionStudents(in: students).count
-      roleData.classroomPlanGapCount = studentsMissingPlans(students: students, plans: plans).count
+      roleData.classroomAttentionCount = Self.urgentAttentionStudents(in: students).count
+      roleData.classroomPlanGapCount = Self.studentsMissingPlans(students: students, plans: plans).count
       roleData.classroomStudentIds = students.compactMap { $0.id }
       
     case .administrator, .admin, .superintendent, .districtAdmin:
-      // Admin sees school/district-wide
+      // MVP: Show all students and plans in single-teacher context
       roleData.schoolWideStudents = students.count
       roleData.schoolWidePlans = plans.count
-      roleData.staffCount = 0 // TODO: Fetch staff count
+      roleData.staffCount = 0
       
     case .socialWorker:
       // Social worker sees referred students with behavioral plans
@@ -781,21 +781,18 @@ struct DashboardView: View {
                             .gridCellColumns(4)
                     }
 
-                    GridRow { Spacer(minLength: TMISpacing.xxl).gridCellColumns(4) }
+                    GridRow {
+                        Color.clear
+                            .frame(height: TMISpacing.xxl)
+                            .gridCellColumns(4)
+                    }
                 }
             }
-            .padding(.horizontal, TMISpacing.screenPadding)
-            .padding(.top)
         }
+        .padding(.horizontal, TMISpacing.screenPadding)
+        .padding(.top)
         .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink(destination: SettingsView()) {
-                    TMIAvatar(initials: "ED", color: .tmiPrimary, size: 36)
-                }
-            }
-        }
         .sheet(isPresented: $showingAllActivities) {
             NavigationStack {
                 allActivitiesView(data)
