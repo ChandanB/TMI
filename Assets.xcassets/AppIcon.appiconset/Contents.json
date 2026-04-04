@@ -1,59 +1,67 @@
 {
   "images" : [
     {
-      "filename" : "ChatGPT Image Apr 1, 2026, 02_42_19 PM 1.png",
+      "filename" : "ChatGPT Image Apr 4, 2026, 02_37_51 PM 1.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
     },
     {
+      "filename" : "tmi_icon_16x16.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "16x16"
     },
     {
+      "filename" : "tmi_icon_32x32 1.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "16x16"
     },
     {
+      "filename" : "tmi_icon_32x32.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "32x32"
     },
     {
+      "filename" : "AppIcon32x32@2x.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "32x32"
     },
     {
+      "filename" : "AppIcon128x128.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "128x128"
     },
     {
+      "filename" : "tmi_icon_256x256 1.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "128x128"
     },
     {
+      "filename" : "tmi_icon_256x256.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "256x256"
     },
     {
+      "filename" : "tmi_icon_512x512 1.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "256x256"
     },
     {
-      "filename" : "TMI_icon_512x512.png",
+      "filename" : "tmi_icon_512x512.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "512x512"
     },
     {
-      "filename" : "ChatGPT Image Apr 1, 2026, 02_42_19 PM.png",
+      "filename" : "ChatGPT Image Apr 4, 2026, 02_37_51 PM.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "512x512"
