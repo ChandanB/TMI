@@ -216,7 +216,7 @@ struct CareerExplorerView: View {
               resetSearch()
             }
           }
-          .foregroundColor(Color.tmiTextPrimary)
+          .foregroundColor(Color.tmiSecondary)
         }
       }
 
@@ -383,14 +383,8 @@ struct CareerExplorerView: View {
           .font(.system(size: 16, weight: .semibold))
           .padding(.horizontal, 20)
           .padding(.vertical, 12)
-          .background(
-            LinearGradient(
-              colors: [Color.tmiSecondary, Color.tmiSecondary.opacity(0.8)],
-              startPoint: .topLeading,
-              endPoint: .bottomTrailing
-            )
-          )
-          .foregroundColor(Color.tmiTextPrimary)
+          .background(Color.tmiSecondary)
+          .foregroundColor(.white)
           .cornerRadius(16)
           .disabled(isSearching)
         }
@@ -1003,6 +997,8 @@ struct FieldBadgeView: View {
     Text(field)
       .font(.system(size: 12, weight: .medium))
       .foregroundColor(Color.tmiTextSecondary)
+      .lineLimit(1)
+      .fixedSize(horizontal: true, vertical: false)
       .padding(.horizontal, 10)
       .padding(.vertical, 5)
       .background(
@@ -1072,7 +1068,7 @@ struct SalaryView: View {
       Image(systemName: "dollarsign.circle")
         .font(.system(size: 11))
 
-      Text("$\(salaryRange.lowerBound/1000)k - $\(salaryRange.upperBound/1000)k")
+      Text("$\(Int(salaryRange.lowerBound/1000))k - $\(Int(salaryRange.upperBound/1000))k")
         .font(.system(size: 12, weight: .medium))
     }
     .foregroundColor(Color.tmiTextSecondary)

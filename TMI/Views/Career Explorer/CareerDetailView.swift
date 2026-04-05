@@ -359,20 +359,7 @@ struct CareerDetailView: View {
               Group {
                 if selectedTab == index {
                   RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                      LinearGradient(
-                        gradient: Gradient(colors: [
-                          Color.tmiPrimary.opacity(0.8),
-                          Color.tmiSecondary.opacity(0.6)
-                        ]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                      )
-                    )
-                    .overlay(
-                      RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                    )
+                    .fill(Color.tmiSecondary)
                 } else {
                   RoundedRectangle(cornerRadius: 20)
                     .fill(Color.white.opacity(0.08))
@@ -591,18 +578,12 @@ struct CareerDetailView: View {
             Text("Create Personalized Plan")
               .font(.system(size: 16, weight: .semibold))
           }
-          .foregroundColor(Color.tmiTextPrimary)
+          .foregroundColor(.white)
           .frame(maxWidth: .infinity)
           .padding(.vertical, 16)
           .background(
             RoundedRectangle(cornerRadius: 16)
-              .fill(
-                LinearGradient(
-                  colors: [Color.tmiPrimary, Color.tmiSecondary],
-                  startPoint: .topLeading,
-                  endPoint: .bottomTrailing
-                )
-              )
+              .fill(Color.tmiPrimary)
               .shadow(color: Color.tmiPrimary.opacity(0.3), radius: 8, x: 0, y: 4)
           )
         }
