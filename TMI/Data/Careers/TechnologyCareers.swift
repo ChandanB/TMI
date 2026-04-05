@@ -475,6 +475,60 @@ enum TechnologyCareers {
             educationLevel: .bachelors,
             icon: "building.2.fill",
             color: "#3498DB"
+        ),
+
+        // MARK: - Legacy Migrated
+
+        CareerPath(
+            title: "Game Developer",
+            category: "technology",
+            subcategory: "Software Development",
+            description: "Design and build video games, from mobile apps to console experiences.",
+            pathway: CareerPathways.gameDeveloperPathway,
+            requiredInterests: ["technology"],
+            estimatedSalary: SalaryRange(min: 55000, max: 120000),
+            educationLevel: .bachelors,
+            icon: "gamecontroller.fill",
+            color: "#3498DB"
+        ),
+
+        CareerPath(
+            title: "App Designer",
+            category: "technology",
+            subcategory: "Product & Design",
+            description: "Create user interfaces and experiences for mobile and web applications.",
+            pathway: CareerPathways.appDesignerPathway,
+            requiredInterests: ["technology", "creative_arts"],
+            estimatedSalary: SalaryRange(min: 60000, max: 130000),
+            educationLevel: .bachelors,
+            icon: "app.fill",
+            color: "#3498DB"
+        ),
+
+        CareerPath(
+            title: "Software Engineer",
+            category: "technology",
+            subcategory: "Software Development",
+            description: "Build software systems and applications that solve real-world problems.",
+            pathway: CareerPathways.softwareEngineerPathway,
+            requiredInterests: ["technology"],
+            estimatedSalary: SalaryRange(min: 70000, max: 180000),
+            educationLevel: .bachelors,
+            icon: "chevron.left.forwardslash.chevron.right",
+            color: "#3498DB"
+        ),
+
+        CareerPath(
+            title: "Data Analyst",
+            category: "technology",
+            subcategory: "AI & Data Science",
+            description: "Analyze data to help organizations make better decisions.",
+            pathway: CareerPathways.dataAnalystPathway,
+            requiredInterests: ["technology"],
+            estimatedSalary: SalaryRange(min: 55000, max: 110000),
+            educationLevel: .bachelors,
+            icon: "chart.bar.fill",
+            color: "#3498DB"
         )
     ]
 }

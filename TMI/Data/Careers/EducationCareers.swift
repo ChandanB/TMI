@@ -344,5 +344,59 @@ enum EducationCareers {
             icon: "magnifyingglass",
             color: "#E67E22"
         ),
+
+        // MARK: - Legacy Migrated
+
+        CareerPath(
+            title: "Teacher",
+            category: "education",
+            subcategory: "Teaching",
+            description: "Educate and inspire students in schools.",
+            pathway: CareerPathways.teacherPathway,
+            requiredInterests: ["education"],
+            estimatedSalary: SalaryRange(min: 40000, max: 75000),
+            educationLevel: .bachelors,
+            icon: "book.fill",
+            color: "#E67E22"
+        ),
+
+        CareerPath(
+            title: "Tutor",
+            category: "education",
+            subcategory: "Teaching",
+            description: "Provide one-on-one or small group instruction to students.",
+            pathway: CareerPathways.tutorPathway,
+            requiredInterests: ["education"],
+            estimatedSalary: SalaryRange(min: 25000, max: 65000),
+            educationLevel: .varies,
+            icon: "person.2.fill",
+            color: "#E67E22"
+        ),
+
+        CareerPath(
+            title: "Education Specialist",
+            category: "education",
+            subcategory: "Curriculum & Instruction",
+            description: "Develop curriculum and support educational programs.",
+            pathway: CareerPathways.educationSpecialistPathway,
+            requiredInterests: ["education"],
+            estimatedSalary: SalaryRange(min: 50000, max: 90000),
+            educationLevel: .masters,
+            icon: "graduationcap.fill",
+            color: "#E67E22"
+        ),
+
+        CareerPath(
+            title: "School Counselor",
+            category: "education",
+            subcategory: "School Support",
+            description: "Support students' academic, social, and emotional development.",
+            pathway: CareerPathways.schoolCounselorPathway,
+            requiredInterests: ["education", "social_services"],
+            estimatedSalary: SalaryRange(min: 45000, max: 80000),
+            educationLevel: .masters,
+            icon: "heart.text.square.fill",
+            color: "#E67E22"
+        ),
     ]
 }

@@ -343,6 +343,60 @@ enum SportsCareers {
             educationLevel: .bachelors,
             icon: "trophy.circle.fill",
             color: "#F39C12"
+        ),
+
+        // MARK: - Legacy Migrated
+
+        CareerPath(
+            title: "Coach",
+            category: "sports",
+            subcategory: "Coaching & Training",
+            description: "Train athletes and teams to reach their full potential.",
+            pathway: CareerPathways.coachPathway,
+            requiredInterests: ["sports_athletics"],
+            estimatedSalary: SalaryRange(min: 35000, max: 90000),
+            educationLevel: .bachelors,
+            icon: "sportscourt.fill",
+            color: "#F39C12"
+        ),
+
+        CareerPath(
+            title: "Athletic Trainer",
+            category: "sports",
+            subcategory: "Coaching & Training",
+            description: "Prevent and treat sports injuries for athletes.",
+            pathway: CareerPathways.athleticTrainerPathway,
+            requiredInterests: ["sports_athletics", "health_wellness"],
+            estimatedSalary: SalaryRange(min: 45000, max: 75000),
+            educationLevel: .masters,
+            icon: "bandage.fill",
+            color: "#F39C12"
+        ),
+
+        CareerPath(
+            title: "Sports Analyst",
+            category: "sports",
+            subcategory: "Sports Analytics & Media",
+            description: "Analyze sports data and provide insights for teams and media.",
+            pathway: CareerPathways.sportsAnalystPathway,
+            requiredInterests: ["sports_athletics", "technology"],
+            estimatedSalary: SalaryRange(min: 40000, max: 95000),
+            educationLevel: .bachelors,
+            icon: "chart.xyaxis.line",
+            color: "#F39C12"
+        ),
+
+        CareerPath(
+            title: "PE Teacher",
+            category: "sports",
+            subcategory: "Sports Education",
+            description: "Teach physical education and promote healthy lifestyles in schools.",
+            pathway: CareerPathways.peTeacherPathway,
+            requiredInterests: ["sports_athletics", "education"],
+            estimatedSalary: SalaryRange(min: 40000, max: 75000),
+            educationLevel: .bachelors,
+            icon: "figure.run",
+            color: "#F39C12"
         )
     ]
 }

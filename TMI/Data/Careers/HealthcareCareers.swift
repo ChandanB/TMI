@@ -488,6 +488,60 @@ enum HealthcareCareers {
             educationLevel: .bachelors,
             icon: "person.crop.circle.badge.checkmark",
             color: "#16A085"
+        ),
+
+        // MARK: - Legacy Migrated
+
+        CareerPath(
+            title: "Fitness Trainer",
+            category: "healthcare",
+            subcategory: "Wellness & Fitness",
+            description: "Help people achieve their health and fitness goals.",
+            pathway: CareerPathways.fitnessTrainerPathway,
+            requiredInterests: ["health_wellness", "sports_athletics"],
+            estimatedSalary: SalaryRange(min: 35000, max: 75000),
+            educationLevel: .certification,
+            icon: "figure.strengthtraining.traditional",
+            color: "#16A085"
+        ),
+
+        CareerPath(
+            title: "Nutritionist",
+            category: "healthcare",
+            subcategory: "Wellness & Fitness",
+            description: "Guide people toward healthier eating and lifestyle choices.",
+            pathway: CareerPathways.nutritionistPathway,
+            requiredInterests: ["health_wellness"],
+            estimatedSalary: SalaryRange(min: 45000, max: 85000),
+            educationLevel: .bachelors,
+            icon: "leaf.fill",
+            color: "#16A085"
+        ),
+
+        CareerPath(
+            title: "Physical Therapist",
+            category: "healthcare",
+            subcategory: "Therapy & Rehabilitation",
+            description: "Help patients recover from injuries and improve mobility.",
+            pathway: CareerPathways.physicalTherapistPathway,
+            requiredInterests: ["health_wellness"],
+            estimatedSalary: SalaryRange(min: 65000, max: 105000),
+            educationLevel: .doctorate,
+            icon: "figure.walk",
+            color: "#16A085"
+        ),
+
+        CareerPath(
+            title: "Nurse",
+            category: "healthcare",
+            subcategory: "Nursing",
+            description: "Provide care and support to patients in hospitals and clinics.",
+            pathway: CareerPathways.nursePathway,
+            requiredInterests: ["health_wellness", "social_services"],
+            estimatedSalary: SalaryRange(min: 55000, max: 95000),
+            educationLevel: .bachelors,
+            icon: "cross.case.fill",
+            color: "#16A085"
         )
     ]
 }

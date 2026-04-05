@@ -343,6 +343,60 @@ enum SocialServicesCareers {
             educationLevel: .bachelors,
             icon: "person.badge.plus",
             color: "#1ABC9C"
+        ),
+
+        // MARK: - Legacy Migrated
+
+        CareerPath(
+            title: "Social Worker",
+            category: "social_services",
+            subcategory: "Social Work",
+            description: "Help individuals and families overcome challenges and access resources.",
+            pathway: CareerPathways.socialWorkerPathway,
+            requiredInterests: ["social_services"],
+            estimatedSalary: SalaryRange(min: 40000, max: 75000),
+            educationLevel: .masters,
+            icon: "hands.sparkles.fill",
+            color: "#1ABC9C"
+        ),
+
+        CareerPath(
+            title: "Counselor",
+            category: "social_services",
+            subcategory: "Counseling",
+            description: "Provide mental health support and guidance to clients.",
+            pathway: CareerPathways.counselorPathway,
+            requiredInterests: ["social_services"],
+            estimatedSalary: SalaryRange(min: 45000, max: 85000),
+            educationLevel: .masters,
+            icon: "brain.head.profile",
+            color: "#1ABC9C"
+        ),
+
+        CareerPath(
+            title: "Community Organizer",
+            category: "social_services",
+            subcategory: "Community & Advocacy",
+            description: "Build community power and advocate for social change.",
+            pathway: CareerPathways.communityOrganizerPathway,
+            requiredInterests: ["social_services"],
+            estimatedSalary: SalaryRange(min: 35000, max: 70000),
+            educationLevel: .bachelors,
+            icon: "person.3.fill",
+            color: "#1ABC9C"
+        ),
+
+        CareerPath(
+            title: "Nonprofit Director",
+            category: "social_services",
+            subcategory: "Nonprofit & Government",
+            description: "Lead nonprofit organizations making a difference in communities.",
+            pathway: CareerPathways.nonprofitDirectorPathway,
+            requiredInterests: ["social_services", "business_entrepreneurship"],
+            estimatedSalary: SalaryRange(min: 50000, max: 120000),
+            educationLevel: .bachelors,
+            icon: "building.2.fill",
+            color: "#1ABC9C"
         )
     ]
 }

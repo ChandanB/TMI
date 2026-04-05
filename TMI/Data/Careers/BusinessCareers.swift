@@ -451,5 +451,59 @@ enum BusinessCareers {
             color: "#2ECC71"
         ),
 
+        // MARK: - Legacy Migrated
+
+        CareerPath(
+            title: "Entrepreneur",
+            category: "business",
+            subcategory: "Entrepreneurship",
+            description: "Start and grow your own business ventures.",
+            pathway: CareerPathways.entrepreneurPathway,
+            requiredInterests: ["business_entrepreneurship"],
+            estimatedSalary: SalaryRange(min: 0, max: 1000000),
+            educationLevel: .varies,
+            icon: "lightbulb.fill",
+            color: "#2ECC71"
+        ),
+
+        CareerPath(
+            title: "Marketing Specialist",
+            category: "business",
+            subcategory: "Marketing",
+            description: "Promote products and brands through creative campaigns.",
+            pathway: CareerPathways.marketingSpecialistPathway,
+            requiredInterests: ["business_entrepreneurship", "creative_arts"],
+            estimatedSalary: SalaryRange(min: 45000, max: 95000),
+            educationLevel: .bachelors,
+            icon: "megaphone.fill",
+            color: "#2ECC71"
+        ),
+
+        CareerPath(
+            title: "Financial Advisor",
+            category: "business",
+            subcategory: "Finance",
+            description: "Help people and businesses manage their finances and investments.",
+            pathway: CareerPathways.financialAdvisorPathway,
+            requiredInterests: ["business_entrepreneurship"],
+            estimatedSalary: SalaryRange(min: 50000, max: 150000),
+            educationLevel: .bachelors,
+            icon: "dollarsign.circle.fill",
+            color: "#2ECC71"
+        ),
+
+        CareerPath(
+            title: "Business Analyst",
+            category: "business",
+            subcategory: "Management & Strategy",
+            description: "Analyze business processes and recommend improvements.",
+            pathway: CareerPathways.businessAnalystPathway,
+            requiredInterests: ["business_entrepreneurship", "technology"],
+            estimatedSalary: SalaryRange(min: 60000, max: 110000),
+            educationLevel: .bachelors,
+            icon: "briefcase.fill",
+            color: "#2ECC71"
+        ),
+
     ]
 }

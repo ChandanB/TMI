@@ -313,18 +313,22 @@ struct CareerExplorationView: View {
 // MARK: - Preview
 
 #Preview {
+    let podcaster = CareerCatalog.allCareers.first(where: { $0.title == "Podcaster" })
+        ?? CareerCatalog.allCareers[0]
+    let gameDeveloper = CareerCatalog.allCareers.first(where: { $0.title == "Game Developer" })
+        ?? CareerCatalog.allCareers[0]
     NavigationStack {
         CareerExplorationView(
             studentId: "preview-student-id",
             careerMatches: [
                 CareerMatchResult(
-                    career: .podcaster,
+                    career: podcaster,
                     score: 0.95,
                     matchingInterests: ["audio_media"],
                     suggestedTMIModules: [.chaseYourSpace, .acknowledgeInterests]
                 ),
                 CareerMatchResult(
-                    career: .gameDeveloper,
+                    career: gameDeveloper,
                     score: 0.82,
                     matchingInterests: ["technology"],
                     suggestedTMIModules: [.chaseYourSpace, .alignYourMind]

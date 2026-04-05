@@ -345,5 +345,59 @@ enum CommunicationsCareers {
             color: "#9B59B6"
         ),
 
+        // MARK: - Audio & Media
+
+        CareerPath(
+            title: "Podcaster",
+            category: "communications",
+            subcategory: "Audio & Media",
+            description: "Create and host audio shows on topics you're passionate about. Build an audience and share stories.",
+            pathway: CareerPathways.podcasterPathway,
+            requiredInterests: ["audio_media"],
+            estimatedSalary: SalaryRange(min: 30000, max: 100000),
+            educationLevel: .varies,
+            icon: "mic.fill",
+            color: "#9B59B6"
+        ),
+
+        CareerPath(
+            title: "Radio Host",
+            category: "communications",
+            subcategory: "Audio & Media",
+            description: "Broadcast live shows, interview guests, and connect with listeners through radio.",
+            pathway: CareerPathways.radioHostPathway,
+            requiredInterests: ["audio_media"],
+            estimatedSalary: SalaryRange(min: 35000, max: 85000),
+            educationLevel: .bachelors,
+            icon: "antenna.radiowaves.left.and.right",
+            color: "#9B59B6"
+        ),
+
+        CareerPath(
+            title: "Audio Engineer",
+            category: "communications",
+            subcategory: "Audio & Media",
+            description: "Mix and master sound for music, podcasts, films, and live events.",
+            pathway: CareerPathways.audioEngineerPathway,
+            requiredInterests: ["audio_media", "technology"],
+            estimatedSalary: SalaryRange(min: 45000, max: 95000),
+            educationLevel: .vocational,
+            icon: "waveform",
+            color: "#9B59B6"
+        ),
+
+        CareerPath(
+            title: "Content Creator",
+            category: "communications",
+            subcategory: "Audio & Media",
+            description: "Create videos, podcasts, and digital content for online platforms.",
+            pathway: CareerPathways.contentCreatorPathway,
+            requiredInterests: ["audio_media", "creative_arts"],
+            estimatedSalary: SalaryRange(min: 25000, max: 150000),
+            educationLevel: .varies,
+            icon: "video.fill",
+            color: "#9B59B6"
+        ),
+
     ]
 }

@@ -423,5 +423,59 @@ enum ArtsEntertainmentCareers {
             color: "#E74C3C"
         ),
 
+        // MARK: - Legacy Migrated
+
+        CareerPath(
+            title: "Graphic Designer",
+            category: "arts_entertainment",
+            subcategory: "Visual Arts",
+            description: "Create visual content for brands, websites, and marketing materials.",
+            pathway: CareerPathways.graphicDesignerPathway,
+            requiredInterests: ["creative_arts"],
+            estimatedSalary: SalaryRange(min: 40000, max: 90000),
+            educationLevel: .bachelors,
+            icon: "paintpalette.fill",
+            color: "#E74C3C"
+        ),
+
+        CareerPath(
+            title: "Photographer",
+            category: "arts_entertainment",
+            subcategory: "Visual Arts",
+            description: "Capture moments and tell stories through photography.",
+            pathway: CareerPathways.photographerPathway,
+            requiredInterests: ["creative_arts"],
+            estimatedSalary: SalaryRange(min: 30000, max: 85000),
+            educationLevel: .varies,
+            icon: "camera.fill",
+            color: "#E74C3C"
+        ),
+
+        CareerPath(
+            title: "Film Director",
+            category: "arts_entertainment",
+            subcategory: "Film & Television",
+            description: "Direct films, commercials, and video productions.",
+            pathway: CareerPathways.filmDirectorPathway,
+            requiredInterests: ["creative_arts", "audio_media"],
+            estimatedSalary: SalaryRange(min: 45000, max: 150000),
+            educationLevel: .bachelors,
+            icon: "film.fill",
+            color: "#E74C3C"
+        ),
+
+        CareerPath(
+            title: "Animator",
+            category: "arts_entertainment",
+            subcategory: "Film & Television",
+            description: "Bring characters and stories to life through animation.",
+            pathway: CareerPathways.animatorPathway,
+            requiredInterests: ["creative_arts", "technology"],
+            estimatedSalary: SalaryRange(min: 50000, max: 110000),
+            educationLevel: .bachelors,
+            icon: "sparkles",
+            color: "#E74C3C"
+        ),
+
     ]
 }
