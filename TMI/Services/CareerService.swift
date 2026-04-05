@@ -529,15 +529,19 @@ final class CareerService: @unchecked Sendable {
     private func interestCategoryToClusterName(_ category: String) -> String {
         switch category.lowercased() {
         case "technology": return "technology"
-        case "science & discovery", "mathematics": return "technology"
+        case "science & discovery", "mathematics": return "science_research"
         case "arts & creativity", "photography", "making & building": return "creative_arts"
         case "sports & athletics": return "sports_athletics"
         case "music", "entertainment & media": return "audio_media"
         case "academics", "learning & education": return "education"
         case "leadership & service", "social causes", "social activities": return "social_services"
         case "health & wellness": return "health_wellness"
-        case "outdoors & nature": return "health_wellness"
+        case "outdoors & nature": return "agriculture_nature"
         case "communication", "languages & culture": return "social_services"
+        case "engineering", "building", "construction": return "engineering_building"
+        case "law", "government", "politics": return "law_government"
+        case "cooking", "travel", "hospitality": return "hospitality_tourism"
+        case "transportation", "vehicles", "logistics": return "transportation_logistics"
         default: return ""
         }
     }

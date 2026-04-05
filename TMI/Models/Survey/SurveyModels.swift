@@ -206,6 +206,60 @@ extension InterestCluster {
         color: "#1ABC9C"
     )
 
+    static let scienceResearch = InterestCluster(
+        name: "science_research",
+        displayName: "Science & Research",
+        weight: 0.0,
+        relatedCareers: [],
+        icon: "atom",
+        color: "#2980B9"
+    )
+
+    static let engineeringBuilding = InterestCluster(
+        name: "engineering_building",
+        displayName: "Engineering & Building",
+        weight: 0.0,
+        relatedCareers: [],
+        icon: "gearshape.2.fill",
+        color: "#2C3E50"
+    )
+
+    static let lawGovernment = InterestCluster(
+        name: "law_government",
+        displayName: "Law & Government",
+        weight: 0.0,
+        relatedCareers: [],
+        icon: "scale.3d",
+        color: "#34495E"
+    )
+
+    static let agricultureNature = InterestCluster(
+        name: "agriculture_nature",
+        displayName: "Agriculture & Nature",
+        weight: 0.0,
+        relatedCareers: [],
+        icon: "leaf.fill",
+        color: "#27AE60"
+    )
+
+    static let hospitalityTourism = InterestCluster(
+        name: "hospitality_tourism",
+        displayName: "Hospitality & Tourism",
+        weight: 0.0,
+        relatedCareers: [],
+        icon: "fork.knife",
+        color: "#D35400"
+    )
+
+    static let transportationLogistics = InterestCluster(
+        name: "transportation_logistics",
+        displayName: "Transportation & Logistics",
+        weight: 0.0,
+        relatedCareers: [],
+        icon: "airplane",
+        color: "#5D6D7E"
+    )
+
     static let allCategories: [InterestCluster] = [
         .audioMedia,
         .healthWellness,
@@ -214,7 +268,13 @@ extension InterestCluster {
         .sportsAthletics,
         .businessEntrepreneurship,
         .education,
-        .socialServices
+        .socialServices,
+        .scienceResearch,
+        .engineeringBuilding,
+        .lawGovernment,
+        .agricultureNature,
+        .hospitalityTourism,
+        .transportationLogistics
     ]
 }
 
