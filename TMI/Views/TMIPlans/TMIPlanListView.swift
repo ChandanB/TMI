@@ -92,7 +92,6 @@ struct TMIPlanListView: View {
 
             VStack(spacing: 0) {
                 HStack(alignment: .center, spacing: 8) {
-                    TMIHelpTooltipButton(message: "View and manage all trauma-informed intervention plans. Filter by status, search, and access detailed plans for each student or group.")
                     Spacer()
                 }
                 .padding(.horizontal, TMISpacing.screenPadding)

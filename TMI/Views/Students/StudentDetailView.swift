@@ -299,8 +299,16 @@ struct StudentDetailView: View {
     // MARK: - Quick Actions
 
     private func quickActionsRow(student: Student) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: TMISpacing.md) {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Quick Actions")
+                .font(.title3.bold())
+                .foregroundColor(.tmiTextPrimary)
+                .padding(.bottom, TMISpacing.sm)
+
+            Divider()
+                .padding(.bottom, TMISpacing.md)
+
+            VStack(spacing: TMISpacing.sm) {
                 quickActionButton(
                     icon: "person.crop.circle.badge.checkmark",
                     label: "Student Mode",
@@ -326,28 +334,32 @@ struct StudentDetailView: View {
                     action: { showingProgress = true }
                 )
             }
-            .padding(.horizontal, TMISpacing.screenPadding)
         }
-        .padding(.horizontal, -TMISpacing.screenPadding)
     }
 
     private func quickActionButton(icon: String, label: String, color: Color = .tmiPrimary, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: TMISpacing.sm) {
+            HStack(spacing: TMISpacing.md) {
                 Image(systemName: icon)
-                    .font(.system(size: 24))
+                    .font(.system(size: 20))
                     .foregroundColor(color)
+                    .frame(width: 40, height: 40)
+                    .background(color.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 Text(label)
-                    .font(.tmiCaption)
-                    .foregroundColor(.tmiTextSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .font(.body.weight(.medium))
+                    .foregroundColor(.tmiTextPrimary)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14))
+                    .foregroundColor(.tmiTextTertiary)
             }
-            .frame(width: 100, height: 80)
-            .padding(.vertical, TMISpacing.md)
-            .background(Color.tmiSurface)
-            .cornerRadius(TMIRadius.md)
+            .padding(.vertical, TMISpacing.sm)
+            .padding(.horizontal, TMISpacing.sm)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
