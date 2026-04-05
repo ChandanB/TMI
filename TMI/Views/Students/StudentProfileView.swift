@@ -127,12 +127,11 @@ struct StudentProfileView: View {
                         icon: "person.fill",
                         title: "Student Information",
                         isRequired: true,
-                        accentColor: .tmiSecondary,
                         isExpanded: $infoExpanded
                     ) {
                         studentInformationContent
                     }
-                    .tmiCard()
+                    .tmiCard(accentColor: .tmiSecondary)
 
                     // Guardian Information
                     AccordionSection(
@@ -351,6 +350,7 @@ struct StudentProfileView: View {
                 .padding(TMISpacing.md)
                 .background(Color.tmiSurface)
                 .cornerRadius(TMIRadius.sm)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             HStack(spacing: TMISpacing.md) {

@@ -107,8 +107,8 @@ struct StudentCareersSection: View {
                     .font(.subheadline.weight(.medium))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .background(.tint, in: RoundedRectangle(cornerRadius: 10))
-                    .foregroundStyle(Color.tmiTextPrimary)
+                    .background(Color.tmiPrimary, in: RoundedRectangle(cornerRadius: 10))
+                    .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
         }

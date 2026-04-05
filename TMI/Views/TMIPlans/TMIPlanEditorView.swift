@@ -131,14 +131,13 @@ struct TMIPlanEditorView: View {
             ScrollView {
                 VStack(spacing: TMISpacing.sm) {
                     // 1. Plan Details
-                    sectionCard {
+                    sectionCard(accentColor: .tmiSecondary) {
                         AccordionSection(
                             icon: "doc.text.fill",
                             title: "Plan Details",
                             badge: planTitle.isEmpty ? nil : "Set",
                             badgeColor: .tmiPrimary,
                             isRequired: true,
-                            accentColor: .tmiSecondary,
                             isExpanded: $detailsExpanded
                         ) {
                             planDetailsContent
@@ -146,14 +145,13 @@ struct TMIPlanEditorView: View {
                     }
 
                     // 2. Students
-                    sectionCard {
+                    sectionCard(accentColor: .tmiSecondary) {
                         AccordionSection(
                             icon: "person.2.fill",
                             title: "Students",
                             badge: selectedStudents.isEmpty ? nil : "\(selectedStudents.count)",
                             badgeColor: .tmiPrimary,
                             isRequired: true,
-                            accentColor: .tmiSecondary,
                             isExpanded: $studentsExpanded
                         ) {
                             studentsContent
@@ -299,11 +297,9 @@ struct TMIPlanEditorView: View {
     // MARK: - Section Card
 
     @ViewBuilder
-    private func sectionCard<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+    private func sectionCard<C: View>(accentColor: Color? = nil, @ViewBuilder _ content: () -> C) -> some View {
         content()
-            .background(Color.tmiSurface)
-            .cornerRadius(TMIRadius.md)
-            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+            .tmiCard(accentColor: accentColor)
             .padding(.horizontal, TMISpacing.screenPadding)
     }
 

@@ -433,23 +433,7 @@ struct TMIPlanDetailView: View {
                 }
             }
         }
-        .padding(TMISpacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .fill(Color.white.opacity(0.05))
-                .background(Color.tmiSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [modelColor.opacity(0.3), .clear, modelColor.opacity(0.1)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
+        .tmiCard(accentColor: modelColor)
     }
 
     // MARK: - Plan Sections (Rules-driven)
@@ -492,16 +476,7 @@ struct TMIPlanDetailView: View {
 
             content()
         }
-        .padding(TMISpacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .fill(Color.white.opacity(0.05))
-                .background(Color.tmiSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-        )
+        .tmiCard()
     }
 
     @ViewBuilder

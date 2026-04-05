@@ -147,10 +147,12 @@ enum TMICardStyle {
 /// Unified solid card component
 struct TMICard<Content: View>: View {
     let style: TMICardStyle
+    let accentColor: Color?
     let content: Content
 
-    init(style: TMICardStyle = .default, @ViewBuilder content: () -> Content) {
+    init(style: TMICardStyle = .default, accentColor: Color? = nil, @ViewBuilder content: () -> Content) {
         self.style = style
+        self.accentColor = accentColor
         self.content = content()
     }
 
@@ -165,6 +167,18 @@ struct TMICard<Content: View>: View {
                         .stroke(style.borderColor, lineWidth: 1)
                     : nil
             )
+            .overlay(alignment: .leading) {
+                if let accentColor {
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: style.cornerRadius,
+                        bottomLeadingRadius: style.cornerRadius,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 0
+                    )
+                    .fill(accentColor)
+                    .frame(width: 3)
+                }
+            }
             .shadow(
                 color: Color(hex: "#2D3436").opacity(style.secondaryShadowOpacity),
                 radius: style.secondaryShadowRadius,
@@ -539,8 +553,8 @@ extension View {
 
 extension View {
     /// Apply TMI card styling
-    func tmiCard(style: TMICardStyle = .default) -> some View {
-        TMICard(style: style) {
+    func tmiCard(style: TMICardStyle = .default, accentColor: Color? = nil) -> some View {
+        TMICard(style: style, accentColor: accentColor) {
             self
         }
     }
