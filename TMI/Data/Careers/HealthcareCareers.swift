@@ -212,19 +212,6 @@ enum HealthcareCareers {
         ),
 
         CareerPath(
-            title: "Substance Abuse Counselor",
-            category: "healthcare",
-            subcategory: "Mental Health",
-            description: "Substance abuse counselors help people overcome addiction to drugs or alcohol by providing counseling, support, and recovery strategies. They work in treatment centers, hospitals, and community organizations to guide clients toward healthier lives.",
-            pathway: nil,
-            requiredInterests: ["health_wellness", "social_services"],
-            estimatedSalary: SalaryRange(min: 40000, max: 80000),
-            educationLevel: .bachelors,
-            icon: "hand.raised.fill",
-            color: "#16A085"
-        ),
-
-        CareerPath(
             title: "Art Therapist",
             category: "healthcare",
             subcategory: "Mental Health",

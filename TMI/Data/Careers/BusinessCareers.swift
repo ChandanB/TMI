@@ -145,19 +145,6 @@ enum BusinessCareers {
         ),
 
         CareerPath(
-            title: "Product Manager",
-            category: "business",
-            subcategory: "Management",
-            description: "Guide the development and launch of products from concept to market. Product managers work across engineering, design, and business teams to build things customers love.",
-            pathway: nil,
-            requiredInterests: ["business_entrepreneurship", "technology"],
-            estimatedSalary: SalaryRange(min: 75000, max: 160000),
-            educationLevel: .bachelors,
-            icon: "square.grid.2x2.fill",
-            color: "#2ECC71"
-        ),
-
-        CareerPath(
             title: "Project Manager",
             category: "business",
             subcategory: "Management",
@@ -435,19 +422,6 @@ enum BusinessCareers {
             estimatedSalary: SalaryRange(min: 45000, max: 100000),
             educationLevel: .bachelors,
             icon: "globe",
-            color: "#2ECC71"
-        ),
-
-        CareerPath(
-            title: "Event Planner",
-            category: "business",
-            subcategory: "Entrepreneurship",
-            description: "Organize and coordinate events such as weddings, corporate meetings, and festivals. Event planners manage budgets, vendors, and timelines to create memorable experiences.",
-            pathway: nil,
-            requiredInterests: ["business_entrepreneurship", "hospitality_tourism"],
-            estimatedSalary: SalaryRange(min: 40000, max: 90000),
-            educationLevel: .bachelors,
-            icon: "calendar.badge.plus",
             color: "#2ECC71"
         ),
 

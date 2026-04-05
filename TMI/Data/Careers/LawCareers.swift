@@ -132,19 +132,6 @@ enum LawCareers {
         ),
 
         CareerPath(
-            title: "Forensic Scientist",
-            category: "law",
-            subcategory: "Criminal Justice",
-            description: "Forensic scientists analyze physical evidence from crime scenes—such as DNA, fingerprints, and chemical substances—to help investigators and courts understand what happened. Their scientific findings can be the key to solving a case.",
-            pathway: nil,
-            requiredInterests: ["law_government", "science_research"],
-            estimatedSalary: SalaryRange(min: 50_000, max: 100_000),
-            educationLevel: .bachelors,
-            icon: "flask.fill",
-            color: "#7F8C8D"
-        ),
-
-        CareerPath(
             title: "Crime Scene Investigator",
             category: "law",
             subcategory: "Criminal Justice",

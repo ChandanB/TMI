@@ -65,19 +65,6 @@ enum ArtsEntertainmentCareers {
         ),
 
         CareerPath(
-            title: "Art Therapist",
-            category: "arts_entertainment",
-            subcategory: "Visual Arts",
-            description: "Use art-making as a therapeutic tool to help people process emotions and improve mental health. Art therapists work in hospitals, schools, and counseling centers.",
-            pathway: nil,
-            requiredInterests: ["creative_arts", "health_wellness"],
-            estimatedSalary: SalaryRange(min: 45000, max: 80000),
-            educationLevel: .masters,
-            icon: "heart.fill",
-            color: "#E74C3C"
-        ),
-
-        CareerPath(
             title: "Illustrator",
             category: "arts_entertainment",
             subcategory: "Visual Arts",
@@ -301,19 +288,6 @@ enum ArtsEntertainmentCareers {
             estimatedSalary: SalaryRange(min: 28000, max: 100000),
             educationLevel: .bachelors,
             icon: "quote.bubble.fill",
-            color: "#E74C3C"
-        ),
-
-        CareerPath(
-            title: "Technical Writer",
-            category: "arts_entertainment",
-            subcategory: "Writing & Publishing",
-            description: "Create clear, accurate documentation such as manuals, guides, and how-to instructions for technical products and processes. Technical writers bridge complex information and everyday users.",
-            pathway: nil,
-            requiredInterests: ["creative_arts", "technology"],
-            estimatedSalary: SalaryRange(min: 55000, max: 110000),
-            educationLevel: .bachelors,
-            icon: "doc.fill",
             color: "#E74C3C"
         ),
 

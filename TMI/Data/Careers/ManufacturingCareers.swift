@@ -131,19 +131,6 @@ enum ManufacturingCareers {
             color: "#95A5A6"
         ),
 
-        CareerPath(
-            title: "Process Engineer",
-            category: "manufacturing",
-            subcategory: "Quality & Safety",
-            description: "Process engineers analyze and improve the methods used to manufacture products, looking for ways to reduce costs, increase speed, and minimize waste. They apply engineering principles to optimize every step of a production process.",
-            pathway: nil,
-            requiredInterests: ["engineering_building", "science_research"],
-            estimatedSalary: SalaryRange(min: 72_000, max: 130_000),
-            educationLevel: .bachelors,
-            icon: "gearshape.fill",
-            color: "#95A5A6"
-        ),
-
         // MARK: - Industrial Design
 
         CareerPath(
@@ -223,19 +210,6 @@ enum ManufacturingCareers {
             estimatedSalary: SalaryRange(min: 42_000, max: 85_000),
             educationLevel: .bachelors,
             icon: "paintpalette.fill",
-            color: "#95A5A6"
-        ),
-
-        CareerPath(
-            title: "Materials Scientist",
-            category: "manufacturing",
-            subcategory: "Materials & Textiles",
-            description: "Materials scientists study the properties of metals, ceramics, plastics, and other substances to develop new materials or improve existing ones for use in manufacturing. Their discoveries drive innovation in industries from electronics to construction.",
-            pathway: nil,
-            requiredInterests: ["engineering_building", "science_research"],
-            estimatedSalary: SalaryRange(min: 65_000, max: 130_000),
-            educationLevel: .masters,
-            icon: "atom",
             color: "#95A5A6"
         ),
 

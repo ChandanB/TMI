@@ -93,19 +93,6 @@ enum ArchitectureCareers {
         ),
 
         CareerPath(
-            title: "City Manager",
-            category: "architecture",
-            subcategory: "Urban Planning",
-            description: "City managers oversee the day-to-day operations of a city's government, managing departments like police, fire, public works, and parks. They implement policies set by elected officials and ensure city services run efficiently.",
-            pathway: nil,
-            requiredInterests: ["engineering_building", "law_government", "business_entrepreneurship"],
-            estimatedSalary: SalaryRange(min: 85_000, max: 175_000),
-            educationLevel: .masters,
-            icon: "building.fill",
-            color: "#8E44AD"
-        ),
-
-        CareerPath(
             title: "Regional Planner",
             category: "architecture",
             subcategory: "Urban Planning",

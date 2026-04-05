@@ -387,10 +387,10 @@ enum TradesCareers {
         ),
 
         CareerPath(
-            title: "Painter",
+            title: "House Painter",
             category: "trades",
             subcategory: "Other Trades",
-            description: "Painters apply paint, stain, and other finishes to interior and exterior surfaces of buildings, preparing surfaces, selecting materials, and using brushes, rollers, and sprayers to achieve durable, attractive results. Professional painters also apply specialty coatings for fire protection, weatherproofing, and industrial purposes.",
+            description: "House painters apply paint, stain, and other finishes to the interior and exterior surfaces of homes and commercial buildings, preparing surfaces and using brushes, rollers, and sprayers to achieve durable, attractive results. Professional painters also apply specialty coatings for weatherproofing and fire protection.",
             pathway: nil,
             requiredInterests: ["engineering_building", "creative_arts"],
             estimatedSalary: SalaryRange(min: 38_000, max: 75_000),

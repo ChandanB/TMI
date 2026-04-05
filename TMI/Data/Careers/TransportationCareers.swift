@@ -93,19 +93,6 @@ enum TransportationCareers {
         ),
 
         CareerPath(
-            title: "Marine Engineer",
-            category: "transportation",
-            subcategory: "Maritime",
-            description: "Marine engineers design, operate, and maintain the engines, propulsion systems, and mechanical equipment that power ships and offshore platforms. They troubleshoot complex machinery at sea, ensure systems run efficiently, and oversee repairs that keep vessels operational far from shore.",
-            pathway: nil,
-            requiredInterests: ["transportation_logistics", "engineering_building"],
-            estimatedSalary: SalaryRange(min: 75_000, max: 140_000),
-            educationLevel: .bachelors,
-            icon: "gearshape.2.fill",
-            color: "#5D6D7E"
-        ),
-
-        CareerPath(
             title: "Port Manager",
             category: "transportation",
             subcategory: "Maritime",
