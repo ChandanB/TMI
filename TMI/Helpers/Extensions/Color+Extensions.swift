@@ -29,11 +29,13 @@ extension Color {
     // MARK: - Surface Colors
     static let tmiSurface = Color(hex: "#FFFFFF")
     static let tmiSurfaceElevated = Color(hex: "#FFFFFF")
+    static let tmiSurfaceTinted = Color(hex: "#F8F3ED")    // Warm tint for section headers
     static let tmiCardBackground = Color(hex: "#FFFFFF")
     static let tmiInputBackground = Color(hex: "#F5F0EB")
 
     // MARK: - Border Colors
     static let tmiBorder = Color(hex: "#E8E2DA")
+    static let tmiBorderStrong = Color(hex: "#D9D2C9")    // Warmer, more visible card border
     static let tmiDivider = Color(hex: "#F0EBE4")
 
     // MARK: - Semantic Colors
