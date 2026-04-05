@@ -85,7 +85,14 @@ enum TMICardStyle {
     var hasBorder: Bool {
         switch self {
         case .default, .outlined: return true
-        case .elevated: return false
+        case .elevated: return true
+        }
+    }
+
+    var borderColor: Color {
+        switch self {
+        case .default, .elevated: return Color.tmiBorderStrong
+        case .outlined: return Color.tmiBorderStrong
         }
     }
 
@@ -98,24 +105,40 @@ enum TMICardStyle {
 
     var shadowRadius: CGFloat {
         switch self {
-        case .default: return 2
-        case .elevated: return 8
+        case .default: return 4
+        case .elevated: return 10
         case .outlined: return 0
         }
     }
 
     var shadowOpacity: Double {
         switch self {
-        case .default: return 0.05
-        case .elevated: return 0.08
+        case .default: return 0.10
+        case .elevated: return 0.12
         case .outlined: return 0
         }
     }
 
     var shadowOffset: CGFloat {
         switch self {
-        case .default: return 1
+        case .default: return 2
         case .elevated: return 4
+        case .outlined: return 0
+        }
+    }
+
+    var secondaryShadowRadius: CGFloat {
+        switch self {
+        case .default: return 2
+        case .elevated: return 4
+        case .outlined: return 0
+        }
+    }
+
+    var secondaryShadowOpacity: Double {
+        switch self {
+        case .default: return 0.06
+        case .elevated: return 0.08
         case .outlined: return 0
         }
     }
@@ -139,8 +162,14 @@ struct TMICard<Content: View>: View {
             .overlay(
                 style.hasBorder
                     ? RoundedRectangle(cornerRadius: style.cornerRadius)
-                        .stroke(Color.tmiBorder, lineWidth: 1)
+                        .stroke(style.borderColor, lineWidth: 1)
                     : nil
+            )
+            .shadow(
+                color: Color(hex: "#2D3436").opacity(style.secondaryShadowOpacity),
+                radius: style.secondaryShadowRadius,
+                x: 0,
+                y: 1
             )
             .shadow(
                 color: Color(hex: "#2D3436").opacity(style.shadowOpacity),
