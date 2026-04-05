@@ -138,6 +138,7 @@ struct TMIPlanEditorView: View {
                             badge: planTitle.isEmpty ? nil : "Set",
                             badgeColor: .tmiPrimary,
                             isRequired: true,
+                            accentColor: .tmiSecondary,
                             isExpanded: $detailsExpanded
                         ) {
                             planDetailsContent
@@ -152,6 +153,7 @@ struct TMIPlanEditorView: View {
                             badge: selectedStudents.isEmpty ? nil : "\(selectedStudents.count)",
                             badgeColor: .tmiPrimary,
                             isRequired: true,
+                            accentColor: .tmiSecondary,
                             isExpanded: $studentsExpanded
                         ) {
                             studentsContent

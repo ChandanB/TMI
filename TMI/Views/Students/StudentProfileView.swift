@@ -127,6 +127,7 @@ struct StudentProfileView: View {
                         icon: "person.fill",
                         title: "Student Information",
                         isRequired: true,
+                        accentColor: .tmiSecondary,
                         isExpanded: $infoExpanded
                     ) {
                         studentInformationContent

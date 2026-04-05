@@ -6,6 +6,7 @@ struct AccordionSection<Content: View>: View {
     var badge: String? = nil
     var badgeColor: Color = .blue
     var isRequired: Bool = false
+    var accentColor: Color? = nil
     @Binding var isExpanded: Bool
     @ViewBuilder let content: () -> Content
 
@@ -53,6 +54,9 @@ struct AccordionSection<Content: View>: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
+                .background(
+                    accentColor != nil ? Color.tmiSurfaceTinted : Color.clear
+                )
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -64,5 +68,13 @@ struct AccordionSection<Content: View>: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .overlay(alignment: .leading) {
+            if let accentColor {
+                Rectangle()
+                    .fill(accentColor)
+                    .frame(width: 3)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
