@@ -20,7 +20,6 @@ struct StudentInterestsSection: View {
     @State private var availableInterests: [Interest] = []
     @State private var isLoadingAvailable: Bool = false
     @State private var loadError: String? = nil
-    @State private var showNewInterestSheet: Bool = false
     @State private var newInterestName: String = ""
     @State private var isCreating: Bool = false
 
@@ -48,37 +47,19 @@ struct StudentInterestsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Search bar + New button
-            HStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField("Search interests…", text: $searchText)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .submitLabel(.search)
-                        .onSubmit {
-                            // Filtering is reactive via searchText binding — just dismiss keyboard
-                        }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                Button {
-                    newInterestName = searchText
-                    showNewInterestSheet = true
-                } label: {
-                    Label("New", systemImage: "plus")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.pink)
-                        .foregroundStyle(Color.tmiTextPrimary)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
+            // Search bar
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search interests…", text: $searchText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
 
             // Selected interests
             if !filteredSelected.isEmpty {
@@ -134,49 +115,41 @@ struct StudentInterestsSection: View {
                     }
                 }
             }
+
+            // Inline new interest entry
+            HStack(spacing: 8) {
+                TextField("Add an interest…", text: $newInterestName)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .onSubmit {
+                        Task { await createAndAddInterest() }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color.tmiInputBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.tmiBorder, lineWidth: 1)
+                    )
+
+                Button {
+                    Task { await createAndAddInterest() }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                        .background(Color.tmiSecondary)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .disabled(newInterestName.trimmingCharacters(in: .whitespaces).isEmpty || isCreating)
+                .opacity(newInterestName.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1.0)
+            }
         }
         .task {
             await loadAvailableInterests()
-        }
-        .sheet(isPresented: $showNewInterestSheet) {
-            newInterestSheetView
-                .tmiSheetStyle()
-        }
-    }
-
-    // MARK: - New Interest Sheet
-
-    private var newInterestSheetView: some View {
-        NavigationStack {
-            Form {
-                Section("Interest name") {
-                    TextField("e.g. Robotics", text: $newInterestName)
-                        .textInputAutocapitalization(.words)
-                }
-            }
-            .padding(.horizontal)
-            .navigationTitle("New Interest")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showNewInterestSheet = false
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        Task { await createAndAddInterest() }
-                    }
-                    .disabled(newInterestName.trimmingCharacters(in: .whitespaces).isEmpty || isCreating)
-                }
-            }
-            .overlay {
-                if isCreating {
-                    ProgressView("Creating…")
-                        .padding()
-                        .background(Color.tmiSurface, in: RoundedRectangle(cornerRadius: 12))
-                }
-            }
         }
     }
 
@@ -259,7 +232,6 @@ struct StudentInterestsSection: View {
         }
 
         newInterestName = ""
-        showNewInterestSheet = false
     }
 }
 
