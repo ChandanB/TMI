@@ -220,50 +220,12 @@ class CareerMatchingService {
 
     /// Determine growth potential for a career category
     private func determineGrowthPotential(for category: String) -> String {
-        switch category {
-        case "technology":
-            return "High - technology careers are growing rapidly with strong demand"
-        case "health_wellness":
-            return "High - healthcare is an expanding field with aging population"
-        case "business_entrepreneurship":
-            return "Moderate to High - entrepreneurship offers unlimited growth potential"
-        case "creative_arts":
-            return "Moderate - creative fields can be competitive but rewarding"
-        case "education":
-            return "Stable - consistent demand for educators"
-        case "social_services":
-            return "Moderate - growing awareness of mental health and social needs"
-        case "sports_athletics":
-            return "Moderate - competitive field with opportunities in various sports industries"
-        case "audio_media":
-            return "High - digital media and content creation is booming"
-        default:
-            return "Varies by specialization"
-        }
+        CareerCategory(rawValue: category)?.growthPotential ?? "Varies by specialization"
     }
 
     /// Get industry outlook for a career category
     private func industryOutlook(for category: String) -> String {
-        switch category {
-        case "technology":
-            return "Excellent long-term outlook with continuous innovation"
-        case "health_wellness":
-            return "Strong outlook due to aging demographics and health focus"
-        case "business_entrepreneurship":
-            return "Stable with opportunities in emerging markets"
-        case "creative_arts":
-            return "Evolving with digital transformation and new platforms"
-        case "education":
-            return "Stable with ongoing need for qualified educators"
-        case "social_services":
-            return "Growing demand for social support services"
-        case "sports_athletics":
-            return "Steady with opportunities in coaching, training, and analytics"
-        case "audio_media":
-            return "Rapidly growing with podcast and streaming boom"
-        default:
-            return "Outlook varies by specific role and location"
-        }
+        CareerCategory(rawValue: category)?.industryOutlook ?? "Outlook varies by specific role and location"
     }
 
     /// Generate human-readable reasoning
@@ -341,35 +303,8 @@ class CareerMatchingService {
 
     /// Suggest TMI modules based on career path and interests
     private func suggestTMIModules(for career: CareerPath, interests: [InterestCluster]) -> [TMIPlanModel] {
-        var modules: [TMIPlanModel] = []
-
-        // Everyone starts with Chase Your Space
-        modules.append(.chaseYourSpace)
-
-        // Add Acknowledge Interests for career exploration
-        modules.append(.acknowledgeInterests)
-
-        // Add Align Your Mind for careers requiring focus/discipline
-        if career.category == "technology" || career.category == "creative_arts" {
-            modules.append(.alignYourMind)
-        }
-
-        // Add Direct & Correct for leadership careers
-        if career.category == "business_entrepreneurship" || career.category == "education" {
-            modules.append(.directAndCorrect)
-        }
-
-        // Add Bully to Boss for entrepreneurship
-        if career.category == "business_entrepreneurship" {
-            modules.append(.bullyToBoss)
-        }
-
-        // Add Meek to Protector for helping professions
-        if career.category == "social_services" || career.category == "health_wellness" {
-            modules.append(.meekToProtector)
-        }
-
-        return modules
+        CareerCategory(rawValue: career.category)?.suggestedTMIModules
+            ?? [.chaseYourSpace, .acknowledgeInterests]
     }
 
     private func estimatedEducationYears(for level: EducationLevel) -> Int? {
