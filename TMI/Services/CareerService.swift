@@ -18,7 +18,7 @@ final class CareerService: @unchecked Sendable {
 
     // MARK: - Static Career Catalog
 
-    /// All available careers from the static catalog (32 careers across 8 categories)
+    /// All available careers from the static catalog (520+ careers across 20 categories)
     var allCareers: [Career] {
         CareerDatabase.allCareerPaths.map { careerFromPath($0) }
     }
@@ -55,68 +55,19 @@ final class CareerService: @unchecked Sendable {
     }
 
     private func fieldName(for category: String) -> String {
-        switch category {
-        case "technology": return "Technology"
-        case "health_wellness": return "Healthcare"
-        case "business_entrepreneurship": return "Business"
-        case "creative_arts": return "Arts"
-        case "education": return "Education"
-        case "social_services": return "Social Services"
-        case "sports_athletics": return "Sports & Athletics"
-        case "audio_media": return "Media"
-        default: return category.replacingOccurrences(of: "_", with: " ").capitalized
-        }
+        CareerCategory(rawValue: category)?.displayName
+            ?? category.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
     private func outlookAndGrowth(for category: String) -> (String, Double) {
-        switch category {
-        case "technology":
-            return ("Excellent long-term outlook with continuous innovation and strong demand.", 0.22)
-        case "health_wellness":
-            return ("Strong outlook due to aging demographics and expanding healthcare needs.", 0.16)
-        case "business_entrepreneurship":
-            return ("Stable with opportunities in emerging markets and digital commerce.", 0.10)
-        case "creative_arts":
-            return ("Evolving with digital transformation and new content platforms.", 0.08)
-        case "education":
-            return ("Stable with ongoing need for qualified educators.", 0.05)
-        case "social_services":
-            return ("Growing demand for social support and mental health services.", 0.12)
-        case "sports_athletics":
-            return ("Steady with opportunities in coaching, training, and sports analytics.", 0.07)
-        case "audio_media":
-            return ("Rapidly growing with the podcast and streaming content boom.", 0.18)
-        default:
-            return ("Outlook varies by specific role and location.", 0.08)
-        }
+        CareerCategory(rawValue: category)?.outlookAndGrowth
+            ?? ("Outlook varies by specific role and location.", 0.08)
     }
 
     private func deriveSkills(from path: CareerPath) -> [String] {
-        var skills: [String] = []
+        var skills = CareerCategory(rawValue: path.category)?.baseSkills
+            ?? ["Communication", "Problem Solving", "Adaptability"]
 
-        // Category-specific base skills
-        switch path.category {
-        case "technology":
-            skills = ["Problem Solving", "Programming", "Critical Thinking", "Collaboration"]
-        case "health_wellness":
-            skills = ["Patient Care", "Communication", "Empathy", "Medical Knowledge"]
-        case "business_entrepreneurship":
-            skills = ["Strategic Planning", "Leadership", "Communication", "Analytics"]
-        case "creative_arts":
-            skills = ["Creativity", "Visual Communication", "Attention to Detail", "Design Thinking"]
-        case "education":
-            skills = ["Communication", "Patience", "Curriculum Development", "Adaptability"]
-        case "social_services":
-            skills = ["Empathy", "Active Listening", "Case Management", "Advocacy"]
-        case "sports_athletics":
-            skills = ["Physical Fitness", "Teamwork", "Coaching", "Performance Analysis"]
-        case "audio_media":
-            skills = ["Storytelling", "Audio Production", "Content Creation", "Audience Engagement"]
-        default:
-            skills = ["Communication", "Problem Solving", "Adaptability"]
-        }
-
-        // Title-specific additional skills
         let title = path.title.lowercased()
         if title.contains("engineer") || title.contains("developer") {
             skills.append(contentsOf: ["Software Development", "System Design"])
@@ -269,23 +220,15 @@ final class CareerService: @unchecked Sendable {
 
     /// Get career field icon with extended coverage
     func getFieldIcon(for field: String) -> String {
-        switch field.lowercased() {
-        case "technology": return "desktopcomputer"
-        case "healthcare": return "heart.text.square"
-        case "education": return "book"
-        case "business": return "briefcase"
-        case "engineering": return "gearshape.2"
-        case "arts": return "paintpalette"
-        case "science": return "atom"
-        case "finance": return "dollarsign.circle"
-        case "law": return "scale.3d"
-        case "public service": return "building.columns"
-        case "media": return "tv"
-        case "sports & athletics": return "figure.run"
-        case "culinary": return "fork.knife"
-        case "social services": return "hands.sparkles"
-        default: return "star"
+        if let category = CareerCategory(rawValue: field.lowercased()) {
+            return category.icon
         }
+        for category in CareerCategory.allCases {
+            if category.displayName.lowercased() == field.lowercased() {
+                return category.icon
+            }
+        }
+        return "star"
     }
 
     // MARK: - Firebase: Bookmarks
