@@ -60,27 +60,46 @@ enum TMIElevation {
     var shadowRadius: CGFloat {
         switch self {
         case .flat: return 0
-        case .raised: return 2
-        case .elevated: return 8
-        case .floating: return 16
+        case .raised: return 4
+        case .elevated: return 10
+        case .floating: return 20
         }
     }
 
     var shadowOpacity: Double {
         switch self {
         case .flat: return 0
-        case .raised: return 0.05
-        case .elevated: return 0.08
-        case .floating: return 0.12
+        case .raised: return 0.10
+        case .elevated: return 0.12
+        case .floating: return 0.14
         }
     }
 
     var shadowOffset: CGSize {
         switch self {
         case .flat: return .zero
-        case .raised: return CGSize(width: 0, height: 1)
+        case .raised: return CGSize(width: 0, height: 2)
         case .elevated: return CGSize(width: 0, height: 4)
         case .floating: return CGSize(width: 0, height: 8)
+        }
+    }
+
+    /// Secondary shadow for layered depth effect
+    var secondaryShadowRadius: CGFloat {
+        switch self {
+        case .flat: return 0
+        case .raised: return 2
+        case .elevated: return 4
+        case .floating: return 8
+        }
+    }
+
+    var secondaryShadowOpacity: Double {
+        switch self {
+        case .flat: return 0
+        case .raised: return 0.06
+        case .elevated: return 0.08
+        case .floating: return 0.10
         }
     }
 }
