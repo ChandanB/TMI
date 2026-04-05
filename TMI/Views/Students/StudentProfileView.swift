@@ -119,7 +119,7 @@ struct StudentProfileView: View {
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: TMISpacing.lg) {
+                VStack(alignment: .leading, spacing: TMISpacing.lg) {
                     headerView
 
                     // Student Information — required, expanded by default
@@ -240,7 +240,7 @@ struct StudentProfileView: View {
     // MARK: - Header
 
     private var headerView: some View {
-        VStack(spacing: TMISpacing.md) {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
             Text(isEditMode ? "Edit Student Profile" : "New Student Intake")
                 .font(.tmiTitle1)
                 .foregroundStyle(Color.tmiTextPrimary)
@@ -250,7 +250,7 @@ struct StudentProfileView: View {
                  : "Complete student profile for comprehensive support")
                 .font(.tmiBody)
                 .foregroundStyle(Color.tmiTextSecondary)
-                .multilineTextAlignment(.center)
+                .multilineTextAlignment(.leading)
         }
         .padding(.top, TMISpacing.lg)
     }
@@ -290,6 +290,7 @@ struct StudentProfileView: View {
                 .padding(TMISpacing.md)
                 .background(Color.tmiSurface)
                 .cornerRadius(TMIRadius.sm)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             // School
@@ -311,6 +312,7 @@ struct StudentProfileView: View {
                     .padding(TMISpacing.sm)
                     .background(Color.tmiSurface)
                     .cornerRadius(TMIRadius.sm)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             // Student ID
