@@ -174,7 +174,7 @@ struct CareerPathDetailView: View {
                 .font(.tmiTitle3)
                 .foregroundColor(.tmiTextPrimary)
 
-            ForEach(career.pathway.tmiModules, id: \.self) { module in
+            ForEach(career.pathway?.tmiModules ?? [], id: \.self) { module in
                 HStack(spacing: TMISpacing.sm) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.tmiSuccess)
@@ -271,7 +271,7 @@ struct CareerPathDetailView: View {
                 title: "\(career.title) Career Plan",
                 description: "Career exploration plan for \(career.title)",
                 students: students,
-                model: career.pathway.tmiModules.first ?? .chaseYourSpace,
+                model: career.pathway?.tmiModules.first ?? .chaseYourSpace,
                 interests: [],
                 startDate: now,
                 endDate: nil,
@@ -321,7 +321,7 @@ struct CareerPathDetailView: View {
         var goals: [Goal] = []
 
         // Add beginner goals
-        for cepGoal in career.pathway.beginnerGoals.prefix(3) {
+        for cepGoal in (career.pathway?.beginnerGoals ?? []).prefix(3) {
             goals.append(Goal(
                 description: cepGoal.title,
                 dueDate: Calendar.current.date(byAdding: .month, value: 1, to: Date()),
@@ -338,7 +338,7 @@ struct CareerPathDetailView: View {
         // Extract strategies from all levels
         var strategies: [String] = []
 
-        for goal in career.pathway.beginnerGoals.prefix(2) {
+        for goal in (career.pathway?.beginnerGoals ?? []).prefix(2) {
             strategies.append(contentsOf: goal.strategies.prefix(2))
         }
 
@@ -350,11 +350,11 @@ struct CareerPathDetailView: View {
     private func goalsForLevel(_ level: SkillLevel) -> [CEPGoal] {
         switch level {
         case .beginner:
-            return career.pathway.beginnerGoals
+            return career.pathway?.beginnerGoals ?? []
         case .intermediate:
-            return career.pathway.intermediateGoals
+            return career.pathway?.intermediateGoals ?? []
         case .advanced:
-            return career.pathway.advancedGoals
+            return career.pathway?.advancedGoals ?? []
         }
     }
 }
