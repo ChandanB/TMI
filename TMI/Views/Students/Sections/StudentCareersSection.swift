@@ -48,7 +48,6 @@ struct StudentCareersSection: View {
             headerRow
             searchAndExploreBar
             selectedCareersSection
-            recommendationsSection
         }
         .task {
             await loadRecommendations()
@@ -147,44 +146,6 @@ struct StudentCareersSection: View {
                         ) {
                             remove(career)
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var recommendationsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("AI Recommendations", systemImage: "sparkles")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if isLoadingRecommendations {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                }
-            }
-
-            if let error = recommendationError {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            } else if !isLoadingRecommendations && filteredRecommendations.isEmpty {
-                Text(interestNames.isEmpty
-                     ? "Add student interests to get career recommendations."
-                     : "No additional recommendations based on current interests.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .padding(.vertical, 4)
-            } else {
-                ForEach(filteredRecommendations) { career in
-                    CareerRecommendationRow(
-                        career: career,
-                        matchingInterests: matchingInterests(for: career)
-                    ) {
-                        add(career)
                     }
                 }
             }

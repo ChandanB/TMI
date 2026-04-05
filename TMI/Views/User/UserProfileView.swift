@@ -370,7 +370,9 @@ struct UserProfileView: View {
             NavigationStack {
                 LegalDocumentView(fileName: "privacy-policy")
                     .navigationTitle("Privacy Policy")
+                    #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
+                    #endif
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") { showingPrivacyPolicy = false }
@@ -382,7 +384,9 @@ struct UserProfileView: View {
             NavigationStack {
                 LegalDocumentView(fileName: "terms-of-service")
                     .navigationTitle("Terms of Service")
+                    #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
+                    #endif
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") { showingTermsOfService = false }
@@ -421,7 +425,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                                 .clipShape(Circle())
                         } else if let photoData = stateModel.selectedPhotoData,
                                   let uiImage = UIImage(data: photoData) {
-                            Image(uiImage: uiImage)
+                            Image(nsImage: uiImage)
                                 .resizable()
                                 .scaledToFill()
                                 .frame(width: 80, height: 80)
@@ -690,7 +694,31 @@ struct ChangeEmailView: View {
 
 // MARK: - Legal Document View
 
-struct LegalDocumentView: UIViewRepresentable {
+struct LegalDocumentView: View {
+    let fileName: String
+
+    var body: some View {
+        LegalDocumentWebView(fileName: fileName)
+    }
+}
+
+#if os(macOS)
+private struct LegalDocumentWebView: NSViewRepresentable {
+    let fileName: String
+
+    func makeNSView(context: Context) -> WKWebView {
+        let webView = WKWebView()
+        return webView
+    }
+
+    func updateNSView(_ webView: WKWebView, context: Context) {
+        if let url = Bundle.main.url(forResource: fileName, withExtension: "html") {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        }
+    }
+}
+#else
+private struct LegalDocumentWebView: UIViewRepresentable {
     let fileName: String
 
     func makeUIView(context: Context) -> WKWebView {
@@ -706,7 +734,9 @@ struct LegalDocumentView: UIViewRepresentable {
         }
     }
 }
+#endif
 
 #Preview {
     UserProfileView()
 }
+

@@ -357,7 +357,7 @@ struct InterestsInsightView: View {
                                 
                                 Text(dataPoint.category)
                                     .font(.caption)
-                                    .foregroundStyle(selectedCategory == dataPoint.category ? Color.tmiTextPrimary : Color(UIColor.secondaryLabel))
+                                    .foregroundStyle(selectedCategory == dataPoint.category ? Color.tmiTextPrimary : Color.secondary)
                                     .fontWeight(selectedCategory == dataPoint.category ? .bold : .regular)
                             }
                             .padding(.vertical, 4)

@@ -13,8 +13,9 @@ struct CareerPath: Codable, Identifiable, Hashable {
     let id: UUID
     let title: String
     let category: String // Maps to InterestCluster name
+    let subcategory: String
     let description: String
-    let pathway: TMICareerPathway
+    let pathway: TMICareerPathway?
     let requiredInterests: [String] // Interest cluster names
     let estimatedSalary: SalaryRange?
     let educationLevel: EducationLevel
@@ -25,8 +26,9 @@ struct CareerPath: Codable, Identifiable, Hashable {
         id: UUID = UUID(),
         title: String,
         category: String,
+        subcategory: String = "",
         description: String,
-        pathway: TMICareerPathway,
+        pathway: TMICareerPathway? = nil,
         requiredInterests: [String],
         estimatedSalary: SalaryRange? = nil,
         educationLevel: EducationLevel = .varies,
@@ -36,6 +38,7 @@ struct CareerPath: Codable, Identifiable, Hashable {
         self.id = id
         self.title = title
         self.category = category
+        self.subcategory = subcategory
         self.description = description
         self.pathway = pathway
         self.requiredInterests = requiredInterests
