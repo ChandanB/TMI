@@ -100,3 +100,31 @@ struct DeleteAccountViewStructureTests {
         #expect(try source().contains("authStateModel.signOut()"))
     }
 }
+
+@Suite("SettingsView account deletion wiring")
+struct SettingsViewDeletionTests {
+
+    private func source() throws -> String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("TMI/Views/Settings/SettingsView.swift")
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    @Test("SettingsView declares showingDeleteAccountSheet state")
+    func declaresDeleteAccountSheetState() throws {
+        #expect(try source().contains("showingDeleteAccountSheet"))
+    }
+
+    @Test("SettingsView presents DeleteAccountView as a sheet")
+    func presentsDeleteAccountViewSheet() throws {
+        #expect(try source().contains("DeleteAccountView()"))
+    }
+
+    @Test("SettingsView has Delete Account row in dangerous actions section")
+    func hasDeleteAccountRow() throws {
+        #expect(try source().contains("Delete Account"))
+    }
+}

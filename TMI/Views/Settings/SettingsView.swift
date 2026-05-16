@@ -21,6 +21,7 @@ struct SettingsView: View {
     @AppStorage("offlineModeEnabled") private var offlineModeEnabled = true
     
     @State private var showingLogoutAlert = false
+    @State private var showingDeleteAccountSheet = false
     @State private var showingExportSheet = false
     @State private var showingImportSheet = false
     @State private var isLoaded = false
@@ -97,6 +98,10 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingDeleteAccountSheet) {
+            DeleteAccountView()
+                .tmiSheetStyle()
+        }
         .onAppear {
             withAnimation(.easeInOut(duration: 0.5).delay(0.1)) {
                 isLoaded = true
@@ -383,6 +388,20 @@ extension SettingsView {
                 titleColor: .orange,
                 action: {
                     showingLogoutAlert = true
+                }
+            )
+
+            Divider()
+                .background(Color.white.opacity(0.1))
+                .padding(.horizontal, 16)
+
+            SettingsRow(
+                title: "Delete Account",
+                subtitle: "Permanently delete your account and all data",
+                icon: "person.crop.circle.badge.minus",
+                titleColor: .red,
+                action: {
+                    showingDeleteAccountSheet = true
                 }
             )
         }
