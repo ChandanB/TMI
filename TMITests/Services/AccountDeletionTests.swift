@@ -54,3 +54,49 @@ struct AccountDeletionTests {
         #expect(source.contains("\"resources\""))
     }
 }
+
+@Suite("DeleteAccountView structure")
+struct DeleteAccountViewStructureTests {
+
+    private func source() throws -> String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("TMI/Views/Settings/DeleteAccountView.swift")
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    @Test("View defines a two-step DeletionStep enum")
+    func definesDeletionStepEnum() throws {
+        let src = try source()
+        #expect(src.contains("enum DeletionStep"))
+        #expect(src.contains("case warning"))
+        #expect(src.contains("case confirm"))
+    }
+
+    @Test("View uses SecureField for password entry")
+    func usesSecureField() throws {
+        #expect(try source().contains("SecureField"))
+    }
+
+    @Test("View shows inline error message state")
+    func showsErrorMessage() throws {
+        #expect(try source().contains("errorMessage"))
+    }
+
+    @Test("Delete button is disabled when password is empty")
+    func deleteButtonDisabledWhenPasswordEmpty() throws {
+        #expect(try source().contains(".disabled(password.isEmpty"))
+    }
+
+    @Test("View calls deleteAccount on AuthenticationService")
+    func callsDeleteAccount() throws {
+        #expect(try source().contains("deleteAccount(password: password)"))
+    }
+
+    @Test("View calls authStateModel.signOut() on success")
+    func callsSignOutOnSuccess() throws {
+        #expect(try source().contains("authStateModel.signOut()"))
+    }
+}
