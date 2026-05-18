@@ -31,6 +31,7 @@ final class AuthenticationService {
         case weakPassword
         case invalidEmail
         case userCreationFailed(String)
+        case deletionFailed(String)
 
         var errorDescription: String? {
             switch self {
@@ -54,6 +55,8 @@ final class AuthenticationService {
                 return "Please enter a valid email address"
             case .userCreationFailed(let message):
                 return "Failed to create user account: \(message)"
+            case .deletionFailed(let message):
+                return "Failed to delete account: \(message)"
             }
         }
     }
@@ -273,5 +276,38 @@ final class AuthenticationService {
     /// Sign out current user
     func signOut() throws {
         try firebaseManager.signOut()
+    }
+
+    // MARK: - Account Deletion
+
+    /// Permanently deletes the authenticated user's account and all associated data.
+    /// Re-authenticates first as required by Firebase before account deletion.
+    func deleteAccount(password: String) async throws {
+        guard let user = Auth.auth().currentUser,
+              let email = user.email else {
+            throw AuthError.deletionFailed("No authenticated user found")
+        }
+
+        // Firebase requires re-authentication immediately before deletion
+        let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+        try await user.reauthenticate(with: credential)
+
+        let uid = user.uid
+
+        // Purge all user-scoped subcollections
+        let subcollections = ["students", "tmiPlans", "interests", "resources"]
+        for name in subcollections {
+            let ref = db.collection("users").document(uid).collection(name)
+            let snapshot = try await ref.getDocuments()
+            for document in snapshot.documents {
+                try await document.reference.delete()
+            }
+        }
+
+        // Delete the top-level user document
+        try await db.collection("users").document(uid).delete()
+
+        // Delete the Firebase Auth account (must be last)
+        try await user.delete()
     }
 }
