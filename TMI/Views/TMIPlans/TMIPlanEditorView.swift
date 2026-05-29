@@ -697,12 +697,6 @@ struct TMIPlanEditorView: View {
 
                 HStack(spacing: TMISpacing.md) {
                     TMIButton(
-                        text: "Cancel",
-                        style: .secondary,
-                        action: { dismiss() }
-                    )
-
-                    TMIButton(
                         text: isEditMode ? "Save Changes" : "Create Plan",
                         icon: "checkmark",
                         style: .primary,

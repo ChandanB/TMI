@@ -709,61 +709,59 @@ struct DashboardView: View {
     @ViewBuilder
     private func dashboardContent(_ data: DashboardData) -> some View {
         ScrollView {
-            if isTeacherRole {
-                teacherActionBoardContent(data)
-            } else {
-                HStack(alignment: .top, spacing: TMISpacing.lg) {
-                    // Left column
-                    VStack(spacing: TMISpacing.lg) {
-                        DashboardHeaderView(
-                            data: data,
-                            attentionCount: studentsNeedingAttention(data) ?? 0,
-                            onNavigateToStudents: { navigateToStudents = true },
-                            onNavigateToPlans: { navigateToPlans = true }
-                        )
+            HStack(alignment: .top, spacing: TMISpacing.lg) {
+                // Left column
+                VStack(spacing: TMISpacing.lg) {
+                    recentActivitySection(data)
+                        .tmiCard()
+                                        
+                    StudentStatusWidget()
                         .tmiCard()
 
-                        StudentStatusWidget()
+                    if !data.engagementData.isEmpty {
+                        DashboardEngagementChart(data: data.engagementData)
                             .tmiCard()
-
-                        if !data.engagementData.isEmpty {
-                            DashboardEngagementChart(data: data.engagementData)
-                                .tmiCard()
-                        }
-
-                        // Actionable alerts
-                        if let readyToGrowCount = studentsNeedingAttention(data), readyToGrowCount > 0 {
-                            StudentsReadyToGrowCard(count: readyToGrowCount) {
-                                navigateToStudents = true
-                            }
-                            .tmiCard()
-                        }
                     }
-                    .frame(maxWidth: .infinity)
 
-                    // Right column
-                    VStack(spacing: TMISpacing.lg) {
-                        DashboardStatsView(
-                            data: data,
-                            onNavigateToStudents: { navigateToStudents = true },
-                            onNavigateToPlans: { navigateToPlans = true }
-                        )
+                    if let readyToGrowCount = studentsNeedingAttention(data), readyToGrowCount > 0 {
+                        StudentsReadyToGrowCard(count: readyToGrowCount) {
+                            navigateToStudents = true
+                        }
                         .tmiCard()
-
-                        QuickActionsGrid()
-                            .tmiCard()
-
-                        recentActivitySection(data)
-                            .tmiCard()
-
-                        if let roleData = data.roleData {
-                            roleSpecificSection(roleData)
-                                .tmiCard()
-                        }
                     }
-                    .frame(maxWidth: .infinity)
+                    
+                    if let roleData = data.roleData {
+                        roleSpecificSection(roleData)
+                            .tmiCard()
+                    }
                 }
+                .frame(maxWidth: .infinity)
+
+                // Right column
+                VStack(spacing: TMISpacing.lg) {
+                    QuickActionsGrid(data: data)
+                        .tmiCard()
+                    
+                    
+                    DashboardStatsView(
+                        data: data,
+                        onNavigateToStudents: { navigateToStudents = true },
+                        onNavigateToPlans: { navigateToPlans = true }
+                    )
+                    .tmiCard()
+                }
+                .frame(maxWidth: .infinity)
             }
+            
+            DashboardHeaderView(
+                data: data,
+                attentionCount: studentsNeedingAttention(data) ?? 0,
+                onNavigateToStudents: { navigateToStudents = true },
+                onNavigateToPlans: { navigateToPlans = true }
+            )
+            .frame(maxWidth: .infinity)
+            
+            Color.clear.frame(height: 120)
         }
         .padding(.horizontal, TMISpacing.screenPadding)
         .padding(.top)
@@ -777,50 +775,13 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Quick Stats Row
-
-    // MARK: - Quick Stats Row moved to Components/DashboardStatsView.swift
-
-    // MARK: - Engagement Chart moved to Components/DashboardEngagementChart.swift
-
-    // MARK: - Primary Insight Card
-
-    // MARK: - Primary Insight Card moved to Components/DashboardHeaderView.swift
-
-
-
     // MARK: - Recent Activity Section
-
-    private func teacherActionBoardContent(_ data: DashboardData) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.lg) {
-            if let action = data.nextBestAction {
-                NextBestActionCard(action: action) {
-                    handleNextAction(action)
-                }
-            }
-
-            if let roleData = data.roleData, roleData.classroomAttentionCount > 0 {
-                let readyToGrowCount = roleData.classroomAttentionCount
-                StudentsReadyToGrowCard(count: readyToGrowCount) {
-                    navigateToStudents = true
-                }
-            }
-
-            QuickActionsGrid()
-
-            if let roleData = data.roleData {
-                roleSpecificSection(roleData)
-            }
-
-            recentActivitySection(data)
-        }
-    }
 
     private func recentActivitySection(_ data: DashboardData) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
                 Text("Recent Activity")
-                    .font(.title3.bold())
+                    .font(.tmiTitle3.bold())
                     .foregroundColor(.tmiTextPrimary)
                 Spacer()
 
@@ -836,6 +797,8 @@ struct DashboardView: View {
                     }
                 }
             }
+
+            Divider()
 
             if data.recentActivities.isEmpty {
                 emptyActivityState
@@ -949,6 +912,7 @@ struct DashboardView: View {
         }
         .listStyle(.plain)
         .background(Color.tmiBackground)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("All Activities")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -982,13 +946,15 @@ struct DashboardView: View {
                         .font(.system(size: 20, weight: .medium))
                         .foregroundColor(Color.tmiPrimary)
                         .frame(width: 32, height: 32)
-                    Text(roleData.role == .teacher ? "Good morning!" : roleData.role.displayName + " Overview")
-                        .font(.tmiTitle3)
+                    Text(roleData.role == .teacher ? "Classroom Summary" : roleData.role.displayName + " Overview")
+                        .font(.tmiTitle3.bold())
                         .foregroundColor(.tmiTextPrimary)
                 }
                 Spacer()
             }
-            
+
+            Divider()
+
             switch roleData.role {
             case .counselor, .socialWorker:
                 counselorSummaryCard(roleData)
@@ -1004,88 +970,34 @@ struct DashboardView: View {
     }
     
     private func counselorSummaryCard(_ data: RoleSpecificData) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: TMISpacing.md) {
-            RoleSummaryItem(
-                icon: "person.2.fill",
-                value: "\(data.caseloadCount)",
-                label: "Caseload",
-                color: .tmiPrimary
-            )
-            RoleSummaryItem(
-                icon: "clock.badge.exclamationmark.fill",
-                value: "\(data.pendingApprovals)",
-                label: "Pending",
-                color: data.pendingApprovals > 0 ? .orange : .gray
-            )
-            RoleSummaryItem(
-                icon: "calendar.badge.clock",
-                value: "\(data.upcomingMeetings)",
-                label: "Meetings",
-                color: .blue
-            )
-            RoleSummaryItem(
-                icon: "exclamationmark.triangle.fill",
-                value: "\(data.criticalAlerts)",
-                label: "Alerts",
-                color: data.criticalAlerts > 0 ? .red : .green
-            )
+        VStack(spacing: 0) {
+            RoleSummaryRow(icon: "person.2.fill", value: "\(data.caseloadCount)", label: "Caseload", color: .tmiPrimary)
+            TMIDivider()
+            RoleSummaryRow(icon: "clock.badge.exclamationmark.fill", value: "\(data.pendingApprovals)", label: "Pending", color: data.pendingApprovals > 0 ? .orange : .gray)
+            TMIDivider()
+            RoleSummaryRow(icon: "calendar.badge.clock", value: "\(data.upcomingMeetings)", label: "Meetings", color: .blue)
+            TMIDivider()
+            RoleSummaryRow(icon: "exclamationmark.triangle.fill", value: "\(data.criticalAlerts)", label: "Alerts", color: data.criticalAlerts > 0 ? .red : .green)
         }
     }
-    
-    private func teacherActionSummaryCard(_ data: RoleSpecificData) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: TMISpacing.md) {
-            RoleSummaryItem(
-                icon: "heart.text.square.fill",
-                value: "\(data.classroomSurveysPending)",
-                label: "Survey Follow-up",
-                color: data.classroomSurveysPending > 0 ? .orange : .green
-            )
-            RoleSummaryItem(
-                icon: "doc.text.fill",
-                value: "\(data.classroomPlanGapCount)",
-                label: "Plans To Start",
-                color: .blue
-            )
-            RoleSummaryItem(
-                icon: "studentdesk",
-                value: "\(data.classroomStudentCount)",
-                label: "Students in View",
-                color: .tmiPrimary
-            )
-        }
-    }
-    
-    private func adminSummaryCard(_ data: RoleSpecificData) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: TMISpacing.md) {
-            RoleSummaryItem(
-                icon: "building.2.fill",
-                value: "\(data.schoolWideStudents)",
-                label: "Students",
-                color: .tmiPrimary
-            )
-            RoleSummaryItem(
-                icon: "doc.text.fill",
-                value: "\(data.schoolWidePlans)",
-                label: "Plans",
-                color: .blue
-            )
-            RoleSummaryItem(
-                icon: "person.3.fill",
-                value: "\(data.staffCount)",
-                label: "Staff",
-                color: .purple
-            )
-        }
-    }
-    
-    // MARK: - Next Action Handler
 
-    private func handleNextAction(_ action: NextBestAction) {
-        switch action.type {
-        case .createPlan, .reviewPlan, .pendingApproval:
-            navigateToPlans = true
-        case .scheduleMeeting, .completeNotes, .addInterests, .checkProgress:
-            navigateToStudents = true
+    private func teacherActionSummaryCard(_ data: RoleSpecificData) -> some View {
+        VStack(spacing: 0) {
+            RoleSummaryRow(icon: "heart.text.square.fill", value: "\(data.classroomSurveysPending)", label: "Survey Follow-up", color: data.classroomSurveysPending > 0 ? .orange : .green)
+            TMIDivider()
+            RoleSummaryRow(icon: "doc.text.fill", value: "\(data.classroomPlanGapCount)", label: "Plans To Start", color: .blue)
+            TMIDivider()
+            RoleSummaryRow(icon: "studentdesk", value: "\(data.classroomStudentCount)", label: "Students in View", color: .tmiPrimary)
+        }
+    }
+
+    private func adminSummaryCard(_ data: RoleSpecificData) -> some View {
+        VStack(spacing: 0) {
+            RoleSummaryRow(icon: "building.2.fill", value: "\(data.schoolWideStudents)", label: "Students", color: .tmiPrimary)
+            TMIDivider()
+            RoleSummaryRow(icon: "doc.text.fill", value: "\(data.schoolWidePlans)", label: "Plans", color: .blue)
+            TMIDivider()
+            RoleSummaryRow(icon: "person.3.fill", value: "\(data.staffCount)", label: "Staff", color: .purple)
         }
     }
 
@@ -1292,32 +1204,36 @@ struct NextBestActionCard: View {
     }
 }
 
-// MARK: - Role Summary Item
+/// MARK: - Role Summary Row
 
-struct RoleSummaryItem: View {
+struct RoleSummaryRow: View {
     let icon: String
     let value: String
     let label: String
     let color: Color
-    
+
     var body: some View {
-        VStack(spacing: TMISpacing.xs) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(color)
-            
-            Text(value)
-                .font(.tmiTitle2)
-                .foregroundColor(.tmiTextPrimary)
-            
+        HStack(spacing: TMISpacing.md) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(color)
+            }
+
             Text(label)
-                .font(.tmiCaption)
-                .foregroundColor(.tmiTextSecondary)
+                .font(.tmiBody)
+                .foregroundColor(.tmiTextPrimary)
+
+            Spacer()
+
+            Text(value)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.tmiTextPrimary)
         }
-        .frame(maxWidth: .infinity)
         .padding(.vertical, TMISpacing.sm)
-        .background(color.opacity(0.05))
-        .cornerRadius(TMIRadius.sm)
     }
 }
 

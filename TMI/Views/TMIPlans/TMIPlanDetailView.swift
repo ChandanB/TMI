@@ -122,12 +122,28 @@ struct TMIPlanDetailView: View {
 
             ScrollView {
                 VStack(spacing: TMISpacing.xl) {
-                    // 1. Plan Overview - What is this plan about?
+                    // 1. Plan Overview - full width
                     planOverviewSection
 
-                    // 2. Plan-specific sections (driven by plan rules)
-                    ForEach(planSections, id: \.title) { section in
-                        planSectionView(for: section)
+                    // 2. Plan-specific sections in 2-column grid
+                    let sections = planSections
+                    let leftSections = Array(sections.enumerated().filter { $0.offset % 2 == 0 }.map(\.element))
+                    let rightSections = Array(sections.enumerated().filter { $0.offset % 2 != 0 }.map(\.element))
+
+                    HStack(alignment: .top, spacing: TMISpacing.lg) {
+                        VStack(spacing: TMISpacing.xl) {
+                            ForEach(leftSections, id: \.title) { section in
+                                planSectionView(for: section)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+
+                        VStack(spacing: TMISpacing.xl) {
+                            ForEach(rightSections, id: \.title) { section in
+                                planSectionView(for: section)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
                     }
 
                     Spacer(minLength: TMISpacing.xxl)
@@ -457,15 +473,28 @@ struct TMIPlanDetailView: View {
         @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
-            HStack(spacing: 8) {
-                Image(systemName: section.icon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(modelColor)
+            HStack(spacing: TMISpacing.sm) {
+                ZStack {
+                    Circle()
+                        .fill(modelColor.opacity(0.12))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: section.icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(modelColor)
+                }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(section.title)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color.tmiTextPrimary)
+                    HStack(spacing: TMISpacing.sm) {
+                        Text(section.title)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(Color.tmiTextPrimary)
+
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(modelColor.opacity(0.7))
+                            .help(section.description)
+                    }
+
                     Text(section.description)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.tmiTextSecondary)
@@ -473,6 +502,8 @@ struct TMIPlanDetailView: View {
 
                 Spacer()
             }
+
+            TMIDivider()
 
             content()
         }
@@ -644,21 +675,21 @@ struct TMIPlanDetailView: View {
                         TextEditor(text: bindingForInput(field))
                             .frame(minHeight: 80)
                             .padding(8)
-                            .background(Color.white.opacity(0.06))
+                            .background(Color.white)
                             .cornerRadius(TMIRadius.sm)
                             .overlay(
                                 RoundedRectangle(cornerRadius: TMIRadius.sm)
-                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                             )
                     } else {
                         TextField("Enter response", text: bindingForInput(field))
                             .textInputAutocapitalization(.sentences)
                             .padding(10)
-                            .background(Color.white.opacity(0.06))
+                            .background(Color.white)
                             .cornerRadius(TMIRadius.sm)
                             .overlay(
                                 RoundedRectangle(cornerRadius: TMIRadius.sm)
-                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                                    .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
                             )
                     }
                 }
@@ -734,7 +765,7 @@ struct TMIPlanDetailView: View {
                     .buttonStyle(.plain)
                 }
                 .padding(8)
-                .background(Color.white.opacity(0.05))
+                .background(Color.white)
                 .cornerRadius(TMIRadius.sm)
             }
 
@@ -742,7 +773,7 @@ struct TMIPlanDetailView: View {
                 TextField(addButtonTitle, text: newItem)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 Button(action: {
@@ -945,7 +976,7 @@ struct TMIPlanDetailView: View {
             TextField("Add quick note (optional)", text: noteBinding)
                 .textInputAutocapitalization(.sentences)
                 .padding(10)
-                .background(Color.white.opacity(0.06))
+                .background(Color.white)
                 .cornerRadius(TMIRadius.sm)
 
             Button(action: {
@@ -1038,7 +1069,7 @@ struct TMIPlanDetailView: View {
                             .foregroundColor(.tmiWarning)
                     }
                     .padding(10)
-                    .background(Color.white.opacity(0.05))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
                 }
             }
@@ -1047,13 +1078,13 @@ struct TMIPlanDetailView: View {
                 TextField("Incident summary", text: $newIncidentSummary)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 TextField("Details", text: $newIncidentDetails)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 HStack {
@@ -1124,7 +1155,7 @@ struct TMIPlanDetailView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                     .padding(10)
-                    .background(Color.white.opacity(0.05))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
                 }
             }
@@ -1133,22 +1164,22 @@ struct TMIPlanDetailView: View {
                 TextField("Trigger", text: $newThoughtTrigger)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
                 TextField("Negative thought", text: $newThought)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
                 TextField("Reframe", text: $newThoughtReframe)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
                 TextField("Replacement action", text: $newThoughtAction)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 Button(action: {
@@ -1206,7 +1237,7 @@ struct TMIPlanDetailView: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.tmiTextPrimary)
                         .padding(8)
-                        .background(Color.white.opacity(0.05))
+                        .background(Color.white)
                         .cornerRadius(TMIRadius.sm)
                 }
             }
@@ -1215,7 +1246,7 @@ struct TMIPlanDetailView: View {
                 TextField("Add replacement thought", text: $newReframeText)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 Button(action: {
@@ -1273,7 +1304,7 @@ struct TMIPlanDetailView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(Color.tmiTextPrimary)
                         .padding(8)
-                        .background(Color.white.opacity(0.05))
+                        .background(Color.white)
                         .cornerRadius(TMIRadius.sm)
                 }
             }
@@ -1282,7 +1313,7 @@ struct TMIPlanDetailView: View {
                 TextField("If X happens, then...", text: $newIfThenRule)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 Button(action: {
@@ -1371,7 +1402,7 @@ struct TMIPlanDetailView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                     .padding(10)
-                    .background(Color.white.opacity(0.05))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
                 }
             }
@@ -1380,13 +1411,13 @@ struct TMIPlanDetailView: View {
                 TextField("From (peer/staff)", text: $newFeedbackFrom)
                     .textInputAutocapitalization(.words)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 TextField("Feedback note", text: $newFeedbackNote)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 Button(action: {
@@ -1443,7 +1474,7 @@ struct TMIPlanDetailView: View {
                             .cornerRadius(TMIRadius.sm)
                     }
                     .padding(8)
-                    .background(Color.white.opacity(0.05))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
                 }
             }
@@ -1462,7 +1493,7 @@ struct TMIPlanDetailView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(Color.tmiTextPrimary)
                         .padding(8)
-                        .background(Color.white.opacity(0.05))
+                        .background(Color.white)
                         .cornerRadius(TMIRadius.sm)
                 }
             }
@@ -1471,7 +1502,7 @@ struct TMIPlanDetailView: View {
                 TextField("Add assertive script", text: $newScript)
                     .textInputAutocapitalization(.sentences)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 Button(action: {
@@ -1509,7 +1540,7 @@ struct TMIPlanDetailView: View {
                         Spacer()
                     }
                     .padding(8)
-                    .background(Color.white.opacity(0.05))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
                 }
             }
@@ -1518,13 +1549,13 @@ struct TMIPlanDetailView: View {
                 TextField("Ally name", text: $newAllyName)
                     .textInputAutocapitalization(.words)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 TextField("Role", text: $newAllyRole)
                     .textInputAutocapitalization(.words)
                     .padding(10)
-                    .background(Color.white.opacity(0.06))
+                    .background(Color.white)
                     .cornerRadius(TMIRadius.sm)
 
                 Button(action: {
@@ -1655,16 +1686,7 @@ struct TMIPlanDetailView: View {
                 .padding(TMISpacing.xl)
             }
         }
-        .padding(TMISpacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .fill(Color.white.opacity(0.05))
-                .background(Color.tmiSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-        )
+        .tmiCard()
     }
 
     // MARK: - Personalized Resources Section
@@ -1757,16 +1779,7 @@ struct TMIPlanDetailView: View {
                 }
             }
         }
-        .padding(TMISpacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .fill(Color.white.opacity(0.05))
-                .background(Color.tmiSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-        )
+        .tmiCard()
     }
 
     // MARK: - Intervention Strategies Section
@@ -1797,16 +1810,7 @@ struct TMIPlanDetailView: View {
                 }
             }
         }
-        .padding(TMISpacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .fill(Color.white.opacity(0.05))
-                .background(Color.tmiSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-        )
+        .tmiCard()
     }
 
     // MARK: - Goals & Progress Section
@@ -1853,9 +1857,11 @@ struct TMIPlanDetailView: View {
                     .foregroundColor(Color.tmiTextSecondary)
             }
             .padding(TMISpacing.md)
-            .background(
+            .background(Color.white)
+            .cornerRadius(TMIRadius.sm)
+            .overlay(
                 RoundedRectangle(cornerRadius: TMIRadius.sm)
-                    .fill(Color.white.opacity(0.05))
+                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
             )
 
             // Goals list
@@ -1909,16 +1915,7 @@ struct TMIPlanDetailView: View {
                 }
             }
         }
-        .padding(TMISpacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .fill(Color.white.opacity(0.05))
-                .background(Color.tmiSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-        )
+        .tmiCard()
     }
 
     // MARK: - Scheduled Meetings Section
@@ -2012,16 +2009,7 @@ struct TMIPlanDetailView: View {
                 }
             }
         }
-        .padding(TMISpacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .fill(Color.white.opacity(0.05))
-                .background(Color.tmiSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-        )
+        .tmiCard()
     }
 
     // MARK: - Collaboration Notes Section
@@ -2051,9 +2039,11 @@ struct TMIPlanDetailView: View {
                     .foregroundColor(Color.tmiTextSecondary)
                     .lineSpacing(4)
                     .padding(TMISpacing.md)
-                    .background(
+                    .background(Color.white)
+                    .cornerRadius(TMIRadius.md)
+                    .overlay(
                         RoundedRectangle(cornerRadius: TMIRadius.md)
-                            .fill(Color.white.opacity(0.05))
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                     )
             }
 
@@ -2067,16 +2057,7 @@ struct TMIPlanDetailView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(TMISpacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .fill(Color.white.opacity(0.05))
-                .background(Color.tmiSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.lg)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-        )
+        .tmiCard()
     }
 
     // MARK: - Local Models
@@ -2200,10 +2181,13 @@ struct TMIPlanDetailView: View {
                 Image(systemName: "sparkles")
                     .foregroundColor(.tmiSecondary)
                 Text("Plan Identity")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Color.tmiTextSecondary)
                     .textCase(.uppercase)
+                    .tracking(0.5)
             }
+
+            TMIDivider()
 
             HStack(spacing: TMISpacing.md) {
                 identityPill(title: "Archetype", value: rules.archetype.rawValue)
@@ -2215,11 +2199,15 @@ struct TMIPlanDetailView: View {
                 identityPill(title: "Proof", value: rules.proofTypes.map { $0.rawValue }.joined(separator: ", "))
             }
 
+            TMIDivider()
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Sections")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(Color.tmiTextSecondary)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
                     ForEach(rules.sections, id: \.title) { section in
                         HStack(spacing: 6) {
                             Image(systemName: section.icon)
@@ -2232,15 +2220,16 @@ struct TMIPlanDetailView: View {
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Color.white.opacity(0.08))
+                        .background(Color.tmiSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: TMIRadius.sm)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
                         .cornerRadius(TMIRadius.sm)
                     }
                 }
             }
         }
-        .padding(TMISpacing.md)
-        .background(Color.white.opacity(0.06))
-        .cornerRadius(TMIRadius.md)
     }
 
     private func identityPill(title: String, value: String) -> some View {
@@ -2248,14 +2237,19 @@ struct TMIPlanDetailView: View {
             Text(title.uppercased())
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(Color.tmiTextSecondary)
+                .tracking(0.3)
             Text(value)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(Color.tmiTextPrimary)
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(TMISpacing.sm)
-        .background(Color.white.opacity(0.08))
+        .background(Color.white)
+        .overlay(
+            RoundedRectangle(cornerRadius: TMIRadius.sm)
+                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+        )
         .cornerRadius(TMIRadius.sm)
     }
 
@@ -2473,6 +2467,46 @@ struct TMIPlanDetailView: View {
                 note: entry.details ?? "",
                 date: entry.createdAt
             )
+        }
+
+        // Load checklist items and mark them complete based on evidence
+        let checklistEntries = entries.filter { $0.type == .checklist }
+        if !checklistEntries.isEmpty {
+            let completedTitles = Set(checklistEntries.map { $0.title })
+            // Mark existing items as complete
+            for i in 0..<dailyResetChecklist.count {
+                if completedTitles.contains(dailyResetChecklist[i].title) {
+                    dailyResetChecklist[i].isComplete = true
+                }
+            }
+        }
+
+        // Load quest items (includes leadership and courage via category)
+        let questEntries = entries.filter { $0.type == .quest }
+        if !questEntries.isEmpty {
+            let completedQuestTitles = Set(questEntries.map { $0.title })
+            // Mark quest items as complete
+            for i in 0..<questTasks.count {
+                if completedQuestTitles.contains(questTasks[i].title) {
+                    questTasks[i].isComplete = true
+                }
+            }
+            // Mark leadership items as complete
+            let leadershipEntries = questEntries.filter { $0.category == "Leadership" }
+            let completedLeadershipTitles = Set(leadershipEntries.map { $0.title })
+            for i in 0..<leadershipTasks.count {
+                if completedLeadershipTitles.contains(leadershipTasks[i].title) {
+                    leadershipTasks[i].isComplete = true
+                }
+            }
+            // Mark courage items as complete
+            let courageEntries = questEntries.filter { $0.category == "Courage" }
+            let completedCouragetitles = Set(courageEntries.map { $0.title })
+            for i in 0..<courageSteps.count {
+                if completedCouragetitles.contains(courageSteps[i].title) {
+                    courageSteps[i].isComplete = true
+                }
+            }
         }
 
         let streakEntries = entries.filter { $0.type == .streak }
@@ -2920,7 +2954,7 @@ struct MeetingCard: View {
                             .padding(.vertical, 3)
                             .background(
                                 Capsule()
-                                    .fill(Color.white.opacity(0.1))
+                                    .fill(Color.tmiSurface)
                             )
                         }
 
@@ -2934,10 +2968,8 @@ struct MeetingCard: View {
             }
         }
         .padding(TMISpacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.md)
-                .fill(Color.white.opacity(0.05))
-        )
+        .background(Color.tmiSurface)
+        .cornerRadius(TMIRadius.md)
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.md)
                 .strokeBorder(modelColor.opacity(0.2), lineWidth: 1)
@@ -2983,10 +3015,8 @@ struct StudentMiniCard: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.md)
-                .fill(Color.white.opacity(0.08))
-        )
+        .background(Color.tmiSurface)
+        .cornerRadius(TMIRadius.md)
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.md)
                 .strokeBorder(modelColor.opacity(0.3), lineWidth: 1)
@@ -3060,10 +3090,8 @@ struct TMIPlanResourceCard: View {
             }
         }
         .padding(TMISpacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.md)
-                .fill(Color.white.opacity(0.05))
-        )
+        .background(Color.tmiSurface)
+        .cornerRadius(TMIRadius.md)
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.md)
                 .strokeBorder(interest.color.opacity(0.3), lineWidth: 1)
@@ -3091,10 +3119,8 @@ struct StrategyRow: View {
             Spacer()
         }
         .padding(TMISpacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.sm)
-                .fill(Color.white.opacity(0.03))
-        )
+        .background(Color.white)
+        .cornerRadius(TMIRadius.sm)
     }
 }
 
@@ -3140,7 +3166,7 @@ struct GoalCard: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.white.opacity(0.1))
+                            .foregroundColor(Color.gray.opacity(0.3))
                             .frame(height: 6)
 
                         RoundedRectangle(cornerRadius: 4)
@@ -3152,10 +3178,8 @@ struct GoalCard: View {
             }
         }
         .padding(TMISpacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.md)
-                .fill(Color.white.opacity(0.05))
-        )
+        .background(Color.tmiSurface)
+        .cornerRadius(TMIRadius.md)
         .overlay(
             RoundedRectangle(cornerRadius: TMIRadius.md)
                 .strokeBorder(modelColor.opacity(0.2), lineWidth: 1)

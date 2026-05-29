@@ -71,8 +71,6 @@ struct QuickActionCard: View {
                     }
                 }
 
-                Spacer()
-
                 // Content
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -127,20 +125,25 @@ struct QuickActionsGrid: View {
     @State private var showingViewAllStudents = false
     @State private var showingCreatePlan = false
     @State private var showingStudentsNeedingSupport = false
+    
+    var data: DashboardData
 
     var body: some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             Text("Quick Actions")
-                .font(.tmiTitle3)
+                .font(.tmiTitle3.bold())
                 .foregroundColor(.tmiTextPrimary)
 
-            // Grid of action cards
-            let gridColumns = [
-                GridItem(.flexible(), spacing: TMISpacing.md),
-                GridItem(.flexible(), spacing: TMISpacing.md)
-            ]
-
-            LazyVGrid(columns: gridColumns, spacing: TMISpacing.md) {
+            Divider()
+            
+            VStack(spacing: TMISpacing.md) {
+                if let action = data.nextBestAction {
+                    NextBestActionCard(action: action) {
+                        handleNextAction(action)
+                    }
+                }
+                
+                
                 QuickActionCard(
                     title: "Add Student",
                     subtitle: "Begin a new student profile",
@@ -214,17 +217,28 @@ struct QuickActionsGrid: View {
             }
             .tmiSheetStyle()
         }
+        .navigationDestination(isPresented: $showingViewAllStudents) {
+            StudentListView()
+        }
+        .navigationDestination(isPresented: $showingCreatePlan) {
+            TMIPlanListView()
+        }
         .sheet(isPresented: $showingStudentsNeedingSupport) {
             NavigationStack {
                 StudentsNeedingSupportView()
             }
             .tmiSheetStyle()
         }
-        .sheet(isPresented: $showingViewAllStudents) {
-            NavigationStack {
-                StudentListView()
-            }
-            .tmiSheetStyle()
+    }
+    
+    // MARK: - Next Action Handler
+
+    private func handleNextAction(_ action: NextBestAction) {
+        switch action.type {
+        case .createPlan, .reviewPlan, .pendingApproval:
+           showingCreatePlan = true
+        case .scheduleMeeting, .completeNotes, .addInterests, .checkProgress:
+            showingViewAllStudents = true
         }
     }
 
@@ -364,50 +378,69 @@ struct StudentSelectorForPlanView: View {
                 .padding(.vertical, TMISpacing.md)
 
             // Student list
-            if studentStateModel.students.isEmpty {
-                TMIEmptyState(
-                    icon: "person.crop.circle.badge.plus",
-                    title: "No Students Yet",
-                    message: "Add a student first before creating a TMI plan",
-                    action: nil,
-                    actionLabel: nil
-                )
-            } else {
-                List(filteredStudents) { student in
-                    Button {
-                        selectedStudent = student
-                    } label: {
-                        HStack(spacing: TMISpacing.md) {
-                            TMIAvatar(
-                                initials: student.initials,
-                                color: avatarColor(for: student),
-                                size: TMISizing.avatarSm
-                            )
+            switch studentStateModel.state {
+            case .idle, .loading:
+                ProgressView("Loading students...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, TMISpacing.xxl)
+            case .loaded:
+                if filteredStudents.isEmpty {
+                    TMIEmptyState(
+                        icon: "person.crop.circle.badge.plus",
+                        title: searchText.isEmpty ? "No Students Yet" : "No Results",
+                        message: searchText.isEmpty ? "Add a student first before creating a TMI plan" : "No students match your search",
+                        action: nil,
+                        actionLabel: nil
+                    )
+                } else {
+                    List(filteredStudents) { student in
+                        Button {
+                            selectedStudent = student
+                        } label: {
+                            HStack(spacing: TMISpacing.md) {
+                                TMIAvatar(
+                                    initials: student.initials,
+                                    color: avatarColor(for: student),
+                                    size: TMISizing.avatarSm
+                                )
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(student.name)
-                                    .font(.tmiBody)
-                                    .foregroundColor(.tmiTextPrimary)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(student.name)
+                                        .font(.tmiBody)
+                                        .foregroundColor(.tmiTextPrimary)
 
-                                Text("Grade \(student.grade) • \(student.school)")
-                                    .font(.tmiCaption)
-                                    .foregroundColor(.tmiTextSecondary)
+                                    Text("Grade \(student.grade) • \(student.school)")
+                                        .font(.tmiCaption)
+                                        .foregroundColor(.tmiTextSecondary)
+                                }
+
+                                Spacer()
+
+                                if selectedStudent?.id == student.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundColor(.tmiPrimary)
+                                } else {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.tmiTextTertiary)
+                                }
                             }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.tmiTextTertiary)
+                            .padding(.vertical, TMISpacing.sm)
                         }
-                        .padding(.vertical, TMISpacing.sm)
                     }
-                    .listRowBackground(Color.tmiBackground)
+                    .listStyle(.plain)
                 }
-                .listStyle(.plain)
+            case .error:
+                TMIEmptyState(
+                    icon: "exclamationmark.triangle",
+                    title: "Unable to Load Students",
+                    message: "Please try again",
+                    action: { Task { await studentStateModel.fetch() } },
+                    actionLabel: "Retry"
+                )
             }
         }
-        .background(Color.tmiBackground)
         .navigationTitle("Select Student")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -448,7 +481,7 @@ struct StudentSelectorForPlanView: View {
     NavigationStack {
         ScrollView {
             VStack(spacing: TMISpacing.lg) {
-                QuickActionsGrid()
+                QuickActionsGrid(data: DashboardData(engagementData: [], totalStudents: 0, activeTMIPlans: 0, interestsIdentified: 0, surveysCompleted: 0, plansAligned: 0, recentActivities: [], nextBestAction: NextBestAction(id: "", type: .addInterests, title: "", description: "", priority: .high, targetStudentId: "", targetPlanId: ""), roleData: nil))
                     .padding()
             }
         }

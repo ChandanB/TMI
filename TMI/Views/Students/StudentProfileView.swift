@@ -6,6 +6,8 @@
 
 import SwiftUI
 import FirebaseAuth
+import PhotosUI
+import FirebaseStorage
 
 struct StudentProfileView: View {
     // MARK: - Parameters
@@ -54,6 +56,13 @@ struct StudentProfileView: View {
     // MARK: - Notes
 
     @State private var behavioralNotes = ""
+
+    // MARK: - Photo Upload State
+
+    @State private var photoURL: URL?
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedPhotoData: Data?
+    @State private var isUploadingPhoto = false
 
     // MARK: - Save State
 
@@ -235,6 +244,16 @@ struct StudentProfileView: View {
             populateFromExistingStudent()
             prefillSchoolIfNeeded()
         }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            Task {
+                if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                    await MainActor.run {
+                        selectedPhotoData = data
+                    }
+                    await uploadProfilePhoto()
+                }
+            }
+        }
     }
 
     // MARK: - Header
@@ -320,6 +339,72 @@ struct StudentProfileView: View {
                 TextField("", text: $studentID,
                           prompt: Text("School-issued ID (optional)").foregroundStyle(Color.tmiTextSecondary))
                     .autocorrectionDisabled()
+            }
+
+            // Profile Photo
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Profile Photo")
+                    .font(.tmiCaption)
+                    .foregroundStyle(Color.tmiTextSecondary)
+
+                HStack(spacing: TMISpacing.md) {
+                    if let photoURL = photoURL, let url = URL(string: photoURL.absoluteString) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 60, height: 60)
+                                .cornerRadius(TMIRadius.md)
+                        } placeholder: {
+                            ProgressView()
+                                .frame(width: 60, height: 60)
+                        }
+                    } else if let photoData = selectedPhotoData,
+                              let uiImage = UIImage(data: photoData) {
+                        #if os(macOS)
+                        Image(nsImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 60, height: 60)
+                            .cornerRadius(TMIRadius.md)
+                        #elseif os(iOS)
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 60, height: 60)
+                            .cornerRadius(TMIRadius.md)
+                        #endif
+                    } else {
+                        RoundedRectangle(cornerRadius: TMIRadius.md)
+                            .fill(Color.tmiSurface)
+                            .frame(width: 60, height: 60)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundColor(Color.tmiTextSecondary)
+                            )
+                    }
+
+                    VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                            Text("Change Photo")
+                                .font(.tmiBody)
+                                .foregroundColor(.tmiPrimary)
+                        }
+
+                        if isUploadingPhoto {
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Uploading...")
+                                    .font(.tmiCaption)
+                                    .foregroundColor(.tmiTextSecondary)
+                            }
+                        }
+                    }
+                }
+                .padding(TMISpacing.md)
+                .background(Color.tmiSurface)
+                .cornerRadius(TMIRadius.sm)
             }
         }
     }
@@ -477,6 +562,7 @@ struct StudentProfileView: View {
         school = student.school
         dateOfBirth = student.dateOfBirth
         studentID = student.studentID ?? ""
+        photoURL = student.photoURL
 
         // Restore behavioral notes from the most recent general note
         if let firstNote = student.notes?.first(where: { $0.category == .general }) {
@@ -490,6 +576,33 @@ struct StudentProfileView: View {
         guard !isEditMode, school.isEmpty else { return }
         if let institutionName = authStateModel.currentUser?.institutionName {
             school = institutionName
+        }
+    }
+
+    // MARK: - Photo Upload
+
+    private func uploadProfilePhoto() async {
+        guard let photoData = selectedPhotoData else { return }
+
+        isUploadingPhoto = true
+        defer { isUploadingPhoto = false }
+
+        do {
+            guard let uid = Auth.auth().currentUser?.uid else { return }
+
+            let storageRef = Storage.storage().reference()
+            let photoRef = storageRef.child("students/\(uid)/profile-photo.jpg")
+            let metadata = StorageMetadata()
+            metadata.contentType = "image/jpeg"
+
+            _ = try await photoRef.putDataAsync(photoData, metadata: metadata)
+            let url = try await photoRef.downloadURL()
+
+            await MainActor.run {
+                photoURL = url
+            }
+        } catch {
+            print("[StudentProfile] Failed to upload photo: \(error)")
         }
     }
 
@@ -527,7 +640,8 @@ struct StudentProfileView: View {
             grade: selectedGrade,
             school: school.trimmingCharacters(in: .whitespacesAndNewlines),
             dateOfBirth: dateOfBirth,
-            studentID: studentID.isEmpty ? nil : studentID
+            studentID: studentID.isEmpty ? nil : studentID,
+            photoURL: photoURL
         )
         let saved = try await studentService.addStudent(student)
 
@@ -584,7 +698,7 @@ struct StudentProfileView: View {
             updatedAt: Date(),
             tmiPlans: existing.tmiPlans,
             studentID: studentID.isEmpty ? nil : studentID,
-            photoURL: existing.photoURL,
+            photoURL: photoURL,
             surveyResults: existing.surveyResults,
             academicPerformance: existing.academicPerformance,
             engagementHistory: existing.engagementHistory,

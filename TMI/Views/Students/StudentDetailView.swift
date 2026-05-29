@@ -112,36 +112,6 @@ struct StudentDetailView: View {
                 .tmiSheetStyle()
             }
         }
-        .sheet(isPresented: $showingAllPlans) {
-            if let student = stateModel.student {
-                NavigationStack {
-                    StudentPlansListView(student: student, plans: studentPlans(for: student))
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Done") {
-                                    showingAllPlans = false
-                                }
-                            }
-                        }
-                }
-                .tmiSheetStyle()
-            }
-        }
-        .sheet(isPresented: $showingProgress) {
-            if let student = stateModel.student {
-                NavigationStack {
-                    StudentProgressView(student: student, plans: studentPlans(for: student))
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Done") {
-                                    showingProgress = false
-                                }
-                            }
-                        }
-                }
-                .tmiSheetStyle()
-            }
-        }
         .alert("Retake Survey?", isPresented: $showRetakeConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Retake", role: .destructive) {
@@ -229,45 +199,72 @@ struct StudentDetailView: View {
 
         ScrollView {
             VStack(spacing: TMISpacing.lg) {
-                // Hero Section
-                heroSection(student: student)
+                // Full-width header
+                headerSection(student: student)
 
-                // Teacher Command Center
-                commandCenterSection(student: student, summary: summary)
-
-                // Quick Actions
+                // Quick Actions (horizontal scroll)
                 quickActionsRow(student: student)
 
-                // Key Stats
-                keyStatsSection(student: student)
+                // Two-column layout
+                HStack(alignment: .top, spacing: TMISpacing.lg) {
+                    // Left column — progress, command center, plans, meetings
+                    VStack(spacing: TMISpacing.lg) {
+                        StudentProgressView(student: student, plans: studentPlans(for: student))
 
-                // TMI Plans Section
-                tmiPlansSection(student: student)
+                        meetingsSection(student: student)
+                        
+                        interestsSection(student: student)
+                        
+                        savedCareersSection(student: student)
+                    }
+                    .frame(maxWidth: .infinity)
 
-                // Meetings Section
-                meetingsSection(student: student)
+                    // Right column — interests, careers, academics, notes
+                    VStack(spacing: TMISpacing.lg) {
+                        commandCenterSection(student: student, summary: summary)
 
-                // Interests Section
-                interestsSection(student: student)
+                        tmiPlansSection(student: student)
 
-                // Saved Careers Section
-                savedCareersSection(student: student)
+                        if let academic = student.academicPerformance {
+                            academicSection(academic)
+                        }
 
-                // Academic Performance
-                if let academic = student.academicPerformance {
-                    academicSection(academic)
+                        if let notes = student.notes, !notes.isEmpty {
+                            notesSection(notes)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
 
-                // Notes & History
-                if let notes = student.notes, !notes.isEmpty {
-                    notesSection(notes)
-                }
-
-                Spacer(minLength: 80) // Space for action bar
+                Spacer(minLength: 80)
             }
             .padding(.horizontal, TMISpacing.screenPadding)
             .padding(.top, TMISpacing.md)
         }
+    }
+    
+    // MARK: - Header
+
+    private func headerSection(student: Student) -> some View {
+        HStack(spacing: TMISpacing.md) {
+            TMIAvatar(
+                initials: student.initials,
+                color: student.avatarColor.color,
+                size: 56
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(student.name)
+                    .font(.tmiTitle2)
+                    .foregroundColor(.tmiTextPrimary)
+
+                Text("Age \(student.age) • Grade \(student.grade) • \(student.school)")
+                    .font(.tmiBody)
+            }
+
+            Spacer()
+        }
+        .tmiCard()
     }
 
     // MARK: - Hero Section
@@ -299,16 +296,8 @@ struct StudentDetailView: View {
     // MARK: - Quick Actions
 
     private func quickActionsRow(student: Student) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Quick Actions")
-                .font(.title3.bold())
-                .foregroundColor(.tmiTextPrimary)
-                .padding(.bottom, TMISpacing.sm)
-
-            Divider()
-                .padding(.bottom, TMISpacing.md)
-
-            VStack(spacing: TMISpacing.sm) {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: TMISpacing.md) {
                 quickActionButton(
                     icon: "person.crop.circle.badge.checkmark",
                     label: "Student Mode",
@@ -321,45 +310,33 @@ struct StudentDetailView: View {
                     label: "Create Plan",
                     action: { showingCreatePlan = true }
                 )
-
-                quickActionButton(
-                    icon: "list.clipboard",
-                    label: "View Plans",
-                    action: { showingAllPlans = true }
-                )
-
-                quickActionButton(
-                    icon: "chart.bar",
-                    label: "Progress",
-                    action: { showingProgress = true }
-                )
             }
+            .padding(.horizontal, TMISpacing.screenPadding)
         }
+        .padding(.horizontal, -TMISpacing.screenPadding)
     }
 
     private func quickActionButton(icon: String, label: String, color: Color = .tmiPrimary, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: TMISpacing.md) {
+            VStack(spacing: TMISpacing.sm) {
                 Image(systemName: icon)
-                    .font(.system(size: 20))
+                    .font(.system(size: 24))
                     .foregroundColor(color)
-                    .frame(width: 40, height: 40)
-                    .background(color.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 Text(label)
-                    .font(.body.weight(.medium))
-                    .foregroundColor(.tmiTextPrimary)
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
-                    .foregroundColor(.tmiTextTertiary)
+                    .font(.tmiCaption)
+                    .foregroundColor(.tmiTextSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .padding(.vertical, TMISpacing.sm)
-            .padding(.horizontal, TMISpacing.sm)
-            .contentShape(Rectangle())
+            .frame(width: 100, height: 80)
+            .padding(.vertical, TMISpacing.md)
+            .background(Color.tmiSurface)
+            .cornerRadius(TMIRadius.md)
+            .overlay(
+                RoundedRectangle(cornerRadius: TMIRadius.md)
+                    .strokeBorder(Color.tmiBorder, lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }
@@ -421,28 +398,7 @@ struct StudentDetailView: View {
         }
         .tmiCard()
     }
-
-    // MARK: - Key Stats
-
-    private func keyStatsSection(student: Student) -> some View {
-        HStack(spacing: TMISpacing.md) {
-            statCard(
-                value: "\(student.age)",
-                label: "Years Old"
-            )
-
-            statCard(
-                value: "\(Int(student.engagementScore * 100))%",
-                label: "Engagement"
-            )
-
-            statCard(
-                value: "\(resolvedInterests.count)",
-                label: "Interests"
-            )
-        }
-    }
-
+    
     private func statCard(value: String, label: String) -> some View {
         VStack(spacing: 8) {
             Text(value)
@@ -458,13 +414,14 @@ struct StudentDetailView: View {
         .tmiCard()
     }
 
+
     // MARK: - Interests Section
 
     private func interestsSection(student: Student) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
                 Text("Interests")
-                    .font(.tmiTitle3)
+                    .font(.tmiTitle3.bold())
                     .foregroundColor(.tmiTextPrimary)
 
                 Spacer()
@@ -500,6 +457,8 @@ struct StudentDetailView: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            Divider()
 
             if isLoadingInterests {
                 HStack {
@@ -626,7 +585,7 @@ struct StudentDetailView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("TMI Plans")
-                        .font(.tmiTitle3)
+                        .font(.tmiTitle3.bold())
                         .foregroundColor(.tmiTextPrimary)
 
                     Text("Active intervention plans for this student")
@@ -644,6 +603,8 @@ struct StudentDetailView: View {
                     )
                 }
             }
+
+            Divider()
 
             if !studentPlans.isEmpty {
                 VStack(spacing: TMISpacing.sm) {
@@ -713,7 +674,7 @@ struct StudentDetailView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Meetings")
-                        .font(.tmiTitle3)
+                        .font(.tmiTitle3.bold())
                         .foregroundColor(.tmiTextPrimary)
 
                     Text("Scheduled meetings for this student")
@@ -731,6 +692,8 @@ struct StudentDetailView: View {
                     )
                 }
             }
+
+            Divider()
 
             if !studentMeetings.isEmpty {
                 VStack(spacing: TMISpacing.sm) {
@@ -779,7 +742,7 @@ struct StudentDetailView: View {
                     TMIButton(
                         text: MVPEmptyStateCopy.studentMeetingsAction,
                         icon: "calendar.badge.plus",
-                        style: .secondary,
+                        style: .primary,
                         action: {
                             scheduleMeetingCoordinator.startScheduling(
                                 forStudentId: student.id,

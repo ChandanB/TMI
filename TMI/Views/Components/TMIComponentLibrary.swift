@@ -540,6 +540,9 @@ struct TMISheetStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .presentationDragIndicator(.visible)
+#if os(macOS)
+            .frame(minWidth: 700, maxHeight: 900)
+        #endif
     }
 }
 

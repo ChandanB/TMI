@@ -21,9 +21,7 @@ struct StudentProgressView: View {
 
             ScrollView {
                 VStack(spacing: TMISpacing.lg) {
-                    // Header
-                    headerSection
-
+            
                     // Overall Metrics
                     overallMetricsSection
 
@@ -52,6 +50,7 @@ struct StudentProgressView: View {
             await loadInterestCount()
         }
     }
+    
 
     // MARK: - Data Loading
 
@@ -65,30 +64,7 @@ struct StudentProgressView: View {
         }
     }
 
-    // MARK: - Header
 
-    private var headerSection: some View {
-        HStack(spacing: TMISpacing.md) {
-            TMIAvatar(
-                initials: student.initials,
-                color: avatarColor,
-                size: 56
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(student.name)
-                    .font(.tmiTitle2)
-                    .foregroundColor(.tmiTextPrimary)
-
-                Text("Grade \(student.grade) • \(student.school)")
-                    .font(.tmiBody)
-                    .foregroundColor(.tmiTextSecondary)
-            }
-
-            Spacer()
-        }
-        .tmiCard()
-    }
 
     // MARK: - Overall Metrics
 

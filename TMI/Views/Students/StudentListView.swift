@@ -92,16 +92,10 @@ struct StudentListView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                HStack(alignment: .center, spacing: 8) {
-                    Spacer()
-                }
-                .padding(.horizontal, TMISpacing.screenPadding)
-                .padding(.vertical, TMISpacing.screenPadding)
-
                 // Search Bar
                 TMISearchBar(text: $searchText, placeholder: "Search students...")
                     .padding(.horizontal, TMISpacing.screenPadding)
-                    .padding(.top, TMISpacing.sm)
+                    .padding(.top, TMISpacing.md)
 
                 // Filter Chips
                 if !availableGrades.isEmpty {
@@ -125,6 +119,7 @@ struct StudentListView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             // FAB for Add Student
             TMIFAB(

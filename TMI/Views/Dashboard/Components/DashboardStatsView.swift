@@ -13,45 +13,53 @@ struct DashboardStatsView: View {
     let onNavigateToPlans: () -> Void
     
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: TMISpacing.md) {
-                MetricPill(
-                    icon: "person.2.fill",
-                    tint: .blue,
-                    value: "\(data.totalStudents)",
-                    label: "Students",
-                    subtitle: "Total Enrolled",
-                    action: onNavigateToStudents
-                )
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            Text("Key Stats")
+                .font(.tmiTitle3.bold())
+                .foregroundColor(.tmiTextPrimary)
 
-                MetricPill(
-                    icon: "doc.fill",
-                    tint: .purple,
-                    value: "\(data.activeTMIPlans)",
-                    label: "Active Plans",
-                    subtitle: "In Progress",
-                    action: onNavigateToPlans
-                )
+            Divider()
 
-                MetricPill(
-                    icon: "checkmark.circle.fill",
-                    tint: .green,
-                    value: "\(data.surveysCompleted)",
-                    label: "Surveys",
-                    subtitle: "Completed",
-                    action: onNavigateToStudents
-                )
-                
-                MetricPill(
-                    icon: "lightbulb.fill",
-                    tint: .orange,
-                    value: "\(data.interestsIdentified)",
-                    label: "Interests",
-                    subtitle: "Identified",
-                    action: onNavigateToStudents
-                )
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: TMISpacing.md) {
+                    MetricPill(
+                        icon: "person.2.fill",
+                        tint: .blue,
+                        value: "\(data.totalStudents)",
+                        label: "Students",
+                        subtitle: "Total Enrolled",
+                        action: onNavigateToStudents
+                    )
+
+                    MetricPill(
+                        icon: "doc.fill",
+                        tint: .purple,
+                        value: "\(data.activeTMIPlans)",
+                        label: "Active Plans",
+                        subtitle: "In Progress",
+                        action: onNavigateToPlans
+                    )
+
+                    MetricPill(
+                        icon: "checkmark.circle.fill",
+                        tint: .green,
+                        value: "\(data.surveysCompleted)",
+                        label: "Surveys",
+                        subtitle: "Completed",
+                        action: onNavigateToStudents
+                    )
+
+                    MetricPill(
+                        icon: "lightbulb.fill",
+                        tint: .orange,
+                        value: "\(data.interestsIdentified)",
+                        label: "Interests",
+                        subtitle: "Identified",
+                        action: onNavigateToStudents
+                    )
+                }
+                .padding(.horizontal, TMISpacing.screenPadding)
             }
-            .padding(.horizontal, TMISpacing.screenPadding)
         }
     }
 }

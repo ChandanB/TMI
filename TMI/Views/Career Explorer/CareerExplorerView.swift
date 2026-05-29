@@ -205,10 +205,17 @@ struct CareerExplorerView: View {
     .navigationBarTitleDisplayMode(.large)
     .foregroundColor(Color.tmiTextPrimary)
     .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Done") {
+          dismiss()
+        }
+        .fontWeight(.semibold)
+      }
+
       ToolbarItem(placement: .navigationBarLeading) {
         studentPickerButton
       }
-      
+
       if hasSearched {
         ToolbarItem(placement: .navigationBarTrailing) {
           Button("New Search") {
@@ -217,17 +224,6 @@ struct CareerExplorerView: View {
             }
           }
           .foregroundColor(Color.tmiSecondary)
-        }
-      }
-
-      ToolbarItem(placement: .navigationBarTrailing) {
-        Button {
-          dismiss()
-        } label: {
-          Image(systemName: "xmark.circle.fill")
-            .font(.system(size: 20))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundColor(.white)
         }
       }
     }
@@ -395,7 +391,7 @@ struct CareerExplorerView: View {
         if !searchResults.isEmpty {
           HStack {
             VStack(alignment: .leading, spacing: 4) {
-              Text("Results for \"\(lastSearchQuery)\"")
+              Text("Results for \"\(searchText)\"")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(Color.tmiTextPrimary)
 
@@ -804,7 +800,7 @@ struct CareerExplorerView: View {
               Text("Skills: \(selectedSkills.joined(separator: ", "))")
                 .font(.system(size: 14))
                 .foregroundColor(Color.tmiSecondary)
-                .lineLimit(1)
+                .lineLimit(2)
             }
           }
 
@@ -960,7 +956,7 @@ struct CareerCardHeader: View {
       Text(title)
         .font(.system(size: 16, weight: .semibold))
         .foregroundColor(Color.tmiTextPrimary)
-        .lineLimit(1)
+        .lineLimit(2)
     }
     .padding(16)
     .background(
@@ -997,7 +993,7 @@ struct FieldBadgeView: View {
     Text(field)
       .font(.system(size: 12, weight: .medium))
       .foregroundColor(Color.tmiTextSecondary)
-      .lineLimit(1)
+      .lineLimit(2)
       .fixedSize(horizontal: true, vertical: false)
       .padding(.horizontal, 10)
       .padding(.vertical, 5)

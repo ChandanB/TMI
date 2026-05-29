@@ -30,7 +30,7 @@ struct StudentStatusWidget: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Student Engagement")
-                        .font(.tmiTitle3)
+                        .font(.tmiTitle3.bold())
                         .foregroundColor(.tmiTextPrimary)
 
                     Text("Current status overview")
@@ -40,6 +40,8 @@ struct StudentStatusWidget: View {
 
                 Spacer()
             }
+
+            Divider()
 
             // Visualization
             switch stateModel.state {
@@ -59,7 +61,6 @@ struct StudentStatusWidget: View {
                 errorState
             }
         }
-        .tmiCard(style: .elevated)
         .task {
             await stateModel.fetch()
         }

@@ -42,8 +42,7 @@ struct CareerDetailView: View {
 
   var body: some View {
     ZStack {
-      // Use unified TMI background
-      TMIBackgroundView(variant: .career)
+      TMIBackgroundView(variant: .base)
         .ignoresSafeArea()
 
       ScrollView {
@@ -54,30 +53,8 @@ struct CareerDetailView: View {
           // Tab selection
           tabSelector
 
-          // Main content container with TMI glass morphism effect
-          ZStack {
-            RoundedRectangle(cornerRadius: 30)
-              .fill(Color.white.opacity(0.05))
-              .background(
-                RoundedRectangle(cornerRadius: 30)
-                  .fill(Color.tmiSurface)
-                  .opacity(0.3)
-              )
-              .overlay(
-                RoundedRectangle(cornerRadius: 30)
-                  .stroke(
-                    LinearGradient(
-                      colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
-                      startPoint: .topLeading,
-                      endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                  )
-              )
-              .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: -5)
-
-            // Content based on selected tab
-            VStack {
+          // Main content container
+          VStack {
               TabView(selection: $selectedTab) {
                 overviewTab.tag(0)
                 skillsTab.tag(1)
@@ -105,7 +82,6 @@ struct CareerDetailView: View {
               }
             }
             .padding(.top, 20)
-          }
         }
         .ignoresSafeArea(edges: .bottom)
       }
@@ -154,180 +130,76 @@ struct CareerDetailView: View {
 
   // MARK: - Hero Header
   private var heroHeader: some View {
-    ZStack {
-      // Enhanced background with gradient and glass morphism
-      RoundedRectangle(cornerRadius: 0)
-        .fill(
-          LinearGradient(
-            gradient: Gradient(stops: [
-              .init(color: Color.tmiPrimary.opacity(0.4), location: 0.0),
-              .init(color: Color.tmiSecondary.opacity(0.3), location: 0.7),
-              .init(color: Color.clear, location: 1.0)
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          )
-        )
-        .background(
-          RoundedRectangle(cornerRadius: 0)
-            .fill(Color.tmiSurface)
-            .opacity(0.8)
-        )
-
-      // Floating geometric elements for visual interest
-      GeometryReader { geometry in
-        ForEach(0..<8) { i in
-          let size = CGFloat.random(in: 8...24)
-          let xPos = CGFloat.random(in: 0...geometry.size.width)
-          let yPos = CGFloat.random(in: 0...geometry.size.height)
-          
-          RoundedRectangle(cornerRadius: size / 4)
-            .fill(Color.white.opacity(0.1))
-            .frame(width: size, height: size)
-            .position(x: xPos, y: yPos)
-            .rotationEffect(.degrees(Double.random(in: 0...360)))
-            .opacity(animateContent ? 1 : 0)
-            .animation(
-              Animation.easeInOut(duration: Double.random(in: 3...6))
-                .repeatForever(autoreverses: true)
-                .delay(Double.random(in: 0...2)),
-              value: animateContent
-            )
+    VStack(spacing: TMISpacing.lg) {
+      // Career icon + title
+      HStack(alignment: .center, spacing: TMISpacing.md) {
+        ZStack {
+          Circle()
+            .fill(Color.tmiSecondary.opacity(0.12))
+            .frame(width: 64, height: 64)
+          Image(systemName: getCareerIcon(field: career.field))
+            .font(.system(size: 28, weight: .medium))
+            .foregroundColor(.tmiSecondary)
         }
+
+        VStack(alignment: .leading, spacing: 6) {
+          Text(career.title)
+            .font(.system(size: 28, weight: .bold))
+            .foregroundColor(.tmiTextPrimary)
+
+          HStack(spacing: 6) {
+            Circle()
+              .fill(Color.tmiSecondary)
+              .frame(width: 8, height: 8)
+            Text(career.field)
+              .font(.system(size: 15, weight: .semibold))
+              .foregroundColor(.tmiTextSecondary)
+          }
+          .padding(.horizontal, 10)
+          .padding(.vertical, 5)
+          .background(
+            Capsule()
+              .fill(Color.tmiSurface)
+          )
+          .overlay(
+            Capsule()
+              .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
+          )
+        }
+
+        Spacer()
       }
 
-      // Enhanced career info with modern layout
-      VStack(spacing: 20) {
-        // Header section with improved typography
-        HStack(alignment: .top, spacing: 16) {
-          // Enhanced career icon with multiple layers
-          ZStack {
-            // Outer glow effect
-            Circle()
-              .fill(
-                RadialGradient(
-                  gradient: Gradient(colors: [
-                    Color.tmiSecondary.opacity(0.3),
-                    Color.clear
-                  ]),
-                  center: .center,
-                  startRadius: 30,
-                  endRadius: 50
-                )
-              )
-              .frame(width: 100, height: 100)
-            
-            // Main icon background
-            Circle()
-              .fill(
-                LinearGradient(
-                  gradient: Gradient(colors: [
-                    Color.white.opacity(0.2),
-                    Color.white.opacity(0.1)
-                  ]),
-                  startPoint: .topLeading,
-                  endPoint: .bottomTrailing
-                )
-              )
-              .frame(width: 70, height: 70)
-              .overlay(
-                Circle()
-                  .stroke(
-                    LinearGradient(
-                      gradient: Gradient(colors: [
-                        Color.white.opacity(0.3),
-                        Color.clear
-                      ]),
-                      startPoint: .topLeading,
-                      endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 2
-                  )
-              )
-
-            Image(systemName: getCareerIcon(field: career.field))
-              .font(.system(size: 32, weight: .medium))
-              .foregroundColor(Color.tmiTextPrimary)
-          }
-          .opacity(animateContent ? 1 : 0)
-          .scaleEffect(animateContent ? 1 : 0.6)
-          .animation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.1), value: animateContent)
-
-          VStack(alignment: .leading, spacing: 8) {
-            // Career title with enhanced typography
-            Text(career.title)
-              .font(.system(size: 32, weight: .bold, design: .rounded))
-              .foregroundColor(Color.tmiTextPrimary)
-              .opacity(animateContent ? 1 : 0)
-              .offset(y: animateContent ? 0 : 30)
-              .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.2), value: animateContent)
-
-            // Field badge with improved design
-            HStack(spacing: 6) {
-              Circle()
-                .fill(Color.tmiSecondary)
-                .frame(width: 8, height: 8)
-              
-              Text(career.field)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(Color.tmiTextSecondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-              Capsule()
-                .fill(Color.white.opacity(0.15))
-                .background(
-                  Capsule()
-                    .fill(Color.tmiSurface)
-                    .opacity(0.6)
-                )
-            )
-            .opacity(animateContent ? 1 : 0)
-            .offset(y: animateContent ? 0 : 30)
-            .animation(.spring(response: 0.8, dampingFraction: 0.8).delay(0.3), value: animateContent)
-            
-            Spacer()
-          }
-        }
-
-        // Enhanced stats cards with improved design
-        HStack(spacing: 12) {
-          // Salary Card
-          CareerStatCard(
-            icon: "dollarsign.circle.fill",
-            title: "$\(career.salaryRange.lowerBound/1000)k-$\(career.salaryRange.upperBound/1000)k",
-            subtitle: "Annual Salary",
-            color: Color.green,
-            animateContent: animateContent,
-            delay: 0.4
-          )
-          
-          // Growth Card
-          CareerStatCard(
-            icon: "chart.line.uptrend.xyaxis",
-            title: getGrowthCategory(outlook: career.jobOutlook),
-            subtitle: "Job Growth",
-            color: Color.blue,
-            animateContent: animateContent,
-            delay: 0.5
-          )
-          
-          // Education Card
-          CareerStatCard(
-            icon: "graduationcap.fill",
-            title: getEducationLevel(education: career.education),
-            subtitle: "Education",
-            color: Color.purple,
-            animateContent: animateContent,
-            delay: 0.6
-          )
-        }
+      // Stats cards
+      HStack(spacing: TMISpacing.md) {
+        CareerStatCard(
+          icon: "dollarsign.circle.fill",
+          title: "$\(Int(career.salaryRange.lowerBound/1000))k-$\(Int(career.salaryRange.upperBound/1000))k",
+          subtitle: "Annual Salary",
+          color: .green,
+          animateContent: animateContent,
+          delay: 0.2
+        )
+        CareerStatCard(
+          icon: "chart.line.uptrend.xyaxis",
+          title: getGrowthCategory(outlook: career.jobOutlook),
+          subtitle: "Job Growth",
+          color: .blue,
+          animateContent: animateContent,
+          delay: 0.3
+        )
+        CareerStatCard(
+          icon: "graduationcap.fill",
+          title: getEducationLevel(education: career.education),
+          subtitle: "Education",
+          color: .purple,
+          animateContent: animateContent,
+          delay: 0.4
+        )
       }
-      .padding(.horizontal, 20)
-      .padding(.bottom, 24)
     }
-    .frame(height: 280)
+    .padding(.horizontal, TMISpacing.screenPadding)
+    .padding(.vertical, TMISpacing.lg)
   }
 
   // MARK: - Enhanced Tab Selector
@@ -362,10 +234,10 @@ struct CareerDetailView: View {
                     .fill(Color.tmiSecondary)
                 } else {
                   RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.08))
+                    .fill(Color.tmiSurface)
                     .overlay(
                       RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                        .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
                     )
                 }
               }
