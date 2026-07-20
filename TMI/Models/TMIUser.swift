@@ -16,13 +16,12 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
   var displayName: String
   var email: String
   var isEmailVerified: Bool
-  let role: UserRole
+  /// Non-authoritative account type requested during registration.
+  /// Trusted role and tenant scope live only in `MembershipContext`.
+  var requestedRole: UserRole?
   var dateOfBirth: Date?
   var institutionCode: String?
-  var institutionID: String?
   var institutionName: String?
-  var districtId: String?
-  var schoolId: String?
   var photoURL: String?
   var organization: String?
 
@@ -32,24 +31,16 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
   var parentalConsentStatus: ParentalConsentStatus
   var ageVerificationStatus: AgeVerificationStatus
   
-  // Privacy and permissions
+  // Personal privacy preferences
   var privacySettings: PrivacySettings
-  var permissions: Set<Permission>
-  var dataClassificationAccess: Set<DataClassification>
   
   // Profile metadata
   let createdAt: Date
   var lastLoginAt: Date?
   var lastActivityAt: Date?
-  var isActive: Bool
   var emergencyContacts: [EmergencyContact]
   
   var formTemplates: [String] = []
-  
-  // Legacy compatibility
-  var legacyRole: String {
-    return role.rawValue
-  }
   
   init(
     id: String? = nil,
@@ -57,13 +48,10 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     displayName: String,
     email: String,
     isEmailVerified: Bool = false,
-    role: UserRole,
+    requestedRole: UserRole? = nil,
     dateOfBirth: Date? = nil,
     institutionCode: String? = nil,
-    institutionID: String? = nil,
     institutionName: String? = nil,
-    districtId: String? = nil,
-    schoolId: String? = nil,
     photoURL: String? = nil,
     organization: String? = nil,
     verificationStatus: VerificationStatus = VerificationStatus(),
@@ -71,12 +59,9 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     parentalConsentStatus: ParentalConsentStatus = .notRequired,
     ageVerificationStatus: AgeVerificationStatus = .notRequired,
     privacySettings: PrivacySettings = PrivacySettings(),
-    permissions: Set<Permission>? = nil,
-    dataClassificationAccess: Set<DataClassification>? = nil,
     createdAt: Date = Date(),
     lastLoginAt: Date? = nil,
     lastActivityAt: Date? = nil,
-    isActive: Bool = true,
     emergencyContacts: [EmergencyContact] = [],
     formTemplates: [String] = []
   ) {
@@ -85,13 +70,10 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     self.displayName = displayName
     self.email = email
     self.isEmailVerified = isEmailVerified
-    self.role = role
+    self.requestedRole = requestedRole
     self.dateOfBirth = dateOfBirth
     self.institutionCode = institutionCode
-    self.institutionID = institutionID
     self.institutionName = institutionName
-    self.districtId = districtId
-    self.schoolId = schoolId
     self.photoURL = photoURL
     self.organization = organization
     self.verificationStatus = verificationStatus
@@ -99,12 +81,9 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     self.parentalConsentStatus = parentalConsentStatus
     self.ageVerificationStatus = ageVerificationStatus
     self.privacySettings = privacySettings
-    self.permissions = permissions ?? role.defaultPermissions
-    self.dataClassificationAccess = dataClassificationAccess ?? role.defaultDataAccess
     self.createdAt = createdAt
     self.lastLoginAt = lastLoginAt
     self.lastActivityAt = lastActivityAt
-    self.isActive = isActive
     self.emergencyContacts = emergencyContacts
     self.formTemplates = formTemplates
   }
@@ -116,24 +95,20 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     case displayName
     case email
     case isEmailVerified
-    case role
+    case requestedRole
     case dateOfBirth
     case institutionCode
-    case institutionID
     case institutionName
-    case districtId
-    case schoolId
+    case photoURL
+    case organization
     case verificationStatus
     case consentRecords
     case parentalConsentStatus
     case ageVerificationStatus
     case privacySettings
-    case permissions
-    case dataClassificationAccess
     case createdAt
     case lastLoginAt
     case lastActivityAt
-    case isActive
     case emergencyContacts
     case formTemplates
   }
@@ -156,19 +131,16 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
         )
       )
     }
-    // Extract role first to use for defaults
-    role = try container.decode(UserRole.self, forKey: .role)
-    
     // Basic fields with reasonable defaults
     displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? "User"
     email = try container.decode(String.self, forKey: .email)
     isEmailVerified = try container.decodeIfPresent(Bool.self, forKey: .isEmailVerified) ?? false
+    requestedRole = try container.decodeIfPresent(UserRole.self, forKey: .requestedRole)
     dateOfBirth = try container.decodeIfPresent(Date.self, forKey: .dateOfBirth)
     institutionCode = try container.decodeIfPresent(String.self, forKey: .institutionCode)
-    institutionID = try container.decodeIfPresent(String.self, forKey: .institutionID)
     institutionName = try container.decodeIfPresent(String.self, forKey: .institutionName)
-    districtId = try container.decodeIfPresent(String.self, forKey: .districtId)
-    schoolId = try container.decodeIfPresent(String.self, forKey: .schoolId)
+    photoURL = try container.decodeIfPresent(String.self, forKey: .photoURL)
+    organization = try container.decodeIfPresent(String.self, forKey: .organization)
     
     // Complex fields with defaults
     verificationStatus = try container.decodeIfPresent(VerificationStatus.self, forKey: .verificationStatus) ?? VerificationStatus()
@@ -176,14 +148,11 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     parentalConsentStatus = try container.decodeIfPresent(ParentalConsentStatus.self, forKey: .parentalConsentStatus) ?? .notRequired
     ageVerificationStatus = try container.decodeIfPresent(AgeVerificationStatus.self, forKey: .ageVerificationStatus) ?? .notRequired
     privacySettings = try container.decodeIfPresent(PrivacySettings.self, forKey: .privacySettings) ?? PrivacySettings()
-    permissions = try container.decodeIfPresent(Set<Permission>.self, forKey: .permissions) ?? role.defaultPermissions
-    dataClassificationAccess = try container.decodeIfPresent(Set<DataClassification>.self, forKey: .dataClassificationAccess) ?? role.defaultDataAccess
     
     // Date fields with defaults
     createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     lastLoginAt = try container.decodeIfPresent(Date.self, forKey: .lastLoginAt)
     lastActivityAt = try container.decodeIfPresent(Date.self, forKey: .lastActivityAt)
-    isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
     emergencyContacts = try container.decodeIfPresent([EmergencyContact].self, forKey: .emergencyContacts) ?? []
     formTemplates = try container.decodeIfPresent([String].self, forKey: .formTemplates) ?? []
   }
@@ -195,24 +164,20 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
     try container.encode(displayName, forKey: .displayName)
     try container.encode(email, forKey: .email)
     try container.encode(isEmailVerified, forKey: .isEmailVerified)
-    try container.encode(role, forKey: .role)
+    try container.encodeIfPresent(requestedRole, forKey: .requestedRole)
     try container.encodeIfPresent(dateOfBirth, forKey: .dateOfBirth)
     try container.encodeIfPresent(institutionCode, forKey: .institutionCode)
-    try container.encodeIfPresent(institutionID, forKey: .institutionID)
     try container.encodeIfPresent(institutionName, forKey: .institutionName)
-    try container.encodeIfPresent(districtId, forKey: .districtId)
-    try container.encodeIfPresent(schoolId, forKey: .schoolId)
+    try container.encodeIfPresent(photoURL, forKey: .photoURL)
+    try container.encodeIfPresent(organization, forKey: .organization)
     try container.encode(verificationStatus, forKey: .verificationStatus)
     try container.encode(consentRecords, forKey: .consentRecords)
     try container.encode(parentalConsentStatus, forKey: .parentalConsentStatus)
     try container.encode(ageVerificationStatus, forKey: .ageVerificationStatus)
     try container.encode(privacySettings, forKey: .privacySettings)
-    try container.encode(permissions, forKey: .permissions)
-    try container.encode(dataClassificationAccess, forKey: .dataClassificationAccess)
     try container.encode(createdAt, forKey: .createdAt)
     try container.encodeIfPresent(lastLoginAt, forKey: .lastLoginAt)
     try container.encodeIfPresent(lastActivityAt, forKey: .lastActivityAt)
-    try container.encode(isActive, forKey: .isActive)
     try container.encode(emergencyContacts, forKey: .emergencyContacts)
     try container.encode(formTemplates, forKey: .formTemplates)
   }
@@ -223,13 +188,13 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
   var lastLoginDate: Date? { lastLoginAt }
   
   // Simplified initializer for basic user creation
-  init(id: String, email: String, displayName: String, role: UserRole, profileCreatedDate: Date, lastLoginDate: Date? = nil) {
+  init(id: String, email: String, displayName: String, requestedRole: UserRole? = nil, profileCreatedDate: Date, lastLoginDate: Date? = nil) {
     self.init(
       id: id,
       userID: id,
       displayName: displayName,
       email: email,
-      role: role,
+      requestedRole: requestedRole,
       createdAt: profileCreatedDate,
       lastLoginAt: lastLoginDate
     )
@@ -265,10 +230,11 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
       }
     }
 
-    // Validate institution information for roles that require it
-    if role.requiresInstitutionalAffiliation {
+    // Validate institution information for a requested account type. This is
+    // registration validation only and never grants application access.
+    if let requestedRole, requestedRole.requiresInstitutionalAffiliation {
       guard let institutionName = institutionName, !institutionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-        throw TMIUserValidationError.missingInstitutionalAffiliation("Institution name is required for \(role.displayName) role")
+        throw TMIUserValidationError.missingInstitutionalAffiliation("Institution name is required for \(requestedRole.displayName) registration")
       }
     }
 
@@ -374,117 +340,6 @@ enum UserRole: String, CaseIterable, Codable, Identifiable, Sendable {
     }
   }
   
-  var defaultPermissions: Set<Permission> {
-    switch self {
-    case .student:
-      return Set([.viewOwnData, .participateInSurveys, .accessSupportResources])
-    case .teacher:
-      return Set([.viewOwnData, .viewStudentData, .createAssessments, .viewReports, .accessSupportResources])
-    case .counselor:
-      return Set([.viewOwnData, .viewStudentData, .viewSensitiveData, .createInterventions, .accessCrisisResources, .accessSupportResources])
-    case .administrator, .admin, .superintendent, .districtAdmin:
-      return Set(Permission.allCases.filter { !$0.isRestrictedPermission })
-    case .socialWorker:
-      return Set([.viewOwnData, .viewStudentData, .viewSensitiveData, .viewFamilyData, .createInterventions, .accessCrisisResources, .accessSupportResources])
-    case .parent, .legalGuardian:
-      return Set([.viewOwnData, .viewChildData, .receiveNotifications, .accessSupportResources])
-    }
-  }
-  
-  var defaultDataAccess: Set<DataClassification> {
-    switch self {
-    case .student:
-      return Set([.publicData, .internalData, .personal])
-    case .teacher:
-      return Set([.publicData, .internalData, .personal, .educational])
-    case .counselor:
-      return Set([.publicData, .internalData, .personal, .educational, .sensitive])
-    case .administrator, .admin, .superintendent, .districtAdmin:
-      return Set(DataClassification.allCases)
-    case .socialWorker:
-      return Set([.publicData, .internalData, .personal, .educational, .sensitive, .traumaRelated])
-    case .parent, .legalGuardian:
-      return Set([.publicData, .internalData, .personal])
-    }
-  }
-}
-
-// MARK: - Permission System
-
-enum Permission: String, CaseIterable, Codable, Identifiable, Sendable {
-  // Basic permissions
-  case viewOwnData = "view_own_data"
-  case editOwnProfile = "edit_own_profile"
-  case deleteOwnAccount = "delete_own_account"
-  
-  // Student data permissions
-  case viewStudentData = "view_student_data"
-  case editStudentData = "edit_student_data"
-  case viewChildData = "view_child_data"
-  
-  // Sensitive data permissions
-  case viewSensitiveData = "view_sensitive_data"
-  case viewFamilyData = "view_family_data"
-  case viewTraumaData = "view_trauma_data"
-  
-  // Educational permissions
-  case participateInSurveys = "participate_in_surveys"
-  case createAssessments = "create_assessments"
-  case viewReports = "view_reports"
-  case createInterventions = "create_interventions"
-  
-  // Administrative permissions
-  case manageUsers = "manage_users"
-  case manageInstitution = "manage_institution"
-  case viewAuditLogs = "view_audit_logs"
-  case manageSystemSettings = "manage_system_settings"
-  
-  // Support and crisis permissions
-  case accessSupportResources = "access_support_resources"
-  case accessCrisisResources = "access_crisis_resources"
-  case receiveNotifications = "receive_notifications"
-  
-  // Data management permissions
-  case exportData = "export_data"
-  case deleteUserData = "delete_user_data"
-  
-  var id: String { rawValue }
-  
-  var displayName: String {
-    switch self {
-    case .viewOwnData: return "View Own Data"
-    case .editOwnProfile: return "Edit Own Profile"
-    case .deleteOwnAccount: return "Delete Own Account"
-    case .viewStudentData: return "View Student Data"
-    case .editStudentData: return "Edit Student Data"
-    case .viewChildData: return "View Child Data"
-    case .viewSensitiveData: return "View Sensitive Data"
-    case .viewFamilyData: return "View Family Data"
-    case .viewTraumaData: return "View Trauma Data"
-    case .participateInSurveys: return "Participate in Surveys"
-    case .createAssessments: return "Create Assessments"
-    case .viewReports: return "View Reports"
-    case .createInterventions: return "Create Interventions"
-    case .manageUsers: return "Manage Users"
-    case .manageInstitution: return "Manage Institution"
-    case .viewAuditLogs: return "View Audit Logs"
-    case .manageSystemSettings: return "Manage System Settings"
-    case .accessSupportResources: return "Access Support Resources"
-    case .accessCrisisResources: return "Access Crisis Resources"
-    case .receiveNotifications: return "Receive Notifications"
-    case .exportData: return "Export Data"
-    case .deleteUserData: return "Delete User Data"
-    }
-  }
-  
-  var isRestrictedPermission: Bool {
-    switch self {
-    case .viewTraumaData, .deleteUserData, .manageSystemSettings:
-      return true
-    default:
-      return false
-    }
-  }
 }
 
 // MARK: - Verification Types and Status
@@ -508,21 +363,6 @@ struct VerificationStatus: Codable, Sendable {
     return isEmailVerified // Minimum requirement for all users
   }
   
-  func isValidForRole(_ role: UserRole) -> Bool {
-    // Email verification is always required
-    guard isEmailVerified else { return false }
-    // Role-specific verification requirements
-    switch role {
-    case .student:
-      return true // Email verification is sufficient for students
-    case .teacher, .counselor, .administrator, .admin, .superintendent, .districtAdmin:
-      return isInstitutionVerified || isEmailVerified // Institution or email verification
-    case .socialWorker:
-      return isCredentialsVerified || isEmailVerified // Credentials or email verification
-    case .parent, .legalGuardian:
-      return isGuardianConsentVerified || isEmailVerified // Guardian consent or email verification
-    }
-  }
 }
 
 enum AgeVerificationStatus: String, Codable, Sendable {
@@ -775,45 +615,6 @@ extension TMIUser {
     }
   }
   
-  func hasPermission(_ permission: Permission) -> Bool {
-    return permissions.contains(permission)
-  }
-  
-  func canAccess(_ dataClassification: DataClassification) -> Bool {
-    return dataClassificationAccess.contains(dataClassification)
-  }
-  
-  // MARK: - Feature Access Methods
-  
-  /// Check if user can access advanced features requiring full verification
-  func canAccessAdvancedFeatures() -> Bool {
-    return verificationStatus.isValidForRole(role)
-  }
-  
-  /// Check if user can access sensitive data features
-  func canAccessSensitiveData() -> Bool {
-    switch role {
-    case .student, .parent, .legalGuardian:
-      return verificationStatus.isEmailVerified
-    case .teacher, .counselor, .administrator, .admin, .superintendent, .districtAdmin:
-      return verificationStatus.isEmailVerified && verificationStatus.isInstitutionVerified
-    case .socialWorker:
-      return verificationStatus.isEmailVerified && verificationStatus.isCredentialsVerified
-    }
-  }
-  
-  /// Check if user can create or manage other users' data
-  func canManageUserData() -> Bool {
-    guard verificationStatus.isEmailVerified else { return false }
-    
-    switch role {
-    case .student, .parent, .legalGuardian:
-      return false // Can only manage their own data
-    case .teacher, .counselor, .administrator, .admin, .superintendent, .districtAdmin, .socialWorker:
-      return canAccessAdvancedFeatures()
-    }
-  }
-  
   mutating func grantConsent(_ consentType: ConsentType, version: String, digitalSignature: String? = nil, ipAddress: String? = nil) {
     let newConsent = ConsentRecord(
       consentType: consentType,
@@ -838,7 +639,6 @@ struct UserProfileData: Codable, Sendable {
   var displayName: String
   var email: String = ""
   var isEmailVerified: Bool = false
-  var role: String = "student"
   var newEmail: String = ""
   var currentPassword: String = ""
   var photoURL: String?
@@ -848,7 +648,6 @@ struct UserProfileData: Codable, Sendable {
     displayName: String,
     email: String = "",
     isEmailVerified: Bool = false,
-    role: String = "student",
     newEmail: String = "",
     currentPassword: String = "",
     photoURL: String? = nil,
@@ -857,7 +656,6 @@ struct UserProfileData: Codable, Sendable {
     self.displayName = displayName
     self.email = email
     self.isEmailVerified = isEmailVerified
-    self.role = role
     self.newEmail = newEmail
     self.currentPassword = currentPassword
     self.photoURL = photoURL

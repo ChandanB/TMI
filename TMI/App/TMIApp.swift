@@ -30,7 +30,9 @@ struct TMIApp: App {
             FirebaseApp.configure()
         }
         
-        _authStateModel = State(initialValue: AuthStateModel())
+        _authStateModel = State(initialValue: AuthStateModel(
+            authorizationSessionStore: .shared
+        ))
         _studentContext = State(initialValue: StudentContextStateModel())
         _deepLinkRouter = State(initialValue: DeepLinkRouter())
         _dashboardStateModel = State(initialValue: DashboardStateModel())
@@ -137,35 +139,35 @@ struct ContentView: View {
     }
 
     private var accountAccess: FeatureFlags.AccountAccess {
-        dependencies.flags.accountAccess(for: authStateModel.currentUser?.role)
+        dependencies.flags.authenticatedAccountAccess(
+            for: authStateModel.currentMembership
+        )
     }
 
     private func performBootstrap(for access: FeatureFlags.AccountAccess) async {
         guard
             !hasBootstrapped,
             access.canBootstrap,
-            let role = authStateModel.currentUser?.role,
-            dependencies.flags.accountAccess(for: role) == access
+            let membership = authStateModel.currentMembership,
+            dependencies.flags.authenticatedAccountAccess(for: membership) == access
         else {
             return
         }
 
         hasBootstrapped = true
         
-        // Bootstrap the app with user's context
-        let districtId = authStateModel.currentUser?.districtId
-        
-        await AppBootstrapService.shared.warmStart(
-            districtId: districtId,
-            role: role
-        )
+        await AppBootstrapService.shared.warmStart(membership: membership)
         
         // Load district context if applicable
-        if let districtId = districtId, role.isDistrictRole {
-            await districtStateModel.loadDistrict(id: districtId)
+        if membership.role == .districtAdministrator,
+           AuthorizationPolicy.canViewAggregate(
+            membership,
+            districtID: membership.districtID
+           ) {
+            await districtStateModel.loadDistrict(id: membership.districtID)
         }
         
-        print("[TMIApp] Bootstrap complete for role: \(role.rawValue)")
+        print("[TMIApp] Bootstrap complete for role: \(membership.role.rawValue)")
     }
 }
 

@@ -157,16 +157,20 @@ struct PlanApprovalView: View {
 
     @MainActor
     private func loadPendingPlans() async {
-        guard let user = authState.currentUser,
-              let districtId = user.districtId else {
+        guard let membership = authState.currentMembership,
+              membership.capabilities.contains(.planApprove) else {
             return
         }
 
         isLoading = true
 
         do {
-            pendingPlans = try await approvalService.fetchPendingApprovalPlans(districtId: districtId)
-            statistics = try await approvalService.getApprovalStatistics(districtId: districtId)
+            pendingPlans = try await approvalService.fetchPendingApprovalPlans(
+                districtId: membership.districtID
+            )
+            statistics = try await approvalService.getApprovalStatistics(
+                districtId: membership.districtID
+            )
         } catch {
             print("[PlanApprovalView] Failed to load pending plans: \(error)")
         }

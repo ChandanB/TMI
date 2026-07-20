@@ -28,20 +28,24 @@ struct SettingsView: View {
     @State private var isLoaded = false
     
     // Role-based visibility
-    private var currentRole: UserRole? {
-        authStateModel.currentUser?.role
+    private var currentMembership: MembershipContext? {
+        authStateModel.currentMembership
     }
     
     private var isDistrictAdmin: Bool {
-        currentRole?.isDistrictRole ?? false
+        guard let currentMembership else { return false }
+        return AuthorizationPolicy.canViewAggregate(
+            currentMembership,
+            districtID: currentMembership.districtID
+        )
     }
     
     private var isStudent: Bool {
-        currentRole == .student
+        false
     }
     
     private var isParent: Bool {
-        currentRole == .parent || currentRole == .legalGuardian
+        false
     }
     
     var body: some View {

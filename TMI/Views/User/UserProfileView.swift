@@ -70,7 +70,6 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             if let userData = try await firebaseManager.getCurrentUserProfile() {
                 print("[UserProfileStateModel] Found Firestore profile data: \(userData)")
                 profileData.displayName = userData["displayName"] as? String ?? profileData.displayName
-                profileData.role = userData["role"] as? String ?? "student"
                 organization = userData["organization"] as? String ?? ""
                 photoURL = userData["photoURL"] as? String
 
@@ -283,6 +282,7 @@ struct UserProfileView: View {
     @State private var showingPrivacyPolicy = false
     @State private var showingTermsOfService = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.authStateModel) private var authStateModel
 
     var body: some View {
         ZStack {
@@ -303,7 +303,8 @@ struct UserProfileView: View {
                         stateModel: stateModel,
                         dismiss: dismiss,
                         showingPrivacyPolicy: $showingPrivacyPolicy,
-                        showingTermsOfService: $showingTermsOfService
+                        showingTermsOfService: $showingTermsOfService,
+                        roleDisplayName: authStateModel.currentMembership?.role.displayName
                     )
 
                 case .error(let error):
@@ -406,7 +407,14 @@ struct UserProfileView: View {
 }
 
 @ViewBuilder
-private func userProfileForm(_ profileData: UserProfileData, stateModel: UserProfileStateModel, dismiss: DismissAction, showingPrivacyPolicy: Binding<Bool>, showingTermsOfService: Binding<Bool>) -> some View {
+private func userProfileForm(
+    _ profileData: UserProfileData,
+    stateModel: UserProfileStateModel,
+    dismiss: DismissAction,
+    showingPrivacyPolicy: Binding<Bool>,
+    showingTermsOfService: Binding<Bool>,
+    roleDisplayName: String?
+) -> some View {
     ScrollView {
         VStack(spacing: 20) {
             // Profile Photo Section
@@ -502,7 +510,7 @@ private func userProfileForm(_ profileData: UserProfileData, stateModel: UserPro
                         .font(.headline)
                         .foregroundColor(Color.tmiTextPrimary)
 
-                    Text(profileData.role.isEmpty ? "Unknown" : profileData.role)
+                    Text(roleDisplayName ?? "Access unavailable")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -747,4 +755,3 @@ private struct LegalDocumentWebView: UIViewRepresentable {
 #Preview {
     UserProfileView()
 }
-

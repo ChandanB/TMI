@@ -14,15 +14,23 @@ import Foundation
 
 final class PlanApprovalService {
     static let shared = PlanApprovalService()
-    
+
     private let db = Firestore.firestore()
-    
-    private init() {}
-    
+    private let authorizationSessions: any AuthorizationSessionProviding
+    private let authorization = RBACService()
+
+    init(
+        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared
+    ) {
+        self.authorizationSessions = authorizationSessions
+    }
+
     // MARK: - Fetch Operations
     
     /// Fetch pending approvals for a district
     func fetchPendingApprovals(districtId: String) async throws -> [TMIPlan] {
+        _ = try requireDistrictApprover(districtID: districtId)
+
         // In production, this would query plans with pendingApproval status for the district
         // For now, return empty array as a stub
         
@@ -43,6 +51,8 @@ final class PlanApprovalService {
     
     /// Get approval statistics for a district
     func getApprovalStatistics(districtId: String) async throws -> PlanApprovalStatistics {
+        _ = try requireDistrictApprover(districtID: districtId)
+
         // In production, this would query all plans for the district and calculate statistics
         // For now, return stub statistics
         
@@ -67,9 +77,7 @@ final class PlanApprovalService {
     
     /// Fetch all approvals (pending, approved, rejected) for a district
     func fetchAllApprovals(districtId: String) async throws -> [PlanApprovalRecord] {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw PlanApprovalError.userNotAuthenticated
-        }
+        _ = try requireDistrictApprover(districtID: districtId)
         
         let collection = db.collection("districts").document(districtId).collection("planApprovals")
         let snapshot = try await collection.getDocuments()
@@ -81,22 +89,19 @@ final class PlanApprovalService {
     
     /// Approve a plan with complete history tracking and notifications
     func approvePlan(plan: TMIPlan, comment: String? = nil) async throws {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw PlanApprovalError.userNotAuthenticated
-        }
-
         guard let planId = plan.id else {
             throw PlanApprovalError.planNotFound
         }
 
+        let session = try await requirePlanAccess(
+            planID: planId,
+            operation: .approve
+        )
+        let uid = session.membership.userID
+
         // Verify plan is in pending approval status
         guard plan.approvalStatus == .pendingApproval else {
             throw PlanApprovalError.invalidStatus
-        }
-
-        // Verify current user is an authorized approver
-        guard plan.currentApprovers?.contains(uid) == true else {
-            throw PlanApprovalError.approvalFailed("You are not authorized to approve this plan")
         }
 
         // Create approval history entry
@@ -108,7 +113,7 @@ final class PlanApprovalService {
         )
 
         // Update plan
-        let docRef = db.collection(FirestorePaths.planTemplates).document(planId)
+        let docRef = planDocument(planID: planId, userID: uid)
 
         try await docRef.updateData([
             "approvalStatus": PlanApprovalStatus.approved.rawValue,
@@ -147,22 +152,19 @@ final class PlanApprovalService {
     
     /// Reject a plan with reason and notifications
     func rejectPlan(plan: TMIPlan, reason: String) async throws {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw PlanApprovalError.userNotAuthenticated
-        }
-
         guard let planId = plan.id else {
             throw PlanApprovalError.planNotFound
         }
 
+        let session = try await requirePlanAccess(
+            planID: planId,
+            operation: .approve
+        )
+        let uid = session.membership.userID
+
         // Verify plan is in pending approval status
         guard plan.approvalStatus == .pendingApproval else {
             throw PlanApprovalError.invalidStatus
-        }
-
-        // Verify current user is an authorized approver
-        guard plan.currentApprovers?.contains(uid) == true else {
-            throw PlanApprovalError.approvalFailed("You are not authorized to reject this plan")
         }
 
         // Create approval history entry
@@ -174,7 +176,7 @@ final class PlanApprovalService {
         )
 
         // Update plan
-        let docRef = db.collection(FirestorePaths.planTemplates).document(planId)
+        let docRef = planDocument(planID: planId, userID: uid)
 
         try await docRef.updateData([
             "approvalStatus": PlanApprovalStatus.rejected.rawValue,
@@ -212,22 +214,19 @@ final class PlanApprovalService {
     
     /// Request revisions/changes on a plan with detailed feedback
     func requestChanges(plan: TMIPlan, feedback: String) async throws {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw PlanApprovalError.userNotAuthenticated
-        }
-
         guard let planId = plan.id else {
             throw PlanApprovalError.planNotFound
         }
 
+        let session = try await requirePlanAccess(
+            planID: planId,
+            operation: .approve
+        )
+        let uid = session.membership.userID
+
         // Verify plan is in pending approval status
         guard plan.approvalStatus == .pendingApproval else {
             throw PlanApprovalError.invalidStatus
-        }
-
-        // Verify current user is an authorized approver
-        guard plan.currentApprovers?.contains(uid) == true else {
-            throw PlanApprovalError.approvalFailed("You are not authorized to request changes on this plan")
         }
 
         // Create approval history entry
@@ -239,7 +238,7 @@ final class PlanApprovalService {
         )
 
         // Update plan
-        let docRef = db.collection(FirestorePaths.planTemplates).document(planId)
+        let docRef = planDocument(planID: planId, userID: uid)
 
         try await docRef.updateData([
             "approvalStatus": PlanApprovalStatus.changesRequested.rawValue,
@@ -281,64 +280,16 @@ final class PlanApprovalService {
         approvers: [String],
         revisionNotes: String? = nil
     ) async throws {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw PlanApprovalError.userNotAuthenticated
-        }
-
         guard let planId = plan.id else {
             throw PlanApprovalError.planNotFound
         }
 
-        // Verify plan is in changes requested status
-        guard plan.approvalStatus == .changesRequested else {
-            throw PlanApprovalError.invalidStatus
-        }
-
-        // Create approval history entry
-        let historyEntry = ApprovalHistoryEntry(
-            action: .resubmitted,
-            actionBy: uid,
-            timestamp: Date(),
-            comment: revisionNotes
+        _ = try await requirePlanAccess(planID: planId, operation: .write)
+        _ = approvers
+        _ = revisionNotes
+        throw PlanApprovalError.approvalFailed(
+            "Approvers must be selected from the verified district staff directory"
         )
-
-        // Update plan
-        let docRef = db.collection(FirestorePaths.planTemplates).document(planId)
-
-        try await docRef.updateData([
-            "approvalStatus": PlanApprovalStatus.pendingApproval.rawValue,
-            "submittedForApprovalAt": FieldValue.serverTimestamp(),
-            "submittedBy": uid,
-            "currentApprovers": approvers,
-            "rejectionReason": FieldValue.delete(), // Clear previous feedback
-            "approvalHistory": FieldValue.arrayUnion([
-                [
-                    "action": historyEntry.action.rawValue,
-                    "actionBy": historyEntry.actionBy,
-                    "timestamp": FieldValue.serverTimestamp(),
-                    "comment": historyEntry.comment as Any
-                ]
-            ]),
-            "lastUpdated": FieldValue.serverTimestamp()
-        ])
-
-        print("[PlanApprovalService] 🔄 Resubmitted plan \(planId) for approval")
-
-        // Notify approvers of resubmission
-        for approverUid in approvers {
-            do {
-                try await NotificationService.shared.createNotification(
-                    type: .planApproval,
-                    title: "Plan Resubmitted for Approval",
-                    message: "A TMI plan '\(plan.title)' has been revised and resubmitted for your approval",
-                    actionUrl: "tmi://plans/\(planId)",
-                    targetId: planId,
-                    forUserId: approverUid
-                )
-            } catch {
-                print("[PlanApprovalService] ⚠️ Failed to notify approver \(approverUid): \(error)")
-            }
-        }
     }
     
     /// Submit a plan for approval with validation and notifications
@@ -347,72 +298,98 @@ final class PlanApprovalService {
         approvers: [String], // UIDs of counselors/admins who should approve
         notifyApprovers: Bool = true
     ) async throws {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw PlanApprovalError.userNotAuthenticated
-        }
-
         guard let planId = plan.id else {
             throw PlanApprovalError.planNotFound
         }
 
-        // Validate plan is complete enough for approval
-        guard !plan.goals.isEmpty else {
-            throw PlanApprovalError.approvalFailed("Plan must have at least one goal before submission")
+        _ = try await requirePlanAccess(planID: planId, operation: .write)
+        _ = approvers
+        _ = notifyApprovers
+        throw PlanApprovalError.approvalFailed(
+            "Approvers must be selected from the verified district staff directory"
+        )
+    }
+
+    // MARK: - Private Helpers
+
+    private enum PlanAccessOperation {
+        case write
+        case approve
+    }
+
+    private func authorizedSession() throws -> AuthenticatedSession {
+        guard let session = authorizationSessions.session(
+            authenticatedUserID: Auth.auth().currentUser?.uid
+        ) else {
+            throw PlanApprovalError.userNotAuthenticated
+        }
+        return session
+    }
+
+    private func requireDistrictApprover(
+        districtID: String
+    ) throws -> AuthenticatedSession {
+        let session = try authorizedSession()
+        guard session.membership.districtID == districtID,
+              session.membership.capabilities.contains(.planApprove) else {
+            throw PlanApprovalError.authorizationDenied
+        }
+        return session
+    }
+
+    private func requirePlanAccess(
+        planID: String,
+        operation: PlanAccessOperation
+    ) async throws -> AuthenticatedSession {
+        let session = try authorizedSession()
+        let planService = TMIPlanService(
+            authorizationSessions: authorizationSessions
+        )
+        guard let trustedPlan = try await planService.fetchPlan(byId: planID),
+              trustedPlan.districtId == session.membership.districtID else {
+            throw PlanApprovalError.authorizationDenied
         }
 
-        guard !plan.students.isEmpty else {
-            throw PlanApprovalError.approvalFailed("Plan must have at least one assigned student")
+        let students = try trustedPlan.students.map { student in
+            guard let scope = StudentAuthorizationScope(student: student) else {
+                throw PlanApprovalError.authorizationDenied
+            }
+            return scope
         }
-
-        // Create approval history entry
-        let historyEntry = ApprovalHistoryEntry(
-            action: .submitted,
-            actionBy: uid,
-            timestamp: Date(),
-            comment: nil
+        let scope = PlanAuthorizationScope(
+            planID: planID,
+            districtID: session.membership.districtID,
+            students: students
         )
 
-        // Update plan with approval fields
-        let docRef = db.collection(FirestorePaths.planTemplates).document(planId)
-
-        try await docRef.updateData([
-            "approvalStatus": PlanApprovalStatus.pendingApproval.rawValue,
-            "submittedForApprovalAt": FieldValue.serverTimestamp(),
-            "submittedBy": uid,
-            "currentApprovers": approvers,
-            "approvalHistory": FieldValue.arrayUnion([
-                [
-                    "action": historyEntry.action.rawValue,
-                    "actionBy": historyEntry.actionBy,
-                    "timestamp": FieldValue.serverTimestamp(),
-                    "comment": historyEntry.comment as Any
-                ]
-            ]),
-            "lastUpdated": FieldValue.serverTimestamp()
-        ])
-
-        print("[PlanApprovalService] ✅ Submitted plan \(planId) for approval")
-
-        // Send notifications to approvers
-        if notifyApprovers {
-            for approverUid in approvers {
-                do {
-                    try await NotificationService.shared.createNotification(
-                        type: .planApproval,
-                        title: "Plan Approval Requested",
-                        message: "A new TMI plan '\(plan.title)' requires your approval",
-                        actionUrl: "tmi://plans/\(planId)",
-                        targetId: planId,
-                        forUserId: approverUid
-                    )
-                } catch {
-                    print("[PlanApprovalService] ⚠️ Failed to notify approver \(approverUid): \(error)")
-                }
-            }
+        let isAllowed: Bool
+        switch operation {
+        case .write:
+            isAllowed = authorization.canWritePlan(
+                member: session.membership,
+                plan: scope
+            )
+        case .approve:
+            isAllowed = authorization.canApprovePlan(
+                member: session.membership,
+                plan: scope
+            )
         }
+        guard isAllowed else {
+            throw PlanApprovalError.authorizationDenied
+        }
+        return session
     }
-    
-    // MARK: - Private Helpers
+
+    private func planDocument(
+        planID: String,
+        userID: String
+    ) -> DocumentReference {
+        db.collection("users")
+            .document(userID)
+            .collection("tmiPlans")
+            .document(planID)
+    }
     
     private func saveApprovalRecord(_ record: PlanApprovalRecord) async throws {
         // Would save to district's planApprovals collection
@@ -588,6 +565,7 @@ enum PlanApprovalError: LocalizedError {
     case planNotFound
     case invalidStatus
     case approvalFailed(String)
+    case authorizationDenied
     
     var errorDescription: String? {
         switch self {
@@ -599,6 +577,8 @@ enum PlanApprovalError: LocalizedError {
             return "Plan is not in a valid status for this action"
         case .approvalFailed(let message):
             return "Approval failed: \(message)"
+        case .authorizationDenied:
+            return "You don’t have access to approve this plan"
         }
     }
 }

@@ -16,8 +16,14 @@ class TMIPlanService {
     static let shared = TMIPlanService()
 
     private let db = Firestore.firestore()
+    private let authorizationSessions: any AuthorizationSessionProviding
+    private let authorization = RBACService()
 
-    private init() {}
+    init(
+        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared
+    ) {
+        self.authorizationSessions = authorizationSessions
+    }
 
     /// Get the user-scoped TMI plans collection
     private var userPlansCollection: CollectionReference? {
@@ -30,6 +36,7 @@ class TMIPlanService {
     
     /// Fetch all TMI plans for the current user
     func fetchPlans() async throws -> [TMIPlan] {
+        let session = try authorizedSession()
         guard let collection = userPlansCollection else {
             print("[TMIPlanService] Error: No user logged in, cannot fetch plans")
             throw TMIPlanServiceError.userNotAuthenticated
@@ -199,8 +206,13 @@ class TMIPlanService {
                     return plan
             }
             
-            print("[TMIPlanService] Successfully fetched \(plans.count) TMI plans")
-            return plans
+            let visiblePlans = try await authorizedPlans(
+                plans,
+                member: session.membership,
+                operation: .read
+            )
+            print("[TMIPlanService] Successfully fetched \(visiblePlans.count) authorized TMI plans")
+            return visiblePlans
         } catch {
             print("[TMIPlanService] Error fetching TMI plans: \(error)")
             throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
@@ -209,6 +221,7 @@ class TMIPlanService {
 
     /// Fetch a single TMI plan by ID
     func fetchPlan(byId planId: String) async throws -> TMIPlan? {
+        let session = try authorizedSession()
         guard let collection = userPlansCollection else {
             print("[TMIPlanService] Error: No user logged in, cannot fetch plan")
             throw TMIPlanServiceError.userNotAuthenticated
@@ -372,8 +385,15 @@ class TMIPlanService {
                 snapshotUpdatedAt: snapshotUpdatedAt
             )
 
-            print("[TMIPlanService] Successfully fetched plan: \(plan.model.rawValue)")
-            return plan
+            guard let authorizedPlan = try await authorizedPlan(
+                plan,
+                member: session.membership,
+                operation: .read
+            ) else {
+                throw TMIPlanServiceError.authorizationDenied
+            }
+            print("[TMIPlanService] Successfully fetched plan: \(authorizedPlan.model.rawValue)")
+            return authorizedPlan
         } catch {
             print("[TMIPlanService] Error fetching plan: \(error)")
             throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
@@ -382,30 +402,38 @@ class TMIPlanService {
 
     /// Add a new TMI plan to Firestore
     func addPlan(_ plan: TMIPlan) async throws -> TMIPlan {
+        let session = try authorizedSession()
         guard let collection = userPlansCollection else {
             throw TMIPlanServiceError.userNotAuthenticated
         }
 
-        // RBAC Check: Verify user has permission to create plans
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw TMIPlanServiceError.userNotAuthenticated
-        }
+        let canonicalStudents = try await canonicalStudents(for: plan.students)
+        let provisionalPlanID = collection.document().documentID
+        let scope = try planAuthorizationScope(
+            planID: provisionalPlanID,
+            districtID: session.membership.districtID,
+            students: canonicalStudents
+        )
+        try authorization.require(
+            authorization.canWritePlan(member: session.membership, plan: scope)
+        )
 
-        let userDoc = try await db.collection("users").document(uid).getDocument()
-        guard let tmiUser = try? userDoc.data(as: TMIUser.self) else {
-            throw TMIPlanServiceError.userNotAuthenticated
-        }
-
-        try RBACService.shared.requirePermission(.createPlan, user: tmiUser)
+        var trustedPlan = plan
+        trustedPlan.id = provisionalPlanID
+        trustedPlan.students = canonicalStudents
+        trustedPlan.districtId = session.membership.districtID
+        trustedPlan.createdBy = session.membership.userID
+        trustedPlan.creationDate = Date()
+        trustedPlan.lastUpdated = Date()
 
         do {
-            print("[TMIPlanService] Adding TMI plan: \(plan.model.rawValue) (user: \(tmiUser.role.rawValue))")
+            print("[TMIPlanService] Adding TMI plan: \(trustedPlan.model.rawValue)")
             
             // Convert plan to Firestore data (without ID)
-            let data = plan.toFirestoreData()
+            let data = trustedPlan.toFirestoreData()
             
-            // Add the document and get the reference
-            let documentRef = try await collection.addDocument(data: data)
+            let documentRef = collection.document(provisionalPlanID)
+            try await documentRef.setData(data)
             
             print("[TMIPlanService] TMI plan added with ID: \(documentRef.documentID)")
             
@@ -539,7 +567,7 @@ class TMIPlanService {
             let interestIdsSnapshot = docData["interestIdsSnapshot"] as? [String]
             let snapshotUpdatedAt = (docData["snapshotUpdatedAt"] as? Double).map(Date.init(timeIntervalSince1970:))
             
-            let savedPlan = TMIPlan(
+            var savedPlan = TMIPlan(
                 id: document.documentID,
                 title: title,
                 description: docData["description"] as? String,
@@ -561,7 +589,9 @@ class TMIPlanService {
                 interestIdsSnapshot: interestIdsSnapshot,
                 snapshotUpdatedAt: snapshotUpdatedAt
             )
-            
+            savedPlan.students = canonicalStudents
+            savedPlan.districtId = session.membership.districtID
+            savedPlan.createdBy = session.membership.userID
             return savedPlan
         } catch {
             print("[TMIPlanService] Error adding TMI plan: \(error)")
@@ -571,6 +601,7 @@ class TMIPlanService {
     
     /// Update an existing TMI plan in Firestore
     func updatePlan(_ plan: TMIPlan) async throws -> TMIPlan {
+        let session = try authorizedSession()
         guard let planId = plan.id else {
             throw TMIPlanServiceError.invalidPlanId
         }
@@ -579,23 +610,28 @@ class TMIPlanService {
             throw TMIPlanServiceError.userNotAuthenticated
         }
 
-        // RBAC Check: Verify user has permission to edit plans
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw TMIPlanServiceError.userNotAuthenticated
+        guard let storedPlan = try await fetchPlan(byId: planId) else {
+            throw TMIPlanServiceError.invalidPlanId
         }
-
-        let userDoc = try await db.collection("users").document(uid).getDocument()
-        guard let tmiUser = try? userDoc.data(as: TMIUser.self) else {
-            throw TMIPlanServiceError.userNotAuthenticated
-        }
-
-        try RBACService.shared.requirePermission(.editPlan, user: tmiUser)
+        let canonicalStudents = try await canonicalStudents(for: storedPlan.students)
+        let scope = try planAuthorizationScope(
+            planID: planId,
+            districtID: session.membership.districtID,
+            students: canonicalStudents
+        )
+        try authorization.require(
+            authorization.canWritePlan(member: session.membership, plan: scope)
+        )
 
         do {
-            print("[TMIPlanService] Updating TMI plan: \(plan.model.rawValue) (user: \(tmiUser.role.rawValue))")
+            print("[TMIPlanService] Updating TMI plan: \(plan.model.rawValue)")
             
             var updatedPlan = plan
-            updatedPlan.lastUpdated = Date() // Update the lastUpdated timestamp
+            updatedPlan.students = canonicalStudents
+            updatedPlan.districtId = session.membership.districtID
+            updatedPlan.createdBy = storedPlan.createdBy
+            updatedPlan.creationDate = storedPlan.creationDate
+            updatedPlan.lastUpdated = Date()
             
             let data = updatedPlan.toFirestoreData()
             try await collection.document(planId).updateData(data)
@@ -610,6 +646,7 @@ class TMIPlanService {
     
     /// Delete a TMI plan from Firestore
     func deletePlan(_ plan: TMIPlan) async throws {
+        let session = try authorizedSession()
         guard let planId = plan.id else {
             throw TMIPlanServiceError.invalidPlanId
         }
@@ -618,38 +655,27 @@ class TMIPlanService {
             throw TMIPlanServiceError.userNotAuthenticated
         }
 
-        // RBAC Check: Verify user has permission to delete plans
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw TMIPlanServiceError.userNotAuthenticated
-        }
-
-        let userDoc = try await db.collection("users").document(uid).getDocument()
-        guard let tmiUser = try? userDoc.data(as: TMIUser.self) else {
-            throw TMIPlanServiceError.userNotAuthenticated
-        }
-
-        try RBACService.shared.requirePermission(.deletePlan, user: tmiUser)
-
-        guard let planId = plan.id else {
+        guard let storedPlan = try await fetchPlan(byId: planId) else {
             throw TMIPlanServiceError.invalidPlanId
         }
-        
-        guard let collection = userPlansCollection else {
-            throw TMIPlanServiceError.userNotAuthenticated
-        }
-        
-        do {
-            print("[TMIPlanService] Deleting TMI plan: \(plan.model.rawValue)")
-            try await collection.document(planId).delete()
-            print("[TMIPlanService] TMI plan deleted successfully")
-        } catch {
-            print("[TMIPlanService] Error deleting TMI plan: \(error)")
-            throw TMIPlanServiceError.deleteFailed(error.localizedDescription)
+        let canonicalStudents = try await canonicalStudents(for: storedPlan.students)
+        let scope = try planAuthorizationScope(
+            planID: planId,
+            districtID: session.membership.districtID,
+            students: canonicalStudents
+        )
+        guard authorization.canDeletePlan(
+            member: session.membership,
+            plan: scope
+        ) else {
+            throw TMIPlanServiceError.authorizationDenied
         }
     }
     
     /// Get a specific TMI plan by ID
     func getPlan(by id: String) async throws -> TMIPlan? {
+        return try await fetchPlan(byId: id)
+
         guard let collection = userPlansCollection else {
             throw TMIPlanServiceError.userNotAuthenticated
         }
@@ -849,6 +875,7 @@ class TMIPlanService {
 
     /// Update plan with survey snapshot data
     func updateSurveySnapshot(planId: String, surveyId: String, interestIds: [String]) async throws {
+        _ = try await requireAuthorizedPlan(planID: planId, operation: .write)
         guard let collection = userPlansCollection else {
             print("[TMIPlanService] Error: No user logged in, cannot update plan snapshot")
             throw TMIPlanServiceError.userNotAuthenticated
@@ -874,6 +901,14 @@ class TMIPlanService {
     
     /// Fetch all plans in a district (for cross-staff access)
     func fetchPlansInDistrict(_ districtId: String) async throws -> [TMIPlan] {
+        let session = try authorizedSession()
+        guard districtId == session.membership.districtID,
+              AuthorizationPolicy.canViewAggregate(
+                session.membership,
+                districtID: districtId
+              ) else {
+            throw TMIPlanServiceError.authorizationDenied
+        }
         print("[TMIPlanService] Fetching plans for district: \(districtId)")
         
         let query = db.collection("plans")
@@ -942,8 +977,13 @@ class TMIPlanService {
                 )
             }
             
-            print("[TMIPlanService] Found \(plans.count) plans in district")
-            return plans
+            let visiblePlans = try await authorizedPlans(
+                plans,
+                member: session.membership,
+                operation: .read
+            )
+            print("[TMIPlanService] Found \(visiblePlans.count) authorized plans in district")
+            return visiblePlans
         } catch {
             print("[TMIPlanService] Error fetching district plans: \(error)")
             throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
@@ -952,6 +992,11 @@ class TMIPlanService {
     
     /// Fetch plans assigned to a specific counselor (caseload)
     func fetchPlansForCounselor(_ counselorId: String) async throws -> [TMIPlan] {
+        let session = try authorizedSession()
+        guard counselorId == session.membership.userID
+                || AuthorizationPolicy.canManageStaff(session.membership) else {
+            throw TMIPlanServiceError.authorizationDenied
+        }
         print("[TMIPlanService] Fetching plans for counselor: \(counselorId)")
         
         let query = db.collection("plans")
@@ -1018,8 +1063,13 @@ class TMIPlanService {
                 )
             }
             
-            print("[TMIPlanService] Found \(plans.count) plans for counselor")
-            return plans
+            let visiblePlans = try await authorizedPlans(
+                plans,
+                member: session.membership,
+                operation: .read
+            )
+            print("[TMIPlanService] Found \(visiblePlans.count) authorized plans for counselor")
+            return visiblePlans
         } catch {
             print("[TMIPlanService] Error fetching counselor plans: \(error)")
             throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
@@ -1028,6 +1078,11 @@ class TMIPlanService {
     
     /// Assign a counselor to a plan
     func assignCounselor(_ counselorId: String, to planId: String) async throws {
+        let session = try authorizedSession()
+        guard AuthorizationPolicy.canManageStaff(session.membership) else {
+            throw TMIPlanServiceError.authorizationDenied
+        }
+        _ = try await requireAuthorizedPlan(planID: planId, operation: .write)
         print("[TMIPlanService] Assigning counselor \(counselorId) to plan \(planId)")
         
         try await db.collection("plans")
@@ -1051,6 +1106,7 @@ class TMIPlanService {
     }
 
     func fetchPlanInputs(planId: String) async throws -> [PlanInputField] {
+        _ = try await requireAuthorizedPlan(planID: planId, operation: .read)
         let snapshot = try await planInputsCollection(planId: planId)
             .order(by: "updatedAt", descending: true)
             .getDocuments()
@@ -1061,10 +1117,12 @@ class TMIPlanService {
     }
 
     func savePlanInputs(planId: String, fields: [PlanInputField]) async throws {
+        let session = try authorizedSession()
+        _ = try await requireAuthorizedPlan(planID: planId, operation: .write)
         guard !fields.isEmpty else { return }
         let batch = db.batch()
         let now = Date()
-        let userId = Auth.auth().currentUser?.uid
+        let userId = session.membership.userID
 
         for field in fields {
             let docRef: DocumentReference
@@ -1091,8 +1149,10 @@ class TMIPlanService {
     }
 
     func upsertPlanInput(planId: String, field: PlanInputField) async throws -> PlanInputField {
+        let session = try authorizedSession()
+        _ = try await requireAuthorizedPlan(planID: planId, operation: .write)
         let now = Date()
-        let userId = Auth.auth().currentUser?.uid
+        let userId = session.membership.userID
         let docRef: DocumentReference
 
         if let id = field.id {
@@ -1118,6 +1178,7 @@ class TMIPlanService {
     }
 
     func fetchPlanEvidence(planId: String) async throws -> [PlanEvidenceEntry] {
+        _ = try await requireAuthorizedPlan(planID: planId, operation: .read)
         let snapshot = try await planEvidenceCollection(planId: planId)
             .order(by: "createdAt", descending: true)
             .getDocuments()
@@ -1128,8 +1189,10 @@ class TMIPlanService {
     }
 
     func addPlanEvidence(planId: String, entry: PlanEvidenceEntry) async throws -> PlanEvidenceEntry {
+        let session = try authorizedSession()
+        _ = try await requireAuthorizedPlan(planID: planId, operation: .write)
         let now = Date()
-        let userId = Auth.auth().currentUser?.uid
+        let userId = session.membership.userID
         let docRef = planEvidenceCollection(planId: planId).document()
 
         var updated = entry
@@ -1162,6 +1225,135 @@ class TMIPlanService {
         }
         return collected
     }
+
+    private enum PlanAuthorizationOperation {
+        case read
+        case write
+        case approve
+    }
+
+    private func authorizedSession() throws -> AuthenticatedSession {
+        let userID = Auth.auth().currentUser?.uid
+        guard let session = authorizationSessions.session(
+            authenticatedUserID: userID
+        ) else {
+            throw TMIPlanServiceError.userNotAuthenticated
+        }
+        return session
+    }
+
+    private func canonicalStudents(for students: [Student]) async throws -> [Student] {
+        let studentIDs = Array(Set(students.compactMap(\.id))).sorted()
+        guard !studentIDs.isEmpty else {
+            throw TMIPlanServiceError.authorizationDenied
+        }
+
+        let studentService = StudentService(
+            authorizationSessions: authorizationSessions
+        )
+        var canonicalStudents: [Student] = []
+        for studentID in studentIDs {
+            guard let student = try await studentService.getStudent(by: studentID) else {
+                throw TMIPlanServiceError.authorizationDenied
+            }
+            canonicalStudents.append(student)
+        }
+        return canonicalStudents
+    }
+
+    private func planAuthorizationScope(
+        planID: String,
+        districtID: String,
+        students: [Student]
+    ) throws -> PlanAuthorizationScope {
+        let studentScopes = try students.map { student in
+            guard let scope = StudentAuthorizationScope(student: student),
+                  scope.districtID == districtID else {
+                throw TMIPlanServiceError.authorizationDenied
+            }
+            return scope
+        }
+
+        return PlanAuthorizationScope(
+            planID: planID,
+            districtID: districtID,
+            students: studentScopes
+        )
+    }
+
+    private func authorizedPlan(
+        _ plan: TMIPlan,
+        member: MembershipContext,
+        operation: PlanAuthorizationOperation
+    ) async throws -> TMIPlan? {
+        guard let planID = plan.id else {
+            return nil
+        }
+
+        let students = try await canonicalStudents(for: plan.students)
+        let districtIDs = Set(students.compactMap(\.districtId))
+        guard districtIDs == [member.districtID],
+              plan.districtId == nil || plan.districtId == member.districtID else {
+            return nil
+        }
+
+        let scope = try planAuthorizationScope(
+            planID: planID,
+            districtID: member.districtID,
+            students: students
+        )
+        let isAllowed: Bool
+        switch operation {
+        case .read:
+            isAllowed = authorization.canReadPlan(member: member, plan: scope)
+        case .write:
+            isAllowed = authorization.canWritePlan(member: member, plan: scope)
+        case .approve:
+            isAllowed = authorization.canApprovePlan(member: member, plan: scope)
+        }
+        guard isAllowed else {
+            return nil
+        }
+
+        var trustedPlan = plan
+        trustedPlan.students = students
+        trustedPlan.districtId = member.districtID
+        return trustedPlan
+    }
+
+    private func authorizedPlans(
+        _ plans: [TMIPlan],
+        member: MembershipContext,
+        operation: PlanAuthorizationOperation
+    ) async throws -> [TMIPlan] {
+        var authorized: [TMIPlan] = []
+        for plan in plans {
+            if let plan = try? await authorizedPlan(
+                plan,
+                member: member,
+                operation: operation
+            ) {
+                authorized.append(plan)
+            }
+        }
+        return authorized
+    }
+
+    private func requireAuthorizedPlan(
+        planID: String,
+        operation: PlanAuthorizationOperation
+    ) async throws -> TMIPlan {
+        let session = try authorizedSession()
+        guard let plan = try await fetchPlan(byId: planID),
+              let authorized = try await authorizedPlan(
+                plan,
+                member: session.membership,
+                operation: operation
+              ) else {
+            throw TMIPlanServiceError.authorizationDenied
+        }
+        return authorized
+    }
 }
 
 // MARK: - Error Types
@@ -1173,6 +1365,7 @@ enum TMIPlanServiceError: Error, LocalizedError {
     case saveFailed(String)
     case updateFailed(String)
     case deleteFailed(String)
+    case authorizationDenied
     
     var errorDescription: String? {
         switch self {
@@ -1188,6 +1381,8 @@ enum TMIPlanServiceError: Error, LocalizedError {
             return "Failed to update TMI plan: \(message)"
         case .deleteFailed(let message):
             return "Failed to delete TMI plan: \(message)"
+        case .authorizationDenied:
+            return "You don’t have access to this TMI plan"
         }
     }
 }

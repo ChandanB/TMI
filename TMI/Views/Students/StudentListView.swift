@@ -82,8 +82,12 @@ struct StudentListView: View {
         return grades.sorted()
     }
 
-    private var canDeleteStudents: Bool {
-        authStateModel.currentUser.map { $0.role.canDeleteStudents } ?? false
+    private func canDelete(_ student: Student) -> Bool {
+        guard let member = authStateModel.currentMembership,
+              let scope = StudentAuthorizationScope(student: student) else {
+            return false
+        }
+        return AuthorizationPolicy.canDeleteStudent(member, student: scope)
     }
 
     var body: some View {
@@ -194,7 +198,7 @@ struct StudentListView: View {
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 6, leading: TMISpacing.screenPadding, bottom: 6, trailing: TMISpacing.screenPadding))
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        if canDeleteStudents {
+                        if canDelete(student) {
                             Button(role: .destructive) {
                                 studentToDelete = student
                                 showingDeleteConfirmation = true
@@ -411,7 +415,7 @@ struct StudentListView: View {
 
             Divider()
 
-            if canDeleteStudents {
+            if canDelete(student) {
                 Button(role: .destructive) {
                     studentToDelete = student
                     showingDeleteConfirmation = true

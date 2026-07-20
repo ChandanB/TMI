@@ -49,12 +49,15 @@ struct SecurityConfig {
     }
     
     /// Determine if biometric authentication is required
-    static func requiresBiometric(for dataType: DataClassification, userRole: UserRole) -> Bool {
+    static func requiresBiometric(
+        for dataType: DataClassification,
+        membership: MembershipContext
+    ) -> Bool {
         switch dataType {
         case .publicData, .internalData:
             return false
         case .personal, .educational:
-            return userRole.requiresBiometricForConfidential
+            return membership.isActive
         case .sensitive, .traumaRelated:
             return true
         }
@@ -132,43 +135,6 @@ enum DataClassification: String, CaseIterable, Codable, Identifiable, Sendable {
       case .personal, .educational, .sensitive, .traumaRelated: return true
       }
   }
-}
-
-// MARK: - User Role Security Extensions
-extension UserRole {
-    var requiresBiometricForConfidential: Bool {
-        switch self {
-        case .teacher, .counselor, .administrator, .admin, .socialWorker:
-            return true
-        case .student:
-            return false
-        case .parent, .legalGuardian:
-            return false
-        default:
-            // Secure default: require biometric for any unknown or future roles
-            return true
-        }
-    }
-    
-    var canAccessRestrictedData: Bool {
-        switch self {
-        case .administrator, .admin, .counselor:
-            return true
-        default:
-            return false
-        }
-    }
-    
-    var dataRetentionPeriod: TimeInterval {
-        switch self {
-        case .administrator, .admin:
-            return 7 * 365 * 24 * 60 * 60 // 7 years
-        case .counselor, .socialWorker:
-            return 5 * 365 * 24 * 60 * 60 // 5 years
-        default:
-            return 3 * 365 * 24 * 60 * 60 // 3 years
-        }
-    }
 }
 
 // MARK: - Security Audit Logger
@@ -489,16 +455,19 @@ final class SecurityManager: ObservableObject {
         logger.info("Security status updated biometricEnabled: \(isBiometricEnabled) securityLevel: \(securityLevel.rawValue) biometricType: \(SecurityUtils.getBiometricType().rawValue)")
     }
     
-    func enforceSecurityPolicy(for operation: SecurityOperation, userRole: UserRole) async throws {
-        logger.debug("Enforcing security policy operation: \(operation.rawValue) userRole: \(userRole.rawValue)")
+    func enforceSecurityPolicy(
+        for operation: SecurityOperation,
+        membership: MembershipContext,
+        student: StudentAuthorizationScope? = nil
+    ) async throws {
+        logger.debug("Enforcing security policy operation: \(operation.rawValue) staffRole: \(membership.role.rawValue)")
         
-        // Check if user role has permission for operation
-        guard operation.isAllowed(for: userRole) else {
+        guard operation.isAllowed(for: membership, student: student) else {
             await auditLogger.logSecurityEvent(
                 .securityPolicyViolation,
-                userId: nil,
+                userId: membership.userID,
                 success: false,
-                details: ["operation": operation.rawValue, "role": userRole.rawValue]
+                details: ["operation": operation.rawValue, "role": membership.role.rawValue]
             )
             throw SecurityError.unauthorized
         }
@@ -511,7 +480,7 @@ final class SecurityManager: ObservableObject {
         // Log successful policy enforcement
         await auditLogger.logSecurityEvent(
             .dataAccess,
-            userId: nil,
+            userId: membership.userID,
             success: true,
             details: ["operation": operation.rawValue]
         )
@@ -548,22 +517,24 @@ enum SecurityOperation: String, Sendable {
     case manageUsers = "manage.users"
     case systemConfiguration = "system.configuration"
     
-    func isAllowed(for role: UserRole) -> Bool {
-        switch (self, role) {
-        case (.viewStudentData, .teacher), (.viewStudentData, .counselor),
-             (.viewStudentData, .administrator), (.viewStudentData, .socialWorker):
-            return true
-        case (.modifyStudentData, .teacher), (.modifyStudentData, .counselor),
-             (.modifyStudentData, .socialWorker):
-            return true
-        case (.exportData, .administrator), (.exportData, .counselor):
-            return true
-        case (.manageUsers, .administrator):
-            return true
-        case (.systemConfiguration, .administrator):
-            return true
-        default:
-            return false
+    func isAllowed(
+        for membership: MembershipContext,
+        student: StudentAuthorizationScope?
+    ) -> Bool {
+        switch self {
+        case .viewStudentData:
+            guard let student else { return false }
+            return AuthorizationPolicy.canReadStudentDetail(membership, student: student)
+        case .modifyStudentData:
+            guard let student else { return false }
+            return AuthorizationPolicy.canWriteStudentDetail(membership, student: student)
+        case .exportData:
+            return AuthorizationPolicy.canExportReports(membership)
+        case .manageUsers:
+            return AuthorizationPolicy.canManageStaff(membership)
+        case .systemConfiguration:
+            return membership.role == .districtAdministrator
+                && AuthorizationPolicy.canManageStaff(membership)
         }
     }
     
@@ -576,4 +547,3 @@ enum SecurityOperation: String, Sendable {
         }
     }
 }
-

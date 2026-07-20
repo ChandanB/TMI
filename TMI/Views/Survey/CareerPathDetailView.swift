@@ -14,6 +14,7 @@ struct CareerPathDetailView: View {
     let studentId: String? // Optional, as we might just be browsing
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.authStateModel) private var authStateModel
     @State private var selectedLevel: SkillLevel = .beginner
     @State private var isCreatingPlan = false
     @State private var showingPlanCreated = false
@@ -243,10 +244,14 @@ struct CareerPathDetailView: View {
                 return
             }
 
-            // Get user's district ID for district-scoped plan
+            guard let membership = authStateModel.currentMembership,
+                  membership.userID == userId else {
+                errorMessage = "We couldn’t verify your organization access."
+                showingError = true
+                return
+            }
+
             let db = Firestore.firestore()
-            let userDoc = try await db.collection("users").document(userId).getDocument()
-            let districtId = userDoc.data()?["districtId"] as? String
 
             // Try to fetch the student
             print("[CareerPlan] Attempting to fetch student with ID: \(studentId)")
@@ -283,7 +288,7 @@ struct CareerPathDetailView: View {
                 strategies: createStrategiesFromCareer(),
                 createdBy: userId,
                 resources: [],
-                districtId: districtId,
+                districtId: membership.districtID,
                 assignedCounselorId: userId // Creator is initially assigned
             )
 
@@ -358,4 +363,3 @@ struct CareerPathDetailView: View {
         }
     }
 }
-

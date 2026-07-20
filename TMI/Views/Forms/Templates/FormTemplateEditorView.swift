@@ -130,12 +130,22 @@ struct FormTemplateEditorView: View {
   
   private func saveTemplate() async {
       isSaving = true
-      // Set user info
-      if let user = authStateModel.currentUser {
-          template.districtId = user.districtId
-          template.schoolId = user.schoolId
-          template.createdBy = user.userID
+      guard let user = authStateModel.currentUser,
+            let membership = authStateModel.currentMembership else {
+          errorMessage = "We couldn’t verify your organization access."
+          isSaving = false
+          return
       }
+
+      template.districtId = membership.districtID
+      if let schoolID = template.schoolId,
+         !membership.schoolIDs.contains(schoolID) {
+          template.schoolId = nil
+      }
+      if template.schoolId == nil, membership.schoolIDs.count == 1 {
+          template.schoolId = membership.schoolIDs.first
+      }
+      template.createdBy = user.userID
       
       do {
           if isNew {

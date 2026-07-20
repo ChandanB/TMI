@@ -43,10 +43,14 @@ actor AppBootstrapService {
     // MARK: - Bootstrap Operations
     
     /// Warm start the app after authentication
-    /// - Parameters:
-    ///   - districtId: The user's district ID (if applicable)
-    ///   - role: The user's role
-    func warmStart(districtId: String?, role: UserRole) async {
+    /// - Parameter membership: Server-verified tenant and staff scope.
+    func warmStart(membership: MembershipContext) async {
+        guard membership.isActive,
+              membership.version > 0,
+              TrustedIdentifier.isValid(membership.districtID) else {
+            return
+        }
+
         guard !isBootstrapping else {
             print("[AppBootstrap] Already bootstrapping, skipping...")
             return
@@ -55,7 +59,7 @@ actor AppBootstrapService {
         isBootstrapping = true
         defer { isBootstrapping = false }
         
-        print("[AppBootstrap] Starting warm start for role: \(role.rawValue), district: \(districtId ?? "none")")
+        print("[AppBootstrap] Starting warm start for role: \(membership.role.rawValue), district: \(membership.districtID)")
         let startTime = Date()
         
         // Clear previous errors
@@ -73,25 +77,23 @@ actor AppBootstrapService {
             }
             
             group.addTask {
-                await self.loadResourceLibrary(districtId: districtId)
+                await self.loadResourceLibrary(districtId: membership.districtID)
             }
             
-            // Role-specific bootstrapping
-            if role.isStaffRole {
-                // Staff roles get student list primed
-                group.addTask {
-                    await self.primeStudentCache()
-                }
-                
-                group.addTask {
-                    await self.primePlanCache()
-                }
+            group.addTask {
+                await self.primeStudentCache()
             }
-            
-            // District roles get district context
-            if role.isDistrictRole, let districtId = districtId {
+
+            group.addTask {
+                await self.primePlanCache()
+            }
+
+            if AuthorizationPolicy.canViewAggregate(
+                membership,
+                districtID: membership.districtID
+            ) {
                 group.addTask {
-                    await self.loadDistrictContext(districtId: districtId)
+                    await self.loadDistrictContext(districtId: membership.districtID)
                 }
             }
         }
@@ -220,35 +222,6 @@ actor AppBootstrapService {
     /// Get cached resources (returns empty if not loaded)
     func getCachedResources() -> [Resource] {
         cachedResources
-    }
-}
-
-// MARK: - UserRole Extensions
-
-extension UserRole {
-    /// Whether this role is a staff role (can manage students)
-    var isStaffRole: Bool {
-        switch self {
-        case .teacher, .counselor, .administrator, .admin, .socialWorker:
-            return true
-        default:
-            return false
-        }
-    }
-    
-    /// Whether this role is a district-level role
-    var isDistrictRole: Bool {
-        switch self {
-        case .superintendent, .districtAdmin:
-            return true
-        default:
-            return false
-        }
-    }
-    
-    /// Whether this role can access student mode
-    var canAccessStudentMode: Bool {
-        isStaffRole
     }
 }
 

@@ -131,18 +131,24 @@ extension FirebaseManager {
     #endif
   }
 
-  nonisolated(nonsending) func signUp(withEmail email: String, password: String, role: String = "teacher") async throws -> String {
+  nonisolated(nonsending) func signUp(
+    withEmail email: String,
+    password: String,
+    requestedRole: String? = nil
+  ) async throws -> String {
     do {
       let authResult = try await auth.createUser(withEmail: email, password: password)
       let uid = authResult.user.uid
 
       // Create a user profile document in Firestore
-      let userData: [String: Any] = [
+      var userData: [String: Any] = [
         "uid": uid,
         "email": email,
-        "createdAt": FieldValue.serverTimestamp(),
-        "role": role,  // Role provided by caller (default teacher for backward compatibility)
+        "createdAt": FieldValue.serverTimestamp()
       ]
+      if let requestedRole {
+        userData["requestedRole"] = requestedRole
+      }
 
       try await firestore.collection("users").document(uid).setData(userData)
       return uid

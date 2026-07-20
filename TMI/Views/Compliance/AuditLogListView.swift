@@ -337,12 +337,10 @@ struct AuditLogListView: View {
 
     @MainActor
     private func exportLogs() async {
-        let csv = auditLogService.exportToCSV(logs: filteredLogs)
-
-        let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("audit_logs_\(Date().ISO8601Format()).csv")
-
         do {
+            let csv = try auditLogService.exportToCSV(logs: filteredLogs)
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("audit_logs_\(Date().ISO8601Format()).csv")
             try csv.write(to: tempURL, atomically: true, encoding: .utf8)
             exportURL = tempURL
             showingExport = true

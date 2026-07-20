@@ -13,39 +13,22 @@ struct FeatureFlagsTests {
         #expect(flags.institutionalSSO == false)
     }
 
-    @Test("Production denies unsupported and missing account roles without bootstrap access")
+    @Test("Production denies a missing trusted membership without bootstrap access")
     func productionDeniedAccountAccess() {
         let flags = FeatureFlags.production
 
-        let decisions = [
-            flags.accountAccess(for: .student),
-            flags.accountAccess(for: .parent),
-            flags.accountAccess(for: .legalGuardian),
-            flags.accountAccess(for: nil),
-        ]
+        let decision = flags.authenticatedAccountAccess(for: nil)
 
-        for decision in decisions {
-            #expect(decision.destination == .unavailable)
-            #expect(decision.destination != .staff)
-            #expect(decision.destination != .student)
-            #expect(decision.canBootstrap == false)
-        }
+        #expect(decision.destination == .unavailable)
+        #expect(decision.canBootstrap == false)
     }
 
-    @Test("Production routes supported staff roles to the staff root with bootstrap access")
+    @Test("Production routes every trusted staff membership to the staff root")
     func productionStaffAccountAccess() {
-        let staffRoles: [UserRole] = [
-            .teacher,
-            .counselor,
-            .administrator,
-            .admin,
-            .socialWorker,
-            .superintendent,
-            .districtAdmin,
-        ]
-
-        for role in staffRoles {
-            let decision = FeatureFlags.production.accountAccess(for: role)
+        for role in StaffRole.allCases {
+            let decision = FeatureFlags.production.authenticatedAccountAccess(
+                for: membership(role: role)
+            )
 
             #expect(decision.destination == .staff)
             #expect(decision.canBootstrap)
@@ -61,7 +44,7 @@ struct FeatureFlagsTests {
             institutionalSSO: false
         )
 
-        let decision = flags.accountAccess(for: .student)
+        let decision = flags.registrationAccountAccess(for: .student)
 
         #expect(decision.destination == .student)
         #expect(decision.canBootstrap)
@@ -77,8 +60,8 @@ struct FeatureFlagsTests {
         )
 
         let decisions = [
-            flags.accountAccess(for: .parent),
-            flags.accountAccess(for: .legalGuardian),
+            flags.registrationAccountAccess(for: .parent),
+            flags.registrationAccountAccess(for: .legalGuardian),
         ]
 
         for decision in decisions {
@@ -122,10 +105,23 @@ struct FeatureFlagsTests {
     @Test("Every simplified registration account type remains a staff account")
     func simplifiedRegistrationAccountAccess() {
         for accountType in AccountType.allCases {
-            let decision = FeatureFlags.production.accountAccess(for: accountType.userRole)
+            let decision = FeatureFlags.production.registrationAccountAccess(for: accountType.userRole)
 
             #expect(decision.destination == .staff)
             #expect(decision.canBootstrap)
         }
+    }
+
+    private func membership(role: StaffRole) -> MembershipContext {
+        MembershipContext(
+            userID: "staff-1",
+            districtID: "district-a",
+            schoolIDs: ["school-a"],
+            role: role,
+            capabilities: [],
+            assignedStudentIDs: [],
+            isActive: true,
+            version: 1
+        )
     }
 }

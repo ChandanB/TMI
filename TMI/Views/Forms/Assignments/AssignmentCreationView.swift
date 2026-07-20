@@ -236,7 +236,7 @@ struct AssignmentCreationView: View {
   private func loadTemplates() async {
       do {
           // Load public + district templates. Simplified for now.
-          if let districtId = authStateModel.currentUser?.districtId {
+          if let districtId = authStateModel.currentMembership?.districtID {
               templates = try await templateService.fetchTemplates(districtId: districtId)
           } else {
               templates = try await templateService.fetchPublicTemplates()
@@ -249,7 +249,8 @@ struct AssignmentCreationView: View {
   private func createAssignment() async {
       guard let template = selectedTemplate,
             let templateId = template.id,
-            let currentUser = authStateModel.currentUser else { return }
+            let currentUser = authStateModel.currentUser,
+            let membership = authStateModel.currentMembership else { return }
       
       isSubmitting = true
       
@@ -276,8 +277,8 @@ struct AssignmentCreationView: View {
           instructions: instructions,
           allowLateSubmissions: allowLateSubmissions,
           requiresReview: requiresReview,
-          districtId: currentUser.districtId,
-          schoolId: currentUser.schoolId
+          districtId: membership.districtID,
+          schoolId: membership.schoolIDs.sorted().first
       )
       
       do {

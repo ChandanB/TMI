@@ -17,9 +17,6 @@ struct StudentFormListView: View {
   @State private var selectedAssignment: FormAssignment?
   @State private var showingCompletion = false
 
-  private let assignmentService = FormAssignmentService()
-  private let submissionService = FormSubmissionService()
-
   var body: some View {
     ZStack {
       TMIBackgroundView(variant: .dashboard)
@@ -144,26 +141,26 @@ struct StudentFormListView: View {
   // MARK: - Actions
 
   private func loadData() async {
-    guard let studentId = authStateModel.currentUser?.userID else { return }
-
     isLoading = true
     errorMessage = nil
 
-    do {
-      // Fetch assignments (would need student-specific query)
-      if let user = authStateModel.currentUser {
-          assignments = try await assignmentService.fetchActiveAssignmentsForStudent(user: user)
-      }
-
-      // Fetch student's submissions
-      submissions = try await submissionService.fetchStudentSubmissions(studentId: studentId)
-
-      print("[StudentFormListView] Loaded \(assignments.count) assignments and \(submissions.count) submissions")
-    } catch {
-      errorMessage = "Failed to load forms: \(error.localizedDescription)"
-      print("[StudentFormListView] Error: \(errorMessage ?? "Unknown")")
+    guard FeatureFlags.production.independentStudentAccounts else {
+      assignments = []
+      submissions = []
+      errorMessage = "Student Mode is not available in this release."
+      isLoading = false
+      return
     }
 
+    guard authStateModel.currentUser != nil else {
+      errorMessage = "Sign in to view assigned forms."
+      isLoading = false
+      return
+    }
+
+    assignments = []
+    submissions = []
+    errorMessage = "Student Mode requires a trusted student session."
     isLoading = false
   }
 

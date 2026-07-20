@@ -71,7 +71,6 @@ final class AuthenticationService {
         lastName: String,
         role: UserRole,
         institutionCode: String? = nil,
-        districtId: String? = nil,
         dateOfBirth: Date? = nil
     ) async throws -> TMIUser {
         let normalizedInstitutionCode = institutionCode?
@@ -87,20 +86,11 @@ final class AuthenticationService {
         )
 
         // Verify institution if code provided
-        var verifiedInstitutionID: String?
         var verifiedInstitutionName: String?
-        var verifiedDistrictId: String?
-        var verifiedSchoolId: String?
 
         if let code = normalizedInstitutionCode, !code.isEmpty {
             let institutionData = try await verifyInstitution(code: code)
-            verifiedInstitutionID = institutionData.id
             verifiedInstitutionName = institutionData.name
-            verifiedDistrictId = institutionData.districtId
-            verifiedSchoolId = institutionData.schoolId
-        } else if let districtId = districtId {
-            // Use provided district ID if no institution code
-            verifiedDistrictId = districtId
         }
 
         // Create Firebase auth user
@@ -124,28 +114,22 @@ final class AuthenticationService {
             displayName: "\(firstName) \(lastName)",
             email: email,
             isEmailVerified: false,
-            role: role,
+            requestedRole: role,
             dateOfBirth: dateOfBirth,
             institutionCode: normalizedInstitutionCode,
-            institutionID: verifiedInstitutionID,
             institutionName: verifiedInstitutionName,
-            districtId: verifiedDistrictId,
-            schoolId: verifiedSchoolId,
             verificationStatus: VerificationStatus(
                 isEmailVerified: false,
                 isAgeVerified: ageVerificationStatus == .verified,
-                isInstitutionVerified: verifiedInstitutionID != nil
+                isInstitutionVerified: verifiedInstitutionName != nil
             ),
             consentRecords: [],
             parentalConsentStatus: parentalConsentStatus,
             ageVerificationStatus: ageVerificationStatus,
             privacySettings: PrivacySettings(),
-            permissions: role.defaultPermissions,
-            dataClassificationAccess: role.defaultDataAccess,
             createdAt: Date(),
             lastLoginAt: Date(),
             lastActivityAt: Date(),
-            isActive: true,
             emergencyContacts: []
         )
 
@@ -221,10 +205,7 @@ final class AuthenticationService {
     // MARK: - Institution Verification
 
     private struct InstitutionData {
-        let id: String
         let name: String
-        let districtId: String?
-        let schoolId: String?
     }
 
     private func verifyInstitution(code: String) async throws -> InstitutionData {
@@ -238,10 +219,7 @@ final class AuthenticationService {
 
         let data = document.data()
         return InstitutionData(
-            id: document.documentID,
-            name: data["name"] as? String ?? "Unknown Institution",
-            districtId: data["districtId"] as? String,
-            schoolId: data["schoolId"] as? String
+            name: data["name"] as? String ?? "Unknown Institution"
         )
     }
 

@@ -530,6 +530,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   private let identityProvider: any AuthenticationIdentityProviding
   private let profileProvider: any UserProfileProviding
   private let membershipProvider: any MembershipProviding
+  private let authorizationSessionStore: TrustedAuthorizationSessionStore
 
   @ObservationIgnored
   private var authStateListenerHandle: AuthStateListenerHandle?
@@ -542,7 +543,6 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   private(set) var authenticatedSession: AuthenticatedSession?
   private var pendingAuthenticatedSession: AuthenticatedSession?
   private(set) var currentUser: TMIUser?
-  private(set) var userRole: UserRole?
   private(set) var institutionContext: Institution?
   private(set) var privacyLevel: PrivacyLevel = .standard
 
@@ -684,6 +684,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     identityProvider: (any AuthenticationIdentityProviding)? = nil,
     profileProvider: (any UserProfileProviding)? = nil,
     membershipProvider: (any MembershipProviding)? = nil,
+    authorizationSessionStore: TrustedAuthorizationSessionStore = TrustedAuthorizationSessionStore(),
     automaticallyStart: Bool = true
   ) {
     self.firebaseManager = firebaseManager
@@ -698,6 +699,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     self.membershipProvider = membershipProvider ?? MembershipRepository(
       store: FirebaseMembershipStore(firestore: firebaseManager.firestore)
     )
+    self.authorizationSessionStore = authorizationSessionStore
     super.init()
 
     if automaticallyStart {
@@ -890,7 +892,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     pendingAuthenticatedSession = nil
     authenticatedSession = session
     currentUser = session.profile
-    userRole = session.profile.role
+    authorizationSessionStore.publish(session)
     currentError = nil
     updateState(.loaded(.authenticated(session)))
   }
@@ -928,7 +930,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   private func clearPublishedSession() {
     authenticatedSession = nil
     currentUser = nil
-    userRole = nil
+    authorizationSessionStore.clear()
     institutionContext = nil
   }
 
@@ -1313,7 +1315,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
     let event = AuditEvent(
       userID: currentUser?.id ?? "anonymous",
-      userRole: currentUser?.role ?? .student,
+      userRole: currentMembership?.role,
       action: action,
       resourceType: "user",
       resourceID: currentUser?.id,

@@ -169,8 +169,7 @@ struct FormAssignmentCreateView: View {
   private func loadTemplates() async {
     isLoadingTemplates = true
     
-    // Get current user's district ID
-    guard let districtId = authStateModel.currentUser?.districtId else {
+    guard let districtId = authStateModel.currentMembership?.districtID else {
         // If no district, maybe just fetch public? Or show empty.
         // For now, let's fetch public only if no district.
         do {
@@ -200,7 +199,8 @@ struct FormAssignmentCreateView: View {
 
   private func createAssignment() async {
     guard let template = selectedTemplate else { return }
-    guard let user = authStateModel.currentUser else { return }
+    guard let user = authStateModel.currentUser,
+          let membership = authStateModel.currentMembership else { return }
 
     let cohort: AssignmentCohort = {
       switch selectedCohortType {
@@ -225,8 +225,8 @@ struct FormAssignmentCreateView: View {
       instructions: instructions.isEmpty ? nil : instructions,
       allowLateSubmissions: allowLateSubmissions,
       requiresReview: requiresReview,
-      districtId: user.districtId,
-      schoolId: user.schoolId
+      districtId: membership.districtID,
+      schoolId: selectedSchool ?? membership.schoolIDs.sorted().first
     )
 
     await viewModel.createAssignment(assignment)
@@ -317,4 +317,3 @@ struct FormTemplatePickerView: View {
 #Preview {
   FormAssignmentCreateView(viewModel: FormAssignmentViewModel())
 }
-

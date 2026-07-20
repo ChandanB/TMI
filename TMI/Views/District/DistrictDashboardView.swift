@@ -100,15 +100,13 @@ struct DistrictDashboardView: View {
       .tmiSheetStyle()
     }
     .task {
-      // Load sample data for demo purposes
-      // In production, get districtId from authStateModel.currentUser.districtId
-      if viewModel.districtId == nil {
-        if let districtId = authStateModel.currentUser?.districtId {
-          await viewModel.loadDashboard(districtId: districtId)
-        } else {
-          // Demo mode: load sample data
-          viewModel.loadSampleData()
-        }
+      if viewModel.districtId == nil,
+         let membership = authStateModel.currentMembership,
+         AuthorizationPolicy.canViewAggregate(
+          membership,
+          districtID: membership.districtID
+         ) {
+        await viewModel.loadDashboard(districtId: membership.districtID)
       }
     }
     .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {

@@ -110,7 +110,9 @@ struct PlanTemplateLibraryView: View {
             viewModel.applyFilters()
         }
         .task {
-            await viewModel.loadTemplates(districtId: authStateModel.currentUser?.districtId)
+            await viewModel.loadTemplates(
+                districtId: authStateModel.currentMembership?.districtID
+            )
         }
         .sheet(isPresented: $showingTemplateDetail) {
             if let template = selectedTemplate {

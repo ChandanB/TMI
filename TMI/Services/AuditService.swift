@@ -43,7 +43,7 @@ struct AuditEvent: Codable, Sendable {
     var eventID: String = UUID().uuidString
     var timestamp: Date = Date()
     var userID: String
-    var userRole: UserRole
+    var userRole: StaffRole?
     var action: AuditAction
     var resourceType: String
     var resourceID: String?

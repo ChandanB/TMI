@@ -14,8 +14,7 @@ struct AuthStateModelMembershipTests {
         )
         let profile = makeUser(
             id: "user-1",
-            role: .districtAdmin,
-            districtID: "attacker-district"
+            role: .districtAdmin
         )
         let membership = makeMembership(
             userID: "user-1",
@@ -34,8 +33,7 @@ struct AuthStateModelMembershipTests {
         await model.fetch()
 
         #expect(model.isLoggedIn)
-        #expect(model.currentUser?.role == .districtAdmin)
-        #expect(model.currentUser?.districtId == "attacker-district")
+        #expect(model.currentUser?.requestedRole == .districtAdmin)
         #expect(model.currentMembership?.role == .teacher)
         #expect(model.currentMembership?.districtID == "trusted-district")
         #expect(model.currentAuthState == .authenticated(
@@ -346,16 +344,14 @@ struct AuthStateModelMembershipTests {
 
     private func makeUser(
         id: String,
-        role: UserRole = .teacher,
-        districtID: String? = nil
+        role: UserRole = .teacher
     ) -> TMIUser {
         TMIUser(
             id: id,
             userID: id,
             displayName: "Test Educator",
             email: "educator@example.com",
-            role: role,
-            districtId: districtID,
+            requestedRole: role,
             createdAt: .distantPast
         )
     }

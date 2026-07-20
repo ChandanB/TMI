@@ -367,8 +367,7 @@ struct RegistrationView: View {
           firstName: firstName,
           lastName: lastName,
           role: selectedRole,
-          institutionCode: selectedRole.requiresInstitutionalAffiliation ? trimmedInstitutionCode : nil,
-          districtId: nil
+          institutionCode: selectedRole.requiresInstitutionalAffiliation ? trimmedInstitutionCode : nil
         )
 
         // Force AuthStateModel to reload and fetch the TMIUser from Firestore

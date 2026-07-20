@@ -16,6 +16,14 @@ import Observation
 @Observable
 class StudentService {
     private let db = Firestore.firestore()
+    private let authorizationSessions: any AuthorizationSessionProviding
+    private let authorization = RBACService()
+
+    init(
+        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared
+    ) {
+        self.authorizationSessions = authorizationSessions
+    }
     
     /// Get the user-scoped students collection
     private var userStudentsCollection: CollectionReference? {
@@ -28,6 +36,7 @@ class StudentService {
     
     /// Fetch all students for the current user
     func fetchStudents() async throws -> [Student] {
+        let session = try authorizedSession()
         guard let collection = userStudentsCollection else {
             throw StudentServiceError.userNotAuthenticated
         }
@@ -48,8 +57,18 @@ class StudentService {
                 }
             }
             
-            print("[StudentService] Successfully fetched \(students.count) students")
-            return students
+            let visibleStudents = students.filter {
+                guard let scope = StudentAuthorizationScope(student: $0) else {
+                    return false
+                }
+                return authorization.canReadStudent(
+                    member: session.membership,
+                    student: scope
+                )
+            }
+
+            print("[StudentService] Successfully fetched \(visibleStudents.count) authorized students")
+            return visibleStudents
         } catch let error as StudentServiceError {
             // Re-throw our custom error
             throw error
@@ -65,30 +84,39 @@ class StudentService {
     
     /// Add a new student to Firestore
     func addStudent(_ student: Student) async throws -> Student {
+        let session = try authorizedSession()
         guard let collection = userStudentsCollection else {
             throw StudentServiceError.userNotAuthenticated
         }
 
-        // RBAC Check: Verify user has permission to create students
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw StudentServiceError.userNotAuthenticated
+        guard let schoolID = trustedSchoolID(
+            requestedSchoolID: student.schoolId,
+            membership: session.membership
+        ) else {
+            throw StudentServiceError.authorizationDenied
         }
+        try authorization.require(
+            authorization.canCreateStudent(
+                member: session.membership,
+                school: SchoolAuthorizationScope(
+                    districtID: session.membership.districtID,
+                    schoolID: schoolID
+                )
+            )
+        )
 
-        // Fetch current user to check permissions
-        let userDoc = try await db.collection("users").document(uid).getDocument()
-        guard let userData = userDoc.data(),
-              let tmiUser = try? userDoc.data(as: TMIUser.self) else {
-            throw StudentServiceError.userNotAuthenticated
-        }
-
-        // Check RBAC permission
-        try RBACService.shared.requirePermission(.createStudent, user: tmiUser)
+        var trustedStudent = student
+        trustedStudent.districtId = session.membership.districtID
+        trustedStudent.schoolId = schoolID
+        trustedStudent.createdBy = session.membership.userID
+        trustedStudent.createdAt = Date()
+        trustedStudent.updatedAt = Date()
 
         do {
-            print("[StudentService] Adding student: \(student.name) (user: \(tmiUser.role.rawValue))")
+            print("[StudentService] Adding student: \(trustedStudent.name)")
             
             // Convert student to Firestore data (without ID)
-            let data = student.toFirestoreData()
+            let data = trustedStudent.toFirestoreData()
             
             // Add the document and get the reference
             let documentRef = try await withTimeout(seconds: 10) {
@@ -111,6 +139,7 @@ class StudentService {
     
     /// Update an existing student in Firestore
     func updateStudent(_ student: Student) async throws -> Student {
+        let session = try authorizedSession()
         guard let studentId = student.id else {
             throw StudentServiceError.invalidStudentId
         }
@@ -119,28 +148,35 @@ class StudentService {
             throw StudentServiceError.userNotAuthenticated
         }
 
-        // RBAC Check: Verify user has permission to edit students
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw StudentServiceError.userNotAuthenticated
+        let storedDocument = try await collection.document(studentId).getDocument()
+        guard storedDocument.exists else {
+            throw StudentServiceError.studentNotFound
         }
-
-        let userDoc = try await db.collection("users").document(uid).getDocument()
-        guard let tmiUser = try? userDoc.data(as: TMIUser.self) else {
-            throw StudentServiceError.userNotAuthenticated
+        let storedStudent = try parseStudent(from: storedDocument)
+        guard let scope = StudentAuthorizationScope(student: storedStudent) else {
+            throw StudentServiceError.authorizationDenied
         }
+        try authorization.require(
+            authorization.canWriteStudent(member: session.membership, student: scope)
+        )
 
-        try RBACService.shared.requirePermission(.editStudent, user: tmiUser)
+        var trustedStudent = student
+        trustedStudent.districtId = storedStudent.districtId
+        trustedStudent.schoolId = storedStudent.schoolId
+        trustedStudent.createdBy = storedStudent.createdBy
+        trustedStudent.createdAt = storedStudent.createdAt
+        trustedStudent.updatedAt = Date()
 
         do {
-            print("[StudentService] Updating student: \(student.name) (user: \(tmiUser.role.rawValue))")
+            print("[StudentService] Updating student: \(trustedStudent.name)")
 
-            let data = student.toFirestoreData()
+            let data = trustedStudent.toFirestoreData()
             try await withTimeout(seconds: 10) {
                 try await collection.document(studentId).updateData(data)
             }
 
             print("[StudentService] Student updated successfully")
-            return student
+            return trustedStudent
         } catch {
             print("[StudentService] Error updating student: \(error)")
             throw StudentServiceError.updateFailed(error.localizedDescription)
@@ -151,10 +187,26 @@ class StudentService {
     /// Now uses StudentInterestService edge collection
     func addInterests(_ newInterests: [Interest], to student: Student) async throws -> Student {
         print("[StudentService] Adding \(newInterests.count) interests to student: \(student.name)")
+        let session = try authorizedSession()
 
         guard let studentId = student.id else {
             throw StudentServiceError.invalidStudentId
         }
+
+        guard let collection = userStudentsCollection else {
+            throw StudentServiceError.userNotAuthenticated
+        }
+        let storedDocument = try await collection.document(studentId).getDocument()
+        guard storedDocument.exists else {
+            throw StudentServiceError.studentNotFound
+        }
+        let storedStudent = try parseStudent(from: storedDocument)
+        guard let scope = StudentAuthorizationScope(student: storedStudent) else {
+            throw StudentServiceError.authorizationDenied
+        }
+        try authorization.require(
+            authorization.canWriteStudent(member: session.membership, student: scope)
+        )
 
         // Get existing interest edges from edge collection
         let existingEdges = try await StudentInterestService.shared.getStudentInterests(studentId: studentId)
@@ -192,6 +244,7 @@ class StudentService {
     
     /// Delete a student from Firestore
     func deleteStudent(_ student: Student) async throws {
+        let session = try authorizedSession()
         guard let studentId = student.id else {
             throw StudentServiceError.invalidStudentId
         }
@@ -200,32 +253,23 @@ class StudentService {
             throw StudentServiceError.userNotAuthenticated
         }
 
-        // RBAC Check: Verify user has permission to delete students
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw StudentServiceError.userNotAuthenticated
+        let storedDocument = try await collection.document(studentId).getDocument()
+        guard storedDocument.exists else {
+            throw StudentServiceError.studentNotFound
         }
-
-        let userDoc = try await db.collection("users").document(uid).getDocument()
-        guard let tmiUser = try? userDoc.data(as: TMIUser.self) else {
-            throw StudentServiceError.userNotAuthenticated
-        }
-
-        try RBACService.shared.requirePermission(.deleteStudent, user: tmiUser)
-
-        do {
-            print("[StudentService] Deleting student: \(student.name)")
-            try await withTimeout(seconds: 10) {
-                try await collection.document(studentId).delete()
-            }
-            print("[StudentService] Student deleted successfully")
-        } catch {
-            print("[StudentService] Error deleting student: \(error)")
-            throw StudentServiceError.deleteFailed(error.localizedDescription)
+        let storedStudent = try parseStudent(from: storedDocument)
+        guard let scope = StudentAuthorizationScope(student: storedStudent),
+              authorization.canDeleteStudent(
+                member: session.membership,
+                student: scope
+              ) else {
+            throw StudentServiceError.deletionRequiresRetentionWorkflow
         }
     }
     
     /// Get a specific student by ID
     func getStudent(by id: String) async throws -> Student? {
+        let session = try authorizedSession()
         guard let collection = userStudentsCollection else {
             throw StudentServiceError.userNotAuthenticated
         }
@@ -240,7 +284,15 @@ class StudentService {
                 return nil
             }
 
-            return try parseStudent(from: document)
+            let student = try parseStudent(from: document)
+            guard let scope = StudentAuthorizationScope(student: student),
+                  authorization.canReadStudent(
+                    member: session.membership,
+                    student: scope
+                  ) else {
+                throw StudentServiceError.authorizationDenied
+            }
+            return student
 
         } catch let error as StudentServiceError {
             throw error
@@ -253,6 +305,13 @@ class StudentService {
     /// Listen to real-time updates for a specific student
     /// Returns a ListenerRegistration that should be removed when no longer needed
     func listenToStudent(id: String, onChange: @escaping (Result<Student, Error>) -> Void) -> ListenerRegistration? {
+        let session: AuthenticatedSession
+        do {
+            session = try authorizedSession()
+        } catch {
+            onChange(.failure(error))
+            return nil
+        }
         guard let collection = userStudentsCollection else {
             onChange(.failure(StudentServiceError.userNotAuthenticated))
             return nil
@@ -275,6 +334,13 @@ class StudentService {
 
             do {
                 let student = try self.parseStudent(from: snapshot)
+                guard let scope = StudentAuthorizationScope(student: student),
+                      self.authorization.canReadStudent(
+                        member: session.membership,
+                        student: scope
+                      ) else {
+                    throw StudentServiceError.authorizationDenied
+                }
                 print("[StudentService] Student updated: \(student.name)")
                 onChange(.success(student))
             } catch {
@@ -544,6 +610,14 @@ class StudentService {
     
     /// Fetch all students in a district (for cross-staff access)
     func fetchStudentsInDistrict(_ districtId: String) async throws -> [Student] {
+        let session = try authorizedSession()
+        guard districtId == session.membership.districtID,
+              AuthorizationPolicy.canViewAggregate(
+                session.membership,
+                districtID: districtId
+              ) else {
+            throw StudentServiceError.authorizationDenied
+        }
         print("[StudentService] Fetching students for district: \(districtId)")
         
         // Query global students collection filtered by districtId
@@ -557,6 +631,14 @@ class StudentService {
             
             let students = try snapshot.documents.compactMap { document in
                 try parseStudent(from: document)
+            }.filter {
+                guard let scope = StudentAuthorizationScope(student: $0) else {
+                    return false
+                }
+                return authorization.canReadStudent(
+                    member: session.membership,
+                    student: scope
+                )
             }
             
             print("[StudentService] Found \(students.count) students in district")
@@ -569,6 +651,11 @@ class StudentService {
     
     /// Fetch students assigned to a specific counselor (caseload)
     func fetchStudentsForCounselor(_ counselorId: String) async throws -> [Student] {
+        let session = try authorizedSession()
+        guard counselorId == session.membership.userID
+                || AuthorizationPolicy.canManageStaff(session.membership) else {
+            throw StudentServiceError.authorizationDenied
+        }
         print("[StudentService] Fetching caseload for counselor: \(counselorId)")
         
         let query = db.collection("students")
@@ -581,6 +668,14 @@ class StudentService {
             
             let students = try snapshot.documents.compactMap { document in
                 try parseStudent(from: document)
+            }.filter {
+                guard let scope = StudentAuthorizationScope(student: $0) else {
+                    return false
+                }
+                return authorization.canReadStudent(
+                    member: session.membership,
+                    student: scope
+                )
             }
             
             print("[StudentService] Found \(students.count) students in caseload")
@@ -593,6 +688,11 @@ class StudentService {
     
     /// Fetch students assigned to a specific teacher
     func fetchStudentsForTeacher(_ teacherId: String) async throws -> [Student] {
+        let session = try authorizedSession()
+        guard teacherId == session.membership.userID
+                || AuthorizationPolicy.canManageStaff(session.membership) else {
+            throw StudentServiceError.authorizationDenied
+        }
         print("[StudentService] Fetching students for teacher: \(teacherId)")
         
         let query = db.collection("students")
@@ -605,6 +705,14 @@ class StudentService {
             
             let students = try snapshot.documents.compactMap { document in
                 try parseStudent(from: document)
+            }.filter {
+                guard let scope = StudentAuthorizationScope(student: $0) else {
+                    return false
+                }
+                return authorization.canReadStudent(
+                    member: session.membership,
+                    student: scope
+                )
             }
             
             print("[StudentService] Found \(students.count) students for teacher")
@@ -617,6 +725,21 @@ class StudentService {
     
     /// Assign a counselor to a student
     func assignCounselor(_ counselorId: String, to studentId: String) async throws {
+        let session = try authorizedSession()
+        guard AuthorizationPolicy.canManageStaff(session.membership) else {
+            throw StudentServiceError.authorizationDenied
+        }
+        let studentDocument = try await db.collection("students").document(studentId).getDocument()
+        guard studentDocument.exists,
+              let scope = StudentAuthorizationScope(
+                student: try parseStudent(from: studentDocument)
+              ),
+              authorization.canWriteStudent(
+                member: session.membership,
+                student: scope
+              ) else {
+            throw StudentServiceError.authorizationDenied
+        }
         print("[StudentService] Assigning counselor \(counselorId) to student \(studentId)")
         
         try await db.collection("students")
@@ -631,6 +754,21 @@ class StudentService {
     
     /// Assign a primary teacher to a student
     func assignPrimaryTeacher(_ teacherId: String, to studentId: String) async throws {
+        let session = try authorizedSession()
+        guard AuthorizationPolicy.canManageStaff(session.membership) else {
+            throw StudentServiceError.authorizationDenied
+        }
+        let studentDocument = try await db.collection("students").document(studentId).getDocument()
+        guard studentDocument.exists,
+              let scope = StudentAuthorizationScope(
+                student: try parseStudent(from: studentDocument)
+              ),
+              authorization.canWriteStudent(
+                member: session.membership,
+                student: scope
+              ) else {
+            throw StudentServiceError.authorizationDenied
+        }
         print("[StudentService] Assigning teacher \(teacherId) to student \(studentId)")
         
         try await db.collection("students")
@@ -641,6 +779,37 @@ class StudentService {
             ])
         
         print("[StudentService] Teacher assigned successfully")
+    }
+
+    private func authorizedSession() throws -> AuthenticatedSession {
+        let userID = Auth.auth().currentUser?.uid
+        guard let session = authorizationSessions.session(
+            authenticatedUserID: userID
+        ) else {
+            throw StudentServiceError.userNotAuthenticated
+        }
+        return session
+    }
+
+    private func trustedSchoolID(
+        requestedSchoolID: String?,
+        membership: MembershipContext
+    ) -> String? {
+        if membership.role == .districtAdministrator,
+           let requestedSchoolID,
+           TrustedIdentifier.isValid(requestedSchoolID) {
+            return requestedSchoolID
+        }
+
+        if let requestedSchoolID,
+           membership.schoolIDs.contains(requestedSchoolID) {
+            return requestedSchoolID
+        }
+
+        guard membership.schoolIDs.count == 1 else {
+            return nil
+        }
+        return membership.schoolIDs.first
     }
 }
 
@@ -654,6 +823,8 @@ enum StudentServiceError: Error, LocalizedError {
     case saveFailed(String)
     case updateFailed(String)
     case deleteFailed(String)
+    case authorizationDenied
+    case deletionRequiresRetentionWorkflow
     case dataParsingFailed(documentID: String, underlyingError: Error)
 
     var errorDescription: String? {
@@ -672,6 +843,10 @@ enum StudentServiceError: Error, LocalizedError {
             return "Failed to update student: \(message)"
         case .deleteFailed(let message):
             return "Failed to delete student: \(message)"
+        case .authorizationDenied:
+            return "You don’t have access to this student record"
+        case .deletionRequiresRetentionWorkflow:
+            return "Student records must be archived through the district retention workflow"
         case .dataParsingFailed(let documentID, let underlyingError):
             return "Failed to parse data for document \(documentID): \(underlyingError.localizedDescription)"
         }

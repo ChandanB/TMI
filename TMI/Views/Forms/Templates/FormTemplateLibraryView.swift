@@ -52,11 +52,11 @@ struct FormTemplateLibraryView: View {
     }
     .task {
       if !viewModel.hasTemplates {
-        await viewModel.loadTemplates(districtId: authStateModel.currentUser?.districtId)
+        await viewModel.loadTemplates(districtId: authStateModel.currentMembership?.districtID)
       }
     }
     .refreshable {
-      await viewModel.refreshTemplates(districtId: authStateModel.currentUser?.districtId)
+      await viewModel.refreshTemplates(districtId: authStateModel.currentMembership?.districtID)
     }
     .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
       Button("OK") {
@@ -196,7 +196,7 @@ struct FormTemplateLibraryView: View {
                 await viewModel.makePrivate(template)
               }
             } else {
-              if let districtId = authStateModel.currentUser?.districtId {
+              if let districtId = authStateModel.currentMembership?.districtID {
                 Task {
                   await viewModel.makePublic(template, districtId: districtId)
                 }
@@ -220,7 +220,7 @@ struct FormTemplateLibraryView: View {
       .onDisappear {
         // Refresh templates after creation
         Task {
-          await viewModel.refreshTemplates(districtId: authStateModel.currentUser?.districtId)
+          await viewModel.refreshTemplates(districtId: authStateModel.currentMembership?.districtID)
         }
       }
     }
@@ -284,5 +284,4 @@ struct FormTemplateLibraryView: View {
     FormTemplateLibraryView()
   }
 }
-
 

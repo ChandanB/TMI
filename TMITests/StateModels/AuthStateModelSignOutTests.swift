@@ -49,7 +49,7 @@ struct AuthStateModelSignOutTests {
             id: "sign-out-test-user",
             email: "educator@example.com",
             displayName: "Test Educator",
-            role: .teacher,
+            requestedRole: .teacher,
             profileCreatedDate: .distantPast
         )
     }

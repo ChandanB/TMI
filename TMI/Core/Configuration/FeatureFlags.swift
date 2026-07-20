@@ -25,12 +25,28 @@ extension FeatureFlags {
         let canBootstrap: Bool
     }
 
-    func accountAccess(for role: UserRole?) -> AccountAccess {
-        guard let role else {
+    func authenticatedAccountAccess(
+        for membership: MembershipContext?
+    ) -> AccountAccess {
+        guard let membership,
+              membership.isActive,
+              membership.version > 0,
+              TrustedIdentifier.isValid(membership.userID),
+              TrustedIdentifier.isValid(membership.districtID) else {
             return AccountAccess(destination: .unavailable, canBootstrap: false)
         }
 
-        switch role {
+        return AccountAccess(destination: .staff, canBootstrap: true)
+    }
+
+    /// Registration availability only. `UserRole` is an untrusted account-type
+    /// request and must never drive authenticated routing or data access.
+    func registrationAccountAccess(for requestedRole: UserRole?) -> AccountAccess {
+        guard let requestedRole else {
+            return AccountAccess(destination: .unavailable, canBootstrap: false)
+        }
+
+        switch requestedRole {
         case .student:
             if independentStudentAccounts {
                 return AccountAccess(destination: .student, canBootstrap: true)

@@ -460,19 +460,10 @@ final class DistrictAnalyticsService {
     }
 
     private func fetchStaffCount(districtId: String) async throws -> Int {
-        let staffRoles = [
-            UserRole.teacher.rawValue,
-            UserRole.counselor.rawValue,
-            UserRole.administrator.rawValue,
-            UserRole.admin.rawValue,
-            UserRole.socialWorker.rawValue,
-            UserRole.superintendent.rawValue,
-            UserRole.districtAdmin.rawValue
-        ]
-
-        let snapshot = try await db.collection("users")
-            .whereField("districtId", isEqualTo: districtId)
-            .whereField("role", in: staffRoles)
+        let snapshot = try await db.collection("districts")
+            .document(districtId)
+            .collection("members")
+            .whereField("isActive", isEqualTo: true)
             .getDocuments()
 
         return snapshot.documents.count

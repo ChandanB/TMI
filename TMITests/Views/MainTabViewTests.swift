@@ -12,7 +12,7 @@ struct MainTabViewTests {
 
     @Test("District admin sees district evidence tab in addition to teacher workflow")
     func districtAdminTabs() {
-        let tabs = MainTabView.Tab.mvpTabs(for: .districtAdmin)
+        let tabs = MainTabView.Tab.mvpTabs(for: .districtAdministrator)
 
         #expect(tabs == [.dashboard, .students, .tmiPlans, .district])
     }
@@ -20,6 +20,5 @@ struct MainTabViewTests {
     @Test("Nil or unsupported role falls back to dashboard only")
     func fallbackTabs() {
         #expect(MainTabView.Tab.mvpTabs(for: nil) == [.dashboard])
-        #expect(MainTabView.Tab.mvpTabs(for: .student) == [.dashboard])
     }
 }

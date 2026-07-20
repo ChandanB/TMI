@@ -20,7 +20,7 @@ struct DashboardStateModelTests {
         )
 
         let action = DashboardStateModel.prioritizedNextBestAction(
-            role: .teacher,
+            membership: membership(role: .teacher),
             students: [lowEngagementStudent, readyForPlanStudent],
             plans: []
         )
@@ -46,7 +46,7 @@ struct DashboardStateModelTests {
         )
 
         let action = DashboardStateModel.prioritizedNextBestAction(
-            role: .teacher,
+            membership: membership(role: .teacher),
             students: [readyForPlanStudent, surveyPendingStudent],
             plans: []
         )
@@ -71,7 +71,7 @@ struct DashboardStateModelTests {
         )
 
         let action = DashboardStateModel.prioritizedNextBestAction(
-            role: .counselor,
+            membership: membership(role: .counselor, capabilities: [.planApprove]),
             students: [lowEngagementStudent],
             plans: [pendingPlan]
         )
@@ -91,7 +91,7 @@ struct DashboardStateModelTests {
         )
 
         let action = DashboardStateModel.prioritizedNextBestAction(
-            role: .teacher,
+            membership: membership(role: .teacher),
             students: [surveyPendingStudent],
             plans: []
         )
@@ -116,7 +116,7 @@ struct DashboardStateModelTests {
         )
 
         let action = DashboardStateModel.prioritizedNextBestAction(
-            role: .teacher,
+            membership: membership(role: .teacher),
             students: [studentWithPlan],
             plans: [approvedPlan]
         )
@@ -126,6 +126,22 @@ struct DashboardStateModelTests {
 }
 
 private extension DashboardStateModelTests {
+    func membership(
+        role: StaffRole,
+        capabilities: Set<Capability> = []
+    ) -> MembershipContext {
+        MembershipContext(
+            userID: "staff-1",
+            districtID: "district-a",
+            schoolIDs: ["school-a"],
+            role: role,
+            capabilities: capabilities,
+            assignedStudentIDs: ["student-low", "student-plan", "student-survey", "student-covered"],
+            isActive: true,
+            version: 1
+        )
+    }
+
     func makeStudent(
         id: String,
         name: String,

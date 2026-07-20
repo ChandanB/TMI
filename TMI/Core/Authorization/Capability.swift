@@ -16,3 +16,15 @@ enum StaffRole: String, Codable, Sendable, CaseIterable, Equatable {
     case schoolAdministrator
     case districtAdministrator
 }
+
+extension StaffRole {
+    var displayName: String {
+        switch self {
+        case .teacher: "Teacher"
+        case .counselor: "Counselor"
+        case .socialWorker: "Social Worker"
+        case .schoolAdministrator: "School Administrator"
+        case .districtAdministrator: "District Administrator"
+        }
+    }
+}

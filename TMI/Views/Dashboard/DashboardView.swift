@@ -64,7 +64,7 @@ struct DashboardData: Equatable, Sendable {
 // MARK: - Role-Specific Data
 
 struct RoleSpecificData: Equatable, Sendable {
-  var role: UserRole
+  var role: StaffRole
   
   // Counselor-specific
   var caseloadCount: Int = 0
@@ -154,11 +154,11 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
 
   @MainActor
   override func fetch() async {
-    await fetchWithRole(nil) // Fetch without role-specific data by default
+    await fetchWithMembership(nil)
   }
   
   @MainActor
-  func fetchWithRole(_ userRole: UserRole?) async {
+  func fetchWithMembership(_ membership: MembershipContext?) async {
     updateState(.loading)
 
     do {
@@ -198,10 +198,16 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       let recentActivities = generateRecentActivities(from: students, plans: plans)
       
       // Generate role-specific data if role is provided
-      let roleData = userRole != nil ? generateRoleSpecificData(role: userRole!, students: students, plans: plans) : nil
+      let roleData = membership.map {
+        generateRoleSpecificData(role: $0.role, students: students, plans: plans)
+      }
       
       // Generate next best action based on role and data
-      let nextAction = Self.prioritizedNextBestAction(role: userRole, students: students, plans: plans)
+      let nextAction = Self.prioritizedNextBestAction(
+        membership: membership,
+        students: students,
+        plans: plans
+      )
 
       let dashboardData = DashboardData(
         engagementData: engagementData,
@@ -226,7 +232,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   
   // MARK: - Role-Specific Data Generation
   
-  private func generateRoleSpecificData(role: UserRole, students: [Student], plans: [TMIPlan]) -> RoleSpecificData {
+  private func generateRoleSpecificData(role: StaffRole, students: [Student], plans: [TMIPlan]) -> RoleSpecificData {
     var roleData = RoleSpecificData(role: role)
     
     switch role {
@@ -247,7 +253,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       roleData.classroomPlanGapCount = Self.studentsMissingPlans(students: students, plans: plans).count
       roleData.classroomStudentIds = students.compactMap { $0.id }
       
-    case .administrator, .admin, .superintendent, .districtAdmin:
+    case .schoolAdministrator, .districtAdministrator:
       // MVP: Show all students and plans in single-teacher context
       roleData.schoolWideStudents = students.count
       roleData.schoolWidePlans = plans.count
@@ -258,8 +264,6 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       roleData.caseloadCount = students.count
       roleData.criticalAlerts = students.filter { $0.engagementScore < 0.3 }.count
       
-    default:
-      break
     }
     
     return roleData
@@ -267,15 +271,19 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   
   // MARK: - Next Best Action Generation
   
-  static func prioritizedNextBestAction(role: UserRole?, students: [Student], plans: [TMIPlan]) -> NextBestAction? {
+  static func prioritizedNextBestAction(
+    membership: MembershipContext?,
+    students: [Student],
+    plans: [TMIPlan]
+  ) -> NextBestAction? {
     let pendingPlans = plans.filter { $0.approvalStatus == .pendingApproval }
-    let canReviewApprovals = role == .counselor || role == .administrator || role == .admin
+    let canReviewApprovals = membership?.capabilities.contains(.planApprove) == true
 
     let candidates: [NextBestAction] = [
       canReviewApprovals ? approvalAction(for: pendingPlans) : nil,
       lowEngagementAction(for: students),
       missingPlanAction(for: students, plans: plans),
-      surveyFollowUpAction(for: students, role: role)
+      surveyFollowUpAction(for: students, role: membership?.role)
     ]
     .compactMap { $0 }
 
@@ -339,7 +347,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     )
   }
 
-  private static func surveyFollowUpAction(for students: [Student], role: UserRole?) -> NextBestAction? {
+  private static func surveyFollowUpAction(for students: [Student], role: StaffRole?) -> NextBestAction? {
     guard role == .teacher || role == .counselor else { return nil }
     guard let firstStudent = students.first(where: { $0.surveyResults?.isEmpty ?? true }) else { return nil }
 
@@ -616,12 +624,15 @@ struct DashboardView: View {
 
     // Roles that should see district-level content appended to the dashboard
     private var isDistrictAdminRole: Bool {
-        guard let role = authStateModel.currentUser?.role else { return false }
-        return [UserRole.superintendent, .districtAdmin, .administrator, .admin].contains(role)
+        guard let membership = authStateModel.currentMembership else { return false }
+        return AuthorizationPolicy.canViewAggregate(
+          membership,
+          districtID: membership.districtID
+        )
     }
 
     private var isTeacherRole: Bool {
-        authStateModel.currentUser?.role == .teacher
+        authStateModel.currentMembership?.role == .teacher
     }
 
     var body: some View {
@@ -641,16 +652,14 @@ struct DashboardView: View {
             }
         }
         .task {
-            let userRole = authStateModel.currentUser?.role
-            await stateModel.fetchWithRole(userRole)
+            await stateModel.fetchWithMembership(authStateModel.currentMembership)
             await studentStateModel.fetch()
             if isDistrictAdminRole {
                 await loadDistrictData()
             }
         }
         .refreshable {
-            let userRole = authStateModel.currentUser?.role
-            await stateModel.fetchWithRole(userRole)
+            await stateModel.fetchWithMembership(authStateModel.currentMembership)
             await studentStateModel.fetch()
             if isDistrictAdminRole {
                 await loadDistrictData()
@@ -960,10 +969,8 @@ struct DashboardView: View {
                 counselorSummaryCard(roleData)
             case .teacher:
                 teacherActionSummaryCard(roleData)
-            case .administrator, .admin, .superintendent, .districtAdmin:
+            case .schoolAdministrator, .districtAdministrator:
                 adminSummaryCard(roleData)
-            default:
-                EmptyView()
             }
         }
         .tmiCard()
@@ -1004,11 +1011,12 @@ struct DashboardView: View {
     // MARK: - District Data Loading
 
     private func loadDistrictData() async {
-        if let districtId = authStateModel.currentUser?.districtId {
-            await districtViewModel.loadDashboard(districtId: districtId)
-        } else {
-            // Demo mode: load sample data so admin users always see district content
-            districtViewModel.loadSampleData()
+        if let membership = authStateModel.currentMembership,
+           AuthorizationPolicy.canViewAggregate(
+            membership,
+            districtID: membership.districtID
+           ) {
+            await districtViewModel.loadDashboard(districtId: membership.districtID)
         }
     }
 

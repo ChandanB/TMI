@@ -6,7 +6,69 @@ struct StudentAuthorizationScope: Codable, Sendable, Equatable {
     let schoolID: String
 }
 
+extension StudentAuthorizationScope {
+    init?(student: Student) {
+        guard let studentID = student.id,
+              let districtID = student.districtId,
+              let schoolID = student.schoolId else {
+            return nil
+        }
+
+        self.init(
+            studentID: studentID,
+            districtID: districtID,
+            schoolID: schoolID
+        )
+    }
+}
+
+struct SchoolAuthorizationScope: Codable, Sendable, Equatable {
+    let districtID: String
+    let schoolID: String
+}
+
+struct PlanAuthorizationScope: Codable, Sendable, Equatable {
+    let planID: String
+    let districtID: String
+    let students: [StudentAuthorizationScope]
+}
+
+struct FormAssignmentAuthorizationScope: Codable, Sendable, Equatable {
+    let districtID: String
+    let schoolID: String?
+    let students: [StudentAuthorizationScope]
+}
+
+struct TemplateAuthorizationScope: Codable, Sendable, Equatable {
+    let districtID: String
+    let schoolID: String?
+}
+
 enum AuthorizationPolicy {
+    static func canCreateStudent(
+        _ member: MembershipContext,
+        school: SchoolAuthorizationScope
+    ) -> Bool {
+        guard isWellFormed(member),
+              isWellFormedIdentifier(school.districtID),
+              isWellFormedIdentifier(school.schoolID),
+              member.districtID == school.districtID else {
+            return false
+        }
+
+        switch member.role {
+        case .teacher, .counselor:
+            return member.schoolIDs.contains(school.schoolID)
+        case .socialWorker:
+            return false
+        case .schoolAdministrator:
+            return member.schoolIDs.contains(school.schoolID)
+                && member.capabilities.contains(.studentWriteDetail)
+        case .districtAdministrator:
+            return member.capabilities.contains(.studentWriteDetail)
+        }
+    }
+
     static func canReadStudentDetail(
         _ member: MembershipContext,
         student: StudentAuthorizationScope
@@ -100,6 +162,155 @@ enum AuthorizationPolicy {
         }
     }
 
+    static func canDeleteStudent(
+        _ member: MembershipContext,
+        student: StudentAuthorizationScope
+    ) -> Bool {
+        // Student records remain institution-owned until the retention-safe
+        // archive/delete contract is implemented.
+        false
+    }
+
+    static func canReadPlan(
+        _ member: MembershipContext,
+        plan: PlanAuthorizationScope
+    ) -> Bool {
+        guard hasValidPlanBoundary(member, plan: plan) else {
+            return false
+        }
+
+        return plan.students.allSatisfy {
+            canReadStudentDetail(member, student: $0)
+        }
+    }
+
+    static func canWritePlan(
+        _ member: MembershipContext,
+        plan: PlanAuthorizationScope
+    ) -> Bool {
+        guard hasValidPlanBoundary(member, plan: plan) else {
+            return false
+        }
+
+        switch member.role {
+        case .teacher, .counselor:
+            return plan.students.allSatisfy {
+                isAssignedStudentInMemberSchool(member, student: $0)
+            }
+        case .socialWorker:
+            return member.capabilities.contains(.studentWriteDetail)
+                && plan.students.allSatisfy {
+                    isAssignedStudentInMemberSchool(member, student: $0)
+                }
+        case .schoolAdministrator, .districtAdministrator:
+            return plan.students.allSatisfy {
+                canWriteStudentDetail(member, student: $0)
+            }
+        }
+    }
+
+    static func canApprovePlan(
+        _ member: MembershipContext,
+        plan: PlanAuthorizationScope
+    ) -> Bool {
+        member.capabilities.contains(.planApprove)
+            && canReadPlan(member, plan: plan)
+    }
+
+    static func canDeletePlan(
+        _ member: MembershipContext,
+        plan: PlanAuthorizationScope
+    ) -> Bool {
+        false
+    }
+
+    static func canAssignForm(
+        _ member: MembershipContext,
+        assignment: FormAssignmentAuthorizationScope
+    ) -> Bool {
+        guard isWellFormed(member),
+              isWellFormedIdentifier(assignment.districtID),
+              member.districtID == assignment.districtID,
+              assignment.students.allSatisfy({
+                  $0.districtID == assignment.districtID && isWellFormed($0)
+              }) else {
+            return false
+        }
+
+        if let schoolID = assignment.schoolID {
+            guard isWellFormedIdentifier(schoolID),
+                  assignment.students.allSatisfy({ $0.schoolID == schoolID }) else {
+                return false
+            }
+        }
+
+        switch member.role {
+        case .teacher, .counselor, .socialWorker:
+            guard let schoolID = assignment.schoolID,
+                  member.schoolIDs.contains(schoolID) else {
+                return false
+            }
+            return assignment.students.allSatisfy {
+                isAssignedStudentInMemberSchool(member, student: $0)
+            }
+        case .schoolAdministrator:
+            guard let schoolID = assignment.schoolID,
+                  member.schoolIDs.contains(schoolID) else {
+                return false
+            }
+            return assignment.students.allSatisfy {
+                member.schoolIDs.contains($0.schoolID)
+            }
+        case .districtAdministrator:
+            return true
+        }
+    }
+
+    static func canDeleteAssignment(
+        _ member: MembershipContext,
+        assignment: FormAssignmentAuthorizationScope
+    ) -> Bool {
+        false
+    }
+
+    static func canReadTemplate(
+        _ member: MembershipContext,
+        template: TemplateAuthorizationScope
+    ) -> Bool {
+        hasValidTemplateBoundary(member, template: template)
+    }
+
+    static func canWriteTemplate(
+        _ member: MembershipContext,
+        template: TemplateAuthorizationScope
+    ) -> Bool {
+        guard hasValidTemplateBoundary(member, template: template) else {
+            return false
+        }
+
+        switch member.role {
+        case .teacher, .counselor, .socialWorker, .schoolAdministrator:
+            guard let schoolID = template.schoolID else {
+                return false
+            }
+            return member.schoolIDs.contains(schoolID)
+        case .districtAdministrator:
+            return true
+        }
+    }
+
+    static func canManageStaff(_ member: MembershipContext) -> Bool {
+        isWellFormed(member) && member.capabilities.contains(.staffManage)
+    }
+
+    static func canExportReports(_ member: MembershipContext) -> Bool {
+        isWellFormed(member) && member.capabilities.contains(.reportExport)
+    }
+
+    static func canReadAudit(_ member: MembershipContext) -> Bool {
+        isWellFormed(member) && member.capabilities.contains(.auditRead)
+    }
+
     private static func hasValidStudentBoundary(
         _ member: MembershipContext,
         student: StudentAuthorizationScope
@@ -107,6 +318,42 @@ enum AuthorizationPolicy {
         isWellFormed(member)
             && isWellFormed(student)
             && member.districtID == student.districtID
+    }
+
+    private static func hasValidPlanBoundary(
+        _ member: MembershipContext,
+        plan: PlanAuthorizationScope
+    ) -> Bool {
+        isWellFormed(member)
+            && isWellFormedIdentifier(plan.planID)
+            && isWellFormedIdentifier(plan.districtID)
+            && member.districtID == plan.districtID
+            && !plan.students.isEmpty
+            && plan.students.allSatisfy {
+                isWellFormed($0) && $0.districtID == plan.districtID
+            }
+    }
+
+    private static func hasValidTemplateBoundary(
+        _ member: MembershipContext,
+        template: TemplateAuthorizationScope
+    ) -> Bool {
+        guard isWellFormed(member),
+              isWellFormedIdentifier(template.districtID),
+              member.districtID == template.districtID else {
+            return false
+        }
+
+        guard let schoolID = template.schoolID else {
+            return true
+        }
+
+        guard isWellFormedIdentifier(schoolID) else {
+            return false
+        }
+
+        return member.role == .districtAdministrator
+            || member.schoolIDs.contains(schoolID)
     }
 
     private static func isAssignedStudentInMemberSchool(

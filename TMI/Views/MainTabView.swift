@@ -39,11 +39,11 @@ struct MainTabView: View {
         case dashboard, students, tmiPlans, district
         var id: Self { self }
 
-        static func mvpTabs(for role: UserRole?) -> [Tab] {
+        static func mvpTabs(for role: StaffRole?) -> [Tab] {
             switch role {
-            case .districtAdmin:
+            case .districtAdministrator:
                 return [.dashboard, .students, .tmiPlans, .district]
-            case .teacher, .counselor, .administrator, .admin, .socialWorker:
+            case .teacher, .counselor, .schoolAdministrator, .socialWorker:
                 return [.dashboard, .students, .tmiPlans]
             default:
                 return [.dashboard]
@@ -71,7 +71,7 @@ struct MainTabView: View {
     
     // Computed property to get tabs for the current MVP role
     var availableTabs: [Tab] {
-        Tab.mvpTabs(for: authStateModel.currentUser?.role)
+        Tab.mvpTabs(for: authStateModel.currentMembership?.role)
     }
     
     // Default tab - use first available or dashboard

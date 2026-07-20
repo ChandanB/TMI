@@ -2,209 +2,254 @@
 //  PlanTemplateService.swift
 //  TMI
 //
-//  Service for managing TMI Plan templates with comprehensive CRUD operations
-//  Phase 2.3: Plan Templates & Activities
+//  Service for managing trusted tenant plan templates.
 //
 
 import Foundation
-@preconcurrency import FirebaseFirestore
 @preconcurrency import FirebaseAuth
+@preconcurrency import FirebaseFirestore
 
 actor PlanTemplateService {
     static let shared = PlanTemplateService()
 
     private let db = Firestore.firestore()
+    private let authorizationSessions: any AuthorizationSessionProviding
+    private let authorization = RBACService()
 
-    private init() {}
+    init(
+        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared
+    ) {
+        self.authorizationSessions = authorizationSessions
+    }
 
-    // MARK: - Convenience Fetch
+    // MARK: - Fetch Operations
 
     func fetchTemplates(districtId: String?) async throws -> [PlanTemplate] {
-        if let districtId {
-            return try await fetchDistrictTemplates(districtId: districtId)
+        guard let districtId else {
+            return try await fetchPublicTemplates()
         }
-        return try await fetchAllTemplates()
+        return try await fetchDistrictTemplates(districtId: districtId)
     }
-    
-    // MARK: - Template CRUD Operations
 
-    /// Create a new plan template
-    func createTemplate(_ template: PlanTemplate) async throws -> PlanTemplate {
-        guard Auth.auth().currentUser?.uid != nil else {
-            throw PlanTemplateError.userNotAuthenticated
+    func fetchTemplate(id: String) async throws -> PlanTemplate? {
+        let snapshot = try await templateDocument(id: id).getDocument()
+        guard snapshot.exists else { return nil }
+
+        let template = try snapshot.data(as: PlanTemplate.self)
+        if template.isPublic {
+            return template
         }
 
-        var newTemplate = template
-        newTemplate.id = newTemplate.id ?? UUID().uuidString
+        let session = try authorizedSession()
+        guard canRead(template, member: session.membership) else {
+            throw PlanTemplateError.authorizationDenied
+        }
+        return template
+    }
 
-        // Save to Firestore
-        let docRef = db.collection(FirestorePaths.planTemplates).document(newTemplate.id!)
-        try await docRef.setData(from: newTemplate)
+    func fetchAllTemplates(includeInactive: Bool = false) async throws -> [PlanTemplate] {
+        _ = includeInactive
+        let session = try authorizedSession()
+        let snapshot = try await templatesCollection.order(by: "title").getDocuments()
+        return try snapshot.documents.compactMap { document in
+            let template = try document.data(as: PlanTemplate.self)
+            return template.isPublic || canRead(template, member: session.membership)
+                ? template
+                : nil
+        }
+    }
 
-        print("[PlanTemplateService] ✅ Created template: \(newTemplate.title)")
+    func fetchTemplates(for model: TMIPlanModel) async throws -> [PlanTemplate] {
+        let session = try authorizedSession()
+        let snapshot = try await templatesCollection
+            .whereField("model", isEqualTo: model.rawValue)
+            .order(by: "usageCount", descending: true)
+            .getDocuments()
+
+        return try snapshot.documents.compactMap { document in
+            let template = try document.data(as: PlanTemplate.self)
+            return template.isPublic || canRead(template, member: session.membership)
+                ? template
+                : nil
+        }
+    }
+
+    func fetchDistrictTemplates(districtId: String) async throws -> [PlanTemplate] {
+        let session = try authorizedSession()
+        guard districtId == session.membership.districtID else {
+            throw PlanTemplateError.authorizationDenied
+        }
+        let scope = TemplateAuthorizationScope(
+            districtID: session.membership.districtID,
+            schoolID: nil
+        )
+        guard authorization.canReadTemplate(
+            member: session.membership,
+            template: scope
+        ) else {
+            throw PlanTemplateError.authorizationDenied
+        }
+
+        let snapshot = try await templatesCollection
+            .whereField("districtId", isEqualTo: session.membership.districtID)
+            .order(by: "title")
+            .getDocuments()
+        return try snapshot.documents.map {
+            try $0.data(as: PlanTemplate.self)
+        }
+    }
+
+    func fetchPublicTemplates() async throws -> [PlanTemplate] {
+        let snapshot = try await templatesCollection
+            .whereField("isPublic", isEqualTo: true)
+            .order(by: "usageCount", descending: true)
+            .getDocuments()
+        return try snapshot.documents.map {
+            try $0.data(as: PlanTemplate.self)
+        }
+    }
+
+    func fetchTemplates(tier: Int, districtId: String? = nil) async throws -> [PlanTemplate] {
+        _ = tier
+        return try await fetchTemplates(districtId: districtId)
+    }
+
+    func fetchTemplates(
+        category: PlanTemplate.Category,
+        districtId: String? = nil
+    ) async throws -> [PlanTemplate] {
+        try await fetchTemplates(districtId: districtId).filter {
+            $0.category == category
+        }
+    }
+
+    // MARK: - Mutations
+
+    func createTemplate(_ template: PlanTemplate) async throws -> PlanTemplate {
+        let session = try authorizedSession()
+        let scope = TemplateAuthorizationScope(
+            districtID: session.membership.districtID,
+            schoolID: nil
+        )
+        guard authorization.canWriteTemplate(
+            member: session.membership,
+            template: scope
+        ) else {
+            throw PlanTemplateError.authorizationDenied
+        }
+
+        let newTemplate = normalizedTemplate(
+            template,
+            id: template.id ?? UUID().uuidString,
+            districtID: session.membership.districtID,
+            createdBy: session.membership.userID,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        guard let id = newTemplate.id else {
+            throw PlanTemplateError.invalidTemplateId
+        }
+        try await templateDocument(id: id).setData(from: newTemplate)
         return newTemplate
     }
 
-    /// Fetch a specific template by ID
-    func fetchTemplate(id: String) async throws -> PlanTemplate? {
-        let docRef = db.collection(FirestorePaths.planTemplates).document(id)
-        let snapshot = try await docRef.getDocument()
-
-        guard snapshot.exists else { return nil }
-
-        return try snapshot.data(as: PlanTemplate.self)
-    }
-
-    /// Fetch all active templates
-    func fetchAllTemplates(includeInactive: Bool = false) async throws -> [PlanTemplate] {
-        var query = db.collection(FirestorePaths.planTemplates).order(by: "title")
-
-        let snapshot = try await query.getDocuments()
-
-        return try snapshot.documents.compactMap { doc in
-            try doc.data(as: PlanTemplate.self)
-        }
-    }
-
-    /// Fetch templates by TMI model
-    func fetchTemplates(for model: TMIPlanModel) async throws -> [PlanTemplate] {
-        let query = db.collection(FirestorePaths.planTemplates)
-            .whereField("model", isEqualTo: model.rawValue)
-            .order(by: "usageCount", descending: true)
-
-        let snapshot = try await query.getDocuments()
-
-        return try snapshot.documents.compactMap { doc in
-            try doc.data(as: PlanTemplate.self)
-        }
-    }
-
-    /// Fetch templates by district
-    func fetchDistrictTemplates(districtId: String) async throws -> [PlanTemplate] {
-        let query = db.collection(FirestorePaths.planTemplates)
-            .whereField("districtId", isEqualTo: districtId)
-            .order(by: "title")
-
-        let snapshot = try await query.getDocuments()
-
-        return try snapshot.documents.compactMap { doc in
-            try doc.data(as: PlanTemplate.self)
-        }
-    }
-
-    /// Fetch public templates (available to all districts)
-    func fetchPublicTemplates() async throws -> [PlanTemplate] {
-        let query = db.collection(FirestorePaths.planTemplates)
-            .whereField("isPublic", isEqualTo: true)
-            .order(by: "usageCount", descending: true)
-
-        let snapshot = try await query.getDocuments()
-
-        return try snapshot.documents.compactMap { doc in
-            try doc.data(as: PlanTemplate.self)
-        }
-    }
-
-    /// Fetch templates by MTSS tier
-    func fetchTemplates(tier: Int, districtId: String? = nil) async throws -> [PlanTemplate] {
-        // Tier is not represented in the current PlanTemplate model.
-        // Return all templates for now and let the caller filter by category/strategy.
-        if let districtId {
-            return try await fetchDistrictTemplates(districtId: districtId)
-        }
-        return try await fetchAllTemplates()
-    }
-
-    /// Fetch templates by category
-    func fetchTemplates(category: PlanTemplate.Category, districtId: String? = nil) async throws -> [PlanTemplate] {
-        let allTemplates = districtId != nil
-            ? try await fetchDistrictTemplates(districtId: districtId!)
-            : try await fetchAllTemplates()
-
-        return allTemplates.filter { $0.category == category }
-    }
-    
-    /// Update an existing template
     func updateTemplate(_ template: PlanTemplate) async throws {
-        guard let templateId = template.id else {
-            throw PlanTemplateError.invalidTemplateId
+        guard let templateID = template.id,
+              let stored = try await fetchTemplate(id: templateID) else {
+            throw PlanTemplateError.templateNotFound
         }
 
-        let docRef = db.collection(FirestorePaths.planTemplates).document(templateId)
-        try await docRef.setData(from: template, merge: true)
-
-        print("[PlanTemplateService] ✅ Updated template: \(template.title)")
+        let session = try authorizedSession()
+        try requireWrite(stored, member: session.membership)
+        let updated = normalizedTemplate(
+            template,
+            id: templateID,
+            districtID: stored.districtId ?? session.membership.districtID,
+            createdBy: stored.createdBy,
+            createdAt: stored.createdAt,
+            updatedAt: Date()
+        )
+        try await templateDocument(id: templateID).setData(from: updated, merge: false)
     }
 
-    /// Archive a template (soft delete)
     func archiveTemplate(id: String) async throws {
-        let docRef = db.collection(FirestorePaths.planTemplates).document(id)
-
-        try await docRef.updateData([
+        guard let stored = try await fetchTemplate(id: id) else {
+            throw PlanTemplateError.templateNotFound
+        }
+        let session = try authorizedSession()
+        try requireWrite(stored, member: session.membership)
+        try await templateDocument(id: id).updateData([
             "isArchived": true,
             "archivedAt": FieldValue.serverTimestamp()
         ])
-
-        print("[PlanTemplateService] 🗄️ Archived template: \(id)")
     }
 
-    /// Delete a template (hard delete - use with caution)
     func deleteTemplate(id: String) async throws {
-        let docRef = db.collection(FirestorePaths.planTemplates).document(id)
-
-        try await docRef.delete()
-
-        print("[PlanTemplateService] 🗑️ Deleted template: \(id)")
+        guard let stored = try await fetchTemplate(id: id) else {
+            throw PlanTemplateError.templateNotFound
+        }
+        let session = try authorizedSession()
+        try requireWrite(stored, member: session.membership)
+        throw PlanTemplateError.deletionRequiresRetentionWorkflow
     }
 
-    // MARK: - Template Usage Tracking
-
-    /// Increment usage count when a template is used to create a plan
+    /// Catalog usage metrics are server-owned and cannot be incremented directly.
     func trackTemplateUsage(id: String) async throws {
-        let docRef = db.collection(FirestorePaths.planTemplates).document(id)
-
-        try await docRef.updateData([
-            "usageCount": FieldValue.increment(Int64(1)),
-            "lastUsedAt": FieldValue.serverTimestamp()
-        ])
+        guard try await fetchTemplate(id: id) != nil else {
+            throw PlanTemplateError.templateNotFound
+        }
+        throw PlanTemplateError.serverOwnedOperation
     }
-    
-    // MARK: - Plan Creation from Template
 
-    /// Create a TMI plan from a template with scheduled activities
+    // MARK: - Plan Creation
+
     func createPlanFromTemplate(
         templateId: String,
         student: Student,
         startDate: Date,
         customizations: [String: Any]? = nil
     ) async throws -> (plan: TMIPlan, activities: [InterventionActivity]) {
-        guard let template = try await fetchTemplate(id: templateId) else {
+        _ = customizations
+        guard let template = try await fetchTemplate(id: templateId),
+              let studentID = student.id else {
             throw PlanTemplateError.templateNotFound
         }
 
-        // Calculate end date
-        let calendar = Calendar.current
-        let endDate = calendar.date(byAdding: .day, value: template.suggestedDurationWeeks * 7, to: startDate) ?? startDate
-
-        // No activity templates in current PlanTemplate model
-        let scheduledActivities: [InterventionActivity] = []
-
-        // Generate goals from template
-        let goals: [Goal] = template.goalsTemplate.map { goalTemplate in
-            Goal(
-                description: goalTemplate.title,
-                notes: goalTemplate.description
-            )
+        let session = try authorizedSession()
+        let studentService = StudentService(
+            authorizationSessions: authorizationSessions
+        )
+        guard let canonicalStudent = try await studentService.getStudent(by: studentID),
+              let studentScope = StudentAuthorizationScope(student: canonicalStudent) else {
+            throw PlanTemplateError.studentNotFound
         }
 
-        let createdBy = Auth.auth().currentUser?.uid ?? "system"
+        let planID = UUID().uuidString
+        let planScope = PlanAuthorizationScope(
+            planID: planID,
+            districtID: session.membership.districtID,
+            students: [studentScope]
+        )
+        guard authorization.canWritePlan(
+            member: session.membership,
+            plan: planScope
+        ) else {
+            throw PlanTemplateError.authorizationDenied
+        }
 
-        // Create TMI plan
+        let endDate = Calendar.current.date(
+            byAdding: .day,
+            value: template.suggestedDurationWeeks * 7,
+            to: startDate
+        ) ?? startDate
+        let goals = template.goalsTemplate.map {
+            Goal(description: $0.title, notes: $0.description)
+        }
         let plan = TMIPlan(
-            id: UUID().uuidString,
-            title: "\(template.title) - \(student.name)",
+            id: planID,
+            title: "\(template.title) - \(canonicalStudent.name)",
             description: template.description,
-            students: [student],
+            students: [canonicalStudent],
             model: template.model,
             interests: [],
             startDate: startDate,
@@ -212,61 +257,127 @@ actor PlanTemplateService {
             creationDate: Date(),
             lastUpdated: Date(),
             goals: goals,
-            progress: 0.0,
+            progress: 0,
             notes: template.description,
             strategies: template.strategiesTemplate,
-            createdBy: createdBy
+            createdBy: session.membership.userID,
+            districtId: session.membership.districtID
         )
-
-        // Track template usage
-        try await trackTemplateUsage(id: templateId)
-
-        return (plan, scheduledActivities)
+        return (plan, [])
     }
 
     // MARK: - Search and Filter
 
-    /// Search templates by keyword
-    func searchTemplates(query: String, districtId: String? = nil) async throws -> [PlanTemplate] {
-        // Note: Firestore doesn't support full-text search natively
-        // For production, consider using Algolia or similar service
-        let allTemplates = districtId != nil
-            ? try await fetchDistrictTemplates(districtId: districtId!)
-            : try await fetchAllTemplates()
-
-        let lowercasedQuery = query.lowercased()
-
-        return allTemplates.filter { template in
-            template.title.lowercased().contains(lowercasedQuery) ||
-            template.description.lowercased().contains(lowercasedQuery) ||
-            template.category.rawValue.lowercased().contains(lowercasedQuery) ||
-            template.strategiesTemplate.contains { $0.lowercased().contains(lowercasedQuery) }
+    func searchTemplates(
+        query: String,
+        districtId: String? = nil
+    ) async throws -> [PlanTemplate] {
+        let templates = try await fetchTemplates(districtId: districtId)
+        let normalizedQuery = query.lowercased()
+        return templates.filter {
+            $0.title.lowercased().contains(normalizedQuery)
+                || $0.description.lowercased().contains(normalizedQuery)
+                || $0.category.rawValue.lowercased().contains(normalizedQuery)
+                || $0.strategiesTemplate.contains {
+                    $0.lowercased().contains(normalizedQuery)
+                }
         }
     }
 
-    /// Get templates matching specific targeted interventions
     func fetchTemplates(targeting interventions: [String]) async throws -> [PlanTemplate] {
-        // Firestore array-contains limitation: can only query one array element at a time
-        // For production, consider denormalization or composite queries
-        let allTemplates = try await fetchAllTemplates()
-
-        return allTemplates.filter { template in
-            !Set(template.strategiesTemplate).intersection(Set(interventions)).isEmpty
+        let templates = try await fetchAllTemplates()
+        return templates.filter {
+            !Set($0.strategiesTemplate).intersection(Set(interventions)).isEmpty
         }
+    }
+
+    // MARK: - Authorization Helpers
+
+    private var templatesCollection: CollectionReference {
+        db.collection(FirestorePaths.planTemplates)
+    }
+
+    private func templateDocument(id: String) -> DocumentReference {
+        templatesCollection.document(id)
+    }
+
+    private func authorizedSession() throws -> AuthenticatedSession {
+        guard let session = authorizationSessions.session(
+            authenticatedUserID: Auth.auth().currentUser?.uid
+        ) else {
+            throw PlanTemplateError.userNotAuthenticated
+        }
+        return session
+    }
+
+    private func canRead(
+        _ template: PlanTemplate,
+        member: MembershipContext
+    ) -> Bool {
+        guard template.districtId == member.districtID else {
+            return false
+        }
+        return authorization.canReadTemplate(
+            member: member,
+            template: TemplateAuthorizationScope(
+                districtID: member.districtID,
+                schoolID: nil
+            )
+        )
+    }
+
+    private func requireWrite(
+        _ template: PlanTemplate,
+        member: MembershipContext
+    ) throws {
+        guard template.districtId == member.districtID,
+              authorization.canWriteTemplate(
+                member: member,
+                template: TemplateAuthorizationScope(
+                    districtID: member.districtID,
+                    schoolID: nil
+                )
+              ) else {
+            throw PlanTemplateError.authorizationDenied
+        }
+    }
+
+    private func normalizedTemplate(
+        _ template: PlanTemplate,
+        id: String,
+        districtID: String,
+        createdBy: String,
+        createdAt: Date,
+        updatedAt: Date
+    ) -> PlanTemplate {
+        PlanTemplate(
+            id: id,
+            title: template.title,
+            description: template.description,
+            model: template.model,
+            category: template.category,
+            goalsTemplate: template.goalsTemplate,
+            strategiesTemplate: template.strategiesTemplate,
+            suggestedDurationWeeks: template.suggestedDurationWeeks,
+            targetGradeLevels: template.targetGradeLevels,
+            isPublic: template.isPublic,
+            createdBy: createdBy,
+            districtId: districtID,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            usageCount: template.usageCount,
+            rating: template.rating
+        )
     }
 }
-
-// MARK: - Extension for FirestorePaths
 
 extension FirestorePaths {
     static let planTemplates = "planTemplates"
 
     static func planTemplate(templateId: String) -> String {
-        return "planTemplates/\(templateId)"
+        "planTemplates/\(templateId)"
     }
 }
-
-// MARK: - Errors
 
 enum PlanTemplateError: LocalizedError {
     case userNotAuthenticated
@@ -274,19 +385,28 @@ enum PlanTemplateError: LocalizedError {
     case templateNotFound
     case studentNotFound
     case invalidCustomizations
+    case authorizationDenied
+    case deletionRequiresRetentionWorkflow
+    case serverOwnedOperation
 
     var errorDescription: String? {
         switch self {
         case .userNotAuthenticated:
-            return "User is not authenticated"
+            "User is not authenticated"
         case .invalidTemplateId:
-            return "Invalid template ID"
+            "Invalid template ID"
         case .templateNotFound:
-            return "Plan template not found"
+            "Plan template not found"
         case .studentNotFound:
-            return "Student not found"
+            "Student not found"
         case .invalidCustomizations:
-            return "Invalid customization parameters"
+            "Invalid customization parameters"
+        case .authorizationDenied:
+            "You don’t have access to this plan template"
+        case .deletionRequiresRetentionWorkflow:
+            "Plan templates must be archived through the retention workflow"
+        case .serverOwnedOperation:
+            "This catalog operation is managed by the server"
         }
     }
 }

@@ -13,8 +13,13 @@ import FirebaseAuth
 final class AuditLogService {
     static let shared = AuditLogService()
     private let db = Firestore.firestore()
+    private let authorizationSessions: any AuthorizationSessionProviding
 
-    private init() {}
+    init(
+        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared
+    ) {
+        self.authorizationSessions = authorizationSessions
+    }
 
     // MARK: - Logging Operations
 
@@ -25,43 +30,28 @@ final class AuditLogService {
         entityId: String,
         metadata: [String: String]? = nil
     ) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            print("[AuditLogService] ⚠️ Cannot log: User not authenticated")
-            return
-        }
-
-        // Fetch user info for context
-        let userDoc = try? await db.collection("users").document(userId).getDocument()
-        let userData = userDoc?.data()
-        let userName = userData?["name"] as? String
-        let userRole = userData?["role"] as? String
-        let districtId = userData?["districtId"] as? String
+        let session = try authorizedSession()
 
         // Create audit log entry
         let auditLog = AuditLog(
             action: action,
             entityType: entityType,
             entityId: entityId,
-            userId: userId,
-            userName: userName,
-            userRole: userRole,
-            districtId: districtId,
+            userId: session.membership.userID,
+            userName: session.profile.displayName,
+            userRole: session.membership.role.rawValue,
+            districtId: session.membership.districtID,
             timestamp: Date(),
             ipAddress: nil, // Could be added via server-side function
             metadata: metadata
         )
 
-        // Store in district-scoped collection if district exists
-        if let districtId = districtId {
-            try await db.collection("districts")
-                .document(districtId)
-                .collection("auditLogs")
-                .addDocument(data: auditLog.toFirestoreData())
+        try await db.collection("districts")
+            .document(session.membership.districtID)
+            .collection("auditLogs")
+            .addDocument(data: auditLog.toFirestoreData())
 
-            print("[AuditLogService] ✅ Logged: \(action.displayName) for \(entityType.displayName)")
-        } else {
-            print("[AuditLogService] ⚠️ No district ID: Audit log not stored")
-        }
+        print("[AuditLogService] ✅ Logged: \(action.displayName) for \(entityType.displayName)")
     }
 
     /// Log an audit event with custom user context (for admin operations)
@@ -75,23 +65,20 @@ final class AuditLogService {
         districtId: String,
         metadata: [String: String]? = nil
     ) async throws {
-        let auditLog = AuditLog(
+        let session = try authorizedSession()
+        guard userId == session.membership.userID,
+              districtId == session.membership.districtID,
+              userRole == nil || userRole == session.membership.role.rawValue,
+              userName == nil || userName == session.profile.displayName else {
+            throw AuditLogServiceError.authorizationDenied
+        }
+
+        try await log(
             action: action,
             entityType: entityType,
             entityId: entityId,
-            userId: userId,
-            userName: userName,
-            userRole: userRole,
-            districtId: districtId,
             metadata: metadata
         )
-
-        try await db.collection("districts")
-            .document(districtId)
-            .collection("auditLogs")
-            .addDocument(data: auditLog.toFirestoreData())
-
-        print("[AuditLogService] ✅ Logged with context: \(action.displayName)")
     }
 
     // MARK: - Fetch Operations
@@ -106,6 +93,8 @@ final class AuditLogService {
         startDate: Date? = nil,
         endDate: Date? = nil
     ) async throws -> [AuditLog] {
+        _ = try requireAuditReader(districtID: districtId)
+
         var query: Query = db.collection("districts")
             .document(districtId)
             .collection("auditLogs")
@@ -145,6 +134,8 @@ final class AuditLogService {
 
     /// Fetch audit logs for a specific entity
     func fetchLogs(for entityId: String, districtId: String) async throws -> [AuditLog] {
+        _ = try requireAuditReader(districtID: districtId)
+
         let snapshot = try await db.collection("districts")
             .document(districtId)
             .collection("auditLogs")
@@ -224,6 +215,13 @@ final class AuditLogService {
 
     /// Delete audit logs older than retention policy
     func applyRetentionPolicy(districtId: String, retentionDays: Int) async throws -> Int {
+        let session = try requireAuditReader(districtID: districtId)
+        guard session.membership.role == .districtAdministrator,
+              session.membership.capabilities.contains(.staffManage),
+              retentionDays > 0 else {
+            throw AuditLogServiceError.authorizationDenied
+        }
+
         let cutoffDate = Date().addingTimeInterval(-Double(retentionDays * 86400))
 
         let snapshot = try await db.collection("districts")
@@ -249,7 +247,15 @@ final class AuditLogService {
     // MARK: - Export
 
     /// Export audit logs to CSV format
-    func exportToCSV(logs: [AuditLog]) -> String {
+    func exportToCSV(logs: [AuditLog]) throws -> String {
+        let session = try requireAuditReader(
+            districtID: try authorizedSession().membership.districtID
+        )
+        guard session.membership.capabilities.contains(.reportExport),
+              logs.allSatisfy({ $0.districtId == session.membership.districtID }) else {
+            throw AuditLogServiceError.authorizationDenied
+        }
+
         var csv = "Timestamp,Action,Entity Type,Entity ID,User,Role,Severity\n"
 
         for log in logs {
@@ -265,6 +271,40 @@ final class AuditLogService {
         }
 
         return csv
+    }
+
+    private func authorizedSession() throws -> AuthenticatedSession {
+        guard let session = authorizationSessions.session(
+            authenticatedUserID: Auth.auth().currentUser?.uid
+        ) else {
+            throw AuditLogServiceError.userNotAuthenticated
+        }
+        return session
+    }
+
+    private func requireAuditReader(
+        districtID: String
+    ) throws -> AuthenticatedSession {
+        let session = try authorizedSession()
+        guard session.membership.districtID == districtID,
+              AuthorizationPolicy.canReadAudit(session.membership) else {
+            throw AuditLogServiceError.authorizationDenied
+        }
+        return session
+    }
+}
+
+enum AuditLogServiceError: LocalizedError {
+    case userNotAuthenticated
+    case authorizationDenied
+
+    var errorDescription: String? {
+        switch self {
+        case .userNotAuthenticated:
+            "User is not authenticated"
+        case .authorizationDenied:
+            "You don’t have access to district audit records"
+        }
     }
 }
 
