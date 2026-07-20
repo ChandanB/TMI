@@ -135,5 +135,12 @@ enum AuthorizationPolicy {
     private static func isWellFormedIdentifier(_ value: String) -> Bool {
         !value.isEmpty
             && value == value.trimmingCharacters(in: .whitespacesAndNewlines)
+            && value.utf8.count <= 1_500
+            && !value.contains("/")
+            && value != "."
+            && value != ".."
+            && value.unicodeScalars.allSatisfy {
+                !CharacterSet.controlCharacters.contains($0)
+            }
     }
 }

@@ -131,6 +131,159 @@ struct AuthorizationPolicyTests {
         #expect(!AuthorizationPolicy.canViewAggregate(validMember, districtID: "district-a", schoolID: " "))
     }
 
+    @Test("Every membership identifier field rejects unsafe opaque identifiers")
+    func membershipIdentifierFieldsRejectUnsafeValues() {
+        for invalidIdentifier in Self.unsafeOpaqueIdentifiers {
+            let invalidUser = membership(
+                userID: invalidIdentifier,
+                role: .districtAdministrator,
+                capabilities: Self.allCapabilities
+            )
+            expectEveryStudentPredicateDenied(invalidUser, student: scope())
+            expectEveryAggregatePredicateDenied(invalidUser, districtID: "district-a")
+
+            let invalidDistrict = membership(
+                districtID: invalidIdentifier,
+                role: .districtAdministrator,
+                capabilities: Self.allCapabilities
+            )
+            expectEveryStudentPredicateDenied(
+                invalidDistrict,
+                student: scope(districtID: invalidIdentifier)
+            )
+            expectEveryAggregatePredicateDenied(invalidDistrict, districtID: invalidIdentifier)
+
+            let invalidSchoolSet = membership(
+                schoolIDs: [invalidIdentifier],
+                role: .districtAdministrator,
+                capabilities: Self.allCapabilities
+            )
+            expectEveryStudentPredicateDenied(invalidSchoolSet, student: scope())
+            expectEveryAggregatePredicateDenied(invalidSchoolSet, districtID: "district-a")
+
+            let invalidAssignmentSet = membership(
+                role: .districtAdministrator,
+                capabilities: Self.allCapabilities,
+                assignedStudentIDs: [invalidIdentifier]
+            )
+            expectEveryStudentPredicateDenied(invalidAssignmentSet, student: scope())
+            expectEveryAggregatePredicateDenied(invalidAssignmentSet, districtID: "district-a")
+        }
+    }
+
+    @Test("Every student scope identifier field rejects unsafe opaque identifiers")
+    func studentScopeIdentifierFieldsRejectUnsafeValues() {
+        let validMember = membership(
+            role: .districtAdministrator,
+            capabilities: Self.allCapabilities
+        )
+
+        for invalidIdentifier in Self.unsafeOpaqueIdentifiers {
+            expectEveryStudentPredicateDenied(
+                validMember,
+                student: scope(studentID: invalidIdentifier)
+            )
+
+            let matchingInvalidDistrictMember = membership(
+                districtID: invalidIdentifier,
+                role: .districtAdministrator,
+                capabilities: Self.allCapabilities
+            )
+            expectEveryStudentPredicateDenied(
+                matchingInvalidDistrictMember,
+                student: scope(districtID: invalidIdentifier)
+            )
+
+            expectEveryStudentPredicateDenied(
+                validMember,
+                student: scope(schoolID: invalidIdentifier)
+            )
+        }
+    }
+
+    @Test("Aggregate district and school identifiers reject unsafe opaque identifiers")
+    func aggregateIdentifierFieldsRejectUnsafeValues() {
+        let validMember = membership(
+            schoolIDs: [],
+            role: .districtAdministrator,
+            capabilities: Self.allCapabilities
+        )
+
+        for invalidIdentifier in Self.unsafeOpaqueIdentifiers {
+            let matchingInvalidDistrictMember = membership(
+                districtID: invalidIdentifier,
+                schoolIDs: [],
+                role: .districtAdministrator,
+                capabilities: Self.allCapabilities
+            )
+
+            #expect(
+                !AuthorizationPolicy.canViewAggregate(
+                    matchingInvalidDistrictMember,
+                    districtID: invalidIdentifier
+                )
+            )
+            #expect(
+                !AuthorizationPolicy.canViewAggregate(
+                    matchingInvalidDistrictMember,
+                    districtID: invalidIdentifier,
+                    schoolID: "school-a"
+                )
+            )
+            #expect(
+                !AuthorizationPolicy.canViewAggregate(
+                    validMember,
+                    districtID: "district-a",
+                    schoolID: invalidIdentifier
+                )
+            )
+        }
+    }
+
+    @Test("Negative membership versions fail closed")
+    func negativeMembershipVersionFailsClosed() {
+        let member = membership(
+            role: .districtAdministrator,
+            capabilities: Self.allCapabilities,
+            version: -1
+        )
+
+        expectEveryStudentPredicateDenied(member, student: scope())
+        expectEveryAggregatePredicateDenied(member, districtID: "district-a")
+    }
+
+    @Test("Opaque identifiers allow exactly 1500 UTF-8 bytes")
+    func maximumOpaqueIdentifierLengthIsAllowed() {
+        let maximumLengthIdentifier = String(repeating: "é", count: 750)
+        let member = membership(
+            userID: maximumLengthIdentifier,
+            districtID: maximumLengthIdentifier,
+            schoolIDs: [maximumLengthIdentifier],
+            role: .districtAdministrator,
+            capabilities: Self.allCapabilities,
+            assignedStudentIDs: [maximumLengthIdentifier]
+        )
+        let student = scope(
+            studentID: maximumLengthIdentifier,
+            districtID: maximumLengthIdentifier,
+            schoolID: maximumLengthIdentifier
+        )
+
+        #expect(maximumLengthIdentifier.utf8.count == 1_500)
+        #expect(AuthorizationPolicy.canReadStudentDetail(member, student: student))
+        #expect(AuthorizationPolicy.canWriteStudentDetail(member, student: student))
+        #expect(AuthorizationPolicy.canReadRestrictedRecord(member, student: student))
+        #expect(AuthorizationPolicy.canWriteRestrictedRecord(member, student: student))
+        #expect(AuthorizationPolicy.canViewAggregate(member, districtID: maximumLengthIdentifier))
+        #expect(
+            AuthorizationPolicy.canViewAggregate(
+                member,
+                districtID: maximumLengthIdentifier,
+                schoolID: maximumLengthIdentifier
+            )
+        )
+    }
+
     @Test("Cross-district and wrong-school targets are denied even with every capability")
     func tenantAndSchoolBoundariesFailClosed() {
         let districtAdministrator = membership(
@@ -329,6 +482,31 @@ struct AuthorizationPolicyTests {
         #expect(!AuthorizationPolicy.canWriteStudentDetail(member, student: student))
         #expect(!AuthorizationPolicy.canReadRestrictedRecord(member, student: student))
         #expect(!AuthorizationPolicy.canWriteRestrictedRecord(member, student: student))
+    }
+
+    private func expectEveryAggregatePredicateDenied(
+        _ member: MembershipContext,
+        districtID: String
+    ) {
+        #expect(!AuthorizationPolicy.canViewAggregate(member, districtID: districtID))
+        #expect(
+            !AuthorizationPolicy.canViewAggregate(
+                member,
+                districtID: districtID,
+                schoolID: "school-a"
+            )
+        )
+    }
+
+    private static var unsafeOpaqueIdentifiers: [String] {
+        [
+            "segment/segment",
+            ".",
+            "..",
+            "line\nbreak",
+            "null\u{0000}scalar",
+            String(repeating: "é", count: 751),
+        ]
     }
 
     private func membership(
