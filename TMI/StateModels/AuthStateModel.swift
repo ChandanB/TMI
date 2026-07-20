@@ -25,7 +25,7 @@ enum AuthenticationState: Equatable {
   case authenticating
   case verifying(VerificationType)
   case awaitingConsent(ConsentType)
-  case authenticated(TMIUser)
+  case authenticated(AuthenticatedSession)
   case error(AuthenticationError)
   case suspended(SuspensionReason)
 
@@ -41,8 +41,8 @@ enum AuthenticationState: Equatable {
       return type1 == type2
     case (.awaitingConsent(let consent1), .awaitingConsent(let consent2)):
       return consent1 == consent2
-    case (.authenticated(let user1), .authenticated(let user2)):
-      return user1.id == user2.id
+    case (.authenticated(let session1), .authenticated(let session2)):
+      return session1 == session2
     case (.error(let error1), .error(let error2)):
       return error1.id == error2.id
     case (.suspended(let reason1), .suspended(let reason2)):
@@ -374,6 +374,145 @@ enum SuspensionReason: String, CaseIterable, Equatable {
   }
 }
 
+// MARK: - Trusted Authentication Adapters
+
+struct AuthenticatedIdentity: Sendable, Equatable {
+  let userID: String
+  let isEmailVerified: Bool
+}
+
+final class AuthStateListenerHandle: @unchecked Sendable {
+  private let lock = NSLock()
+  private var removalOperation: (() -> Void)?
+
+  init(removalOperation: @escaping () -> Void) {
+    self.removalOperation = removalOperation
+  }
+
+  func remove() {
+    lock.lock()
+    let operation = removalOperation
+    removalOperation = nil
+    lock.unlock()
+    operation?()
+  }
+
+  deinit {
+    remove()
+  }
+}
+
+protocol AuthenticationIdentityProviding: AnyObject {
+  @MainActor
+  var currentIdentity: AuthenticatedIdentity? { get }
+
+  @MainActor
+  func trustedClaim(for identity: AuthenticatedIdentity) async throws -> TrustedTenantClaim
+
+  @MainActor
+  func addStateDidChangeListener(
+    _ listener: @escaping @MainActor (AuthenticatedIdentity?) -> Void
+  ) -> AuthStateListenerHandle
+}
+
+final class FirebaseAuthenticationIdentityProvider: AuthenticationIdentityProviding {
+  private let auth: Auth
+
+  init(auth: Auth = Auth.auth()) {
+    self.auth = auth
+  }
+
+  @MainActor
+  var currentIdentity: AuthenticatedIdentity? {
+    guard let user = auth.currentUser else {
+      return nil
+    }
+    return AuthenticatedIdentity(
+      userID: user.uid,
+      isEmailVerified: user.isEmailVerified
+    )
+  }
+
+  @MainActor
+  func trustedClaim(for identity: AuthenticatedIdentity) async throws -> TrustedTenantClaim {
+    guard let user = auth.currentUser, user.uid == identity.userID else {
+      throw TrustedTenantClaimError.malformed
+    }
+
+    let result = try await user.getIDTokenResult(forcingRefresh: true)
+    guard auth.currentUser?.uid == identity.userID else {
+      throw CancellationError()
+    }
+    return try TrustedTenantClaim(
+      userID: identity.userID,
+      tokenClaims: result.claims
+    )
+  }
+
+  @MainActor
+  func addStateDidChangeListener(
+    _ listener: @escaping @MainActor (AuthenticatedIdentity?) -> Void
+  ) -> AuthStateListenerHandle {
+    let handle = auth.addStateDidChangeListener { _, user in
+      let identity = user.map {
+        AuthenticatedIdentity(
+          userID: $0.uid,
+          isEmailVerified: $0.isEmailVerified
+        )
+      }
+      Task { @MainActor in
+        listener(identity)
+      }
+    }
+
+    return AuthStateListenerHandle { [auth] in
+      auth.removeStateDidChangeListener(handle)
+    }
+  }
+}
+
+protocol UserProfileProviding: Sendable {
+  func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser?
+}
+
+struct FirebaseUserProfileProvider: UserProfileProviding, @unchecked Sendable {
+  private let firestore: Firestore
+
+  init(firestore: Firestore) {
+    self.firestore = firestore
+  }
+
+  func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
+    let reference = firestore.collection("users").document(identity.userID)
+    let snapshot = try await reference.getDocument()
+    guard snapshot.exists else {
+      return nil
+    }
+
+    var profile = try snapshot.data(as: TMIUser.self)
+    guard profile.userID == identity.userID else {
+      throw UserProfileLoadingError.identityMismatch
+    }
+
+    let storedVerification = snapshot.data()?["isEmailVerified"] as? Bool ?? false
+    profile.isEmailVerified = identity.isEmailVerified
+    profile.verificationStatus.isEmailVerified = identity.isEmailVerified
+
+    if storedVerification != identity.isEmailVerified {
+      try? await reference.updateData([
+        "isEmailVerified": identity.isEmailVerified,
+        "verificationStatus.isEmailVerified": identity.isEmailVerified,
+      ])
+    }
+
+    return profile
+  }
+}
+
+private enum UserProfileLoadingError: Error {
+  case identityMismatch
+}
+
 // MARK: - Environment Key
 extension EnvironmentValues {
   @Entry var authStateModel: AuthStateModel = AuthStateModel()
@@ -388,8 +527,20 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   private let firebaseManager: FirebaseManager
   private let auditService: AuditService
   private let signOutOperation: @MainActor () throws -> Void
+  private let identityProvider: any AuthenticationIdentityProviding
+  private let profileProvider: any UserProfileProviding
+  private let membershipProvider: any MembershipProviding
+
+  @ObservationIgnored
+  private var authStateListenerHandle: AuthStateListenerHandle?
+  @ObservationIgnored
+  private var authorizationTask: Task<Void, Never>?
+  @ObservationIgnored
+  private var authorizationGeneration: UInt64 = 0
 
   // MARK: - Current User State
+  private(set) var authenticatedSession: AuthenticatedSession?
+  private var pendingAuthenticatedSession: AuthenticatedSession?
   private(set) var currentUser: TMIUser?
   private(set) var userRole: UserRole?
   private(set) var institutionContext: Institution?
@@ -517,76 +668,98 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     return nil
   }
 
+  var currentMembership: MembershipContext? {
+    authenticatedSession?.membership
+  }
+
+  var currentClaim: TrustedTenantClaim? {
+    authenticatedSession?.claim
+  }
+
   // MARK: - Initialization
   init(
     firebaseManager: FirebaseManager = FIREBASE_MANAGER,
     auditService: AuditService = AUDIT_SERVICE,
-    signOutOperation: (@MainActor () throws -> Void)? = nil
+    signOutOperation: (@MainActor () throws -> Void)? = nil,
+    identityProvider: (any AuthenticationIdentityProviding)? = nil,
+    profileProvider: (any UserProfileProviding)? = nil,
+    membershipProvider: (any MembershipProviding)? = nil,
+    automaticallyStart: Bool = true
   ) {
     self.firebaseManager = firebaseManager
     self.auditService = auditService
     self.signOutOperation = signOutOperation ?? {
       try firebaseManager.signOut()
     }
+    self.identityProvider = identityProvider ?? FirebaseAuthenticationIdentityProvider()
+    self.profileProvider = profileProvider ?? FirebaseUserProfileProvider(
+      firestore: firebaseManager.firestore
+    )
+    self.membershipProvider = membershipProvider ?? MembershipRepository(
+      store: FirebaseMembershipStore(firestore: firebaseManager.firestore)
+    )
     super.init()
 
-    Task { await fetch() }
+    if automaticallyStart {
+      Task { @MainActor [weak self] in
+        await self?.fetch()
+      }
+    }
   }
 
+  deinit {
+    authorizationTask?.cancel()
+    authStateListenerHandle?.remove()
+  }
+
+  @MainActor
   override func fetch() async {
-    await setupInitialState()
-    await setupAuthListener()
+    setupInitialState()
+    setupAuthListenerIfNeeded()
+
+    if let identity = identityProvider.currentIdentity {
+      let task = startAuthorization(for: identity)
+      await task.value
+    } else {
+      transitionToUnauthenticated(logLogout: false)
+    }
+
     await initializeDeviceInfo()
   }
 
   // MARK: - Setup Methods
 
   @MainActor
-  private func setupInitialState() async {
-    // Initialize UI state
+  private func setupInitialState() {
     ui.set("showingRegistration", value: false)
     ui.set("showingForgotPassword", value: false)
     ui.set("showingSupportResources", value: false)
     ui.set("focusedField", value: nil as AuthField?)
     ui.set("currentError", value: nil as AuthenticationError?)
-
-    // Initialize session
-    sessionID = UUID().uuidString
-
-    // Stay in loading state until Firebase auth check completes
+    sessionID = sessionID ?? UUID().uuidString
     updateState(.loading)
   }
 
   @MainActor
-  private func setupAuthListener() async {
-    // Resolve auth state synchronously before installing the listener so state
-    // never stays in .loading if the listener fires late or is delayed.
-    let currentFirebaseUser = Auth.auth().currentUser
-
-    if let firebaseUser = currentFirebaseUser {
-      await loadUserProfile(for: firebaseUser.uid)
-    } else {
-      updateState(.loaded(.unauthenticated))
+  private func setupAuthListenerIfNeeded() {
+    guard authStateListenerHandle == nil else {
+      return
     }
 
-    // The listener handles subsequent auth changes (sign in / sign out).
-    // addStateDidChangeListener also fires immediately, which would call
-    // loadUserProfile a second time for the same user — deduplicated inside
-    // loadUserProfile via an early-return guard.
-    let _ = Auth.auth().addStateDidChangeListener { [weak self] _, user in
-      guard let self = self else { return }
+    authStateListenerHandle = identityProvider.addStateDidChangeListener { [weak self] identity in
+      guard let self else {
+        return
+      }
 
-      Task { @MainActor in
-        if let user = user {
-          await self.loadUserProfile(for: user.uid)
-        } else {
-          self.updateState(.loaded(.unauthenticated))
-          await self.logAuditEvent(.logout, result: .success)
-        }
+      if let identity {
+        self.startAuthorization(for: identity)
+      } else {
+        self.transitionToUnauthenticated(logLogout: true)
       }
     }
   }
 
+  @MainActor
   private func initializeDeviceInfo() async {
     deviceInfo = DeviceInfo(
       deviceType: .iPhone,  // Would detect actual device type
@@ -600,128 +773,174 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     )
   }
 
-    @MainActor
-    private func loadUserProfile(for userID: String) async {
-        // Deduplicate: if we're already authenticated as this exact user, skip the
-        // round-trip. Firebase fires addStateDidChangeListener on every token refresh,
-        // so without this guard every refresh triggers a full Firestore fetch and an
-        // @Observable assignment that cascades into view recreation.
-        if case .loaded(.authenticated(let existing)) = state, existing.id == userID {
-            return
-        }
+  @discardableResult
+  @MainActor
+  private func startAuthorization(
+    for identity: AuthenticatedIdentity
+  ) -> Task<Void, Never> {
+    invalidateAuthorization()
+    let generation = authorizationGeneration
+    clearPublishedSession()
+    pendingAuthenticatedSession = nil
+    currentError = nil
+    sessionID = sessionID ?? UUID().uuidString
+    updateState(.loading)
 
-        // Sign-out safety: Firebase can queue multiple listener Tasks. If sign-out
-        // happened between scheduling and execution, bail out so we don't restore
-        // the authenticated state after it has already been cleared.
-        guard Auth.auth().currentUser?.uid == userID else {
-            return
-        }
-
-        // Load user profile from Firestore
-        let userDoc: DocumentSnapshot
-        do {
-                userDoc = try await firebaseManager.firestore
-                    .collection("users")
-                    .document(userID)
-                    .getDocument()
-            } catch {
-                print("[AuthStateModel] Firestore fetch failed for userID=\(userID):", error, String(describing: type(of: error)))
-                updateState(
-                    .loaded(
-                        .error(
-                            AuthenticationError(
-                                type: .serverError,
-                                message: "Firestore fetch failed: \(error.localizedDescription)"
-                            ))))
-                return
-            }
-            
-            guard let userData = userDoc.data() else {
-                print("[AuthStateModel] No user data found for userID=\(userID). Document exists: \(userDoc.exists)")
-                // User authenticated but no profile - start registration
-                updateState(.loaded(.registering(.basicInfo)))
-                return
-            }
-            
-            var user: TMIUser
-            do {
-                user = try Firestore.Decoder().decode(TMIUser.self, from: userData)
-            } catch {
-                print("[AuthStateModel] Decoding TMIUser failed for userID=\(userID):", error, String(describing: type(of: error)), "Raw data:", userData)
-                updateState(
-                    .loaded(
-                        .error(
-                            AuthenticationError(
-                                type: .serverError,
-                                message: "Failed to decode user profile: \(error.localizedDescription)"
-                            ))))
-                return
-            }
-            
-            // Sync email verification status from Firebase Auth
-            if let firebaseUser = Auth.auth().currentUser {
-                user.isEmailVerified = firebaseUser.isEmailVerified
-                user.verificationStatus.isEmailVerified = firebaseUser.isEmailVerified
-                
-                print("[AuthStateModel] Synced email verification status for userID=\(userID): \(firebaseUser.isEmailVerified)")
-                
-                // Update Firestore document if email verification status changed
-                if user.isEmailVerified != (userData["isEmailVerified"] as? Bool ?? false) {
-                    Task {
-                        do {
-                            try await firebaseManager.firestore
-                                .collection("users")
-                                .document(userID)
-                                .updateData([
-                                    "isEmailVerified": user.isEmailVerified,
-                                    "verificationStatus.isEmailVerified": user.isEmailVerified
-                                ])
-                            print("[AuthStateModel] Updated email verification status in Firestore for userID=\(userID)")
-                        } catch {
-                            print("[AuthStateModel] Failed to update email verification status in Firestore for userID=\(userID):", error)
-                        }
-                    }
-                }
-            }
-            
-            // Note: We don't block login based on verification status anymore.
-            // Verification is checked when accessing specific features within the app.
-            // If Firebase Auth allowed them in, they can access the basic app.
-            if !user.verificationStatus.isValid {
-                print("[AuthStateModel] User has minimal verification for userID=\(userID). Verification status:", user.verificationStatus)
-                print("[AuthStateModel] User can access app, but some features may require additional verification")
-            }
-            
-            // Check consent status - only block for critical missing consent
-            if user.requiresParentalConsent && !user.hasValidConsent {
-                print("[AuthStateModel] Minor user missing parental consent for userID=\(userID)")
-                updateState(.loaded(.awaitingConsent(.coppa)))
-                return
-            }
-            
-            // Log consent status but don't block access for basic data collection consent
-            if !user.hasValidConsent {
-                print("[AuthStateModel] User may need additional consent for some features, userID=\(userID)")
-            }
-            
-            // DISABLED: Seed initial data for new educators (sample students, interests, hobbies)
-            // This was creating mock data on account creation which is no longer desired.
-            // Educators will start with a clean slate and add their own students.
-            // do {
-            //     try await firebaseManager.seedInitialEducatorDataIfNeeded()
-            // } catch {
-            //     print("[AuthStateModel] Seeding initial educator data failed for userID=\(userID):", error)
-            //     // Optional: Log or handle seeding error silently
-            // }
-            
-            // All checks passed - user is authenticated
-            currentUser = user
-            userRole = user.role
-            print("[AuthStateModel] Successfully loaded user profile for userID=\(userID). Role: \(user.role)")
-            updateState(.loaded(.authenticated(user)))
-            
-        await logAuditEvent(.login, result: .success)
+    let task = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+      await self.authorize(identity, generation: generation)
     }
+    authorizationTask = task
+    return task
+  }
+
+  @MainActor
+  private func authorize(
+    _ identity: AuthenticatedIdentity,
+    generation: UInt64
+  ) async {
+    do {
+      guard let profile = try await profileProvider.profile(for: identity) else {
+        guard isCurrentAuthorization(identity, generation: generation) else {
+          return
+        }
+        updateState(.loaded(.registering(.basicInfo)))
+        authorizationTask = nil
+        return
+      }
+      guard profile.userID == identity.userID,
+            isCurrentAuthorization(identity, generation: generation) else {
+        throw UserProfileLoadingError.identityMismatch
+      }
+
+      let claim = try await identityProvider.trustedClaim(for: identity)
+      guard isCurrentAuthorization(identity, generation: generation) else {
+        return
+      }
+
+      let membership = try await membershipProvider.membership(for: claim)
+      guard isCurrentAuthorization(identity, generation: generation) else {
+        return
+      }
+
+      let session = AuthenticatedSession(
+        profile: profile,
+        claim: claim,
+        membership: membership
+      )
+      guard isValidTrustedSession(session, identity: identity) else {
+        throw MembershipRepositoryError.malformed
+      }
+
+      if profile.requiresParentalConsent && !profile.hasValidConsent {
+        pendingAuthenticatedSession = session
+        updateState(.loaded(.awaitingConsent(.coppa)))
+      } else {
+        publishAuthenticatedSession(session)
+        await logAuditEvent(.login, result: .success)
+      }
+
+      if authorizationGeneration == generation {
+        authorizationTask = nil
+      }
+    } catch {
+      guard isCurrentAuthorization(identity, generation: generation) else {
+        return
+      }
+      failOrganizationAccessVerification()
+      authorizationTask = nil
+    }
+  }
+
+  @MainActor
+  private func isCurrentAuthorization(
+    _ identity: AuthenticatedIdentity,
+    generation: UInt64
+  ) -> Bool {
+    !Task.isCancelled
+      && authorizationGeneration == generation
+      && identityProvider.currentIdentity?.userID == identity.userID
+  }
+
+  private func isValidTrustedSession(
+    _ session: AuthenticatedSession,
+    identity: AuthenticatedIdentity
+  ) -> Bool {
+    let claim = session.claim
+    let membership = session.membership
+
+    return session.profile.userID == identity.userID
+      && claim.userID == identity.userID
+      && claim.accessClass == .staff
+      && TrustedIdentifier.isValid(claim.userID)
+      && TrustedIdentifier.isValid(claim.districtID)
+      && claim.membershipVersion > 0
+      && membership.userID == claim.userID
+      && membership.districtID == claim.districtID
+      && membership.version == claim.membershipVersion
+      && membership.isActive
+      && membership.schoolIDs.allSatisfy(TrustedIdentifier.isValid)
+      && membership.assignedStudentIDs.allSatisfy(TrustedIdentifier.isValid)
+  }
+
+  @MainActor
+  private func publishAuthenticatedSession(_ session: AuthenticatedSession) {
+    pendingAuthenticatedSession = nil
+    authenticatedSession = session
+    currentUser = session.profile
+    userRole = session.profile.role
+    currentError = nil
+    updateState(.loaded(.authenticated(session)))
+  }
+
+  @MainActor
+  private func failOrganizationAccessVerification() {
+    clearPublishedSession()
+    pendingAuthenticatedSession = nil
+    let error = AuthenticationError(
+      type: .institutionVerificationFailed,
+      message: Self.organizationAccessErrorMessage,
+      traumaInformedMessage: Self.organizationAccessErrorMessage
+    )
+    currentError = error
+    updateState(.loaded(.error(error)))
+  }
+
+  @MainActor
+  private func transitionToUnauthenticated(logLogout: Bool) {
+    invalidateAuthorization()
+    clearPublishedSession()
+    pendingAuthenticatedSession = nil
+    sessionID = nil
+    currentError = nil
+    updateState(.loaded(.unauthenticated))
+
+    if logLogout {
+      Task { @MainActor [weak self] in
+        await self?.logAuditEvent(.logout, result: .success)
+      }
+    }
+  }
+
+  @MainActor
+  private func clearPublishedSession() {
+    authenticatedSession = nil
+    currentUser = nil
+    userRole = nil
+    institutionContext = nil
+  }
+
+  @MainActor
+  private func invalidateAuthorization() {
+    authorizationGeneration &+= 1
+    authorizationTask?.cancel()
+    authorizationTask = nil
+  }
+
+  static let organizationAccessErrorMessage =
+    "We couldn’t verify your organization access. Check your connection and try again."
 
   // MARK: - Form Field Methods
 
@@ -839,13 +1058,11 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
     do {
       try signOutOperation()
-      // Clear local state
-      currentUser = nil
-      userRole = nil
-      institutionContext = nil
+      invalidateAuthorization()
+      clearPublishedSession()
+      pendingAuthenticatedSession = nil
       sessionID = nil
       currentError = nil
-
       updateState(.loaded(.unauthenticated))
       return true
     } catch {
@@ -1035,8 +1252,11 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
   // MARK: - Consent Methods
 
+  @MainActor
   func grantConsent(_ consentType: ConsentType, digitalSignature: String? = nil) async {
-    guard currentUser?.id != nil else { return }
+    guard let session = authenticatedSession ?? pendingAuthenticatedSession else {
+      return
+    }
 
     let consentRecord = ConsentRecord(
       consentType: consentType,
@@ -1054,7 +1274,18 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     if hasAllRequiredConsents {
       consentStatus = .granted
       if case .loaded(.awaitingConsent) = state {
-        await updateState(.loaded(.authenticated(currentUser!)))
+        guard identityProvider.currentIdentity?.userID == session.claim.userID,
+              isValidTrustedSession(
+                session,
+                identity: AuthenticatedIdentity(
+                  userID: session.claim.userID,
+                  isEmailVerified: session.profile.isEmailVerified
+                )
+              ) else {
+          failOrganizationAccessVerification()
+          return
+        }
+        publishAuthenticatedSession(session)
       }
     }
 
