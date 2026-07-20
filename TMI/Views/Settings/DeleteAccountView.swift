@@ -33,6 +33,7 @@ struct DeleteAccountView: View {
                         .font(.system(size: 16))
                         .foregroundColor(.tmiTextSecondary)
                         .padding()
+                        .disabled(isDeleting)
                 }
 
                 ScrollView {
@@ -75,15 +76,46 @@ struct DeleteAccountView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("This will permanently delete:")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.tmiTextPrimary)
+                        .foregroundStyle(Color.tmiTextPrimary)
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        consequenceRow(icon: "person.fill", text: "Your account and profile")
-                        consequenceRow(icon: "person.2.fill", text: "All student records")
-                        consequenceRow(icon: "doc.text.fill", text: "All TMI plans")
-                        consequenceRow(icon: "heart.fill", text: "All interests and resources")
+                        consequenceRow(
+                            icon: "person.fill",
+                            text: "Personal profile and preferences",
+                            color: .red
+                        )
+                        consequenceRow(
+                            icon: "heart.fill",
+                            text: "Personal interests, activity, and saved resources",
+                            color: .red
+                        )
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                }
+            }
+
+            TMICard(style: .default) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Institutional records retained")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.tmiTextPrimary)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        consequenceRow(
+                            icon: "person.2.fill",
+                            text: "Student records and TMI plans",
+                            color: .tmiSecondary
+                        )
+                        consequenceRow(
+                            icon: "building.2.fill",
+                            text: "School forms, meetings, consents, and audit records",
+                            color: .tmiSecondary
+                        )
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
@@ -107,15 +139,15 @@ struct DeleteAccountView: View {
         }
     }
 
-    private func consequenceRow(icon: String, text: String) -> some View {
+    private func consequenceRow(icon: String, text: String, color: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundColor(.red.opacity(0.8))
+                .foregroundStyle(color.opacity(0.8))
                 .frame(width: 20)
             Text(text)
                 .font(.system(size: 15))
-                .foregroundColor(.tmiTextPrimary)
+                .foregroundStyle(Color.tmiTextPrimary)
         }
     }
 
@@ -135,6 +167,7 @@ struct DeleteAccountView: View {
                     .foregroundColor(.tmiTextPrimary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
+                    .disabled(isDeleting || accountDeletionCompleted)
             }
 
             if let errorMessage {
@@ -146,8 +179,11 @@ struct DeleteAccountView: View {
             }
 
             TMIButton(
-                text: isDeleting ? "" : accountDeletionCompleted ? "Retry Sign Out" : "Permanently Delete Account",
-                style: .primary
+                text: accountDeletionCompleted ? "Retry Sign Out" : "Permanently Delete Account",
+                style: .destructive,
+                isLoading: isDeleting,
+                isDisabled: !accountDeletionCompleted
+                    && password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ) {
                 Task {
                     if accountDeletionCompleted {
@@ -157,14 +193,10 @@ struct DeleteAccountView: View {
                     }
                 }
             }
-            .disabled(password.isEmpty || isDeleting)
-            .overlay {
-                if isDeleting {
-                    ProgressView()
-                        .tint(.white)
-                }
-            }
-            .tint(.red)
+            .accessibilityLabel(
+                accountDeletionCompleted ? "Retry Sign Out" : "Permanently Delete Account"
+            )
+            .accessibilityValue(isDeleting ? "Deleting account" : "")
 
             Button("Go Back") {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -174,6 +206,7 @@ struct DeleteAccountView: View {
             }
             .font(.system(size: 16))
             .foregroundColor(.tmiTextSecondary)
+            .disabled(isDeleting || accountDeletionCompleted)
         }
     }
 
@@ -194,11 +227,18 @@ struct DeleteAccountView: View {
         defer { isDeleting = false }
 
         do {
-            try await AuthenticationService.shared.deleteAccount(password: password)
+            try await AccountDeletionService.shared.deleteAccount(password: password)
+            password = ""
             accountDeletionCompleted = true
             attemptSignOut()
-        } catch let error as AuthenticationService.AuthError {
-            withAnimation { errorMessage = error.errorDescription ?? "Deletion failed. Please try again." }
+        } catch let error as AccountDeletionError {
+            withAnimation {
+                if error == .incorrectPassword {
+                    errorMessage = "Incorrect password. Please try again."
+                } else {
+                    errorMessage = "Deletion failed. Check your connection and try again."
+                }
+            }
         } catch {
             withAnimation { errorMessage = "Deletion failed. Check your connection and try again." }
         }

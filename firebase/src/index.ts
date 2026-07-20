@@ -35,6 +35,11 @@ import {
   type StaffRole,
   type TrustedMembership,
 } from "./authz.js";
+import {
+  createProductionDeletePersonalAccountDataHandler,
+} from "./accountDeletion.js";
+
+export type { DeletePersonalAccountDataRequest } from "./accountDeletion.js";
 
 if (getApps().length === 0) {
   const projectID =
@@ -109,8 +114,6 @@ export interface IssueStudentModeSessionRequest
   readonly assignmentIDs: readonly string[];
   readonly durationMinutes: number;
 }
-
-export type DeletePersonalAccountDataRequest = PrivilegedBaseRequest;
 
 const exportTypeValues = [
   "professionalPlan",
@@ -253,14 +256,6 @@ const parseIssueStudentModeSessionRequest = (
       60,
     ),
   };
-};
-
-const parseDeletePersonalAccountDataRequest = (
-  value: unknown,
-): DeletePersonalAccountDataRequest => {
-  const data = requireRecord(value);
-  rejectUnexpectedFields(data, withBaseFields());
-  return parseBaseRequest(data);
 };
 
 const parseRequestSensitiveExportRequest = (
@@ -774,44 +769,8 @@ const issueStudentModeSessionHandler = async (
   return { ...result, customToken, expiresAt: expiresAt.toDate().toISOString() };
 };
 
-const deletePersonalAccountDataHandler = async (
-  request: CallableRequest<DeletePersonalAccountDataRequest>,
-): Promise<PrivilegedOperationResult> => {
-  const data = parseDeletePersonalAccountDataRequest(request.data);
-  const firestore = getFirestore();
-  return executePrivilegedOperation(firestore, request, data, {
-    action: "account.personalData.delete",
-    targetPath: (_input) => `users/${request.auth?.uid ?? "unauthenticated"}`,
-    requiredCapability: null,
-    auditDetails: () => ({
-      scope: "personal-account-data",
-      institutionalRecordsPreserved: true,
-    }),
-    mutate: async ({ transaction, identity }) => {
-      const userReference = firestore.doc(`users/${identity.userID}`);
-      const profileReference = firestore.doc(
-        `users/${identity.userID}/private/profile`,
-      );
-      const preferencesReference = firestore.doc(
-        `users/${identity.userID}/preferences/settings`,
-      );
-      const userSnapshot = await transaction.get(userReference);
-      if (userSnapshot.exists) {
-        const user = userSnapshot.data() ?? {};
-        assertRecordVersion(
-          user.recordVersion ?? 0,
-          data.expectedRecordVersion,
-        );
-      } else if (data.expectedRecordVersion !== 0) {
-        throw new HttpsError("not-found", "Personal profile was not found.");
-      }
-      transaction.delete(profileReference);
-      transaction.delete(preferencesReference);
-      transaction.delete(userReference);
-      return { recordVersion: data.expectedRecordVersion + 1 };
-    },
-  });
-};
+const deletePersonalAccountDataHandler =
+  createProductionDeletePersonalAccountDataHandler();
 
 const requestSensitiveExportHandler = async (
   request: CallableRequest<RequestSensitiveExportRequest>,
@@ -933,7 +892,7 @@ export const issueStudentModeSession = onCall(
   issueStudentModeSessionHandler,
 );
 export const deletePersonalAccountData = onCall(
-  callableOptions,
+  { ...callableOptions, timeoutSeconds: 540 },
   deletePersonalAccountDataHandler,
 );
 export const requestSensitiveExport = onCall(

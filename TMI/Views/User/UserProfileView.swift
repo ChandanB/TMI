@@ -281,6 +281,7 @@ struct UserProfileView: View {
     @State private var stateModel = UserProfileStateModel()
     @State private var showingPrivacyPolicy = false
     @State private var showingTermsOfService = false
+    @State private var showingDeleteAccount = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.authStateModel) private var authStateModel
 
@@ -304,6 +305,7 @@ struct UserProfileView: View {
                         dismiss: dismiss,
                         showingPrivacyPolicy: $showingPrivacyPolicy,
                         showingTermsOfService: $showingTermsOfService,
+                        showingDeleteAccount: $showingDeleteAccount,
                         roleDisplayName: authStateModel.currentMembership?.role.displayName
                     )
 
@@ -395,6 +397,10 @@ struct UserProfileView: View {
                     }
             }
         }
+        .sheet(isPresented: $showingDeleteAccount) {
+            DeleteAccountView()
+                .tmiSheetStyle()
+        }
         .onAppear {
             // Only fetch if we haven't loaded data yet
             if case .idle = stateModel.state {
@@ -413,6 +419,7 @@ private func userProfileForm(
     dismiss: DismissAction,
     showingPrivacyPolicy: Binding<Bool>,
     showingTermsOfService: Binding<Bool>,
+    showingDeleteAccount: Binding<Bool>,
     roleDisplayName: String?
 ) -> some View {
     ScrollView {
@@ -561,6 +568,35 @@ private func userProfileForm(
                         }
                         .padding(.vertical, 8)
                     }
+
+                    Button {
+                        showingDeleteAccount.wrappedValue = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.crop.circle.badge.minus")
+                                .foregroundStyle(.red)
+                                .frame(width: 24)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Delete Account")
+                                    .foregroundStyle(.red)
+                                Text("Permanently delete your account and personal data")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.tmiTextSecondary)
+                                    .multilineTextAlignment(.leading)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(Color.tmiTextSecondary)
+                        }
+                        .contentShape(Rectangle())
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Delete Account")
+                    .accessibilityHint("Permanently delete your account and personal data")
                 }
             }
 

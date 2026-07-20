@@ -408,7 +408,7 @@ extension SettingsView {
 
             SettingsRow(
                 title: "Delete Account",
-                subtitle: "Permanently delete your account and all data",
+                subtitle: "Permanently delete your account and personal data",
                 icon: "person.crop.circle.badge.minus",
                 titleColor: .red,
                 action: {
