@@ -1,0 +1,30 @@
+{
+  "name": "tmi-firebase",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/src/index.js",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "firebase emulators:exec --config ../firebase.json --project demo-tmi --only firestore,storage \"npm run test:unit\"",
+    "test:unit": "vitest run --dir test --maxWorkers=1 --fileParallelism=false",
+    "emulators": "firebase emulators:start --config ../firebase.json --project demo-tmi",
+    "migrate:dry-run": "npm run build && node lib/src/migrate.js --dry-run",
+    "reconcile": "npm run build && node lib/src/reconcile.js"
+  },
+  "dependencies": {
+    "firebase-admin": "14.2.0",
+    "firebase-functions": "7.3.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.1",
+    "firebase": "12.16.0",
+    "firebase-tools": "15.24.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

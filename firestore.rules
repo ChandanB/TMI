@@ -1,351 +1,649 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function trustedDistrictID() {
+      return isAuthenticated()
+        ? request.auth.token.get('tmiDistrictID', '')
+        : '';
     }
 
-    function getUserRole() {
-      return getUserData().role;
+    function trustedMembershipVersion() {
+      return isAuthenticated()
+        ? request.auth.token.get('tmiMembershipVersion', 0)
+        : 0;
     }
 
-    function getUserDistrictId() {
-      return getUserData().get('districtId', null);
+    function hasTrustedStaffClaim(districtID) {
+      return isAuthenticated()
+        && request.auth.token.get('tmiAccessClass', '') == 'staff'
+        && trustedDistrictID() == districtID
+        && trustedMembershipVersion() > 0;
     }
 
-    function isDistrictAdmin() {
-      return getUserRole() in ['superintendent', 'district_admin', 'administrator', 'admin'];
+    function membershipPath(districtID) {
+      return /databases/$(database)/documents/districts/$(districtID)/members/$(request.auth.uid);
     }
 
-    function isSameDistrict(districtId) {
-      return getUserDistrictId() == districtId;
+    function membershipExists(districtID) {
+      return hasTrustedStaffClaim(districtID)
+        && exists(membershipPath(districtID));
     }
 
-    // User documents
-    match /users/{userId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid == userId ||
-        isDistrictAdmin()
-      );
-      allow write: if request.auth.uid == userId;
-
-      // MVP Sub-collections: Students and TMI Plans
-      match /students/{studentId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-
-      match /tmiPlans/{planId} {
-        allow read: if request.auth.uid == userId || isDistrictAdmin();
-        allow write: if request.auth.uid == userId;
-      }
-
-      // Form templates
-      match /formTemplates/{templateId} {
-        allow read: if request.auth.uid == userId ||
-                       (resource.data.get('isPublic', false) == true &&
-                        isSameDistrict(resource.data.get('districtId', '')));
-        allow write: if request.auth.uid == userId;
-      }
-
-      // Form assignments
-      match /formAssignments/{assignmentId} {
-        allow read: if request.auth.uid == userId || isDistrictAdmin();
-        allow write: if request.auth.uid == userId;
-      }
-
-      // Form submissions
-      match /formSubmissions/{submissionId} {
-        allow read: if request.auth.uid == userId ||
-                       request.auth.uid == resource.data.get('submittedBy', '') ||
-                       isDistrictAdmin();
-        allow create: if isAuthenticated();
-        allow update: if request.auth.uid == userId ||
-                         request.auth.uid == resource.data.get('submittedBy', '');
-      }
-
-      // Meetings
-      match /meetings/{meetingId} {
-        allow read: if request.auth.uid == userId;
-        allow write: if request.auth.uid == userId;
-      }
-
-      // Resources
-      match /resources/{resourceId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-
-      // Resource assignments (user-scoped)
-      match /resourceAssignments/{assignmentId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-
-      // In-app notifications (user-scoped)
-      match /notifications/{notificationId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-
-      // Interests and hobbies
-      match /interests/{interestId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-
-      match /hobbies/{hobbyId} {
-        allow read, write: if request.auth.uid == userId;
-      }
+    function membership(districtID) {
+      return get(membershipPath(districtID)).data;
     }
 
-    // Districts collection
-    match /districts/{districtId} {
-      allow read: if isAuthenticated() && (
-        isSameDistrict(districtId) || isDistrictAdmin()
-      );
-      allow write: if isDistrictAdmin() && isSameDistrict(districtId);
+    function hasActiveMembership(districtID) {
+      return membershipExists(districtID)
+        && membership(districtID).get('isActive', false) == true
+        && membership(districtID).get('version', 0) == trustedMembershipVersion()
+        && membership(districtID).get('role', '') in [
+          'teacher',
+          'counselor',
+          'socialWorker',
+          'schoolAdministrator',
+          'districtAdministrator'
+        ];
+    }
 
-      // Schools sub-collection
-      match /schools/{schoolId} {
-        allow read: if isAuthenticated() && (
-          isSameDistrict(districtId) || isDistrictAdmin()
+    function role(districtID) {
+      return membership(districtID).get('role', '');
+    }
+
+    function hasCapability(districtID, capability) {
+      return hasActiveMembership(districtID)
+        && capability in membership(districtID).get('capabilities', []);
+    }
+
+    function belongsToSchool(districtID, schoolID) {
+      return hasActiveMembership(districtID)
+        && schoolID in membership(districtID).get('schoolIDs', []);
+    }
+
+    function isAssignedStudent(districtID, studentID, studentData) {
+      return hasActiveMembership(districtID)
+        && studentID in membership(districtID).get('assignedStudentIDs', [])
+        && studentData.get('schoolId', '') in membership(districtID).get('schoolIDs', []);
+    }
+
+    function canReadStudent(districtID, studentID, studentData) {
+      return hasActiveMembership(districtID)
+        && studentData.get('districtId', districtID) == districtID
+        && (
+          (
+            role(districtID) in ['teacher', 'counselor', 'socialWorker']
+            && isAssignedStudent(districtID, studentID, studentData)
+          )
+          || (
+            role(districtID) == 'schoolAdministrator'
+            && hasCapability(districtID, 'student.read.detail')
+            && belongsToSchool(districtID, studentData.get('schoolId', ''))
+          )
+          || (
+            role(districtID) == 'districtAdministrator'
+            && hasCapability(districtID, 'student.read.detail')
+          )
         );
-        allow write: if isDistrictAdmin() && isSameDistrict(districtId);
-      }
-
-      // Audit logs (read-only for most, write via server-side recommended)
-      match /auditLogs/{logId} {
-        allow read: if isDistrictAdmin() && isSameDistrict(districtId);
-        allow write: if isAuthenticated();
-      }
-
-      // Analytics aggregations (server-side only)
-      match /analytics/{date} {
-        allow read: if isDistrictAdmin() && isSameDistrict(districtId);
-        allow write: if false; // Server-side only (Cloud Functions)
-      }
     }
 
-    // Global AI-generated resources (shared across all users)
-    match /generatedResources/{interestId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-
-      // Resources sub-collection
-      match /resources/{resourceId} {
-        allow read: if isAuthenticated();
-        allow write: if isAuthenticated();
-      }
-    }
-
-    // Global form templates collection (Phase 1: District Pilot - PR #3)
-    match /formTemplates/{templateId} {
-      allow read: if isAuthenticated() && (
-        // Public templates in same district
-        (resource.data.get('isPublic', false) == true &&
-         isSameDistrict(resource.data.get('districtId', ''))) ||
-        // Own templates
-        resource.data.get('createdBy', '') == request.auth.uid ||
-        // District admins can see all in their district
-        (isDistrictAdmin() && isSameDistrict(resource.data.get('districtId', '')))
-      );
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (
-        resource.data.get('createdBy', '') == request.auth.uid ||
-        isDistrictAdmin()
-      );
-    }
-
-    // Global resource assignments collection (Phase 1: District Pilot - PR #5)
-    match /resourceAssignments/{assignmentId} {
-      allow read: if isAuthenticated() && (
-        // Student can read their own assignments
-        resource.data.get('studentId', '') == request.auth.uid ||
-        // Assigner can read assignments they created
-        resource.data.get('assignedBy', '') == request.auth.uid ||
-        // District admins can read all
-        isDistrictAdmin()
-      );
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (
-        // Student can update their own assignments (status, notes)
-        resource.data.get('studentId', '') == request.auth.uid ||
-        // Assigner can update
-        resource.data.get('assignedBy', '') == request.auth.uid ||
-        // District admins can update all
-        isDistrictAdmin()
-      );
-      allow delete: if isAuthenticated() && (
-        resource.data.get('assignedBy', '') == request.auth.uid ||
-        isDistrictAdmin()
-      );
-    }
-
-    // Global Interest Library (Phase 1: Unified Architecture)
-    match /interests/{interestId} {
-      // All authenticated users can read global interests
-      allow read: if isAuthenticated();
-      // District admins can create/update global and district interests
-      // Personal interests can be created by anyone
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (
-        // Own personal interests
-        (request.resource.data.get('scope', 'global') == 'personal' &&
-         request.resource.data.get('ownerUid', '') == request.auth.uid) ||
-        // District admins can manage district/global interests
-        isDistrictAdmin()
-      );
-    }
-
-    // Global Career Library (Phase 1: Unified Architecture)
-    match /careers/{careerId} {
-      // All authenticated users can read careers
-      allow read: if isAuthenticated();
-      // Anyone can cache AI-generated careers
-      allow create: if isAuthenticated();
-      // District admins can update/delete careers
-      allow update, delete: if isAuthenticated() && isDistrictAdmin();
-    }
-
-    // Global Resource Library (Phase 1: Unified Architecture)
-    match /resources/{resourceId} {
-      // All authenticated users can read resources
-      allow read: if isAuthenticated();
-      // Anyone can create resources
-      allow create: if isAuthenticated();
-      // Update/delete based on scope
-      allow update, delete: if isAuthenticated() && (
-        // Own personal resources
-        (request.resource.data.get('scope', 'global') == 'personal' &&
-         request.resource.data.get('ownerUid', '') == request.auth.uid) ||
-        // District admins can manage district/global resources
-        isDistrictAdmin()
-      );
-    }
-
-    // Phase 1: District-Scoped Students Collection
-    // This is the canonical location for student data (replacing user-scoped /users/{uid}/students)
-    match /students/{studentId} {
-      // Helper function: Check if user is assigned to this student
-      function isAssignedToStudent() {
-        return resource.data.get('assignedCounselorId', '') == request.auth.uid ||
-               resource.data.get('primaryTeacherId', '') == request.auth.uid ||
-               resource.data.get('createdBy', '') == request.auth.uid;
-      }
-      
-      // Helper function: Check if user is in same district as student
-      function isStudentInUserDistrict() {
-        return resource.data.get('districtId', '') == getUserDistrictId();
-      }
-      
-      // Read: Staff can read students in their district
-      allow read: if isAuthenticated() && (
-        isStudentInUserDistrict() ||
-        isAssignedToStudent() ||
-        isDistrictAdmin()
-      );
-      
-      // Create: Staff can create students in their district
-      allow create: if isAuthenticated() && (
-        request.resource.data.get('districtId', '') == getUserDistrictId() ||
-        isDistrictAdmin()
-      );
-      
-      // Update: Assigned staff or district admins can update
-      allow update: if isAuthenticated() && (
-        isAssignedToStudent() ||
-        (isDistrictAdmin() && isStudentInUserDistrict())
-      );
-      
-      // Delete: Only district admins can delete students
-      allow delete: if isAuthenticated() && isDistrictAdmin() && isStudentInUserDistrict();
-      
-      // Student Interest Edges (sub-collection)
-      match /studentInterests/{interestId} {
-        // Must be assigned to parent student OR in same district OR district admin
-        allow read: if isAuthenticated() && (
-          isAssignedToStudent() ||
-          isStudentInUserDistrict() ||
-          isDistrictAdmin()
+    function canWriteStudent(districtID, studentID, studentData) {
+      return hasActiveMembership(districtID)
+        && studentData.get('districtId', districtID) == districtID
+        && (
+          (
+            role(districtID) in ['teacher', 'counselor']
+            && isAssignedStudent(districtID, studentID, studentData)
+          )
+          || (
+            role(districtID) == 'schoolAdministrator'
+            && hasCapability(districtID, 'student.write.detail')
+            && belongsToSchool(districtID, studentData.get('schoolId', ''))
+          )
+          || (
+            role(districtID) == 'districtAdministrator'
+            && hasCapability(districtID, 'student.write.detail')
+          )
         );
-        // Only assigned staff or district admins can write
-        allow write: if isAuthenticated() && (
-          isAssignedToStudent() ||
-          isDistrictAdmin()
+    }
+
+    function canCreateStudent(districtID, studentID, studentData) {
+      return hasActiveMembership(districtID)
+        && studentData.get('districtId', districtID) == districtID
+        && (
+          (
+            role(districtID) in ['teacher', 'counselor']
+            && belongsToSchool(districtID, studentData.get('schoolId', ''))
+          )
+          || (
+            role(districtID) == 'schoolAdministrator'
+            && hasCapability(districtID, 'student.write.detail')
+            && belongsToSchool(districtID, studentData.get('schoolId', ''))
+          )
+          || (
+            role(districtID) == 'districtAdministrator'
+            && hasCapability(districtID, 'student.write.detail')
+          )
         );
+    }
+
+    function studentData(districtID, studentID) {
+      return get(
+        /databases/$(database)/documents/districts/$(districtID)/students/$(studentID)
+      ).data;
+    }
+
+    function canReadRestrictedStudentRecord(districtID, studentID) {
+      return canReadStudent(
+          districtID,
+          studentID,
+          studentData(districtID, studentID)
+        )
+        && hasCapability(districtID, 'student.restricted.read');
+    }
+
+    function canWriteRestrictedStudentRecord(districtID, studentID) {
+      return canReadStudent(
+          districtID,
+          studentID,
+          studentData(districtID, studentID)
+        )
+        && hasCapability(districtID, 'student.restricted.write');
+    }
+
+    function canCollaborateOnStudent(districtID, studentID) {
+      let data = studentData(districtID, studentID);
+      return hasActiveMembership(districtID)
+        && (
+          isAssignedStudent(districtID, studentID, data)
+          || canWriteStudent(districtID, studentID, data)
+        );
+    }
+
+    function canReadPlan(districtID, planID, planData) {
+      let studentIDs = planData.get('studentIDs', []);
+      let schoolIDs = planData.get('schoolIDs', []);
+      return hasActiveMembership(districtID)
+        && planData.get('districtId', districtID) == districtID
+        && studentIDs.size() > 0
+        && (
+          (
+            role(districtID) in ['teacher', 'counselor', 'socialWorker']
+            && studentIDs.hasOnly(membership(districtID).get('assignedStudentIDs', []))
+          )
+          || (
+            role(districtID) == 'schoolAdministrator'
+            && hasCapability(districtID, 'student.read.detail')
+            && schoolIDs.size() > 0
+            && schoolIDs.hasOnly(membership(districtID).get('schoolIDs', []))
+          )
+          || (
+            role(districtID) == 'districtAdministrator'
+            && hasCapability(districtID, 'student.read.detail')
+          )
+        );
+    }
+
+    function canWritePlan(districtID, planID, planData) {
+      let studentIDs = planData.get('studentIDs', []);
+      let schoolIDs = planData.get('schoolIDs', []);
+      return hasActiveMembership(districtID)
+        && planData.get('districtId', districtID) == districtID
+        && studentIDs.size() > 0
+        && (
+          (
+            role(districtID) in ['teacher', 'counselor', 'socialWorker']
+            && studentIDs.hasOnly(membership(districtID).get('assignedStudentIDs', []))
+          )
+          || (
+            role(districtID) == 'schoolAdministrator'
+            && hasCapability(districtID, 'student.write.detail')
+            && schoolIDs.size() > 0
+            && schoolIDs.hasOnly(membership(districtID).get('schoolIDs', []))
+          )
+          || (
+            role(districtID) == 'districtAdministrator'
+            && hasCapability(districtID, 'student.write.detail')
+          )
+        );
+    }
+
+    function planData(districtID, planID) {
+      return get(
+        /databases/$(database)/documents/districts/$(districtID)/plans/$(planID)
+      ).data;
+    }
+
+    function canReadAggregate(districtID, snapshotData) {
+      return hasActiveMembership(districtID)
+        && (
+          role(districtID) == 'districtAdministrator'
+          || (
+            role(districtID) == 'schoolAdministrator'
+            && snapshotData.get('schoolId', '') in membership(districtID).get('schoolIDs', [])
+          )
+        );
+    }
+
+    function profileCreateKeysAreAllowed(data) {
+      return data.keys().hasOnly([
+        'userID',
+        'uid',
+        'displayName',
+        'email',
+        'isEmailVerified',
+        'requestedRole',
+        'dateOfBirth',
+        'institutionCode',
+        'institutionName',
+        'photoURL',
+        'organization',
+        'verificationStatus',
+        'consentRecords',
+        'parentalConsentStatus',
+        'ageVerificationStatus',
+        'privacySettings',
+        'createdAt',
+        'lastLoginAt',
+        'lastActivityAt',
+        'emergencyContacts',
+        'formTemplates'
+      ]);
+    }
+
+    function profileUpdateKeysAreAllowed() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'displayName',
+        'requestedRole',
+        'dateOfBirth',
+        'institutionCode',
+        'institutionName',
+        'photoURL',
+        'organization',
+        'privacySettings',
+        'lastLoginAt',
+        'lastActivityAt',
+        'emergencyContacts',
+        'formTemplates'
+      ]);
+    }
+
+    match /users/{userID} {
+      allow read: if isAuthenticated() && request.auth.uid == userID;
+      allow create: if isAuthenticated()
+        && request.auth.uid == userID
+        && profileCreateKeysAreAllowed(request.resource.data);
+      allow update: if isAuthenticated()
+        && request.auth.uid == userID
+        && profileUpdateKeysAreAllowed();
+      allow delete: if false;
+
+      match /private/profile {
+        allow read: if isAuthenticated() && request.auth.uid == userID;
+        allow create: if isAuthenticated()
+          && request.auth.uid == userID
+          && profileCreateKeysAreAllowed(request.resource.data);
+        allow update: if isAuthenticated()
+          && request.auth.uid == userID
+          && profileUpdateKeysAreAllowed();
+        allow delete: if false;
       }
 
-      // Student Career State (sub-collection)
-      match /careerState/{careerId} {
-        // Must be assigned to parent student OR in same district OR district admin
-        allow read: if isAuthenticated() && (
-          isAssignedToStudent() ||
-          isStudentInUserDistrict() ||
-          isDistrictAdmin()
-        );
-        // Only assigned staff or district admins can write
-        allow write: if isAuthenticated() && (
-          isAssignedToStudent() ||
-          isDistrictAdmin()
-        );
+      match /preferences/settings {
+        allow read, create, update: if isAuthenticated() && request.auth.uid == userID;
+        allow delete: if false;
+      }
+
+      match /{legacyPath=**} {
+        allow read, write: if false;
       }
     }
 
-    // TMI Plans Collection (Phase 1: District-Scoped)
-    match /plans/{planId} {
-      // Helper function: Check if user is assigned to this plan
-      function isAssignedToPlan() {
-        return resource.data.get('assignedCounselorId', '') == request.auth.uid ||
-               resource.data.get('createdBy', '') == request.auth.uid ||
-               resource.data.get('approvedBy', '') == request.auth.uid;
-      }
-      
-      // Helper function: Check if plan is in user's district
-      function isPlanInUserDistrict() {
-        return resource.data.get('districtId', '') == getUserDistrictId();
-      }
-      
-      // Read: Staff can read plans in their district or assigned to them
-      allow read: if isAuthenticated() && (
-        isPlanInUserDistrict() ||
-        isAssignedToPlan() ||
-        isDistrictAdmin()
-      );
-      
-      // Create: Staff can create plans in their district
-      allow create: if isAuthenticated() && (
-        request.resource.data.get('districtId', '') == getUserDistrictId() ||
-        isDistrictAdmin()
-      );
-      
-      // Update: Assigned staff or district admins can update
-      allow update: if isAuthenticated() && (
-        isAssignedToPlan() ||
-        (isDistrictAdmin() && isPlanInUserDistrict())
-      );
-      
-      // Delete: Only district admins or plan creator can delete
-      allow delete: if isAuthenticated() && (
-        resource.data.get('createdBy', '') == request.auth.uid ||
-        (isDistrictAdmin() && isPlanInUserDistrict())
-      );
+    match /districts/{districtID} {
+      allow read: if hasActiveMembership(districtID);
+      allow write: if false;
 
-      // Plan Resource Links (sub-collection)
-      match /planResources/{resourceId} {
-        // Must be assigned to parent plan OR in same district OR district admin
-        allow read: if isAuthenticated() && (
-          isAssignedToPlan() ||
-          isPlanInUserDistrict() ||
-          isDistrictAdmin()
-        );
-        // Only assigned staff or district admins can write
-        allow write: if isAuthenticated() && (
-          isAssignedToPlan() ||
-          (isDistrictAdmin() && isPlanInUserDistrict())
-        );
+      match /schools/{schoolID} {
+        allow read: if hasActiveMembership(districtID)
+          && (
+            role(districtID) == 'districtAdministrator'
+            || belongsToSchool(districtID, schoolID)
+          );
+        allow write: if false;
       }
+
+      match /members/{userID} {
+        allow read: if hasActiveMembership(districtID)
+          && (
+            request.auth.uid == userID
+            || hasCapability(districtID, 'staff.manage')
+          );
+        allow write: if false;
+
+        match /acknowledgements/{acknowledgementID} {
+          allow read: if hasActiveMembership(districtID)
+            && request.auth.uid == userID;
+          allow create: if hasActiveMembership(districtID)
+            && request.auth.uid == userID
+            && request.resource.data.keys().hasOnly([
+              'documentID',
+              'version',
+              'acceptedAt',
+              'operationID'
+            ]);
+          allow update, delete: if false;
+        }
+      }
+
+      match /students/{studentID} {
+        allow read: if canReadStudent(districtID, studentID, resource.data);
+        allow create: if canCreateStudent(
+          districtID,
+          studentID,
+          request.resource.data
+        );
+        allow update: if canWriteStudent(districtID, studentID, resource.data)
+          && canWriteStudent(districtID, studentID, request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasNone([
+            'districtId',
+            'schoolId',
+            'createdAt',
+            'createdBy'
+          ]);
+        allow delete: if false;
+
+        match /restrictedRecords/{recordID} {
+          allow read: if canReadRestrictedStudentRecord(districtID, studentID);
+          allow create, update: if canWriteRestrictedStudentRecord(districtID, studentID);
+          allow delete: if false;
+        }
+
+        match /consents/{consentID} {
+          allow read: if canReadRestrictedStudentRecord(districtID, studentID);
+          allow create: if canWriteRestrictedStudentRecord(districtID, studentID);
+          allow update, delete: if false;
+        }
+
+        match /responses/{responseID} {
+          allow read: if canReadStudent(
+            districtID,
+            studentID,
+            studentData(districtID, studentID)
+          );
+          allow create: if canCollaborateOnStudent(districtID, studentID);
+          allow update, delete: if false;
+        }
+
+        match /progress/{entryID} {
+          allow read: if canReadStudent(
+            districtID,
+            studentID,
+            studentData(districtID, studentID)
+          );
+          allow create: if canCollaborateOnStudent(districtID, studentID);
+          allow update, delete: if false;
+        }
+
+        match /{collectionName}/{recordID} {
+          allow read: if collectionName in [
+              'interests',
+              'careers',
+              'resources',
+              'surveys',
+              'notes'
+            ]
+            && canReadStudent(
+              districtID,
+              studentID,
+              studentData(districtID, studentID)
+            );
+          allow create, update: if collectionName in [
+              'interests',
+              'careers',
+              'resources',
+              'surveys',
+              'notes'
+            ]
+            && canCollaborateOnStudent(districtID, studentID);
+          allow delete: if false;
+        }
+      }
+
+      match /plans/{planID} {
+        allow read: if canReadPlan(districtID, planID, resource.data);
+        allow create: if canWritePlan(districtID, planID, request.resource.data)
+          && request.resource.data.get('status', 'draft') == 'draft';
+        allow update: if canWritePlan(districtID, planID, resource.data)
+          && canWritePlan(districtID, planID, request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasNone([
+            'districtId',
+            'studentIDs',
+            'schoolIDs',
+            'status',
+            'approvalStatus',
+            'approvedAt',
+            'approvedBy',
+            'createdAt',
+            'createdBy'
+          ]);
+        allow delete: if false;
+
+        match /approvals/{approvalID} {
+          allow read: if canReadPlan(
+            districtID,
+            planID,
+            planData(districtID, planID)
+          );
+          allow write: if false;
+        }
+
+        match /revisions/{revisionID} {
+          allow read: if canReadPlan(
+            districtID,
+            planID,
+            planData(districtID, planID)
+          );
+          allow write: if false;
+        }
+
+        match /progress/{entryID} {
+          allow read: if canReadPlan(
+            districtID,
+            planID,
+            planData(districtID, planID)
+          );
+          allow create: if canWritePlan(
+            districtID,
+            planID,
+            planData(districtID, planID)
+          );
+          allow update, delete: if false;
+        }
+
+        match /{collectionName}/{recordID} {
+          allow read: if collectionName in ['goals', 'actions', 'resources', 'forms']
+            && canReadPlan(
+              districtID,
+              planID,
+              planData(districtID, planID)
+            );
+          allow create, update: if collectionName in [
+              'goals',
+              'actions',
+              'resources',
+              'forms'
+            ]
+            && canWritePlan(
+              districtID,
+              planID,
+              planData(districtID, planID)
+            );
+          allow delete: if false;
+        }
+      }
+
+      match /meetings/{meetingID} {
+        allow read: if hasActiveMembership(districtID)
+          && request.auth.uid in resource.data.get('participantUserIDs', []);
+        allow create: if hasActiveMembership(districtID)
+          && request.auth.uid in request.resource.data.get('participantUserIDs', []);
+        allow update: if hasActiveMembership(districtID)
+          && request.auth.uid in resource.data.get('participantUserIDs', [])
+          && request.auth.uid in request.resource.data.get('participantUserIDs', []);
+        allow delete: if false;
+      }
+
+      match /tasks/{taskID} {
+        allow read: if hasActiveMembership(districtID)
+          && (
+            resource.data.get('assigneeUserID', '') == request.auth.uid
+            || resource.data.get('createdBy', '') == request.auth.uid
+          );
+        allow create: if hasActiveMembership(districtID)
+          && request.resource.data.get('createdBy', '') == request.auth.uid;
+        allow update: if hasActiveMembership(districtID)
+          && (
+            resource.data.get('assigneeUserID', '') == request.auth.uid
+            || resource.data.get('createdBy', '') == request.auth.uid
+          )
+          && request.resource.data.diff(resource.data).affectedKeys().hasNone([
+            'districtId',
+            'createdAt',
+            'createdBy'
+          ]);
+        allow delete: if false;
+      }
+
+      match /formTemplates/{templateID} {
+        allow read: if hasActiveMembership(districtID)
+          && (
+            resource.data.get('schoolId', null) == null
+            || role(districtID) == 'districtAdministrator'
+            || belongsToSchool(districtID, resource.data.get('schoolId', ''))
+          );
+        allow create: if hasActiveMembership(districtID)
+          && request.resource.data.get('districtId', districtID) == districtID
+          && (
+            role(districtID) == 'districtAdministrator'
+            || belongsToSchool(
+              districtID,
+              request.resource.data.get('schoolId', '')
+            )
+          );
+        allow update: if hasActiveMembership(districtID)
+          && resource.data.get('districtId', districtID) == districtID
+          && request.resource.data.get('districtId', districtID) == districtID
+          && resource.data.get('schoolId', null) == request.resource.data.get('schoolId', null)
+          && (
+            role(districtID) == 'districtAdministrator'
+            || belongsToSchool(districtID, resource.data.get('schoolId', ''))
+          );
+        allow delete: if false;
+      }
+
+      match /formAssignments/{assignmentID} {
+        allow read: if hasActiveMembership(districtID)
+          && (
+            resource.data.get('assignedBy', '') == request.auth.uid
+            || resource.data.get('studentIDs', []).hasOnly(
+              membership(districtID).get('assignedStudentIDs', [])
+            )
+            || role(districtID) in ['schoolAdministrator', 'districtAdministrator']
+          );
+        allow create: if hasActiveMembership(districtID)
+          && request.resource.data.get('assignedBy', '') == request.auth.uid
+          && request.resource.data.get('districtId', districtID) == districtID
+          && request.resource.data.get('studentIDs', []).hasOnly(
+            membership(districtID).get('assignedStudentIDs', [])
+          );
+        allow update: if hasActiveMembership(districtID)
+          && resource.data.get('assignedBy', '') == request.auth.uid
+          && request.resource.data.get('assignedBy', '') == request.auth.uid
+          && request.resource.data.get('districtId', districtID) == districtID
+          && request.resource.data.get('studentIDs', []).hasOnly(
+            membership(districtID).get('assignedStudentIDs', [])
+          );
+        allow delete: if false;
+
+        match /respondents/{respondentID} {
+          allow read: if hasActiveMembership(districtID);
+          allow write: if false;
+        }
+      }
+
+      match /resources/{resourceID} {
+        allow read: if hasActiveMembership(districtID)
+          && (
+            resource.data.get('schoolId', null) == null
+            || role(districtID) == 'districtAdministrator'
+            || belongsToSchool(districtID, resource.data.get('schoolId', ''))
+          );
+        allow create, update: if hasActiveMembership(districtID)
+          && (
+            role(districtID) == 'districtAdministrator'
+            || belongsToSchool(
+              districtID,
+              request.resource.data.get('schoolId', '')
+            )
+          );
+        allow delete: if false;
+      }
+
+      match /notifications/{notificationID} {
+        allow read: if hasActiveMembership(districtID)
+          && resource.data.get('recipientUserID', '') == request.auth.uid;
+        allow update: if hasActiveMembership(districtID)
+          && resource.data.get('recipientUserID', '') == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'isRead',
+            'readAt'
+          ]);
+        allow create, delete: if false;
+      }
+
+      match /studentModeSessions/{sessionID} {
+        allow read, write: if false;
+      }
+
+      match /auditEvents/{eventID} {
+        allow read: if hasActiveMembership(districtID)
+          && (
+            resource.data.get(
+              'actorUserID',
+              resource.data.get('userID', '')
+            ) == request.auth.uid
+            || hasCapability(districtID, 'audit.read')
+          );
+        allow write: if false;
+      }
+
+      match /metricSnapshots/{snapshotID} {
+        allow read: if canReadAggregate(districtID, resource.data);
+        allow write: if false;
+      }
+
+      match /{unmatched=**} {
+        allow read, write: if false;
+      }
+    }
+
+    match /catalogs/{catalogName}/items/{itemID} {
+      allow read: if isAuthenticated()
+        && catalogName in [
+          'careers',
+          'interests',
+          'globalResources',
+          'tmiModels',
+          'surveyDefinitions'
+        ];
+      allow write: if false;
+    }
+
+    match /{unmatched=**} {
+      allow read, write: if false;
     }
   }
 }

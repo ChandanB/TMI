@@ -1,0 +1,222 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function trustedDistrictID() {
+      return isAuthenticated()
+        ? request.auth.token.get('tmiDistrictID', '')
+        : '';
+    }
+
+    function trustedMembershipVersion() {
+      return isAuthenticated()
+        ? request.auth.token.get('tmiMembershipVersion', 0)
+        : 0;
+    }
+
+    function membership(districtID) {
+      return firestore.get(
+        /databases/(default)/documents/districts/$(districtID)/members/$(request.auth.uid)
+      ).data;
+    }
+
+    function hasActiveMembership(districtID) {
+      return isAuthenticated()
+        && request.auth.token.get('tmiAccessClass', '') == 'staff'
+        && trustedDistrictID() == districtID
+        && trustedMembershipVersion() > 0
+        && firestore.exists(
+          /databases/(default)/documents/districts/$(districtID)/members/$(request.auth.uid)
+        )
+        && membership(districtID).get('isActive', false) == true
+        && membership(districtID).get('version', 0) == trustedMembershipVersion();
+    }
+
+    function hasCapability(districtID, capability) {
+      return hasActiveMembership(districtID)
+        && capability in membership(districtID).get('capabilities', []);
+    }
+
+    function studentPath(districtID, studentID) {
+      return /databases/(default)/documents/districts/$(districtID)/students/$(studentID);
+    }
+
+    function student(districtID, studentID) {
+      return firestore.get(studentPath(districtID, studentID)).data;
+    }
+
+    function hasStudentBoundary(districtID, studentID) {
+      return firestore.exists(studentPath(districtID, studentID))
+        && student(districtID, studentID).get('districtId', districtID) == districtID
+        && student(districtID, studentID).get('schoolId', '') != '';
+    }
+
+    function canReadStudent(districtID, studentID) {
+      return hasActiveMembership(districtID)
+        && hasStudentBoundary(districtID, studentID)
+        && (
+          (
+            membership(districtID).get('role', '') in [
+              'teacher',
+              'counselor',
+              'socialWorker'
+            ]
+            && studentID in membership(districtID).get('assignedStudentIDs', [])
+            && student(districtID, studentID).get('schoolId', '')
+              in membership(districtID).get('schoolIDs', [])
+          )
+          || (
+            membership(districtID).get('role', '') == 'schoolAdministrator'
+            && hasCapability(districtID, 'student.read.detail')
+            && student(districtID, studentID).get('schoolId', '')
+              in membership(districtID).get('schoolIDs', [])
+          )
+          || (
+            membership(districtID).get('role', '') == 'districtAdministrator'
+            && hasCapability(districtID, 'student.read.detail')
+          )
+        );
+    }
+
+    function canWriteStudent(districtID, studentID) {
+      return hasActiveMembership(districtID)
+        && hasStudentBoundary(districtID, studentID)
+        && (
+          (
+            membership(districtID).get('role', '') in ['teacher', 'counselor']
+            && studentID in membership(districtID).get('assignedStudentIDs', [])
+            && student(districtID, studentID).get('schoolId', '')
+              in membership(districtID).get('schoolIDs', [])
+          )
+          || (
+            membership(districtID).get('role', '') == 'schoolAdministrator'
+            && hasCapability(districtID, 'student.write.detail')
+            && student(districtID, studentID).get('schoolId', '')
+              in membership(districtID).get('schoolIDs', [])
+          )
+          || (
+            membership(districtID).get('role', '') == 'districtAdministrator'
+            && hasCapability(districtID, 'student.write.detail')
+          )
+        );
+    }
+
+    function planPath(districtID, planID) {
+      return /databases/(default)/documents/districts/$(districtID)/plans/$(planID);
+    }
+
+    function plan(districtID, planID) {
+      return firestore.get(planPath(districtID, planID)).data;
+    }
+
+    function canReadPlan(districtID, planID) {
+      return hasActiveMembership(districtID)
+        && firestore.exists(planPath(districtID, planID))
+        && plan(districtID, planID).get('districtId', districtID) == districtID
+        && plan(districtID, planID).get('studentIDs', []).size() > 0
+        && (
+          (
+            membership(districtID).get('role', '') in [
+              'teacher',
+              'counselor',
+              'socialWorker'
+            ]
+            && plan(districtID, planID).get('studentIDs', []).hasOnly(
+              membership(districtID).get('assignedStudentIDs', [])
+            )
+          )
+          || (
+            membership(districtID).get('role', '') == 'schoolAdministrator'
+            && hasCapability(districtID, 'student.read.detail')
+            && plan(districtID, planID).get('schoolIDs', []).size() > 0
+            && plan(districtID, planID).get('schoolIDs', []).hasOnly(
+              membership(districtID).get('schoolIDs', [])
+            )
+          )
+          || (
+            membership(districtID).get('role', '') == 'districtAdministrator'
+            && hasCapability(districtID, 'student.read.detail')
+          )
+        );
+    }
+
+    function canWritePlan(districtID, planID) {
+      return canReadPlan(districtID, planID)
+        && (
+          membership(districtID).get('role', '') in ['teacher', 'counselor']
+          || hasCapability(districtID, 'student.write.detail')
+        );
+    }
+
+    function exportTaskPath(districtID, exportID) {
+      return /databases/(default)/documents/districts/$(districtID)/tasks/$(exportID);
+    }
+
+    function canReadExport(districtID, exportID) {
+      return hasCapability(districtID, 'report.export')
+        && firestore.exists(exportTaskPath(districtID, exportID))
+        && firestore.get(exportTaskPath(districtID, exportID)).data.get('type', '')
+          == 'sensitiveExport'
+        && firestore.get(exportTaskPath(districtID, exportID)).data.get('requestedBy', '')
+          == request.auth.uid
+        && firestore.get(exportTaskPath(districtID, exportID)).data.get('state', '')
+          == 'ready';
+    }
+
+    match /users/{userID}/profile/{fileName} {
+      allow read: if isAuthenticated() && request.auth.uid == userID;
+      allow create, update: if isAuthenticated()
+        && request.auth.uid == userID
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isAuthenticated() && request.auth.uid == userID;
+    }
+
+    match /districts/{districtID}/students/{studentID}/files/{allPaths=**} {
+      allow read: if canReadStudent(districtID, studentID);
+      allow create, update: if canWriteStudent(districtID, studentID)
+        && request.resource.size < 25 * 1024 * 1024;
+      allow delete: if false;
+    }
+
+    match /districts/{districtID}/students/{studentID}/restricted/{allPaths=**} {
+      allow read: if canReadStudent(districtID, studentID)
+        && hasCapability(districtID, 'student.restricted.read');
+      allow create, update: if canReadStudent(districtID, studentID)
+        && hasCapability(districtID, 'student.restricted.write')
+        && request.resource.size < 25 * 1024 * 1024;
+      allow delete: if false;
+    }
+
+    match /districts/{districtID}/plans/{planID}/{allPaths=**} {
+      allow read: if canReadPlan(districtID, planID);
+      allow create, update: if canWritePlan(districtID, planID)
+        && request.resource.size < 25 * 1024 * 1024;
+      allow delete: if false;
+    }
+
+    match /districts/{districtID}/exports/{exportID}/{fileName} {
+      allow read: if canReadExport(districtID, exportID);
+      allow write: if false;
+    }
+
+    match /catalogs/{catalogName}/{allPaths=**} {
+      allow read: if isAuthenticated()
+        && catalogName in [
+          'careers',
+          'interests',
+          'globalResources',
+          'tmiModels',
+          'surveyDefinitions'
+        ];
+      allow write: if false;
+    }
+
+    match /{unmatched=**} {
+      allow read, write: if false;
+    }
+  }
+}
