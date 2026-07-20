@@ -1,0 +1,61 @@
+{
+  "migrationId": "gate0-canonical-v1",
+  "migrationTimestamp": "2026-07-20T12:00:00.000Z",
+  "schemaVersion": 1,
+  "ownership": {
+    "users/teacher-1": "district-a",
+    "students/student-top": "district-b",
+    "plans/plan-top": "district-b"
+  },
+  "documents": [
+    {
+      "path": "users/teacher-1/students/student-user",
+      "data": {
+        "name": "User Scoped Student",
+        "districtId": "district-a",
+        "schoolId": "school-a",
+        "grade": "7"
+      }
+    },
+    {
+      "path": "users/teacher-1/tmiPlans/plan-user",
+      "data": {
+        "name": "User Scoped Plan",
+        "districtId": "district-a",
+        "schoolId": "school-a",
+        "schoolIDs": ["school-a"],
+        "studentIDs": ["student-user"],
+        "status": "draft"
+      }
+    },
+    {
+      "path": "students/student-top",
+      "data": {
+        "name": "Top Level Student",
+        "districtId": "district-b",
+        "schoolId": "school-b",
+        "grade": "9"
+      }
+    },
+    {
+      "path": "plans/plan-top",
+      "data": {
+        "name": "Top Level Plan",
+        "districtId": "district-b",
+        "schoolId": "school-b",
+        "schoolIDs": ["school-b"],
+        "studentIDs": ["student-top"],
+        "status": "submitted"
+      }
+    },
+    {
+      "path": "students/student-unresolved",
+      "data": {
+        "name": "Unresolved Student",
+        "districtId": "untrusted-legacy-value",
+        "schoolId": "school-unknown",
+        "grade": "8"
+      }
+    }
+  ]
+}

@@ -1,0 +1,266 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import {
+  buildMigrationPlan,
+  canonicalJSONString,
+  parseMigrationFixture,
+  type MigrationPlan,
+  type MigrationWrite,
+} from "./migrationManifest.js";
+import {
+  applyMigrationPlan,
+  FirestoreMigrationStore,
+  MemoryMigrationStore,
+  type MigrationStore,
+} from "./migrate.js";
+
+export interface ReconciliationReport {
+  readonly expectedCount: number;
+  readonly foundCount: number;
+  readonly mismatches: readonly string[];
+  readonly isConsistent: boolean;
+}
+
+export async function reconcileMigrationPlan(
+  plan: MigrationPlan,
+  store: MigrationStore,
+): Promise<ReconciliationReport> {
+  const mismatches: string[] = [];
+  let foundCount = 0;
+
+  for (const write of plan.writes) {
+    const actual = await store.read(write.manifest.destinationPath);
+    if (actual === null) {
+      mismatches.push(`missing destination: ${write.manifest.destinationPath}`);
+      continue;
+    }
+    foundCount += 1;
+    reconcileRequiredFields(plan, write, actual, mismatches);
+    reconcileStableID(write, mismatches);
+    reconcileTenantOwnership(write, actual, mismatches);
+    if (canonicalJSONString(actual) !== canonicalJSONString(write.data)) {
+      mismatches.push(
+        `decoded equality mismatch: ${write.manifest.destinationPath}`,
+      );
+    }
+  }
+
+  await reconcilePlanReferences(plan, store, mismatches);
+  mismatches.sort((left, right) => left.localeCompare(right));
+  return {
+    expectedCount: plan.writes.length,
+    foundCount,
+    mismatches,
+    isConsistent: mismatches.length === 0,
+  };
+}
+
+function reconcileRequiredFields(
+  plan: MigrationPlan,
+  write: MigrationWrite,
+  actual: Readonly<Record<string, unknown>>,
+  mismatches: string[],
+): void {
+  const legacyID = write.manifest.sourcePath.split("/").at(-1);
+  const expectedFields: Readonly<Record<string, unknown>> = {
+    migrationId: plan.migrationId,
+    legacyPath: write.manifest.sourcePath,
+    legacyId: legacyID,
+    checksum: write.manifest.checksum,
+    schemaVersion: write.manifest.schemaVersion,
+    createdAt: write.data.createdAt,
+    createdBy: write.data.createdBy,
+    updatedAt: write.data.updatedAt,
+    updatedBy: write.data.updatedBy,
+  };
+  for (const [field, expected] of Object.entries(expectedFields)) {
+    if (canonicalJSONString(actual[field]) !== canonicalJSONString(expected)) {
+      mismatches.push(
+        `required field mismatch (${field}): ${write.manifest.destinationPath}`,
+      );
+    }
+  }
+  if (
+    typeof actual.recordVersion !== "number" ||
+    !Number.isSafeInteger(actual.recordVersion) ||
+    actual.recordVersion < 1
+  ) {
+    mismatches.push(
+      `required field mismatch (recordVersion): ${write.manifest.destinationPath}`,
+    );
+  }
+}
+
+function reconcileStableID(
+  write: MigrationWrite,
+  mismatches: string[],
+): void {
+  if (write.manifest.ownerResolution !== "mapped") {
+    return;
+  }
+  const legacyID = write.manifest.sourcePath.split("/").at(-1);
+  const destinationID = write.manifest.destinationPath.split("/").at(-1);
+  if (legacyID !== destinationID) {
+    mismatches.push(
+      `stable ID mismatch: ${write.manifest.destinationPath}`,
+    );
+  }
+}
+
+function reconcileTenantOwnership(
+  write: MigrationWrite,
+  actual: Readonly<Record<string, unknown>>,
+  mismatches: string[],
+): void {
+  if (write.manifest.ownerResolution === "quarantine") {
+    if (!write.manifest.destinationPath.startsWith("migrationQuarantine/")) {
+      mismatches.push(
+        `quarantine path mismatch: ${write.manifest.destinationPath}`,
+      );
+    }
+    return;
+  }
+  const segments = write.manifest.destinationPath.split("/");
+  const districtID = segments[1];
+  if (
+    segments.length !== 4 ||
+    segments[0] !== "districts" ||
+    (segments[2] !== "students" && segments[2] !== "plans") ||
+    actual.districtId !== districtID
+  ) {
+    mismatches.push(
+      `tenant ownership mismatch: ${write.manifest.destinationPath}`,
+    );
+  }
+}
+
+async function reconcilePlanReferences(
+  plan: MigrationPlan,
+  store: MigrationStore,
+  mismatches: string[],
+): Promise<void> {
+  for (const write of plan.writes) {
+    const segments = write.manifest.destinationPath.split("/");
+    if (
+      write.manifest.ownerResolution !== "mapped" ||
+      segments[2] !== "plans"
+    ) {
+      continue;
+    }
+    const studentIDs = write.data.studentIDs;
+    if (!Array.isArray(studentIDs) || studentIDs.length === 0) {
+      mismatches.push(
+        `required plan reference mismatch: ${write.manifest.destinationPath}`,
+      );
+      continue;
+    }
+    const districtID = segments[1] ?? "";
+    for (const studentID of studentIDs) {
+      if (typeof studentID !== "string") {
+        mismatches.push(
+          `malformed student reference: ${write.manifest.destinationPath}`,
+        );
+        continue;
+      }
+      const studentPath = `districts/${districtID}/students/${studentID}`;
+      if ((await store.read(studentPath)) === null) {
+        mismatches.push(
+          `broken student reference (${studentID}): ${write.manifest.destinationPath}`,
+        );
+      }
+    }
+  }
+}
+
+interface ReconcileCLIArguments {
+  readonly project: string;
+  readonly fixturePath: string;
+  readonly againstFirestore: boolean;
+  readonly confirmedProject: string | null;
+}
+
+function parseCLIArguments(arguments_: readonly string[]): ReconcileCLIArguments {
+  const readValue = (flag: string): string | null => {
+    const index = arguments_.indexOf(flag);
+    const value = index < 0 ? undefined : arguments_[index + 1];
+    return value === undefined || value.startsWith("--") ? null : value;
+  };
+  const project = readValue("--project");
+  const fixturePath = readValue("--fixture");
+  if (project === null || fixturePath === null) {
+    throw new TypeError("--project and --fixture are required.");
+  }
+  return {
+    project,
+    fixturePath,
+    againstFirestore: arguments_.includes("--against-firestore"),
+    confirmedProject: readValue("--confirm-project"),
+  };
+}
+
+function resolveInputPath(path: string): string {
+  const initialDirectory = process.env.INIT_CWD;
+  const candidates = [
+    resolve(process.cwd(), path),
+    ...(initialDirectory === undefined ? [] : [resolve(initialDirectory, path)]),
+    resolve(process.cwd(), "..", path),
+  ];
+  const match = candidates.find(existsSync);
+  if (match === undefined) {
+    throw new TypeError(`Fixture not found: ${path}.`);
+  }
+  return match;
+}
+
+async function runCLI(): Promise<void> {
+  const arguments_ = parseCLIArguments(process.argv.slice(2));
+  const fixture = parseMigrationFixture(
+    JSON.parse(
+      readFileSync(resolveInputPath(arguments_.fixturePath), "utf8"),
+    ) as unknown,
+  );
+  const plan = buildMigrationPlan(fixture);
+  let store: MigrationStore;
+  let mode: "fixture" | "firestore";
+
+  if (arguments_.againstFirestore) {
+    if (arguments_.confirmedProject !== arguments_.project) {
+      throw new TypeError(
+        "Firestore reconciliation requires an exact --confirm-project value.",
+      );
+    }
+    if (getApps().length === 0) {
+      initializeApp({ projectId: arguments_.project });
+    }
+    store = new FirestoreMigrationStore(getFirestore());
+    mode = "firestore";
+  } else {
+    const memoryStore = new MemoryMigrationStore();
+    await applyMigrationPlan(plan, memoryStore);
+    store = memoryStore;
+    mode = "fixture";
+  }
+
+  const report = await reconcileMigrationPlan(plan, store);
+  process.stdout.write(
+    `${JSON.stringify({ mode, project: arguments_.project, ...report }, null, 2)}\n`,
+  );
+  if (!report.isConsistent) {
+    process.exitCode = 2;
+  }
+}
+
+const isMainModule =
+  process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+
+if (isMainModule) {
+  runCLI().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${message}\n`);
+    process.exitCode = 1;
+  });
+}
