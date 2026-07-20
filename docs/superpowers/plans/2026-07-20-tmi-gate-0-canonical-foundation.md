@@ -97,6 +97,7 @@ git commit -m "test: repair accessibility test compilation"
 
 **Files:**
 - Create: `TMI/Core/Configuration/FeatureFlags.swift`
+- Create: `TMI/Core/Dependencies/AppDependencies.swift`
 - Create: `TMITests/Core/FeatureFlagsTests.swift`
 - Modify: `TMI/App/TMIApp.swift`
 - Modify: `TMI/Views/Authentication/RoleSelectionView.swift`
@@ -140,7 +141,7 @@ struct FeatureFlags: Sendable, Equatable {
 }
 ```
 
-Inject the value through `AppDependencies`; remove role-selection and root-routing branches for student, parent, and legal-guardian accounts unless the corresponding flag is true. Do not destroy stored legacy users.
+Create the minimal `AppDependencies` composition value with an immutable `flags` property and inject it through SwiftUI Environment at `TMIApp`; Task 10 expands this same value with repositories and adapters. Remove role-selection and root-routing branches for student, parent, and legal-guardian accounts unless the corresponding flag is true. Do not destroy stored legacy users.
 
 - [ ] **Step 4: Re-run focused and navigation tests**
 
@@ -149,7 +150,7 @@ Expected: `FeatureFlagsTests`, `SimplifiedRegistrationViewTests`, and `MainTabVi
 - [ ] **Step 5: Commit**
 
 ```bash
-git add TMI/Core/Configuration/FeatureFlags.swift TMITests/Core/FeatureFlagsTests.swift TMI/App/TMIApp.swift TMI/Views/Authentication/RoleSelectionView.swift
+git add TMI/Core/Configuration/FeatureFlags.swift TMI/Core/Dependencies/AppDependencies.swift TMITests/Core/FeatureFlagsTests.swift TMI/App/TMIApp.swift TMI/Views/Authentication/RoleSelectionView.swift
 git commit -m "feat: gate unsupported accounts and optional AI"
 ```
 
@@ -512,7 +513,7 @@ git commit -m "feat: establish Aubergine and Teal tokens"
 ## Task 10: Create the injected composition root and eliminate production fabrication
 
 **Files:**
-- Create: `TMI/Core/Dependencies/AppDependencies.swift`
+- Modify: `TMI/Core/Dependencies/AppDependencies.swift`
 - Modify: `TMI/App/TMIApp.swift`
 - Modify: `TMI/Services/FirebaseManager.swift`
 - Modify: `TMI/Utilities/SampleDataSeeder.swift`
