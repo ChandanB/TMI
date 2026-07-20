@@ -294,7 +294,7 @@ actor PlanTemplateService {
     // MARK: - Authorization Helpers
 
     private var templatesCollection: CollectionReference {
-        db.collection(FirestorePaths.planTemplates)
+        db.collection(FirestorePaths.catalogItems(.tmiModels))
     }
 
     private func templateDocument(id: String) -> DocumentReference {
@@ -368,14 +368,6 @@ actor PlanTemplateService {
             usageCount: template.usageCount,
             rating: template.rating
         )
-    }
-}
-
-extension FirestorePaths {
-    static let planTemplates = "planTemplates"
-
-    static func planTemplate(templateId: String) -> String {
-        "planTemplates/\(templateId)"
     }
 }
 

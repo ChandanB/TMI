@@ -23,10 +23,6 @@ class FormAssignmentService {
     self.authorizationSessions = authorizationSessions
   }
 
-  private var assignmentsCollection: CollectionReference {
-    db.collection(FirestorePaths.formAssignments)
-  }
-
   // MARK: - CRUD Operations
 
   /// Fetch assignments created by the currently authenticated staff member.
@@ -36,7 +32,9 @@ class FormAssignmentService {
       throw FormAssignmentError.authorizationDenied
     }
 
-    let querySnapshot = try await assignmentsCollection
+    let querySnapshot = try await assignmentsCollection(
+      districtID: session.membership.districtID
+    )
       .whereField("assignedBy", isEqualTo: session.membership.userID)
       .order(by: "createdAt", descending: true)
       .getDocuments()
@@ -77,7 +75,9 @@ class FormAssignmentService {
       throw FormAssignmentError.authorizationDenied
     }
 
-    let snapshot = try await assignmentsCollection
+    let snapshot = try await assignmentsCollection(
+      districtID: session.membership.districtID
+    )
       .whereField("isActive", isEqualTo: true)
       .whereField("districtId", isEqualTo: session.membership.districtID)
       .getDocuments()
@@ -92,7 +92,10 @@ class FormAssignmentService {
 
   /// Fetch a single assignment after rebuilding its canonical target scope.
   func fetchAssignment(id: String) async throws -> FormAssignment {
-    let document = try await assignmentsCollection.document(id).getDocument()
+    let session = try authorizedSession()
+    let document = try await assignmentsCollection(
+      districtID: session.membership.districtID
+    ).document(id).getDocument()
     guard document.exists else {
       throw FormAssignmentError.assignmentNotFound(id)
     }
@@ -133,7 +136,9 @@ class FormAssignmentService {
     }
 
     let data = try Firestore.Encoder().encode(newAssignment)
-    let documentRef = try await assignmentsCollection.addDocument(data: data)
+    let documentRef = try await assignmentsCollection(
+      districtID: session.membership.districtID
+    ).addDocument(data: data)
     newAssignment.id = documentRef.documentID
 
     print("[FormAssignmentService] Created assignment: \(documentRef.documentID)")
@@ -172,7 +177,9 @@ class FormAssignmentService {
     updated.totalAssigned = proposedAccess.students.count
 
     let data = try Firestore.Encoder().encode(updated)
-    try await assignmentsCollection.document(id).setData(data, merge: false)
+    try await assignmentsCollection(
+      districtID: session.membership.districtID
+    ).document(id).setData(data, merge: false)
     print("[FormAssignmentService] Updated assignment: \(id)")
   }
 
@@ -187,7 +194,9 @@ class FormAssignmentService {
       throw FormAssignmentError.deletionRequiresRetentionWorkflow
     }
 
-    try await assignmentsCollection.document(id).delete()
+    try await assignmentsCollection(
+      districtID: access.session.membership.districtID
+    ).document(id).delete()
   }
 
   func deactivateAssignment(_ assignment: FormAssignment) async throws {
@@ -200,8 +209,10 @@ class FormAssignmentService {
 
   func updateStatistics(for assignmentId: String) async throws {
     let stored = try await fetchAssignmentDocument(id: assignmentId)
-    _ = try await requireAssignmentAccess(stored)
-    try await assignmentsCollection.document(assignmentId).updateData([
+    let access = try await requireAssignmentAccess(stored)
+    try await assignmentsCollection(
+      districtID: access.session.membership.districtID
+    ).document(assignmentId).updateData([
       "updatedAt": FieldValue.serverTimestamp()
     ])
   }
@@ -259,8 +270,15 @@ class FormAssignmentService {
     return session
   }
 
+  private func assignmentsCollection(districtID: String) -> CollectionReference {
+    db.collection(FirestorePaths.formAssignments(districtID: districtID))
+  }
+
   private func fetchAssignmentDocument(id: String) async throws -> FormAssignment {
-    let document = try await assignmentsCollection.document(id).getDocument()
+    let session = try authorizedSession()
+    let document = try await assignmentsCollection(
+      districtID: session.membership.districtID
+    ).document(id).getDocument()
     guard document.exists else {
       throw FormAssignmentError.assignmentNotFound(id)
     }

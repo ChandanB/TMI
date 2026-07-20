@@ -1098,11 +1098,13 @@ class TMIPlanService {
     // MARK: - Plan Inputs & Evidence
 
     private func planInputsCollection(planId: String) -> CollectionReference {
-        db.collection(FirestorePaths.planInputs(planId: planId))
+        // Release 3 migrates this legacy shape into canonical plan actions.
+        db.collection("plans").document(planId).collection("inputs")
     }
 
     private func planEvidenceCollection(planId: String) -> CollectionReference {
-        db.collection(FirestorePaths.planEvidence(planId: planId))
+        // Release 3 migrates this legacy shape into canonical plan progress.
+        db.collection("plans").document(planId).collection("evidence")
     }
 
     func fetchPlanInputs(planId: String) async throws -> [PlanInputField] {

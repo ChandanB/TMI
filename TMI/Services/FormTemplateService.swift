@@ -23,10 +23,6 @@ class FormTemplateService {
     self.authorizationSessions = authorizationSessions
   }
 
-  private var templatesCollection: CollectionReference {
-    db.collection(FirestorePaths.formTemplates)
-  }
-
   // MARK: - Fetch Operations
 
   func fetchTemplates(districtId: String) async throws -> [FormTemplate] {
@@ -35,7 +31,9 @@ class FormTemplateService {
       throw FormTemplateError.authorizationDenied
     }
 
-    let querySnapshot = try await templatesCollection
+    let querySnapshot = try await templatesCollection(
+      districtID: session.membership.districtID
+    )
       .whereField("districtId", isEqualTo: session.membership.districtID)
       .order(by: "updatedAt", descending: true)
       .getDocuments()
@@ -50,7 +48,10 @@ class FormTemplateService {
 
   /// Public catalog records do not confer tenant authority.
   func fetchPublicTemplates() async throws -> [FormTemplate] {
-    let querySnapshot = try await templatesCollection
+    let session = try authorizedSession()
+    let querySnapshot = try await templatesCollection(
+      districtID: session.membership.districtID
+    )
       .whereField("isPublic", isEqualTo: true)
       .order(by: "name", descending: false)
       .getDocuments()
@@ -61,12 +62,15 @@ class FormTemplateService {
   }
 
   func fetchTemplate(id: String) async throws -> FormTemplate {
-    let template = try await fetchTemplateDocument(id: id)
+    let session = try authorizedSession()
+    let template = try await fetchTemplateDocument(
+      id: id,
+      districtID: session.membership.districtID
+    )
     if template.isPublic {
       return template
     }
 
-    let session = try authorizedSession()
     guard canRead(template, member: session.membership) else {
       throw FormTemplateError.authorizationDenied
     }
@@ -100,7 +104,9 @@ class FormTemplateService {
     }
 
     let data = try Firestore.Encoder().encode(newTemplate)
-    let documentRef = try await templatesCollection.addDocument(data: data)
+    let documentRef = try await templatesCollection(
+      districtID: session.membership.districtID
+    ).addDocument(data: data)
     newTemplate.id = documentRef.documentID
     return newTemplate
   }
@@ -111,7 +117,10 @@ class FormTemplateService {
     }
 
     let session = try authorizedSession()
-    let stored = try await fetchTemplateDocument(id: id)
+    let stored = try await fetchTemplateDocument(
+      id: id,
+      districtID: session.membership.districtID
+    )
     try requireWrite(stored, member: session.membership)
 
     var updated = template
@@ -127,14 +136,21 @@ class FormTemplateService {
     }
 
     let data = try Firestore.Encoder().encode(updated)
-    try await templatesCollection.document(id).setData(data, merge: false)
+    try await templatesCollection(
+      districtID: session.membership.districtID
+    ).document(id).setData(data, merge: false)
   }
 
   func publishTemplate(_ id: String) async throws {
     let session = try authorizedSession()
-    let stored = try await fetchTemplateDocument(id: id)
+    let stored = try await fetchTemplateDocument(
+      id: id,
+      districtID: session.membership.districtID
+    )
     try requireWrite(stored, member: session.membership)
-    try await templatesCollection.document(id).updateData([
+    try await templatesCollection(
+      districtID: session.membership.districtID
+    ).document(id).updateData([
       "isActive": true,
       "updatedAt": Date()
     ])
@@ -143,7 +159,10 @@ class FormTemplateService {
   /// Hard deletion remains disabled until a retention-aware template contract exists.
   func deleteTemplate(id: String) async throws {
     let session = try authorizedSession()
-    let stored = try await fetchTemplateDocument(id: id)
+    let stored = try await fetchTemplateDocument(
+      id: id,
+      districtID: session.membership.districtID
+    )
     try requireWrite(stored, member: session.membership)
     throw FormTemplateError.deletionRequiresRetentionWorkflow
   }
@@ -240,8 +259,17 @@ class FormTemplateService {
     return session
   }
 
-  private func fetchTemplateDocument(id: String) async throws -> FormTemplate {
-    let document = try await templatesCollection.document(id).getDocument()
+  private func templatesCollection(districtID: String) -> CollectionReference {
+    db.collection(FirestorePaths.formTemplates(districtID: districtID))
+  }
+
+  private func fetchTemplateDocument(
+    id: String,
+    districtID: String
+  ) async throws -> FormTemplate {
+    let document = try await templatesCollection(
+      districtID: districtID
+    ).document(id).getDocument()
     guard document.exists else {
       throw FormTemplateError.templateNotFound(id)
     }

@@ -1,349 +1,433 @@
-//
-//  FirestorePaths.swift
-//  TMI
-//
-//  Centralized Firestore path builder for district-scoped collections
-//
-
 import Foundation
 
-/// Errors for missing identifiers when building Firestore paths
-enum FirestorePathError: Error, LocalizedError {
-    case missingIdentifier(String)
-    var errorDescription: String? {
-        switch self {
-        case .missingIdentifier(let context):
-            return "Missing required identifier: \(context)"
-        }
-    }
+/// The only catalog identifiers permitted by the canonical product contract.
+enum CatalogName: String, Codable, CaseIterable, Sendable {
+    case careers
+    case interests
+    case globalResources
+    case tmiModels
+    case surveyDefinitions
 }
 
-/// Centralized path builder for consistent Firestore collection access
+/// Canonical Firestore path construction.
+///
+/// Production repositories use this district-scoped tree. Historical paths
+/// belong in `Migration/LegacyFirestorePaths.swift` and are never added here.
 enum FirestorePaths {
+    // MARK: - Personal profile
 
-    // MARK: - User-Scoped Paths (Legacy/Backward Compatibility)
-
-    static func userStudents(userId: String) -> String {
-        return "users/\(userId)/students"
+    static func privateProfile(userID: String) -> String {
+        path("users", userID, "private", "profile")
     }
 
-    static func userStudent(userId: String, studentId: String) -> String {
-        return "users/\(userId)/students/\(studentId)"
+    static func preferences(userID: String) -> String {
+        path("users", userID, "preferences", "settings")
     }
 
-    static func userPlans(userId: String) -> String {
-        return "users/\(userId)/tmiPlans"
+    // MARK: - District, schools, and membership
+
+    static func district(districtID: String) -> String {
+        path("districts", districtID)
     }
 
-    static func userPlan(userId: String, planId: String) -> String {
-        return "users/\(userId)/tmiPlans/\(planId)"
+    static func schools(districtID: String) -> String {
+        path(district(districtID: districtID), "schools")
     }
 
-    static func userResources(userId: String) -> String {
-        return "users/\(userId)/resources"
+    static func school(districtID: String, schoolID: String) -> String {
+        path(schools(districtID: districtID), schoolID)
     }
 
-    static func userResource(userId: String, resourceId: String) -> String {
-        return "users/\(userId)/resources/\(resourceId)"
+    static func members(districtID: String) -> String {
+        path(district(districtID: districtID), "members")
     }
 
-    static func userMeetings(userId: String) -> String {
-        return "users/\(userId)/meetings"
+    static func member(districtID: String, userID: String) -> String {
+        path(members(districtID: districtID), userID)
     }
 
-    static func userMeeting(userId: String, meetingId: String) -> String {
-        return "users/\(userId)/meetings/\(meetingId)"
+    static func memberAcknowledgements(districtID: String, userID: String) -> String {
+        path(member(districtID: districtID, userID: userID), "acknowledgements")
     }
 
-    // MARK: - District-Scoped Paths (Primary)
-
-    static func districtStudents(districtId: String) -> String {
-        return "districts/\(districtId)/students"
+    static func memberAcknowledgement(
+        districtID: String,
+        userID: String,
+        acknowledgementID: String
+    ) -> String {
+        path(
+            memberAcknowledgements(districtID: districtID, userID: userID),
+            acknowledgementID
+        )
     }
 
-    static func districtStudent(districtId: String, studentId: String) -> String {
-        return "districts/\(districtId)/students/\(studentId)"
+    // MARK: - Students
+
+    static func students(districtID: String) -> String {
+        path(district(districtID: districtID), "students")
     }
 
-    static func districtPlans(districtId: String) -> String {
-        return "districts/\(districtId)/plans"
+    static func student(districtID: String, studentID: String) -> String {
+        path(students(districtID: districtID), studentID)
     }
 
-    static func districtPlan(districtId: String, planId: String) -> String {
-        return "districts/\(districtId)/plans/\(planId)"
+    static func studentInterests(districtID: String, studentID: String) -> String {
+        studentCollection("interests", districtID: districtID, studentID: studentID)
     }
 
-    static func districtStaff(districtId: String) -> String {
-        return "districts/\(districtId)/staff"
+    static func studentInterest(
+        districtID: String,
+        studentID: String,
+        interestID: String
+    ) -> String {
+        path(studentInterests(districtID: districtID, studentID: studentID), interestID)
     }
 
-    static func districtStaffMember(districtId: String, staffId: String) -> String {
-        return "districts/\(districtId)/staff/\(staffId)"
+    static func studentCareers(districtID: String, studentID: String) -> String {
+        studentCollection("careers", districtID: districtID, studentID: studentID)
     }
 
-    static func districtAnalytics(districtId: String) -> String {
-        return "districts/\(districtId)/analytics"
+    static func studentCareer(
+        districtID: String,
+        studentID: String,
+        careerID: String
+    ) -> String {
+        path(studentCareers(districtID: districtID, studentID: studentID), careerID)
     }
 
-    static func districtAnalyticsForDate(districtId: String, date: String) -> String {
-        return "districts/\(districtId)/analytics/\(date)"
+    static func studentResources(districtID: String, studentID: String) -> String {
+        studentCollection("resources", districtID: districtID, studentID: studentID)
     }
 
-    static func districtSchools(districtId: String) -> String {
-        return "districts/\(districtId)/schools"
+    static func studentResource(
+        districtID: String,
+        studentID: String,
+        relationshipID: String
+    ) -> String {
+        path(studentResources(districtID: districtID, studentID: studentID), relationshipID)
     }
 
-    static func districtSchool(districtId: String, schoolId: String) -> String {
-        return "districts/\(districtId)/schools/\(schoolId)"
+    static func studentSurveys(districtID: String, studentID: String) -> String {
+        studentCollection("surveys", districtID: districtID, studentID: studentID)
     }
 
-    static func districtAuditLogs(districtId: String) -> String {
-        return "districts/\(districtId)/auditLogs"
+    static func studentSurvey(
+        districtID: String,
+        studentID: String,
+        assignmentID: String
+    ) -> String {
+        path(studentSurveys(districtID: districtID, studentID: studentID), assignmentID)
     }
 
-    // MARK: - Top-Level Student Edge Collections
-
-    static func studentInterests(studentId: String) -> String {
-        return "students/\(studentId)/studentInterests"
+    static func studentResponses(districtID: String, studentID: String) -> String {
+        studentCollection("responses", districtID: districtID, studentID: studentID)
     }
 
-    static func studentInterest(studentId: String, interestId: String) -> String {
-        return "students/\(studentId)/studentInterests/\(interestId)"
+    static func studentResponse(
+        districtID: String,
+        studentID: String,
+        responseID: String
+    ) -> String {
+        path(studentResponses(districtID: districtID, studentID: studentID), responseID)
     }
 
-    static func studentCareerState(studentId: String) -> String {
-        return "students/\(studentId)/careerState"
+    static func studentNotes(districtID: String, studentID: String) -> String {
+        studentCollection("notes", districtID: districtID, studentID: studentID)
     }
 
-    static func studentCareer(studentId: String, careerId: String) -> String {
-        return "students/\(studentId)/careerState/\(careerId)"
+    static func studentNote(districtID: String, studentID: String, noteID: String) -> String {
+        path(studentNotes(districtID: districtID, studentID: studentID), noteID)
     }
 
-    static func studentSurveys(studentId: String) -> String {
-        return "students/\(studentId)/surveys"
+    static func studentRestrictedRecords(districtID: String, studentID: String) -> String {
+        studentCollection("restrictedRecords", districtID: districtID, studentID: studentID)
     }
 
-    static func studentSurvey(studentId: String, surveyId: String) -> String {
-        return "students/\(studentId)/surveys/\(surveyId)"
+    static func studentRestrictedRecord(
+        districtID: String,
+        studentID: String,
+        recordID: String
+    ) -> String {
+        path(
+            studentRestrictedRecords(districtID: districtID, studentID: studentID),
+            recordID
+        )
     }
 
-    // MARK: - Top-Level Plan Sub-Collections
-
-    static func planResources(planId: String) -> String {
-        return "plans/\(planId)/planResources"
+    static func studentConsents(districtID: String, studentID: String) -> String {
+        studentCollection("consents", districtID: districtID, studentID: studentID)
     }
 
-    static func planResource(planId: String, resourceId: String) -> String {
-        return "plans/\(planId)/planResources/\(resourceId)"
+    static func studentConsent(
+        districtID: String,
+        studentID: String,
+        consentID: String
+    ) -> String {
+        path(studentConsents(districtID: districtID, studentID: studentID), consentID)
     }
 
-    static func planActivities(planId: String) -> String {
-        return "plans/\(planId)/activities"
+    static func studentProgress(districtID: String, studentID: String) -> String {
+        studentCollection("progress", districtID: districtID, studentID: studentID)
     }
 
-    static func planActivity(planId: String, activityId: String) -> String {
-        return "plans/\(planId)/activities/\(activityId)"
+    static func studentProgressEntry(
+        districtID: String,
+        studentID: String,
+        entryID: String
+    ) -> String {
+        path(studentProgress(districtID: districtID, studentID: studentID), entryID)
     }
 
-    static func planApprovals(planId: String) -> String {
-        return "plans/\(planId)/approvals"
+    // MARK: - Plans
+
+    static func plans(districtID: String) -> String {
+        path(district(districtID: districtID), "plans")
     }
 
-    static func planApproval(planId: String, approvalId: String) -> String {
-        return "plans/\(planId)/approvals/\(approvalId)"
+    static func plan(districtID: String, planID: String) -> String {
+        path(plans(districtID: districtID), planID)
     }
 
-    static func planInputs(planId: String) -> String {
-        return "plans/\(planId)/inputs"
+    static func planGoals(districtID: String, planID: String) -> String {
+        planCollection("goals", districtID: districtID, planID: planID)
     }
 
-    static func planInput(planId: String, inputId: String) -> String {
-        return "plans/\(planId)/inputs/\(inputId)"
+    static func planGoal(districtID: String, planID: String, goalID: String) -> String {
+        path(planGoals(districtID: districtID, planID: planID), goalID)
     }
 
-    static func planEvidence(planId: String) -> String {
-        return "plans/\(planId)/evidence"
+    static func planActions(districtID: String, planID: String) -> String {
+        planCollection("actions", districtID: districtID, planID: planID)
     }
 
-    static func planEvidenceEntry(planId: String, evidenceId: String) -> String {
-        return "plans/\(planId)/evidence/\(evidenceId)"
+    static func planAction(districtID: String, planID: String, actionID: String) -> String {
+        path(planActions(districtID: districtID, planID: planID), actionID)
     }
 
-    // MARK: - Global Collections
-
-    static let interests = "interests"
-
-    static func interest(interestId: String) -> String {
-        return "interests/\(interestId)"
+    static func planProgress(districtID: String, planID: String) -> String {
+        planCollection("progress", districtID: districtID, planID: planID)
     }
 
-    static let careers = "careers"
-
-    static func career(careerId: String) -> String {
-        return "careers/\(careerId)"
+    static func planProgressEntry(
+        districtID: String,
+        planID: String,
+        entryID: String
+    ) -> String {
+        path(planProgress(districtID: districtID, planID: planID), entryID)
     }
 
-    static let resources = "resources"
-
-    static func resource(resourceId: String) -> String {
-        return "resources/\(resourceId)"
+    static func planApprovals(districtID: String, planID: String) -> String {
+        planCollection("approvals", districtID: districtID, planID: planID)
     }
 
-    static let formTemplates = "formTemplates"
-
-    static func formTemplate(templateId: String) -> String {
-        return "formTemplates/\(templateId)"
+    static func planApproval(
+        districtID: String,
+        planID: String,
+        approvalID: String
+    ) -> String {
+        path(planApprovals(districtID: districtID, planID: planID), approvalID)
     }
 
-    static let formAssignments = "formAssignments"
-
-    static func formAssignment(assignmentId: String) -> String {
-        return "formAssignments/\(assignmentId)"
+    static func planResources(districtID: String, planID: String) -> String {
+        planCollection("resources", districtID: districtID, planID: planID)
     }
 
-    static let formSubmissions = "formSubmissions"
-
-    static func formSubmission(submissionId: String) -> String {
-        return "formSubmissions/\(submissionId)"
+    static func planResource(
+        districtID: String,
+        planID: String,
+        relationshipID: String
+    ) -> String {
+        path(planResources(districtID: districtID, planID: planID), relationshipID)
     }
 
-    static let resourceAssignments = "resourceAssignments"
-
-    static func resourceAssignment(assignmentId: String) -> String {
-        return "resourceAssignments/\(assignmentId)"
+    static func planForms(districtID: String, planID: String) -> String {
+        planCollection("forms", districtID: districtID, planID: planID)
     }
 
-    static let districts = "districts"
-
-    static func district(districtId: String) -> String {
-        return "districts/\(districtId)"
+    static func planForm(districtID: String, planID: String, assignmentID: String) -> String {
+        path(planForms(districtID: districtID, planID: planID), assignmentID)
     }
 
-    static let users = "users"
-
-    static func user(userId: String) -> String {
-        return "users/\(userId)"
+    static func planRevisions(districtID: String, planID: String) -> String {
+        planCollection("revisions", districtID: districtID, planID: planID)
     }
 
-    static let notifications = "notifications"
-
-    static func notification(notificationId: String) -> String {
-        return "notifications/\(notificationId)"
+    static func planRevision(
+        districtID: String,
+        planID: String,
+        revisionID: String
+    ) -> String {
+        path(planRevisions(districtID: districtID, planID: planID), revisionID)
     }
 
-    // MARK: - Generated Resources (AI-Generated Content)
+    // MARK: - District collaboration
 
-    static let generatedResources = "generatedResources"
-
-    static func generatedResourcesForInterest(interestId: String) -> String {
-        return "generatedResources/\(interestId)/resources"
+    static func meetings(districtID: String) -> String {
+        districtCollection("meetings", districtID: districtID)
     }
 
-    static func generatedResource(interestId: String, resourceId: String) -> String {
-        return "generatedResources/\(interestId)/resources/\(resourceId)"
+    static func meeting(districtID: String, meetingID: String) -> String {
+        path(meetings(districtID: districtID), meetingID)
     }
 
-    // MARK: - Helper Methods
-
-    /// Get the appropriate student collection path based on migration strategy
-    /// - Parameters:
-    ///   - districtId: Optional district ID for district-scoped access
-    ///   - userId: Optional user ID for user-scoped fallback
-    /// - Returns: The collection path to use
-    static func students(districtId: String?, userId: String?) throws -> String {
-        if let districtId = districtId {
-            return districtStudents(districtId: districtId)
-        } else if let userId = userId {
-            return userStudents(userId: userId)
-        } else {
-            throw FirestorePathError.missingIdentifier("Either districtId or userId must be provided for students path")
-        }
+    static func tasks(districtID: String) -> String {
+        districtCollection("tasks", districtID: districtID)
     }
 
-    /// Get the appropriate plan collection path based on migration strategy
-    /// - Parameters:
-    ///   - districtId: Optional district ID for district-scoped access
-    ///   - userId: Optional user ID for user-scoped fallback
-    /// - Returns: The collection path to use
-    static func plans(districtId: String?, userId: String?) throws -> String {
-        if let districtId = districtId {
-            return districtPlans(districtId: districtId)
-        } else if let userId = userId {
-            return userPlans(userId: userId)
-        } else {
-            throw FirestorePathError.missingIdentifier("Either districtId or userId must be provided for plans path")
-        }
-    }
-}
-
-// MARK: - Migration Helpers
-
-extension FirestorePaths {
-    /// Strategy for reading data during migration
-    enum ReadStrategy {
-        case districtOnly       // Read only from district-scoped collections
-        case userOnly           // Read only from user-scoped collections (legacy)
-        case districtWithFallback // Try district first, fall back to user-scoped
+    static func task(districtID: String, taskID: String) -> String {
+        path(tasks(districtID: districtID), taskID)
     }
 
-    /// Strategy for writing data during migration
-    enum WriteStrategy {
-        case districtOnly    // Write only to district-scoped collections
-        case userOnly        // Write only to user-scoped collections (legacy)
-        case dualWrite       // Write to both locations (migration phase)
+    static func formTemplates(districtID: String) -> String {
+        districtCollection("formTemplates", districtID: districtID)
     }
 
-    /// Get collection paths for students based on read strategy
-    static func studentCollections(
-        strategy: ReadStrategy,
-        districtId: String?,
-        userId: String?
-    ) -> [String] {
-        switch strategy {
-        case .districtOnly:
-            guard let districtId = districtId else { return [] }
-            return [districtStudents(districtId: districtId)]
-
-        case .userOnly:
-            guard let userId = userId else { return [] }
-            return [userStudents(userId: userId)]
-
-        case .districtWithFallback:
-            var paths: [String] = []
-            if let districtId = districtId {
-                paths.append(districtStudents(districtId: districtId))
-            }
-            if let userId = userId {
-                paths.append(userStudents(userId: userId))
-            }
-            return paths
-        }
+    static func formTemplate(districtID: String, templateID: String) -> String {
+        path(formTemplates(districtID: districtID), templateID)
     }
 
-    /// Get collection paths for plans based on read strategy
-    static func planCollections(
-        strategy: ReadStrategy,
-        districtId: String?,
-        userId: String?
-    ) -> [String] {
-        switch strategy {
-        case .districtOnly:
-            guard let districtId = districtId else { return [] }
-            return [districtPlans(districtId: districtId)]
+    static func formAssignments(districtID: String) -> String {
+        districtCollection("formAssignments", districtID: districtID)
+    }
 
-        case .userOnly:
-            guard let userId = userId else { return [] }
-            return [userPlans(userId: userId)]
+    static func formAssignment(districtID: String, assignmentID: String) -> String {
+        path(formAssignments(districtID: districtID), assignmentID)
+    }
 
-        case .districtWithFallback:
-            var paths: [String] = []
-            if let districtId = districtId {
-                paths.append(districtPlans(districtId: districtId))
-            }
-            if let userId = userId {
-                paths.append(userPlans(userId: userId))
-            }
-            return paths
-        }
+    static func formAssignmentRespondents(
+        districtID: String,
+        assignmentID: String
+    ) -> String {
+        path(formAssignment(districtID: districtID, assignmentID: assignmentID), "respondents")
+    }
+
+    static func formAssignmentRespondent(
+        districtID: String,
+        assignmentID: String,
+        respondentID: String
+    ) -> String {
+        path(
+            formAssignmentRespondents(
+                districtID: districtID,
+                assignmentID: assignmentID
+            ),
+            respondentID
+        )
+    }
+
+    static func resources(districtID: String) -> String {
+        districtCollection("resources", districtID: districtID)
+    }
+
+    static func resource(districtID: String, resourceID: String) -> String {
+        path(resources(districtID: districtID), resourceID)
+    }
+
+    static func notifications(districtID: String) -> String {
+        districtCollection("notifications", districtID: districtID)
+    }
+
+    static func notification(districtID: String, notificationID: String) -> String {
+        path(notifications(districtID: districtID), notificationID)
+    }
+
+    static func studentModeSessions(districtID: String) -> String {
+        districtCollection("studentModeSessions", districtID: districtID)
+    }
+
+    static func studentModeSession(districtID: String, sessionID: String) -> String {
+        path(studentModeSessions(districtID: districtID), sessionID)
+    }
+
+    static func auditEvents(districtID: String) -> String {
+        districtCollection("auditEvents", districtID: districtID)
+    }
+
+    static func auditEvent(districtID: String, eventID: String) -> String {
+        path(auditEvents(districtID: districtID), eventID)
+    }
+
+    static func metricSnapshots(districtID: String) -> String {
+        districtCollection("metricSnapshots", districtID: districtID)
+    }
+
+    static func metricSnapshot(districtID: String, snapshotID: String) -> String {
+        path(metricSnapshots(districtID: districtID), snapshotID)
+    }
+
+    // MARK: - Catalogs
+
+    static func catalog(_ name: CatalogName) -> String {
+        path("catalogs", name.rawValue)
+    }
+
+    static func catalogItems(_ name: CatalogName) -> String {
+        path(catalog(name), "items")
+    }
+
+    static func catalogItem(_ name: CatalogName, itemID: String) -> String {
+        path(catalogItems(name), itemID)
+    }
+
+    /// Auditable collection shapes used by rules, migration, and source tests.
+    static let productionCollectionTemplates: Set<String> = [
+        "users/{uid}/private",
+        "users/{uid}/preferences",
+        "districts/{districtId}/schools",
+        "districts/{districtId}/members",
+        "districts/{districtId}/members/{uid}/acknowledgements",
+        "districts/{districtId}/students",
+        "districts/{districtId}/students/{studentId}/interests",
+        "districts/{districtId}/students/{studentId}/careers",
+        "districts/{districtId}/students/{studentId}/resources",
+        "districts/{districtId}/students/{studentId}/surveys",
+        "districts/{districtId}/students/{studentId}/responses",
+        "districts/{districtId}/students/{studentId}/notes",
+        "districts/{districtId}/students/{studentId}/restrictedRecords",
+        "districts/{districtId}/students/{studentId}/consents",
+        "districts/{districtId}/students/{studentId}/progress",
+        "districts/{districtId}/plans",
+        "districts/{districtId}/plans/{planId}/goals",
+        "districts/{districtId}/plans/{planId}/actions",
+        "districts/{districtId}/plans/{planId}/progress",
+        "districts/{districtId}/plans/{planId}/approvals",
+        "districts/{districtId}/plans/{planId}/resources",
+        "districts/{districtId}/plans/{planId}/forms",
+        "districts/{districtId}/plans/{planId}/revisions",
+        "districts/{districtId}/meetings",
+        "districts/{districtId}/tasks",
+        "districts/{districtId}/formTemplates",
+        "districts/{districtId}/formAssignments",
+        "districts/{districtId}/formAssignments/{assignmentId}/respondents",
+        "districts/{districtId}/resources",
+        "districts/{districtId}/notifications",
+        "districts/{districtId}/studentModeSessions",
+        "districts/{districtId}/auditEvents",
+        "districts/{districtId}/metricSnapshots",
+        "catalogs/{catalogName}/items",
+    ]
+
+    private static func districtCollection(_ name: String, districtID: String) -> String {
+        path(district(districtID: districtID), name)
+    }
+
+    private static func studentCollection(
+        _ name: String,
+        districtID: String,
+        studentID: String
+    ) -> String {
+        path(student(districtID: districtID, studentID: studentID), name)
+    }
+
+    private static func planCollection(
+        _ name: String,
+        districtID: String,
+        planID: String
+    ) -> String {
+        path(plan(districtID: districtID, planID: planID), name)
+    }
+
+    private static func path(_ components: String...) -> String {
+        components.joined(separator: "/")
     }
 }
