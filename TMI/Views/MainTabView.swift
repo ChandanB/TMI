@@ -12,6 +12,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var selectedTab: Tab = .dashboard
+    @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) private var authStateModel
     @Environment(\.studentContext) private var studentContext
     @Environment(\.deepLinkRouter) private var deepLinkRouter
@@ -87,7 +88,10 @@ struct MainTabView: View {
                     .environment(\.studentModeSession, studentModeSession)
                     .environment(\.studentAccessMode, .studentMode)
                     .onAppear {
-                        print("[MainTabView] 🎓 Switched to Student Mode for: \(activeStudent.name)")
+                        dependencies.logger.info(
+                            "student_mode_entered",
+                            metadata: ["studentID": activeStudent.id ?? "missing"]
+                        )
                     }
             } else {
                 // Staff Mode - Full Interface
@@ -96,7 +100,7 @@ struct MainTabView: View {
                     .environment(\.meetingsStateModel, meetingsStateModel)
                     .environment(\.recommendationsStateModel, recommendationsStateModel)
                     .onAppear {
-                        print("[MainTabView] 👨‍💼 In Staff Mode")
+                        dependencies.logger.info("staff_mode_entered")
                     }
             }
         }

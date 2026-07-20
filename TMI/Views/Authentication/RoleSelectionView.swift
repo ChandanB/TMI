@@ -175,12 +175,6 @@ struct RoleSelectionView: View {
       showingAgeVerification = true
 
     case .institutionalEmail:
-      // Always allow progress, initiate background verification if institutionCode or selectedInstitution present
-      if !institutionCode.isEmpty || selectedInstitution != nil {
-        Task {
-          await verifyInstitutionInBackground()
-        }
-      }
       // Transition directly to registration
       showingRegistrationView = true
       // Notify about registration start
@@ -206,12 +200,6 @@ struct RoleSelectionView: View {
     }
   }
 
-  private func verifyInstitutionInBackground() async {
-    // Simulate background verification with delay
-    print("Starting background institution verification...")
-    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds delay
-    print("Institution verification completed.")
-  }
 }
 
 // MARK: - Trauma-Informed Welcome Section

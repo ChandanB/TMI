@@ -133,7 +133,13 @@ final class AuthenticationService {
         // Save to Firestore
         try await saveUserToFirestore(user)
 
-        print("[AuthenticationService] ✅ Created user: \(email) with role: \(role.rawValue)")
+        Log.auth.info(
+            "account_created",
+            metadata: [
+                "userID": uid,
+                "requestedRole": role.rawValue,
+            ]
+        )
 
         return user
     }

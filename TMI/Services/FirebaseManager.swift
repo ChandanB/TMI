@@ -30,56 +30,45 @@ struct FirebaseManager {
     
     // Check Firebase configuration status
     let configStatus = FirebaseConfigurationHelper.shared.checkFirebaseConfiguration()
-    let message = FirebaseConfigurationHelper.shared.getUserFriendlyMessage(for: configStatus)
-    print("Firebase Status: \(message)")
+    Log.firebase.info(
+      "firebase_configuration_checked",
+      metadata: ["status": configStatus.telemetryValue]
+    )
     
     // Enable offline mode if needed
     if configStatus.canWorkOffline {
       FirebaseConfigurationHelper.shared.enableOfflineMode()
     }
     
-    // Print developer instructions if there are configuration issues
     if !configStatus.isWorking {
-      let instructions = FirebaseConfigurationHelper.shared.getDeveloperInstructions(for: configStatus)
-      print("🔧 Developer Instructions:")
-      for instruction in instructions {
-        print("   \(instruction)")
-      }
-      
-      // Print complete setup instructions for comprehensive guidance
-      print("\n")
-      let completeInstructions = FirebaseConfigurationHelper.shared.getCompleteSetupInstructions()
-      for instruction in completeInstructions {
-        print(instruction)
-      }
+      Log.firebase.warning(
+        "firebase_configuration_incomplete",
+        metadata: ["status": configStatus.telemetryValue]
+      )
     }
   }
 }
 
 extension FirebaseManager {
-  /// Performs Firebase configuration checks and prints setup status and instructions.
+  /// Performs Firebase configuration checks and configures offline support.
   /// Call this from your app's startup (e.g., AppDelegate, SceneDelegate, or main SwiftUI entry point) after FirebaseManager has been initialized.
   @MainActor
   static func configureIfNeeded() async {
     let configStatus = FirebaseConfigurationHelper.shared.checkFirebaseConfiguration()
-    let message = FirebaseConfigurationHelper.shared.getUserFriendlyMessage(for: configStatus)
-    print("Firebase Status: \(message)")
+    Log.firebase.info(
+      "firebase_configuration_checked",
+      metadata: ["status": configStatus.telemetryValue]
+    )
     
     if configStatus.canWorkOffline {
       FirebaseConfigurationHelper.shared.enableOfflineMode()
     }
     
     if !configStatus.isWorking {
-      let instructions = FirebaseConfigurationHelper.shared.getDeveloperInstructions(for: configStatus)
-      print("🔧 Developer Instructions:")
-      for instruction in instructions {
-        print("   \(instruction)")
-      }
-      print("\n")
-      let completeInstructions = FirebaseConfigurationHelper.shared.getCompleteSetupInstructions()
-      for instruction in completeInstructions {
-        print(instruction)
-      }
+      Log.firebase.warning(
+        "firebase_configuration_incomplete",
+        metadata: ["status": configStatus.telemetryValue]
+      )
     }
   }
 }
@@ -89,12 +78,8 @@ extension FirebaseManager {
   nonisolated(nonsending) func signIn(withEmail email: String, password: String) async throws {
     let configStatus = FirebaseConfigurationHelper.shared.checkFirebaseConfiguration()
     
-    // If Firebase is not properly configured, use mock authentication for development
-    if !configStatus.isWorking && isDevelopmentMode() {
-      print("🚧 Using mock authentication for development - Firebase not configured")
-      // Simulate successful authentication delay
-      try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-      return
+    guard configStatus.isWorking else {
+      throw FirebaseManagerError.databaseNotConfigured
     }
     
     do {
@@ -110,7 +95,10 @@ extension FirebaseManager {
         throw FirebaseManagerError.appCheckNotEnabled
       case .inAppMessagingDisabled:
         // Log but don't throw - in-app messaging is not critical for authentication
-        print("⚠️ In-App Messaging disabled: \(errorResponse.userMessage)")
+        Log.firebase.warning(
+          "firebase_in_app_messaging_unavailable",
+          metadata: ["operation": "sign_in"]
+        )
         throw FirebaseManagerError.signInFailed("Authentication completed with limited messaging features.")
       case .networkError:
         throw FirebaseManagerError.signInFailed("Network connection issue. Please check your internet connection.")
@@ -122,15 +110,6 @@ extension FirebaseManager {
     }
   }
   
-  /// Check if running in development mode
-  nonisolated private func isDevelopmentMode() -> Bool {
-    #if DEBUG
-    return true
-    #else
-    return false
-    #endif
-  }
-
   nonisolated(nonsending) func signUp(
     withEmail email: String,
     password: String,
@@ -179,7 +158,10 @@ extension FirebaseManager {
         throw FirebaseManagerError.appCheckNotEnabled
       case .inAppMessagingDisabled:
         // Log but continue - in-app messaging is not critical for password reset
-        print("⚠️ In-App Messaging disabled: \(errorResponse.userMessage)")
+        Log.firebase.warning(
+          "firebase_in_app_messaging_unavailable",
+          metadata: ["operation": "password_reset"]
+        )
         return // Password reset succeeded despite messaging limitation
       case .networkError:
         throw FirebaseManagerError.signInFailed("Network connection issue. Please check your internet connection.")
@@ -214,34 +196,6 @@ extension FirebaseManager {
     try await firestore.collection("users").document(currentUser.uid).updateData(data)
   }
   
-  // MARK: - Educator Data Seeding
-  /// Seeds sample students, interests, and hobbies for a newly authenticated educator if missing.
-  nonisolated(nonsending) func seedInitialEducatorDataIfNeeded() async throws {
-    guard let userID = auth.currentUser?.uid else { return }
-    let studentsCollection = firestore.collection("users").document(userID).collection("students")
-    let studentSnapshot = try await studentsCollection.limit(to: 1).getDocuments()
-
-    // Seed only if no students found
-    if studentSnapshot.isEmpty {
-      // Seed sample students
-      let students = Student.comprehensiveSampleStudents
-      for student in students {
-        // Don't manually set @DocumentID - let Firestore manage it
-        let _ = try await studentsCollection.addDocument(data: student.toFirestoreData())
-      }
-
-      // Seed interests
-      let interestsCollection = firestore.collection("users").document(userID).collection("interests")
-      let interests = Interest.expandedSampleInterests
-      for interest in interests {
-        let doc = interestsCollection.document(interest.id ?? UUID().uuidString)
-        try await doc.setData(interest.toFirestoreData())
-      }
-
-      // Note: Hobbies are now included in interests above
-    }
-  }
-
   // MARK: - User Account Management
 
   /// Reauthenticate user with current password

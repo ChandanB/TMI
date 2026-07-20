@@ -131,7 +131,10 @@ class FirebaseConfigurationHelper {
     settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: 100 * 1024 * 1024)) // 100MB
     Firestore.firestore().settings = settings
     
-    print("Firebase offline mode enabled with enhanced caching.")
+    Log.firebase.info(
+      "firebase_offline_cache_enabled",
+      metadata: ["sizeBytes": "104857600"]
+    )
   }
   
   /// Analyzes runtime Firebase errors and provides appropriate responses
@@ -195,6 +198,21 @@ enum FirebaseConfigurationStatus {
       return true
     default:
       return false
+    }
+  }
+
+  var telemetryValue: String {
+    switch self {
+    case .configured:
+      return "configured"
+    case .notConfigured:
+      return "not_configured"
+    case .databaseMissing:
+      return "database_missing"
+    case .appCheckDisabled:
+      return "app_check_disabled"
+    case .configurationError:
+      return "configuration_error"
     }
   }
 }

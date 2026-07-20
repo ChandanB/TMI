@@ -12,6 +12,8 @@ final class TMILogger: Sendable {
     private let subsystem = "com.tmi.education"
     private let logger: Logger
     private let category: String
+
+    static let production = TMILogger(category: "Application")
     
     // Log levels
     enum Level: String, Sendable {
@@ -177,20 +179,31 @@ final class TMILogger: Sendable {
     private func log(level: Level, message: String, metadata: [String: Any]?, file: String = #file, line: Int = #line) {
         let fileName = URL(fileURLWithPath: file).lastPathComponent
         let metadataString = formatMetadata(metadata)
-        let fullMessage = "[\(category)] \(level.rawValue) \(message)\(metadataString.isEmpty ? "" : " | \(metadataString)")"
-        
-        // Log to OS logging system
+        let metadataSuffix = metadataString.isEmpty ? "" : " | \(metadataString)"
+
+        // Runtime messages and metadata are private by default. Categories and
+        // levels are stable operational labels and are safe to expose.
         switch level {
         case .debug:
-            logger.debug("\(fullMessage)")
+            logger.debug(
+                "[\(self.category, privacy: .public)] \(level.rawValue, privacy: .public) \(message, privacy: .private)\(metadataSuffix, privacy: .private)"
+            )
         case .info:
-            logger.info("\(fullMessage)")
+            logger.info(
+                "[\(self.category, privacy: .public)] \(level.rawValue, privacy: .public) \(message, privacy: .private)\(metadataSuffix, privacy: .private)"
+            )
         case .warning:
-            logger.warning("\(fullMessage)")
+            logger.warning(
+                "[\(self.category, privacy: .public)] \(level.rawValue, privacy: .public) \(message, privacy: .private)\(metadataSuffix, privacy: .private)"
+            )
         case .error:
-            logger.error("\(fullMessage)")
+            logger.error(
+                "[\(self.category, privacy: .public)] \(level.rawValue, privacy: .public) \(message, privacy: .private)\(metadataSuffix, privacy: .private)"
+            )
         case .critical:
-            logger.critical("\(fullMessage)")
+            logger.critical(
+                "[\(self.category, privacy: .public)] \(level.rawValue, privacy: .public) \(message, privacy: .private)\(metadataSuffix, privacy: .private)"
+            )
         }
         
         // Store for crash reporting context
@@ -257,7 +270,8 @@ struct Log {
 // MARK: - Analytics Integration
 actor Analytics {
     static let shared = Analytics()
-    
+
+    private let logger = Logger(subsystem: "com.tmi.education", category: "Analytics")
     private var events: [AnalyticsEvent] = []
     
     func trackError(_ message: String, error: Error?, metadata: [String: Any]) async {
@@ -329,11 +343,9 @@ actor Analytics {
     }
     
     private func flush() async {
-        // In a real implementation, this would send events to your analytics service
-        // For now, we'll just log them
         #if DEBUG
         if !events.isEmpty {
-            print("📊 Analytics: \(events.count) events queued")
+            logger.debug("analytics_events_queued count=\(self.events.count, privacy: .public)")
         }
         #endif
     }
@@ -342,13 +354,17 @@ actor Analytics {
 // MARK: - Crash Reporter
 actor CrashReporter {
     static let shared = CrashReporter()
-    
+
+    private let logger = Logger(subsystem: "com.tmi.education", category: "CrashReporter")
+
     func logCritical(_ message: String, error: Error?) async {
         // In a real implementation, this would integrate with crash reporting services
         // like Firebase Crashlytics or Bugsnag
         
         #if DEBUG
-        print("🔥 CRITICAL: \(message) - \(error?.localizedDescription ?? "No error")")
+        logger.critical(
+            "critical_event message=\(message, privacy: .private) error=\(error?.localizedDescription ?? "none", privacy: .private)"
+        )
         #else
         // Send to crash reporting service
         // FirebaseCrashlytics.crashlytics().log(message)

@@ -8,8 +8,10 @@
 import FirebaseFirestore
 import Foundation
 
+#if DEBUG
+@MainActor
 @Observable
-class SampleDataSeeder {
+final class SampleDataSeeder {
   static let shared = SampleDataSeeder()
   private let db = Firestore.firestore()
   
@@ -56,3 +58,4 @@ class SampleDataSeeder {
     }
   }
 }
+#endif

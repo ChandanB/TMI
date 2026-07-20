@@ -14,7 +14,7 @@ import FirebaseAuth
 
 @main
 struct TMIApp: App {
-    private let dependencies: AppDependencies = .production
+    private let dependencies: AppDependencies
 
     @State private var authStateModel: AuthStateModel
     @State private var studentContext: StudentContextStateModel
@@ -29,8 +29,16 @@ struct TMIApp: App {
         if FirebaseApp.app() == nil {
             FirebaseApp.configure()
         }
-        
+
+        let firebaseManager = FirebaseManager.shared
+        let dependencies = AppDependencies.production(
+            firestore: firebaseManager.firestore
+        )
+        self.dependencies = dependencies
+
         _authStateModel = State(initialValue: AuthStateModel(
+            firebaseManager: firebaseManager,
+            membershipProvider: dependencies.membership,
             authorizationSessionStore: .shared
         ))
         _studentContext = State(initialValue: StudentContextStateModel())
@@ -168,7 +176,13 @@ struct ContentView: View {
             await districtStateModel.loadDistrict(id: membership.districtID)
         }
         
-        print("[TMIApp] Bootstrap complete for role: \(membership.role.rawValue)")
+        dependencies.logger.info(
+            "bootstrap_completed",
+            metadata: [
+                "membershipRole": membership.role.rawValue,
+                "districtID": membership.districtID,
+            ]
+        )
     }
 }
 
@@ -197,9 +211,17 @@ struct LoadingView: View {
 // MARK: - Preview
 
 #Preview {
+    let dependencies = AppDependencies.preview()
+
     ContentView()
-        .environment(\.appDependencies, .production)
-        .environment(\.authStateModel, AuthStateModel())
+        .environment(\.appDependencies, dependencies)
+        .environment(
+            \.authStateModel,
+            AuthStateModel(
+                membershipProvider: dependencies.membership,
+                automaticallyStart: false
+            )
+        )
         .environment(\.studentContext, StudentContextStateModel())
         .environment(\.dashboardStateModel, DashboardStateModel())
 }

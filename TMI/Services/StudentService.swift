@@ -855,6 +855,7 @@ enum StudentServiceError: Error, LocalizedError {
 
 // MARK: - Mock Service for Previews
 
+#if DEBUG
 class MockStudentService: StudentService {
     private var mockStudents: [Student] = Student.sampleStudents.map {
         // Adjust sampleStudents to have school: "" by creating new struct
@@ -875,13 +876,13 @@ class MockStudentService: StudentService {
     }
     
     override func fetchStudents() async throws -> [Student] {
-        print("[MockStudentService] Fetching mock students...")
+        Log.student.debug("preview_students_fetch_started")
         try await Task.sleep(nanoseconds: 1_000_000_000) // Simulate network delay
         return mockStudents
     }
     
     override func addStudent(_ student: Student) async throws -> Student {
-        print("[MockStudentService] Adding mock student: \(student.name)")
+        Log.student.debug("preview_student_add_started")
         let newStudent = Student(
             id: UUID().uuidString,
             name: student.name,
@@ -901,7 +902,7 @@ class MockStudentService: StudentService {
     }
     
     override func updateStudent(_ student: Student) async throws -> Student {
-        print("[MockStudentService] Updating mock student: \(student.name)")
+        Log.student.debug("preview_student_update_started")
         if let index = mockStudents.firstIndex(where: { $0.id == student.id }) {
             let updatedStudent = Student(
                 id: student.id,
@@ -924,12 +925,13 @@ class MockStudentService: StudentService {
     }
     
     override func deleteStudent(_ student: Student) async throws {
-        print("[MockStudentService] Deleting mock student: \(student.name)")
+        Log.student.debug("preview_student_delete_started")
         mockStudents.removeAll { $0.id == student.id }
     }
     
     override func getStudent(by id: String) async throws -> Student? {
-        print("[MockStudentService] Getting mock student by ID: \(id)")
+        Log.student.debug("preview_student_lookup_started")
         return mockStudents.first { $0.id == id }
     }
 }
+#endif

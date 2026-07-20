@@ -90,9 +90,6 @@ protocol TMIAuthService {
     /// - Throws: Authentication or fetch errors
     func fetchCurrentTMIUser() async throws -> TMIUser
     
-    /// Deletes the current user account
-    func deleteAccount() async throws
-    
     /// Sends an email verification to the current user
     func sendEmailVerification() async throws
     
@@ -206,10 +203,10 @@ class FirebaseTMIAuthService: TMIAuthService {
         // Prevent duplicate listeners
         removeAuthStateListener()
         
-        print("👂 Setting up TMI auth state listener")
+        Log.auth.debug("auth_listener_setup")
         authStateHandler = auth.addStateDidChangeListener { [weak self] _, user in
             guard let self = self else { return }
-            
+
             // Track statistics
             self.authStateChanges += 1
             self.lastAuthChange = Date()
@@ -219,11 +216,17 @@ class FirebaseTMIAuthService: TMIAuthService {
             self.isHandlingAuthChange = true
             
             if let user = user {
-                print("🔐 TMI Auth state changed: User \(user.uid) logged in")
+                Log.auth.info(
+                    "auth_state_signed_in",
+                    metadata: ["userID": user.uid]
+                )
                 self.updateAuthState(.authenticated(user))
                 
                 let userID = user.uid
-                print("📲 Loading TMI user for: \(userID)")
+                Log.auth.debug(
+                    "profile_load_started",
+                    metadata: ["userID": userID]
+                )
                 
                 // Check if we already have a TMI user
                 if let tmiUser = self.currentTMIUser {
@@ -240,7 +243,7 @@ class FirebaseTMIAuthService: TMIAuthService {
                             self.currentTMIUser = tmiUser
                             self.updateAuthState(.userReady(tmiUser))
                         } catch {
-                            print("⚠️ Failed to load TMI user: \(error.localizedDescription)")
+                            Log.auth.warning("profile_load_failed")
                             // User authenticated but profile load failed - they can still use basic features
                             self.updateAuthState(.needsProfileSetup(user))
                         }
@@ -248,9 +251,9 @@ class FirebaseTMIAuthService: TMIAuthService {
                         self.isHandlingAuthChange = false
                     }
                 }
-                
+
             } else {
-                print("🚪 TMI Auth state changed: User logged out")
+                Log.auth.info("auth_state_signed_out")
                 self.currentTMIUser = nil
                 self.updateAuthState(.needsAuthentication)
                 self.isHandlingAuthChange = false
@@ -260,7 +263,7 @@ class FirebaseTMIAuthService: TMIAuthService {
     
     func removeAuthStateListener() {
         if let authStateHandler = authStateHandler {
-            print("🛑 Removing TMI auth state listener")
+            Log.auth.debug("auth_listener_removed")
             auth.removeStateDidChangeListener(authStateHandler)
             self.authStateHandler = nil
         }
@@ -283,23 +286,24 @@ class FirebaseTMIAuthService: TMIAuthService {
             stateDescription = "Initializing"
         case .needsAuthentication:
             stateDescription = "Needs Authentication"
-        case .authenticated(let user):
-            let uid = user.uid // Safely capture uid to avoid EXC_BAD_ACCESS
-            stateDescription = "Authenticated (\(uid))"
-        case .needsProfileSetup(let user):
-            let uid = user.uid // Safely capture uid to avoid EXC_BAD_ACCESS
-            stateDescription = "Needs Profile Setup (\(uid))"
-        case .userReady(let tmiUser):
-            stateDescription = "User Ready (\(tmiUser.email))"
-        case .error(let error):
-            stateDescription = "Error: \(error.message)"
+        case .authenticated:
+            stateDescription = "authenticated"
+        case .needsProfileSetup:
+            stateDescription = "needs_profile_setup"
+        case .userReady:
+            stateDescription = "user_ready"
+        case .error:
+            stateDescription = "error"
         }
-        
-        print("🔄 TMI Auth state updated: \(stateDescription)")
+
+        Log.auth.debug(
+            "auth_state_updated",
+            metadata: ["state": stateDescription]
+        )
     }
     
     func restoreAuthenticationState() async throws -> Bool {
-        print("🔄 Attempting to restore TMI authentication state")
+        Log.auth.debug("auth_restore_started")
         
         // First check if we already have a valid user
         if let currentUser = auth.currentUser {
@@ -309,23 +313,23 @@ class FirebaseTMIAuthService: TMIAuthService {
                 
                 // If token refresh succeeded, try to fetch the TMI user
                 if let _ = currentTMIUser {
-                    print("✅ TMI Authentication state restored from existing session")
+                    Log.auth.info("auth_restore_existing_session_succeeded")
                     return true
                 } else {
                     do {
                         let tmiUser = try await fetchCurrentTMIUser()
                         self.currentTMIUser = tmiUser
                         updateAuthState(.userReady(tmiUser))
-                        print("✅ TMI Authentication state restored and user fetched")
+                        Log.auth.info("auth_restore_profile_succeeded")
                         return true
                     } catch {
-                        print("⚠️ User authenticated but TMI user fetch failed: \(error.localizedDescription)")
+                        Log.auth.warning("auth_restore_profile_failed")
                         updateAuthState(.authenticated(currentUser))
                         return true
                     }
                 }
             } catch {
-                print("❌ Token refresh failed, authentication state invalid: \(error.localizedDescription)")
+                Log.auth.warning("auth_restore_token_refresh_failed")
                 // Sign out the user since their token is invalid
                 try? auth.signOut()
                 updateAuthState(.needsAuthentication)
@@ -337,7 +341,7 @@ class FirebaseTMIAuthService: TMIAuthService {
         try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         
         if let restoredUser = auth.currentUser {
-            print("✅ TMI Authentication state restored from persistent storage")
+            Log.auth.info("auth_restore_persistent_session_succeeded")
             updateAuthState(.authenticated(restoredUser))
             
             // Try to fetch the TMI user
@@ -347,12 +351,12 @@ class FirebaseTMIAuthService: TMIAuthService {
                 updateAuthState(.userReady(tmiUser))
                 return true
             } catch {
-                print("⚠️ User restored but TMI user fetch failed: \(error.localizedDescription)")
+                Log.auth.warning("auth_restore_persistent_profile_failed")
                 return true
             }
         }
         
-        print("❌ No TMI authentication state to restore")
+        Log.auth.info("auth_restore_no_session")
         updateAuthState(.needsAuthentication)
         return false
     }
@@ -371,11 +375,14 @@ class FirebaseTMIAuthService: TMIAuthService {
             guard let user = auth.currentUser else {
                 throw FirebaseError.signInFailed("Failed to get authenticated user")
             }
-            print("✅ User signed in: \(user.uid)")
+            Log.auth.info(
+                "sign_in_succeeded",
+                metadata: ["userID": user.uid]
+            )
             updateAuthState(.authenticated(user))
             return user
         } catch {
-            print("❌ Sign in failed: \(error.localizedDescription)")
+            Log.auth.warning("sign_in_failed")
             throw error
         }
     }
@@ -390,14 +397,17 @@ class FirebaseTMIAuthService: TMIAuthService {
             guard let user = auth.currentUser else {
                 throw FirebaseError.signUpFailed("Failed to get authenticated user after registration")
             }
-            print("✅ User created: \(user.uid)")
+            Log.auth.info(
+                "sign_up_succeeded",
+                metadata: ["userID": user.uid]
+            )
             
             // Make email verification optional to avoid failing the whole registration
             do {
                 try await user.sendEmailVerification()
-                print("✅ Verification email sent to \(email)")
+                Log.auth.info("verification_email_sent")
             } catch {
-                print("⚠️ Warning: Could not send verification email: \(error.localizedDescription)")
+                Log.auth.warning("verification_email_failed")
             }
             
             updateAuthState(.authenticated(user))
@@ -419,7 +429,7 @@ class FirebaseTMIAuthService: TMIAuthService {
     func sendPasswordReset(email: String) async throws {
         do {
             try await firebaseManager.resetPassword(email: email)
-            print("✅ Password reset email sent to \(email)")
+            Log.auth.info("password_reset_requested")
         } catch {
             throw error
         }
@@ -432,7 +442,10 @@ class FirebaseTMIAuthService: TMIAuthService {
         
         do {
             try await user.reauthenticate(with: credential)
-            print("✅ User reauthenticated: \(user.uid)")
+            Log.auth.info(
+                "reauthentication_succeeded",
+                metadata: ["userID": user.uid]
+            )
         } catch {
             throw FirebaseError.authError("Failed to reauthenticate: \(error.localizedDescription)")
         }
@@ -445,7 +458,7 @@ class FirebaseTMIAuthService: TMIAuthService {
         
         do {
             try await user.sendEmailVerification(beforeUpdatingEmail: newEmail)
-            print("✅ Email verification sent before updating to \(newEmail)")
+            Log.auth.info("email_update_verification_sent")
         } catch {
             throw FirebaseError.userProfileUpdateFailed("Failed to update email: \(error.localizedDescription)")
         }
@@ -458,23 +471,12 @@ class FirebaseTMIAuthService: TMIAuthService {
         
         do {
             try await user.updatePassword(to: newPassword)
-            print("✅ Password updated for user: \(user.uid)")
+            Log.auth.info(
+                "password_update_succeeded",
+                metadata: ["userID": user.uid]
+            )
         } catch {
             throw FirebaseError.userProfileUpdateFailed("Failed to update password: \(error.localizedDescription)")
-        }
-    }
-    
-    func deleteAccount() async throws {
-        guard let user = currentUser else {
-            throw FirebaseError.userNotAuthenticated
-        }
-        
-        do {
-            try await user.delete()
-            updateAuthState(.needsAuthentication)
-            print("✅ User account deleted: \(user.uid)")
-        } catch {
-            throw FirebaseError.accountCreationFailed("Failed to delete account: \(error.localizedDescription)")
         }
     }
     
@@ -485,7 +487,10 @@ class FirebaseTMIAuthService: TMIAuthService {
         
         do {
             try await user.sendEmailVerification()
-            print("✅ Verification email sent to user: \(user.uid)")
+            Log.auth.info(
+                "verification_email_sent",
+                metadata: ["userID": user.uid]
+            )
         } catch {
             throw FirebaseError.authError("Failed to send verification email: \(error.localizedDescription)")
         }
@@ -579,7 +584,10 @@ class FirebaseTMIAuthService: TMIAuthService {
             let _ = try await currentUser.getIDTokenResult(forcingRefresh: true)
             
             // If we successfully got a token, the auth is valid
-            print("✅ Auth token verified for user: \(currentUser.uid)")
+            Log.auth.debug(
+                "auth_token_verified",
+                metadata: ["userID": currentUser.uid]
+            )
             return true
         } catch let error as NSError {
             // Check for specific Firebase auth errors that indicate invalid token
@@ -588,12 +596,12 @@ class FirebaseTMIAuthService: TMIAuthService {
                  AuthErrorCode.invalidUserToken.rawValue,
                  AuthErrorCode.userDisabled.rawValue,
                  AuthErrorCode.userNotFound.rawValue:
-                print("❌ Auth token invalid: \(error.localizedDescription)")
+                Log.auth.warning("auth_token_invalid")
                 return false
             default:
                 // For network errors or other temporary issues, we'll throw to let caller decide
                 if error.domain == NSURLErrorDomain {
-                    print("⚠️ Network error during token verification: \(error.localizedDescription)")
+                    Log.auth.warning("auth_token_verification_network_unavailable")
                     // Return true for network errors to avoid unnecessary logouts
                     return true
                 }
