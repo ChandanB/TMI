@@ -833,7 +833,6 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     }
   }
 
-  @discardableResult
   @MainActor
   func signOut() -> Bool {
     let previousState = state

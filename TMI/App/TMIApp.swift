@@ -90,7 +90,7 @@ struct ContentView: View {
         .onChange(of: authStateModel.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
                 Task {
-                    await performBootstrap(for: accountAccess)
+                    await self.performBootstrap(for: self.accountAccess)
                 }
             } else {
                 // Clear state on logout

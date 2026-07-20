@@ -23,6 +23,7 @@ struct MainTabView: View {
     // Sheet state
     @State private var showingUserProfile = false
     @State private var showingSignOutConfirmation = false
+    @State private var showingSignOutFailure = false
     @State private var showingWorkspacePanel = false
     
     // State models
@@ -148,15 +149,17 @@ struct MainTabView: View {
         }
         .alert("Sign Out", isPresented: $showingSignOutConfirmation) {
             Button("Sign Out", role: .destructive) {
-                Task {
-                    // Clear context on sign out
-                    studentContext.clearContext()
-                    authStateModel.signOut()
-                }
+                attemptSignOut()
             }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Are you sure you want to sign out?")
+        }
+        .alert("Couldn’t Sign Out", isPresented: $showingSignOutFailure) {
+            Button("Retry", action: attemptSignOut)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Your account is still signed in. Check your connection and try again.")
         }
         .onAppear {
             // Set appropriate default tab for user role
@@ -173,6 +176,16 @@ struct MainTabView: View {
             // Clear deep link when manually changing tabs
             studentContext.clearPendingDeepLink()
         }
+    }
+
+    @MainActor
+    private func attemptSignOut() {
+        guard authStateModel.signOut() else {
+            showingSignOutFailure = true
+            return
+        }
+
+        studentContext.clearContext()
     }
     
     // MARK: - Workspace Button

@@ -18,6 +18,8 @@ struct DeleteAccountView: View {
     @State private var password: String = ""
     @State private var isDeleting: Bool = false
     @State private var errorMessage: String? = nil
+    @State private var showingSignOutFailure = false
+    @State private var accountDeletionCompleted = false
 
     var body: some View {
         ZStack {
@@ -56,6 +58,12 @@ struct DeleteAccountView: View {
                     .padding(.bottom, 40)
                 }
             }
+        }
+        .alert("Couldn’t Sign Out", isPresented: $showingSignOutFailure) {
+            Button("Retry", action: attemptSignOut)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Your account is still signed in. Check your connection and try again.")
         }
     }
 
@@ -138,10 +146,16 @@ struct DeleteAccountView: View {
             }
 
             TMIButton(
-                text: isDeleting ? "" : "Permanently Delete Account",
+                text: isDeleting ? "" : accountDeletionCompleted ? "Retry Sign Out" : "Permanently Delete Account",
                 style: .primary
             ) {
-                Task { await deleteAccount() }
+                Task {
+                    if accountDeletionCompleted {
+                        attemptSignOut()
+                    } else {
+                        await deleteAccount()
+                    }
+                }
             }
             .disabled(password.isEmpty || isDeleting)
             .overlay {
@@ -166,6 +180,14 @@ struct DeleteAccountView: View {
     // MARK: - Deletion Logic
 
     @MainActor
+    private func attemptSignOut() {
+        guard authStateModel.signOut() else {
+            showingSignOutFailure = true
+            return
+        }
+    }
+
+    @MainActor
     private func deleteAccount() async {
         isDeleting = true
         errorMessage = nil
@@ -173,7 +195,8 @@ struct DeleteAccountView: View {
 
         do {
             try await AuthenticationService.shared.deleteAccount(password: password)
-            authStateModel.signOut()
+            accountDeletionCompleted = true
+            attemptSignOut()
         } catch let error as AuthenticationService.AuthError {
             withAnimation { errorMessage = error.errorDescription ?? "Deletion failed. Please try again." }
         } catch {

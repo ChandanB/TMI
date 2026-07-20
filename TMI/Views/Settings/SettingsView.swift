@@ -21,6 +21,7 @@ struct SettingsView: View {
     @AppStorage("offlineModeEnabled") private var offlineModeEnabled = true
     
     @State private var showingLogoutAlert = false
+    @State private var showingSignOutFailure = false
     @State private var showingDeleteAccountSheet = false
     @State private var showingExportSheet = false
     @State private var showingImportSheet = false
@@ -101,6 +102,20 @@ struct SettingsView: View {
         .sheet(isPresented: $showingDeleteAccountSheet) {
             DeleteAccountView()
                 .tmiSheetStyle()
+        }
+        .alert("Log Out", isPresented: $showingLogoutAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Log Out", role: .destructive) {
+                attemptSignOut()
+            }
+        } message: {
+            Text("Are you sure you want to log out? Your data will remain safe and you can sign back in anytime.")
+        }
+        .alert("Couldn’t Sign Out", isPresented: $showingSignOutFailure) {
+            Button("Retry", action: attemptSignOut)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Your account is still signed in. Check your connection and try again.")
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 0.5).delay(0.1)) {
@@ -220,14 +235,6 @@ struct SettingsView: View {
             }
             .padding(.vertical, 14)
             .padding(.horizontal, 16)
-        }
-        .alert("Log Out", isPresented: $showingLogoutAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Log Out", role: .destructive) {
-                logOut()
-            }
-        } message: {
-            Text("Are you sure you want to log out? Your data will remain safe and you can sign back in anytime.")
         }
         .sheet(isPresented: $showingExportSheet) {
             DataExportView()
@@ -409,8 +416,12 @@ extension SettingsView {
 
     // MARK: - Helper Functions
 
-    private func logOut() {
-        authStateModel.signOut()
+    @MainActor
+    private func attemptSignOut() {
+        guard authStateModel.signOut() else {
+            showingSignOutFailure = true
+            return
+        }
     }
 }
 

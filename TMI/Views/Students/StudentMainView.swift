@@ -12,6 +12,7 @@ struct StudentMainView: View {
     @State private var selectedTab: StudentTab = .myInterests
     @State private var showingProfile = false
     @State private var showingSignOutConfirmation = false
+    @State private var showingSignOutFailure = false
 
     enum StudentTab: String, CaseIterable, Identifiable {
         case myInterests = "My Interests"
@@ -71,13 +72,25 @@ struct StudentMainView: View {
         .tint(.tmiPrimary)
         .confirmationDialog("Sign Out", isPresented: $showingSignOutConfirmation, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
-                Task {
-                    authStateModel.signOut()
-                }
+                attemptSignOut()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Are you sure you want to sign out?")
+        }
+        .alert("Couldn’t Sign Out", isPresented: $showingSignOutFailure) {
+            Button("Retry", action: attemptSignOut)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Your account is still signed in. Check your connection and try again.")
+        }
+    }
+
+    @MainActor
+    private func attemptSignOut() {
+        guard authStateModel.signOut() else {
+            showingSignOutFailure = true
+            return
         }
     }
 
