@@ -66,8 +66,7 @@ Run the exact `xcodebuild` and emulator commands in that release plan. Expected:
 xcodebuild test -project TMI.xcodeproj -scheme TMI \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' \
   -derivedDataPath /tmp/TMI-Full-DerivedData \
-  -resultBundlePath /tmp/TMI-Full-Results.xcresult \
-  CODE_SIGNING_ALLOWED=NO
+  -resultBundlePath /tmp/TMI-Full-Results.xcresult
 ```
 
 Expected: `** TEST SUCCEEDED **`, zero failures, and no tests skipped because Firebase was unavailable.
@@ -79,8 +78,10 @@ xcodebuild test -project TMI.xcodeproj -scheme TMI \
   -destination 'platform=macOS' \
   -derivedDataPath /tmp/TMI-Full-Mac-DerivedData \
   -resultBundlePath /tmp/TMI-Full-Mac-Results.xcresult \
-  -only-testing:TMITests CODE_SIGNING_ALLOWED=NO
+  -only-testing:TMITests
 ```
+
+Hosted Keychain/SecureStorage tests require normal local signing so runtime entitlements remain embedded; simulator “Sign to Run Locally” does not require distribution credentials.
 
 Expected: `** TEST SUCCEEDED **` with the same platform-independent domain fixtures passing.
 

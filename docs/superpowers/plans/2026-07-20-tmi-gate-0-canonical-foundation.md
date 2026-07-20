@@ -65,8 +65,10 @@ Run:
 xcodebuild test -project TMI.xcodeproj -scheme TMI \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' \
   -derivedDataPath /tmp/TMI-Gate0-DerivedData \
-  -resultBundlePath /tmp/TMI-Gate0-Red.xcresult CODE_SIGNING_ALLOWED=NO
+  -resultBundlePath /tmp/TMI-Gate0-Red.xcresult
 ```
+
+Hosted Keychain/SecureStorage tests require normal local signing so runtime entitlements remain embedded; simulator “Sign to Run Locally” does not require distribution credentials.
 
 Expected: build fails at line 446 with `ambiguous use of 'init(_:)'`; zero tests execute.
 
@@ -75,8 +77,10 @@ Expected: build fails at line 446 with `ambiguous use of 'init(_:)'`; zero tests
 Replace the ambiguous construction with:
 
 ```swift
-let contentSizeCategory = SwiftUI.ContentSizeCategory(uiCategory)
+let contentSizeCategory: SwiftUI.ContentSizeCategory = .init(uiCategory)
 ```
+
+The nonoptional contextual result selects TMI's non-failable mapping initializer over SwiftUI's failable overload.
 
 - [ ] **Step 3: Re-run the full test suite**
 
