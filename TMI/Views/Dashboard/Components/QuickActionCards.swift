@@ -149,7 +149,7 @@ struct QuickActionsGrid: View {
                     subtitle: "Begin a new student profile",
                     icon: "person.badge.plus",
                     iconColor: .tmiPrimary,
-                    accentBorderColor: Color(hex: "#D4930D"),
+                    accentBorderColor: .tmiPrimary,
                     badge: nil,
                     action: { showingAddStudent = true }
                 )
@@ -159,7 +159,7 @@ struct QuickActionsGrid: View {
                     subtitle: "Design a TMI intervention",
                     icon: "doc.badge.plus",
                     iconColor: .tmiSuccess,
-                    accentBorderColor: Color(hex: "#5B8C5A"),
+                    accentBorderColor: .tmiSuccess,
                     badge: nil,
                     action: { showingCreatePlan = true }
                 )
@@ -169,7 +169,7 @@ struct QuickActionsGrid: View {
                     subtitle: "View students requiring attention",
                     icon: "heart.text.square",
                     iconColor: .tmiWarning,
-                    accentBorderColor: Color(hex: "#E07A5F"),
+                    accentBorderColor: .tmiWarning,
                     badge: studentsNeedingSupportCount,
                     action: { showingStudentsNeedingSupport = true }
                 )
@@ -179,7 +179,7 @@ struct QuickActionsGrid: View {
                     subtitle: "View complete student roster",
                     icon: "person.3.fill",
                     iconColor: .tmiSecondary,
-                    accentBorderColor: Color(hex: "#3B6FA0"),
+                    accentBorderColor: .tmiSecondary,
                     badge: totalStudentsCount,
                     action: { showingViewAllStudents = true }
                 )

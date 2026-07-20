@@ -25,7 +25,7 @@ import SwiftUI
 
 // MARK: - Foundation Components
 
-/// Unified background component — warm-light redesign
+/// Unified solid background component.
 struct TMIBackgroundView: View {
     var variant: BackgroundVariant = .base
 
@@ -48,12 +48,8 @@ struct TMIBackgroundView: View {
     var body: some View {
         switch variant.resolvedVariant {
         case .auth:
-            LinearGradient(
-                colors: [Color(hex: "#FDF8F3"), Color(hex: "#F5EDE3")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            TMIColors.background
+                .ignoresSafeArea()
         default:
             Color.tmiBackground
                 .ignoresSafeArea()
@@ -180,13 +176,13 @@ struct TMICard<Content: View>: View {
                 }
             }
             .shadow(
-                color: Color(hex: "#2D3436").opacity(style.secondaryShadowOpacity),
+                color: TMIColors.textPrimary.opacity(style.secondaryShadowOpacity),
                 radius: style.secondaryShadowRadius,
                 x: 0,
                 y: 1
             )
             .shadow(
-                color: Color(hex: "#2D3436").opacity(style.shadowOpacity),
+                color: TMIColors.textPrimary.opacity(style.shadowOpacity),
                 radius: style.shadowRadius,
                 x: 0,
                 y: style.shadowOffset
@@ -271,11 +267,11 @@ struct TMIButton: View {
             switch self {
             case .primary: return Color.tmiSecondary
             case .secondary: return .clear
-            case .tertiary: return Color(hex: "#F0EBE4")
+            case .tertiary: return TMIColors.aubergineSoft
             case .destructive: return Color.tmiError
             case .floating: return Color.tmiPrimary
-            case .filter(let isSelected): return isSelected ? Color.tmiSecondary : Color(hex: "#F0EBE4")
-            case .icon: return Color(hex: "#F0EBE4")
+            case .filter(let isSelected): return isSelected ? TMIColors.teal : TMIColors.aubergineSoft
+            case .icon: return TMIColors.aubergineSoft
             }
         }
 
@@ -475,7 +471,7 @@ struct TMITextField: View {
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.tmiInputBackground)
-                .shadow(color: Color(hex: "#2D3436").opacity(0.04), radius: 5, x: 0, y: 2)
+                .shadow(color: TMIColors.textPrimary.opacity(0.04), radius: 5, x: 0, y: 2)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -490,9 +486,9 @@ struct TMITextField: View {
 
 // MARK: - Progress Components
 
-/// Unified progress view style — warm-light redesign
+/// Unified progress view style.
 struct TMIProgressViewStyle: ProgressViewStyle {
-    var color: Color = .tmiPrimary
+    var color: Color = TMIColors.teal
     var height: CGFloat = 4
     var cornerRadius: CGFloat = 10
 
@@ -504,13 +500,7 @@ struct TMIProgressViewStyle: ProgressViewStyle {
                     .frame(height: height)
 
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(
-                        LinearGradient(
-                            colors: [color, color.opacity(0.8)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .fill(color)
                     .frame(
                         width: geometry.size.width * CGFloat(configuration.fractionCompleted ?? 0),
                         height: height
@@ -563,7 +553,7 @@ extension View {
     }
 
     /// Apply TMI progress view styling
-    func tmiProgressStyle(color: Color = .tmiPrimary, height: CGFloat = 4) -> some View {
+    func tmiProgressStyle(color: Color = TMIColors.teal, height: CGFloat = 4) -> some View {
         self.progressViewStyle(TMIProgressViewStyle(color: color, height: height))
     }
 

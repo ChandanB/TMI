@@ -57,7 +57,8 @@ struct TMIApp: App {
                 .environment(\.meetingsStateModel, meetingsStateModel)
                 .environment(\.districtStateModel, districtStateModel)
                 .environment(\.recommendationsStateModel, recommendationsStateModel)
-                
+
+                .tint(TMIColors.teal)
                 .preferredColorScheme(.light)
                 .onOpenURL { url in
                     // Handle deep links

@@ -54,7 +54,7 @@ enum TMIElevation {
     case floating
 
     var shadowColor: Color {
-        Color(hex: "#2D3436")
+        TMIColors.textPrimary
     }
 
     var shadowRadius: CGFloat {

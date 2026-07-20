@@ -14,7 +14,6 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.authStateModel) private var authStateModel
     
-    @AppStorage("darkModeEnabled") private var darkModeEnabled = false
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     @AppStorage("showAnimations") private var showAnimations = true
     @AppStorage("dataBackupEnabled") private var dataBackupEnabled = true
@@ -335,13 +334,6 @@ extension SettingsView {
 
     private var appPreferencesSection: some View {
         SettingsSection(title: "App Preferences", icon: "gear") {
-            SettingsToggleRow(
-                title: "Dark Mode",
-                subtitle: "Use dark interface theme",
-                icon: "moon.fill",
-                isOn: $darkModeEnabled
-            )
-            
             SettingsToggleRow(
                 title: "Enable Animations",
                 subtitle: "Show interface animations",
