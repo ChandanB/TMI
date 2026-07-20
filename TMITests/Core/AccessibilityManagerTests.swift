@@ -443,7 +443,7 @@ extension AccessibilityManagerTests {
         
         for uiCategory in uiCategories {
             // When
-            let contentSizeCategory = ContentSizeCategory(uiCategory)
+            let contentSizeCategory: SwiftUI.ContentSizeCategory = .init(uiCategory)
             
             // Then
             XCTAssertNotNil(contentSizeCategory, "ContentSizeCategory should initialize from UIContentSizeCategory")
