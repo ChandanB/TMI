@@ -13,18 +13,27 @@ struct FeatureFlagsTests {
         #expect(flags.institutionalSSO == false)
     }
 
-    @Test("Production denies unsupported and missing account roles")
-    func productionDeniedAccountRoutes() {
+    @Test("Production denies unsupported and missing account roles without bootstrap access")
+    func productionDeniedAccountAccess() {
         let flags = FeatureFlags.production
 
-        #expect(flags.accountRoute(for: .student) == .unavailable)
-        #expect(flags.accountRoute(for: .parent) == .unavailable)
-        #expect(flags.accountRoute(for: .legalGuardian) == .unavailable)
-        #expect(flags.accountRoute(for: nil) == .unavailable)
+        let decisions = [
+            flags.accountAccess(for: .student),
+            flags.accountAccess(for: .parent),
+            flags.accountAccess(for: .legalGuardian),
+            flags.accountAccess(for: nil),
+        ]
+
+        for decision in decisions {
+            #expect(decision.destination == .unavailable)
+            #expect(decision.destination != .staff)
+            #expect(decision.destination != .student)
+            #expect(decision.canBootstrap == false)
+        }
     }
 
-    @Test("Production routes supported staff roles to the staff root")
-    func productionStaffAccountRoutes() {
+    @Test("Production routes supported staff roles to the staff root with bootstrap access")
+    func productionStaffAccountAccess() {
         let staffRoles: [UserRole] = [
             .teacher,
             .counselor,
@@ -36,12 +45,15 @@ struct FeatureFlagsTests {
         ]
 
         for role in staffRoles {
-            #expect(FeatureFlags.production.accountRoute(for: role) == .staff)
+            let decision = FeatureFlags.production.accountAccess(for: role)
+
+            #expect(decision.destination == .staff)
+            #expect(decision.canBootstrap)
         }
     }
 
-    @Test("An enabled independent student account routes to the student root")
-    func enabledStudentAccountRoute() {
+    @Test("An enabled independent student account routes to the student root with bootstrap access")
+    func enabledStudentAccountAccess() {
         let flags = FeatureFlags(
             independentStudentAccounts: true,
             guardianAccounts: false,
@@ -49,11 +61,14 @@ struct FeatureFlagsTests {
             institutionalSSO: false
         )
 
-        #expect(flags.accountRoute(for: .student) == .student)
+        let decision = flags.accountAccess(for: .student)
+
+        #expect(decision.destination == .student)
+        #expect(decision.canBootstrap)
     }
 
-    @Test("Enabled guardian accounts route to the existing nonstudent root")
-    func enabledGuardianAccountRoutes() {
+    @Test("Enabled guardian accounts use a restricted guardian root without bootstrap access")
+    func enabledGuardianAccountAccess() {
         let flags = FeatureFlags(
             independentStudentAccounts: false,
             guardianAccounts: true,
@@ -61,8 +76,17 @@ struct FeatureFlagsTests {
             institutionalSSO: false
         )
 
-        #expect(flags.accountRoute(for: .parent) == .staff)
-        #expect(flags.accountRoute(for: .legalGuardian) == .staff)
+        let decisions = [
+            flags.accountAccess(for: .parent),
+            flags.accountAccess(for: .legalGuardian),
+        ]
+
+        for decision in decisions {
+            #expect(decision.destination == .guardian)
+            #expect(decision.destination != .staff)
+            #expect(decision.destination != .student)
+            #expect(decision.canBootstrap == false)
+        }
     }
 
     @Test("Production exposes only the staff role category")
@@ -96,11 +120,12 @@ struct FeatureFlagsTests {
     }
 
     @Test("Every simplified registration account type remains a staff account")
-    func simplifiedRegistrationAccountRoutes() {
+    func simplifiedRegistrationAccountAccess() {
         for accountType in AccountType.allCases {
-            #expect(
-                FeatureFlags.production.accountRoute(for: accountType.userRole) == .staff
-            )
+            let decision = FeatureFlags.production.accountAccess(for: accountType.userRole)
+
+            #expect(decision.destination == .staff)
+            #expect(decision.canBootstrap)
         }
     }
 }

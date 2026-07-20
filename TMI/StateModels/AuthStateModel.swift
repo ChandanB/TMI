@@ -387,6 +387,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   // MARK: - Dependencies
   private let firebaseManager: FirebaseManager
   private let auditService: AuditService
+  private let signOutOperation: @MainActor () throws -> Void
 
   // MARK: - Current User State
   private(set) var currentUser: TMIUser?
@@ -518,10 +519,15 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
   // MARK: - Initialization
   init(
-    firebaseManager: FirebaseManager = FIREBASE_MANAGER, auditService: AuditService = AUDIT_SERVICE
+    firebaseManager: FirebaseManager = FIREBASE_MANAGER,
+    auditService: AuditService = AUDIT_SERVICE,
+    signOutOperation: (@MainActor () throws -> Void)? = nil
   ) {
     self.firebaseManager = firebaseManager
     self.auditService = auditService
+    self.signOutOperation = signOutOperation ?? {
+      try firebaseManager.signOut()
+    }
     super.init()
 
     Task { await fetch() }
@@ -827,23 +833,30 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     }
   }
 
+  @discardableResult
   @MainActor
-  func signOut() {
+  func signOut() -> Bool {
+    let previousState = state
+
     do {
-      try firebaseManager.signOut()
+      try signOutOperation()
       // Clear local state
       currentUser = nil
       userRole = nil
       institutionContext = nil
       sessionID = nil
+      currentError = nil
 
       updateState(.loaded(.unauthenticated))
+      return true
     } catch {
       let authError = AuthenticationError(
         type: .serverError,
         message: "Failed to sign out: \(error.localizedDescription)"
       )
-      updateState(.loaded(.error(authError)))
+      currentError = authError
+      updateState(previousState)
+      return false
     }
   }
 

@@ -13,25 +13,37 @@ struct FeatureFlags: Sendable, Equatable {
 }
 
 extension FeatureFlags {
-    enum AccountRoute: Sendable, Equatable {
-        case student
-        case staff
-        case unavailable
+    struct AccountAccess: Sendable, Equatable {
+        enum Destination: Sendable, Equatable {
+            case student
+            case staff
+            case guardian
+            case unavailable
+        }
+
+        let destination: Destination
+        let canBootstrap: Bool
     }
 
-    func accountRoute(for role: UserRole?) -> AccountRoute {
+    func accountAccess(for role: UserRole?) -> AccountAccess {
         guard let role else {
-            return .unavailable
+            return AccountAccess(destination: .unavailable, canBootstrap: false)
         }
 
         switch role {
         case .student:
-            return independentStudentAccounts ? .student : .unavailable
+            if independentStudentAccounts {
+                return AccountAccess(destination: .student, canBootstrap: true)
+            }
+            return AccountAccess(destination: .unavailable, canBootstrap: false)
         case .parent, .legalGuardian:
-            return guardianAccounts ? .staff : .unavailable
+            if guardianAccounts {
+                return AccountAccess(destination: .guardian, canBootstrap: false)
+            }
+            return AccountAccess(destination: .unavailable, canBootstrap: false)
         case .teacher, .counselor, .administrator, .admin, .socialWorker,
                 .superintendent, .districtAdmin:
-            return .staff
+            return AccountAccess(destination: .staff, canBootstrap: true)
         }
     }
 }

@@ -90,7 +90,7 @@ struct ContentView: View {
         .onChange(of: authStateModel.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
                 Task {
-                    await performBootstrap()
+                    await performBootstrap(for: accountAccess)
                 }
             } else {
                 // Clear state on logout
@@ -107,28 +107,45 @@ struct ContentView: View {
     
     @ViewBuilder
     private var authenticatedContent: some View {
+        let access = accountAccess
+
         Group {
-            switch dependencies.flags.accountRoute(for: authStateModel.currentUser?.role) {
+            switch access.destination {
             case .student:
                 StudentMainView()
                     .environment(\.studentAccessMode, .signedInStudent)
             case .staff:
                 MainTabView()
                     .environment(\.studentAccessMode, .staffViewing)
+            case .guardian:
+                AccountUnavailableView(
+                    title: "Guardian Account Unavailable",
+                    description: "Guardian accounts are not available in this version of TMI.",
+                    signOutAction: authStateModel.signOut
+                )
             case .unavailable:
-                AccountUnavailableView()
+                AccountUnavailableView(
+                    title: "Account Unavailable",
+                    description: "This account type is not available in this version of TMI.",
+                    signOutAction: authStateModel.signOut
+                )
             }
         }
-        .task {
-            await self.performBootstrap()
+        .task(id: access) {
+            await self.performBootstrap(for: access)
         }
     }
-    
-    private func performBootstrap() async {
+
+    private var accountAccess: FeatureFlags.AccountAccess {
+        dependencies.flags.accountAccess(for: authStateModel.currentUser?.role)
+    }
+
+    private func performBootstrap(for access: FeatureFlags.AccountAccess) async {
         guard
             !hasBootstrapped,
+            access.canBootstrap,
             let role = authStateModel.currentUser?.role,
-            dependencies.flags.accountRoute(for: role) != .unavailable
+            dependencies.flags.accountAccess(for: role) == access
         else {
             return
         }
@@ -149,26 +166,6 @@ struct ContentView: View {
         }
         
         print("[TMIApp] Bootstrap complete for role: \(role.rawValue)")
-    }
-}
-
-private struct AccountUnavailableView: View {
-    @Environment(\.authStateModel) private var authStateModel
-
-    var body: some View {
-        ContentUnavailableView {
-            Label("Account Unavailable", systemImage: "exclamationmark.circle")
-        } description: {
-            Text("This account type is not available in this version of TMI.")
-        } actions: {
-            Button("Sign Out", action: signOut)
-                .buttonStyle(.borderedProminent)
-        }
-    }
-
-    @MainActor
-    private func signOut() {
-        authStateModel.signOut()
     }
 }
 
