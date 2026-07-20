@@ -14,6 +14,8 @@ import FirebaseAuth
 
 @main
 struct TMIApp: App {
+    private let dependencies: AppDependencies = .production
+
     @State private var authStateModel: AuthStateModel
     @State private var studentContext: StudentContextStateModel
     @State private var deepLinkRouter: DeepLinkRouter
@@ -42,6 +44,7 @@ struct TMIApp: App {
         WindowGroup {
             ContentView()
                 // Core state models
+                .environment(\.appDependencies, dependencies)
                 .environment(\.authStateModel, authStateModel)
                 .environment(\.studentContext, studentContext)
                 .environment(\.deepLinkRouter, deepLinkRouter)
@@ -65,6 +68,7 @@ struct TMIApp: App {
 }
 
 struct ContentView: View {
+    @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) var authStateModel
     @Environment(\.studentContext) var studentContext
     @Environment(\.districtStateModel) var districtStateModel
@@ -104,30 +108,35 @@ struct ContentView: View {
     @ViewBuilder
     private var authenticatedContent: some View {
         Group {
-            // Route based on user role
-            if authStateModel.currentUser?.role == .student {
+            switch dependencies.flags.accountRoute(for: authStateModel.currentUser?.role) {
+            case .student:
                 StudentMainView()
                     .environment(\.studentAccessMode, .signedInStudent)
-            } else {
-                // Staff/parent view
+            case .staff:
                 MainTabView()
                     .environment(\.studentAccessMode, .staffViewing)
+            case .unavailable:
+                AccountUnavailableView()
             }
         }
         .task {
-            if !hasBootstrapped {
-                await performBootstrap()
-            }
+            await self.performBootstrap()
         }
     }
     
     private func performBootstrap() async {
-        guard !hasBootstrapped else { return }
+        guard
+            !hasBootstrapped,
+            let role = authStateModel.currentUser?.role,
+            dependencies.flags.accountRoute(for: role) != .unavailable
+        else {
+            return
+        }
+
         hasBootstrapped = true
         
         // Bootstrap the app with user's context
         let districtId = authStateModel.currentUser?.districtId
-        let role = authStateModel.currentUser?.role ?? .student
         
         await AppBootstrapService.shared.warmStart(
             districtId: districtId,
@@ -140,6 +149,26 @@ struct ContentView: View {
         }
         
         print("[TMIApp] Bootstrap complete for role: \(role.rawValue)")
+    }
+}
+
+private struct AccountUnavailableView: View {
+    @Environment(\.authStateModel) private var authStateModel
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("Account Unavailable", systemImage: "exclamationmark.circle")
+        } description: {
+            Text("This account type is not available in this version of TMI.")
+        } actions: {
+            Button("Sign Out", action: signOut)
+                .buttonStyle(.borderedProminent)
+        }
+    }
+
+    @MainActor
+    private func signOut() {
+        authStateModel.signOut()
     }
 }
 
@@ -169,6 +198,7 @@ struct LoadingView: View {
 
 #Preview {
     ContentView()
+        .environment(\.appDependencies, .production)
         .environment(\.authStateModel, AuthStateModel())
         .environment(\.studentContext, StudentContextStateModel())
         .environment(\.dashboardStateModel, DashboardStateModel())

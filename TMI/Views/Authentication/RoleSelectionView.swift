@@ -24,6 +24,7 @@ struct RoleSelectionView: View {
   @State private var showingInfoSheet = false
   @State private var showingRegistrationView = false
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.appDependencies) private var dependencies
 
   // Animation states for role cards
   @State private var animateCards = false
@@ -59,7 +60,11 @@ struct RoleSelectionView: View {
             )
 
           // Role selection grid
-          RoleSelectionGrid(selectedRole: $selectedRole, selectedCategory: $selectedCategory)
+          RoleSelectionGrid(
+            selectedRole: $selectedRole,
+            selectedCategory: $selectedCategory,
+            categories: SimplifiedRoleCategory.availableCategories(for: dependencies.flags)
+          )
             .opacity(animateCards ? 1.0 : 0)
             .offset(y: animateCards ? 0 : 30)
             .animation(
@@ -303,6 +308,19 @@ enum SimplifiedRoleCategory: String, CaseIterable, Identifiable {
     case .student, .parentGuardian: return false
     }
   }
+
+  static func availableCategories(for flags: FeatureFlags) -> [SimplifiedRoleCategory] {
+    allCases.filter { category in
+      switch category {
+      case .student:
+        flags.independentStudentAccounts
+      case .staff:
+        true
+      case .parentGuardian:
+        flags.guardianAccounts
+      }
+    }
+  }
 }
 
 // MARK: - Role Selection Grid
@@ -310,8 +328,7 @@ enum SimplifiedRoleCategory: String, CaseIterable, Identifiable {
 struct RoleSelectionGrid: View {
   @Binding var selectedRole: UserRole?
   @Binding var selectedCategory: SimplifiedRoleCategory?
-
-  private let categories = SimplifiedRoleCategory.allCases
+  let categories: [SimplifiedRoleCategory]
 
   var body: some View {
     TMICard(style: .default) {
@@ -846,4 +863,3 @@ extension UserRole {
 #Preview {
   RoleSelectionView()
 }
-
