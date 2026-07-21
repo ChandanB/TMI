@@ -256,7 +256,7 @@ git commit -m "feat: define canonical student records"
 - Create: `TMITests/Features/Students/StudentRepositoryTests.swift`
 - Create: `firebase/test/students.test.ts`
 
-- [ ] **Step 1: Write failing repository tests**
+- [x] **Step 1: Write failing repository tests**
 
 Cover first page/next page of 50, search by normalized name/identifier, school/grade/member/status filters, create idempotency, version-conflict edit, archive, duplicate result, assignment scope, permission revocation, offline queued draft, and online-required archive.
 
@@ -270,15 +270,15 @@ protocol StudentRepository: Sendable {
 }
 ```
 
-- [ ] **Step 2: Implement Firestore reads and trusted writes**
+- [x] **Step 2: Implement Firestore reads and trusted writes**
 
 Reads query `districts/{districtId}/students`, constrained by membership assignments and approved filters. Create/update/archive call trusted functions; functions revalidate capability, duplicate candidates, version, assignment, and operation ID in a transaction and write an authoritative audit event.
 
-- [ ] **Step 3: Run Swift and emulator tests**
+- [x] **Step 3: Run Swift and emulator tests**
 
 Expected: cross-tenant, unassigned, self-promoted, duplicate, stale-version, and replayed operations behave exactly as tests specify.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add TMI/Features/Students/StudentRepository.swift TMITests/Features/Students/StudentRepositoryTests.swift firebase/src/index.ts firebase/test/students.test.ts

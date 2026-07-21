@@ -2,7 +2,7 @@ import Foundation
 
 /// Editable student fields. Tenant identity is intentionally supplied by the
 /// trusted membership context rather than accepted as user-editable input.
-nonisolated struct StudentDraft: Sendable, Equatable {
+nonisolated struct StudentDraft: Codable, Sendable, Equatable {
     var displayName: String
     var schoolID: String
     var grade: String

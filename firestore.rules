@@ -65,14 +65,14 @@ service cloud.firestore {
     }
 
     function isAssignedStudent(districtID, studentID, studentData) {
-      return hasActiveMembership(districtID)
-        && studentID in membership(districtID).get('assignedStudentIDs', [])
+      return studentID in membership(districtID).get('assignedStudentIDs', [])
+        && request.auth.uid in studentData.get('assignedMemberIDs', [])
         && studentData.get('schoolId', '') in membership(districtID).get('schoolIDs', []);
     }
 
     function canReadStudent(districtID, studentID, studentData) {
       return hasActiveMembership(districtID)
-        && studentData.get('districtId', districtID) == districtID
+        && studentData.get('districtId', '') == districtID
         && (
           (
             role(districtID) in ['teacher', 'counselor', 'socialWorker']
@@ -90,33 +90,33 @@ service cloud.firestore {
         );
     }
 
-    function canWriteStudent(districtID, studentID, studentData) {
+    function canListStudent(districtID, studentData) {
       return hasActiveMembership(districtID)
-        && studentData.get('districtId', districtID) == districtID
         && (
           (
-            role(districtID) in ['teacher', 'counselor']
-            && isAssignedStudent(districtID, studentID, studentData)
+            role(districtID) in ['teacher', 'counselor', 'socialWorker']
+            && request.auth.uid in studentData.get('assignedMemberIDs', [])
+            && studentData.get('schoolId', '') in membership(districtID).get('schoolIDs', [])
           )
           || (
             role(districtID) == 'schoolAdministrator'
-            && hasCapability(districtID, 'student.write.detail')
+            && hasCapability(districtID, 'student.read.detail')
             && belongsToSchool(districtID, studentData.get('schoolId', ''))
           )
           || (
             role(districtID) == 'districtAdministrator'
-            && hasCapability(districtID, 'student.write.detail')
+            && hasCapability(districtID, 'student.read.detail')
           )
         );
     }
 
-    function canCreateStudent(districtID, studentID, studentData) {
+    function canWriteStudent(districtID, studentID, studentData) {
       return hasActiveMembership(districtID)
-        && studentData.get('districtId', districtID) == districtID
+        && studentData.get('districtId', '') == districtID
         && (
           (
             role(districtID) in ['teacher', 'counselor']
-            && belongsToSchool(districtID, studentData.get('schoolId', ''))
+            && isAssignedStudent(districtID, studentID, studentData)
           )
           || (
             role(districtID) == 'schoolAdministrator'
@@ -339,21 +339,9 @@ service cloud.firestore {
       }
 
       match /students/{studentID} {
-        allow read: if canReadStudent(districtID, studentID, resource.data);
-        allow create: if canCreateStudent(
-          districtID,
-          studentID,
-          request.resource.data
-        );
-        allow update: if canWriteStudent(districtID, studentID, resource.data)
-          && canWriteStudent(districtID, studentID, request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasNone([
-            'districtId',
-            'schoolId',
-            'createdAt',
-            'createdBy'
-          ]);
-        allow delete: if false;
+        allow get: if canReadStudent(districtID, studentID, resource.data);
+        allow list: if canListStudent(districtID, resource.data);
+        allow create, update, delete: if false;
 
         match /restrictedRecords/{recordID} {
           allow read: if canReadRestrictedStudentRecord(districtID, studentID);

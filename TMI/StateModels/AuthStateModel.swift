@@ -580,6 +580,8 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   private var authorizationTask: Task<Void, Never>?
   @ObservationIgnored
   private var authorizationGeneration: UInt64 = 0
+  @ObservationIgnored
+  private var authorizationSessionUpdateTask: Task<Void, Never>?
 
   // MARK: - Current User State
   private(set) var authenticatedSession: AuthenticatedSession?
@@ -766,7 +768,17 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
       MembershipRepository(store: FirebaseMembershipStore(firestore: $0.firestore))
     } ?? UnavailableAuthMembershipProvider()
     self.authorizationSessionStore = authorizationSessionStore
+    let authorizationSessionUpdates = authorizationSessionStore.sessionUpdates()
     super.init()
+
+    authorizationSessionUpdateTask = Task { @MainActor [weak self] in
+      for await session in authorizationSessionUpdates {
+        guard let self, !Task.isCancelled else {
+          return
+        }
+        self.acceptAuthorizationSessionUpdate(session)
+      }
+    }
 
     if automaticallyStart {
       Task { @MainActor [weak self] in
@@ -777,6 +789,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
   isolated deinit {
     authorizationTask?.cancel()
+    authorizationSessionUpdateTask?.cancel()
     authStateListenerHandle?.remove()
   }
 
@@ -967,6 +980,26 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     authenticatedSession = session
     currentUser = session.profile
     authorizationSessionStore.publish(session)
+    currentError = nil
+    updateState(.loaded(.authenticated(session)))
+  }
+
+  @MainActor
+  private func acceptAuthorizationSessionUpdate(_ session: AuthenticatedSession) {
+    guard let currentSession = authenticatedSession,
+          case .loaded(.authenticated(let displayedSession)) = state,
+          displayedSession == currentSession,
+          let identity = identityProvider.currentIdentity,
+          identity.userID == currentSession.profile.userID,
+          session.claim.districtID == currentSession.claim.districtID,
+          session.membership.districtID == currentSession.membership.districtID,
+          session.membership.version > currentSession.membership.version,
+          isValidTrustedSession(session, identity: identity) else {
+      return
+    }
+
+    authenticatedSession = session
+    currentUser = session.profile
     currentError = nil
     updateState(.loaded(.authenticated(session)))
   }

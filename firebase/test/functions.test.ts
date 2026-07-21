@@ -222,6 +222,59 @@ describe("privileged callable boundary", () => {
     );
   });
 
+  it("prevents legacy membership mutation from changing student assignments one-sided", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(
+        doc(db, "districts/d1/members/approver-1"),
+        activeMembership({
+          role: "schoolAdministrator",
+          capabilities: ["staff.manage"],
+        }),
+      );
+      await setDoc(doc(db, "districts/d1/members/teacher-2"), {
+        ...activeMembership({
+          assignedStudentIDs: ["student-existing"],
+        }),
+        districtID: "d1",
+        recordVersion: 3,
+        version: 3,
+      });
+    });
+
+    await expectHttpsError(
+      mutateMembership.run(
+        callableRequest({
+          districtID: "d1",
+          targetUserID: "teacher-2",
+          role: "teacher",
+          schoolIDs: ["school-1"],
+          capabilities: [],
+          assignedStudentIDs: [],
+          isActive: true,
+          expectedRecordVersion: 3,
+          idempotencyKey: "one-sided-membership-assignment",
+          reasonCode: "staff-reassignment",
+        }),
+      ),
+      "failed-precondition",
+    );
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const [membership, audit] = await Promise.all([
+        getDoc(doc(db, "districts/d1/members/teacher-2")),
+        getDoc(doc(db, "districts/d1/auditEvents/one-sided-membership-assignment")),
+      ]);
+      expect(membership.data()).toMatchObject({
+        assignedStudentIDs: ["student-existing"],
+        version: 3,
+        recordVersion: 3,
+      });
+      expect(audit.exists()).toBe(false);
+    });
+  });
+
   it("rejects stale aggregate versions without mutating the record", async () => {
     await expectHttpsError(
       transitionPlan.run(
@@ -276,13 +329,15 @@ describe("privileged callable boundary", () => {
   it("rejects reuse of an idempotency key for changed input", async () => {
     await transitionPlan.run(callableRequest(transitionRequest()));
 
-    await expectHttpsError(
+    await expect(
       transitionPlan.run(
         callableRequest(
           transitionRequest({ nextStatus: "changesRequested" }),
         ),
       ),
-      "already-exists",
-    );
+    ).rejects.toMatchObject({
+      code: "already-exists",
+      details: { kind: "idempotency-key-reused" },
+    });
   });
 });

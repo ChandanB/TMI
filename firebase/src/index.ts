@@ -6,13 +6,17 @@ import {
   Timestamp,
   getFirestore,
   type DocumentData,
+  type DocumentReference,
   type DocumentSnapshot,
+  type Firestore,
+  type Transaction,
 } from "firebase-admin/firestore";
 import {
   HttpsError,
   onCall,
   type CallableRequest,
 } from "firebase-functions/v2/https";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import {
   assertRecordVersion,
   canManageSchool,
@@ -71,6 +75,8 @@ const baseFields = [
   "reasonCode",
 ] as const;
 
+const maximumStudentAssignments = 200;
+
 const allowedPlanStatuses = [
   "draft",
   "submitted",
@@ -106,6 +112,39 @@ export interface GrantStudentDetailAccessRequest
   extends PrivilegedBaseRequest {
   readonly targetUserID: string;
   readonly studentID: string;
+}
+
+export interface CreateStudentRequest extends PrivilegedBaseRequest {
+  readonly schoolID: string;
+  readonly displayName: string;
+  readonly grade: string;
+  readonly studentIdentifier?: string;
+  readonly dateOfBirth?: string;
+  readonly pronouns?: string;
+  readonly assignedMemberIDs: readonly string[];
+}
+
+export interface UpdateStudentRequest extends CreateStudentRequest {
+  readonly studentID: string;
+}
+
+export interface ArchiveStudentRequest extends PrivilegedBaseRequest {
+  readonly studentID: string;
+}
+
+export interface StudentMutationMembership {
+  readonly districtID: string;
+  readonly schoolIDs: readonly string[];
+  readonly role: StaffRole;
+  readonly capabilities: readonly Capability[];
+  readonly assignedStudentIDs: readonly string[];
+  readonly isActive: boolean;
+  readonly version: number;
+}
+
+export interface StudentMutationResult extends PrivilegedOperationResult {
+  readonly studentID: string;
+  readonly membership: StudentMutationMembership;
 }
 
 export interface TransitionPlanRequest extends PrivilegedBaseRequest {
@@ -220,6 +259,163 @@ const parseGrantStudentDetailAccessRequest = (
   return {
     ...parseBaseRequest(data),
     targetUserID: requireIdentifier(data.targetUserID, "targetUserID"),
+    studentID: requireIdentifier(data.studentID, "studentID"),
+  };
+};
+
+const parseOptionalStudentText = (
+  value: unknown,
+  fieldName: string,
+  maximumCharacters: number,
+  maximumUTF8Bytes: number,
+  collapseWhitespace: boolean,
+): string | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new HttpsError(
+      "invalid-argument",
+      `${fieldName} is missing or malformed.`,
+    );
+  }
+  const normalized = collapseWhitespace
+    ? value.trim().split(/\s+/u).join(" ")
+    : value.trim();
+  if (normalized.length === 0) {
+    return undefined;
+  }
+  if (
+    [...normalized].length > maximumCharacters ||
+    Buffer.byteLength(normalized, "utf8") > maximumUTF8Bytes ||
+    /\p{Cc}/u.test(normalized)
+  ) {
+    throw new HttpsError(
+      "invalid-argument",
+      `${fieldName} is missing or malformed.`,
+    );
+  }
+  return normalized;
+};
+
+const parseRequiredStudentText = (
+  value: unknown,
+  fieldName: string,
+  maximumCharacters: number,
+  maximumUTF8Bytes: number,
+): string => {
+  const parsed = parseOptionalStudentText(
+    value,
+    fieldName,
+    maximumCharacters,
+    maximumUTF8Bytes,
+    true,
+  );
+  if (parsed === undefined) {
+    throw new HttpsError(
+      "invalid-argument",
+      `${fieldName} is missing or malformed.`,
+    );
+  }
+  return parsed;
+};
+
+const parseOptionalDateOfBirth = (value: unknown): string | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (
+    typeof value !== "string" ||
+    value.length > 40 ||
+    !/^\d{4}-\d{2}-\d{2}(?:T.*)?$/u.test(value)
+  ) {
+    throw new HttpsError(
+      "invalid-argument",
+      "dateOfBirth must be a valid ISO 8601 date.",
+    );
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime()) || parsed.getTime() > Date.now()) {
+    throw new HttpsError(
+      "invalid-argument",
+      "dateOfBirth must be a valid non-future ISO 8601 date.",
+    );
+  }
+  return parsed.toISOString();
+};
+
+const parseStudentDraftFields = (
+  data: Record<string, unknown>,
+): Omit<CreateStudentRequest, keyof PrivilegedBaseRequest> => {
+  const studentIdentifier = parseOptionalStudentText(
+    data.studentIdentifier,
+    "studentIdentifier",
+    128,
+    512,
+    false,
+  );
+  const pronouns = parseOptionalStudentText(
+    data.pronouns,
+    "pronouns",
+    80,
+    320,
+    true,
+  );
+  const dateOfBirth = parseOptionalDateOfBirth(data.dateOfBirth);
+  return {
+    schoolID: requireIdentifier(data.schoolID, "schoolID"),
+    displayName: parseRequiredStudentText(
+      data.displayName,
+      "displayName",
+      120,
+      512,
+    ),
+    grade: parseRequiredStudentText(data.grade, "grade", 32, 128),
+    ...(studentIdentifier === undefined ? {} : { studentIdentifier }),
+    ...(dateOfBirth === undefined ? {} : { dateOfBirth }),
+    ...(pronouns === undefined ? {} : { pronouns }),
+    assignedMemberIDs: requireIdentifierArray(
+      data.assignedMemberIDs,
+      "assignedMemberIDs",
+      { allowEmpty: true, maximumCount: maximumStudentAssignments },
+    ).sort(),
+  };
+};
+
+const studentDraftFieldNames = [
+  "schoolID",
+  "displayName",
+  "grade",
+  "studentIdentifier",
+  "dateOfBirth",
+  "pronouns",
+  "assignedMemberIDs",
+] as const;
+
+const parseCreateStudentRequest = (value: unknown): CreateStudentRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(data, withBaseFields(...studentDraftFieldNames));
+  return { ...parseBaseRequest(data), ...parseStudentDraftFields(data) };
+};
+
+const parseUpdateStudentRequest = (value: unknown): UpdateStudentRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(
+    data,
+    withBaseFields("studentID", ...studentDraftFieldNames),
+  );
+  return {
+    ...parseBaseRequest(data),
+    studentID: requireIdentifier(data.studentID, "studentID"),
+    ...parseStudentDraftFields(data),
+  };
+};
+
+const parseArchiveStudentRequest = (value: unknown): ArchiveStudentRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(data, withBaseFields("studentID"));
+  return {
+    ...parseBaseRequest(data),
     studentID: requireIdentifier(data.studentID, "studentID"),
   };
 };
@@ -485,6 +681,24 @@ const mutateMembershipHandler = async (
           existing.schoolIDs,
           "membership.schoolIDs",
         );
+        const existingAssignedStudentIDs = requireStoredIdentifierArray(
+          existing.assignedStudentIDs,
+          "membership.assignedStudentIDs",
+        ).sort();
+        const requestedAssignedStudentIDs = [...data.assignedStudentIDs].sort();
+        if (
+          existingAssignedStudentIDs.length !==
+            requestedAssignedStudentIDs.length ||
+          existingAssignedStudentIDs.some(
+            (studentID, index) =>
+              studentID !== requestedAssignedStudentIDs[index],
+          )
+        ) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Student assignments must be changed through a trusted student mutation.",
+          );
+        }
         requireStaffMutationScope(
           membership,
           data.targetUserID,
@@ -500,7 +714,7 @@ const mutateMembershipHandler = async (
           schoolIDs: [...data.schoolIDs],
           role: data.role,
           capabilities: [...data.capabilities],
-          assignedStudentIDs: [...data.assignedStudentIDs],
+          assignedStudentIDs: existingAssignedStudentIDs,
           isActive: data.isActive,
           createdAt: existing.createdAt ?? FieldValue.serverTimestamp(),
           createdBy: existing.createdBy ?? identity.userID,
@@ -519,13 +733,14 @@ const mutateMembershipHandler = async (
   return result;
 };
 
-const grantStudentDetailAccessHandler = async (
+export const createGrantStudentDetailAccessHandler = (
+  dependencies: StudentMutationDependencies,
+) => async (
   request: CallableRequest<GrantStudentDetailAccessRequest>,
 ): Promise<PrivilegedOperationResult> => {
   const data = parseGrantStudentDetailAccessRequest(request.data);
-  const firestore = getFirestore();
   const result = await executePrivilegedOperation(
-    firestore,
+    dependencies.firestore,
     request,
     data,
     {
@@ -544,17 +759,20 @@ const grantStudentDetailAccessHandler = async (
             "An administrator cannot grant their own detail access.",
           );
         }
-        const studentReference = firestore.doc(
+        const studentReference = dependencies.firestore.doc(
           `districts/${data.districtID}/students/${data.studentID}`,
         );
-        const targetReference = firestore.doc(
+        const targetReference = dependencies.firestore.doc(
           `districts/${data.districtID}/members/${data.targetUserID}`,
         );
         const [studentSnapshot, targetSnapshot] = await Promise.all([
           transaction.get(studentReference),
           transaction.get(targetReference),
         ]);
-        const student = requireExistingData(studentSnapshot, "Student");
+        const student = requireCanonicalStudent(
+          studentSnapshot,
+          data.districtID,
+        );
         const schoolID = requireSchoolID(student, "Student");
         if (!canManageSchool(membership, schoolID)) {
           throw new HttpsError(
@@ -570,28 +788,63 @@ const grantStudentDetailAccessHandler = async (
         if (target === null) {
           throw new HttpsError("not-found", "Membership was not found.");
         }
-        const targetSchoolIDs = requireStoredIdentifierArray(
-          target.schoolIDs,
-          "membership.schoolIDs",
+        const targetMembership = parseAssignmentMembership(
+          targetSnapshot,
+          data.districtID,
+          schoolID,
+          true,
         );
-        if (!targetSchoolIDs.includes(schoolID)) {
-          throw new HttpsError(
-            "failed-precondition",
-            "The target member is not assigned to the student's school.",
-          );
-        }
-        const assignments = new Set(
+        const memberAssignments = new Set(
+          targetMembership.assignedStudentIDs,
+        );
+        const studentAssignments = new Set(
           requireStoredIdentifierArray(
-            target.assignedStudentIDs,
-            "membership.assignedStudentIDs",
+            student.assignedMemberIDs,
+            "student.assignedMemberIDs",
           ),
         );
-        assignments.add(data.studentID);
+        if (
+          studentAssignments.size >= maximumStudentAssignments &&
+          !studentAssignments.has(data.targetUserID)
+        ) {
+          throw new HttpsError(
+            "failed-precondition",
+            "The student has reached the maximum staff assignment count.",
+          );
+        }
+        if (
+          memberAssignments.has(data.studentID) &&
+          studentAssignments.has(data.targetUserID)
+        ) {
+          throw new HttpsError(
+            "failed-precondition",
+            "The target member already has student detail access.",
+          );
+        }
+        const studentRecordVersion = student.recordVersion;
+        if (
+          typeof studentRecordVersion !== "number" ||
+          !Number.isSafeInteger(studentRecordVersion) ||
+          studentRecordVersion < 1
+        ) {
+          throw new HttpsError(
+            "data-loss",
+            "The student record version is malformed.",
+          );
+        }
+        memberAssignments.add(data.studentID);
+        studentAssignments.add(data.targetUserID);
         const nextVersion = data.expectedRecordVersion + 1;
         transaction.update(targetReference, {
-          assignedStudentIDs: [...assignments].sort(),
+          assignedStudentIDs: [...memberAssignments].sort(),
           recordVersion: nextVersion,
           version: nextVersion,
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: identity.userID,
+        });
+        transaction.update(studentReference, {
+          assignedMemberIDs: [...studentAssignments].sort(),
+          recordVersion: studentRecordVersion + 1,
           updatedAt: FieldValue.serverTimestamp(),
           updatedBy: identity.userID,
         });
@@ -599,13 +852,881 @@ const grantStudentDetailAccessHandler = async (
       },
     },
   );
-  await refreshTrustedClaims(
+  await dependencies.refreshTrustedClaimsForUser(
     data.targetUserID,
     data.districtID,
-    result.recordVersion,
   );
   return result;
 };
+
+const grantStudentDetailAccessHandler = async (
+  request: CallableRequest<GrantStudentDetailAccessRequest>,
+): Promise<PrivilegedOperationResult> =>
+  createGrantStudentDetailAccessHandler({
+    firestore: getFirestore(),
+    refreshTrustedClaimsForUser: refreshCurrentTrustedClaimsForUser,
+  })(request);
+
+interface StudentMutationDependencies {
+  readonly firestore: Firestore;
+  readonly refreshTrustedClaimsForUser: (
+    userID: string,
+    districtID: string,
+  ) => Promise<void>;
+}
+
+interface AssignmentMembershipRecord {
+  readonly reference: DocumentReference;
+  readonly assignedStudentIDs: Set<string>;
+  readonly version: number;
+}
+
+const normalizeSearchText = (value: string): string =>
+  value
+    .trim()
+    .split(/\s+/u)
+    .join(" ")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase();
+
+const studentIDForCreate = (data: CreateStudentRequest): string =>
+  `student_${createHash("sha256")
+    .update(`${data.districtID}:${data.idempotencyKey}`)
+    .digest("hex")
+    .slice(0, 32)}`;
+
+const studentClaimRefreshPath = (
+  districtID: string,
+  operationID: string,
+): string =>
+  `districts/${districtID}/studentClaimRefreshes/${operationID}`;
+
+const areEqualIdentifierSets = (
+  left: ReadonlySet<string>,
+  right: ReadonlySet<string>,
+): boolean =>
+  left.size === right.size && [...left].every((value) => right.has(value));
+
+const requireCanonicalStudent = (
+  snapshot: DocumentSnapshot,
+  districtID: string,
+): DocumentData => {
+  const data = requireExistingData(snapshot, "Student");
+  if (data.districtId !== districtID) {
+    throw new HttpsError(
+      "data-loss",
+      "The student does not have a valid district boundary.",
+    );
+  }
+  requireSchoolID(data, "Student");
+  requireStoredIdentifierArray(
+    data.assignedMemberIDs,
+    "student.assignedMemberIDs",
+  );
+  if (typeof data.isArchived !== "boolean") {
+    throw new HttpsError(
+      "data-loss",
+      "The student archive state is malformed.",
+    );
+  }
+  return data;
+};
+
+const canCreateStudentInSchool = (
+  membership: TrustedMembership,
+  schoolID: string,
+): boolean => {
+  switch (membership.role) {
+    case "teacher":
+    case "counselor":
+      return membership.schoolIDs.has(schoolID);
+    case "socialWorker":
+      return false;
+    case "schoolAdministrator":
+      return (
+        membership.schoolIDs.has(schoolID) &&
+        membership.capabilities.has("student.write.detail")
+      );
+    case "districtAdministrator":
+      return membership.capabilities.has("student.write.detail");
+  }
+};
+
+const canWriteCanonicalStudent = (
+  membership: TrustedMembership,
+  studentID: string,
+  schoolID: string,
+  assignedMemberIDs: ReadonlySet<string>,
+): boolean => {
+  switch (membership.role) {
+    case "teacher":
+    case "counselor":
+      return (
+        membership.schoolIDs.has(schoolID) &&
+        membership.assignedStudentIDs.has(studentID) &&
+        assignedMemberIDs.has(membership.userID)
+      );
+    case "socialWorker":
+      return false;
+    case "schoolAdministrator":
+      return (
+        membership.schoolIDs.has(schoolID) &&
+        membership.capabilities.has("student.write.detail")
+      );
+    case "districtAdministrator":
+      return membership.capabilities.has("student.write.detail");
+  }
+};
+
+const requireCreateAssignmentScope = (
+  membership: TrustedMembership,
+  schoolID: string,
+  assignedMemberIDs: ReadonlySet<string>,
+): void => {
+  if (
+    (membership.role === "teacher" || membership.role === "counselor") &&
+    (!assignedMemberIDs.has(membership.userID) ||
+      assignedMemberIDs.size !== 1)
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "Ordinary roster creators must assign themselves and cannot expand assignment scope.",
+    );
+  }
+  const containsAnotherMember = [...assignedMemberIDs].some(
+    (memberID) => memberID !== membership.userID,
+  );
+  if (containsAnotherMember && !canManageSchool(membership, schoolID)) {
+    throw new HttpsError(
+      "permission-denied",
+      "Assigning another staff member requires staff management scope.",
+    );
+  }
+};
+
+const assertNoStudentDuplicate = async (
+  transaction: Transaction,
+  firestore: Firestore,
+  data: CreateStudentRequest,
+  excludingStudentID?: string,
+): Promise<void> => {
+  const collection = firestore.collection(
+    `districts/${data.districtID}/students`,
+  );
+  const normalizedDisplayName = normalizeSearchText(data.displayName);
+  const normalizedGrade = normalizeSearchText(data.grade);
+  const nameQuery = collection
+    .where("schoolId", "==", data.schoolID)
+    .where("normalizedDisplayName", "==", normalizedDisplayName);
+  const identifierQuery =
+    data.studentIdentifier === undefined
+      ? null
+      : collection
+          .where("schoolId", "==", data.schoolID)
+          .where(
+            "normalizedStudentIdentifier",
+            "==",
+            normalizeSearchText(data.studentIdentifier),
+          );
+  const nameMatches = await transaction.get(nameQuery);
+  const identifierMatches =
+    identifierQuery === null
+      ? null
+      : await transaction.get(identifierQuery);
+  const candidateIDs = new Set<string>();
+  for (const snapshot of nameMatches.docs) {
+    if (snapshot.id === excludingStudentID) {
+      continue;
+    }
+    const grade = snapshot.get("grade");
+    if (
+      typeof grade === "string" &&
+      normalizeSearchText(grade) === normalizedGrade
+    ) {
+      candidateIDs.add(snapshot.id);
+    }
+  }
+  for (const snapshot of identifierMatches?.docs ?? []) {
+    if (snapshot.id !== excludingStudentID) {
+      candidateIDs.add(snapshot.id);
+    }
+  }
+  if (candidateIDs.size > 0) {
+    throw new HttpsError(
+      "already-exists",
+      "A matching student already exists in this school, including archived records.",
+      {
+        kind: "student-duplicate",
+        candidateIDs: [...candidateIDs].sort(),
+      },
+    );
+  }
+};
+
+const assertStudentRecordVersion = (
+  actualRecordVersion: unknown,
+  expectedRecordVersion: number,
+): void => {
+  if (
+    typeof actualRecordVersion !== "number" ||
+    !Number.isSafeInteger(actualRecordVersion) ||
+    actualRecordVersion < 1
+  ) {
+    throw new HttpsError(
+      "data-loss",
+      "The student record version is malformed.",
+    );
+  }
+  if (actualRecordVersion !== expectedRecordVersion) {
+    throw new HttpsError(
+      "aborted",
+      "The student changed. Refresh and retry with its current version.",
+      {
+        kind: "record-version-conflict",
+        expectedRecordVersion,
+        actualRecordVersion,
+      },
+    );
+  }
+};
+
+const parseAssignmentMembership = (
+  snapshot: DocumentSnapshot,
+  districtID: string,
+  schoolID: string,
+  requiresActiveSchoolScope: boolean,
+): AssignmentMembershipRecord => {
+  const data = requireExistingData(snapshot, "Assigned membership");
+  const schoolIDs = requireStoredIdentifierArray(
+    data.schoolIDs,
+    "membership.schoolIDs",
+  );
+  const assignedStudentIDs = requireStoredIdentifierArray(
+    data.assignedStudentIDs,
+    "membership.assignedStudentIDs",
+  );
+  const version = data.version;
+  const recordVersion = data.recordVersion ?? version;
+  if (
+    data.districtID !== undefined &&
+    data.districtID !== districtID
+  ) {
+    throw new HttpsError(
+      "data-loss",
+      "An assigned membership crosses the student district boundary.",
+    );
+  }
+  if (
+    typeof version !== "number" ||
+    !Number.isSafeInteger(version) ||
+    version < 1 ||
+    recordVersion !== version
+  ) {
+    throw new HttpsError(
+      "data-loss",
+      "An assigned membership version is malformed.",
+    );
+  }
+  if (
+    requiresActiveSchoolScope &&
+    (data.isActive !== true || !schoolIDs.includes(schoolID))
+  ) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Every assigned staff member must have an active membership in the student's school.",
+    );
+  }
+  return {
+    reference: snapshot.ref,
+    assignedStudentIDs: new Set(assignedStudentIDs),
+    version,
+  };
+};
+
+const applyStudentAssignmentChanges = async (
+  transaction: Transaction,
+  firestore: Firestore,
+  parameters: {
+    readonly districtID: string;
+    readonly schoolID: string;
+    readonly studentID: string;
+    readonly operationID: string;
+    readonly actorUserID: string;
+    readonly previousMemberIDs: ReadonlySet<string>;
+    readonly nextMemberIDs: ReadonlySet<string>;
+    readonly validateAllNextMemberScopes?: boolean;
+  },
+): Promise<void> => {
+  const affectedUserIDs = [...new Set([
+    ...parameters.previousMemberIDs,
+    ...parameters.nextMemberIDs,
+  ])]
+    .filter(
+      (userID) =>
+        parameters.previousMemberIDs.has(userID) !==
+        parameters.nextMemberIDs.has(userID),
+    )
+    .sort();
+  const memberIDsToRead = [...new Set([
+    ...affectedUserIDs,
+    ...(parameters.validateAllNextMemberScopes === true
+      ? parameters.nextMemberIDs
+      : []),
+  ])].sort();
+  if (memberIDsToRead.length === 0) {
+    return;
+  }
+  const references = memberIDsToRead.map((userID) =>
+    firestore.doc(`districts/${parameters.districtID}/members/${userID}`),
+  );
+  const snapshots = await Promise.all(
+    references.map(async (reference) => transaction.get(reference)),
+  );
+  const memberships = new Map(
+    snapshots.map((snapshot, index) => {
+      const userID = memberIDsToRead[index] ?? "";
+      return [
+        userID,
+        parseAssignmentMembership(
+          snapshot,
+          parameters.districtID,
+          parameters.schoolID,
+          parameters.nextMemberIDs.has(userID),
+        ),
+      ] as const;
+    }),
+  );
+  for (const userID of affectedUserIDs) {
+    const membership = memberships.get(userID);
+    if (membership === undefined) {
+      throw new HttpsError("data-loss", "An assignment member is missing.");
+    }
+    const nextAssignments = new Set(membership.assignedStudentIDs);
+    if (parameters.nextMemberIDs.has(userID)) {
+      nextAssignments.add(parameters.studentID);
+    } else {
+      nextAssignments.delete(parameters.studentID);
+    }
+    const nextVersion = membership.version + 1;
+    transaction.update(membership.reference, {
+      assignedStudentIDs: [...nextAssignments].sort(),
+      version: nextVersion,
+      recordVersion: nextVersion,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: parameters.actorUserID,
+    });
+  }
+  if (affectedUserIDs.length > 0) {
+    transaction.create(
+      firestore.doc(
+        studentClaimRefreshPath(parameters.districtID, parameters.operationID),
+      ),
+      {
+        schemaVersion: 1,
+        districtID: parameters.districtID,
+        affectedUserIDs,
+        createdAt: FieldValue.serverTimestamp(),
+        createdBy: parameters.actorUserID,
+      },
+    );
+  }
+};
+
+export const createStudentClaimRefreshHandler = (
+  dependencies: StudentMutationDependencies,
+) => async (input: {
+  readonly districtID: string;
+  readonly operationID: string;
+}): Promise<void> => {
+  const districtID = requireIdentifier(input.districtID, "districtID");
+  const operationID = requireIdentifier(input.operationID, "operationID");
+  const reference = dependencies.firestore.doc(
+    studentClaimRefreshPath(districtID, operationID),
+  );
+  const snapshot = await reference.get();
+  if (!snapshot.exists || snapshot.get("completedAt") !== undefined) {
+    return;
+  }
+  if (snapshot.get("districtID") !== districtID) {
+    throw new HttpsError(
+      "data-loss",
+      "The claim refresh task crosses its district boundary.",
+    );
+  }
+  const affectedUserIDs = requireStoredIdentifierArray(
+    snapshot.get("affectedUserIDs"),
+    "claimRefresh.affectedUserIDs",
+  );
+  const rawCompletedUserIDs = snapshot.get("completedUserIDs");
+  const completedUserIDs = new Set(
+    rawCompletedUserIDs === undefined
+      ? []
+      : requireStoredIdentifierArray(
+          rawCompletedUserIDs,
+          "claimRefresh.completedUserIDs",
+        ),
+  );
+  if (
+    [...completedUserIDs].some(
+      (userID) => !affectedUserIDs.includes(userID),
+    )
+  ) {
+    throw new HttpsError(
+      "data-loss",
+      "The claim refresh task completion state is malformed.",
+    );
+  }
+
+  let firstError: unknown;
+  for (const userID of affectedUserIDs) {
+    if (completedUserIDs.has(userID)) {
+      continue;
+    }
+    try {
+      await dependencies.refreshTrustedClaimsForUser(userID, districtID);
+      await reference.update({
+        completedUserIDs: FieldValue.arrayUnion(userID),
+        lastAttemptAt: FieldValue.serverTimestamp(),
+      });
+      completedUserIDs.add(userID);
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  if (firstError !== undefined) {
+    throw firstError;
+  }
+  await reference.update({
+    completedAt: FieldValue.serverTimestamp(),
+    completedUserIDs: [...affectedUserIDs].sort(),
+  });
+};
+
+const refreshStudentAssignmentClaims = async (
+  dependencies: StudentMutationDependencies,
+  districtID: string,
+  operationID: string,
+): Promise<void> =>
+  createStudentClaimRefreshHandler(dependencies)({ districtID, operationID });
+
+const studentDocumentFields = (
+  data: CreateStudentRequest,
+): Readonly<Record<string, unknown>> => ({
+  districtId: data.districtID,
+  schoolId: data.schoolID,
+  displayName: data.displayName,
+  normalizedDisplayName: normalizeSearchText(data.displayName),
+  grade: data.grade,
+  ...(data.studentIdentifier === undefined
+    ? {}
+    : {
+        studentIdentifier: data.studentIdentifier,
+        normalizedStudentIdentifier: normalizeSearchText(
+          data.studentIdentifier,
+        ),
+      }),
+  ...(data.dateOfBirth === undefined
+    ? {}
+    : { dateOfBirth: Timestamp.fromDate(new Date(data.dateOfBirth)) }),
+  ...(data.pronouns === undefined ? {} : { pronouns: data.pronouns }),
+  assignedMemberIDs: [...data.assignedMemberIDs].sort(),
+});
+
+const readStudentMutationMembership = async (
+  firestore: Firestore,
+  districtID: string,
+  userID: string,
+): Promise<StudentMutationMembership> => {
+  const snapshot = await firestore
+    .doc(`districts/${districtID}/members/${userID}`)
+    .get();
+  const data = requireExistingData(snapshot, "Caller membership");
+  let schoolIDs: string[];
+  let assignedStudentIDs: string[];
+  let role: StaffRole;
+  let capabilities: Capability[];
+  try {
+    schoolIDs = requireStoredIdentifierArray(
+      data.schoolIDs,
+      "membership.schoolIDs",
+    );
+    assignedStudentIDs = requireStoredIdentifierArray(
+      data.assignedStudentIDs,
+      "membership.assignedStudentIDs",
+    );
+    role = requireEnum(data.role, "membership.role", staffRoleValues);
+    capabilities = parseCapabilityArray(data.capabilities);
+  } catch {
+    throw new HttpsError(
+      "data-loss",
+      "The caller membership authority is malformed after mutation.",
+    );
+  }
+  const version = data.version;
+  if (
+    data.districtID !== districtID ||
+    data.isActive !== true ||
+    typeof version !== "number" ||
+    !Number.isSafeInteger(version) ||
+    version < 1 ||
+    (data.recordVersion !== undefined && data.recordVersion !== version)
+  ) {
+    throw new HttpsError(
+      "data-loss",
+      "The caller membership authority is malformed after mutation.",
+    );
+  }
+  return {
+    districtID,
+    schoolIDs: schoolIDs.sort(),
+    role,
+    capabilities: capabilities.sort(),
+    assignedStudentIDs: assignedStudentIDs.sort(),
+    isActive: true,
+    version,
+  };
+};
+
+export const createStudentMutationHandlers = (
+  dependencies: StudentMutationDependencies,
+) => ({
+  createStudent: async (
+    request: CallableRequest<CreateStudentRequest>,
+  ): Promise<StudentMutationResult> => {
+    const data = parseCreateStudentRequest(request.data);
+    if (data.expectedRecordVersion !== 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "A new student must expect record version zero.",
+      );
+    }
+    const studentID = studentIDForCreate(data);
+    const result = await executePrivilegedOperation(
+      dependencies.firestore,
+      request,
+      data,
+      {
+        action: "student.create",
+        targetPath: () =>
+          `districts/${data.districtID}/students/${studentID}`,
+        requiredCapability: null,
+        auditDetails: () => ({
+          studentID,
+          schoolID: data.schoolID,
+          assignmentCount: data.assignedMemberIDs.length,
+        }),
+        mutate: async ({ transaction, membership, identity }) => {
+          if (!canCreateStudentInSchool(membership, data.schoolID)) {
+            throw new HttpsError(
+              "permission-denied",
+              "The member cannot create students in this school.",
+            );
+          }
+          const assignedMemberIDs = new Set(data.assignedMemberIDs);
+          requireCreateAssignmentScope(
+            membership,
+            data.schoolID,
+            assignedMemberIDs,
+          );
+          const reference = dependencies.firestore.doc(
+            `districts/${data.districtID}/students/${studentID}`,
+          );
+          const snapshot = await transaction.get(reference);
+          if (snapshot.exists) {
+            throw new HttpsError(
+              "already-exists",
+              "The student operation target already exists.",
+            );
+          }
+          await assertNoStudentDuplicate(
+            transaction,
+            dependencies.firestore,
+            data,
+          );
+          await applyStudentAssignmentChanges(
+            transaction,
+            dependencies.firestore,
+            {
+              districtID: data.districtID,
+              schoolID: data.schoolID,
+              studentID,
+              operationID: data.idempotencyKey,
+              actorUserID: identity.userID,
+              previousMemberIDs: new Set(),
+              nextMemberIDs: assignedMemberIDs,
+            },
+          );
+          transaction.create(reference, {
+            ...studentDocumentFields(data),
+            isArchived: false,
+            schemaVersion: 1,
+            recordVersion: 1,
+            createdAt: FieldValue.serverTimestamp(),
+            createdBy: identity.userID,
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedBy: identity.userID,
+          });
+          return { recordVersion: 1 };
+        },
+      },
+    );
+    await refreshStudentAssignmentClaims(
+      dependencies,
+      data.districtID,
+      data.idempotencyKey,
+    );
+    const membership = await readStudentMutationMembership(
+      dependencies.firestore,
+      data.districtID,
+      request.auth?.uid ?? "",
+    );
+    return { ...result, studentID, membership };
+  },
+
+  updateStudent: async (
+    request: CallableRequest<UpdateStudentRequest>,
+  ): Promise<StudentMutationResult> => {
+    const data = parseUpdateStudentRequest(request.data);
+    if (data.expectedRecordVersion < 1) {
+      throw new HttpsError(
+        "invalid-argument",
+        "An updated student must expect an existing record version.",
+      );
+    }
+    const result = await executePrivilegedOperation(
+      dependencies.firestore,
+      request,
+      data,
+      {
+        action: "student.update",
+        targetPath: () =>
+          `districts/${data.districtID}/students/${data.studentID}`,
+        requiredCapability: null,
+        auditDetails: () => ({
+          studentID: data.studentID,
+          schoolID: data.schoolID,
+          assignmentCount: data.assignedMemberIDs.length,
+        }),
+        mutate: async ({ transaction, membership, identity }) => {
+          const reference = dependencies.firestore.doc(
+            `districts/${data.districtID}/students/${data.studentID}`,
+          );
+          const snapshot = await transaction.get(reference);
+          const existing = requireCanonicalStudent(
+            snapshot,
+            data.districtID,
+          );
+          assertStudentRecordVersion(
+            existing.recordVersion,
+            data.expectedRecordVersion,
+          );
+          if (existing.isArchived === true) {
+            throw new HttpsError(
+              "failed-precondition",
+              "Archived students cannot be edited.",
+            );
+          }
+          const existingSchoolID = requireSchoolID(existing, "Student");
+          const previousMemberIDs = new Set(
+            requireStoredIdentifierArray(
+              existing.assignedMemberIDs,
+              "student.assignedMemberIDs",
+            ),
+          );
+          if (previousMemberIDs.size > maximumStudentAssignments) {
+            throw new HttpsError(
+              "failed-precondition",
+              "The legacy student exceeds the maximum staff assignment count and must be reconciled before editing.",
+            );
+          }
+          if (
+            !canWriteCanonicalStudent(
+              membership,
+              data.studentID,
+              existingSchoolID,
+              previousMemberIDs,
+            )
+          ) {
+            throw new HttpsError(
+              "permission-denied",
+              "The member cannot edit this student.",
+            );
+          }
+          const nextMemberIDs = new Set(data.assignedMemberIDs);
+          const changesSchool = data.schoolID !== existingSchoolID;
+          const changesAssignments = !areEqualIdentifierSets(
+            previousMemberIDs,
+            nextMemberIDs,
+          );
+          if (
+            (changesSchool || changesAssignments) &&
+            (!canManageSchool(membership, existingSchoolID) ||
+              !canManageSchool(membership, data.schoolID))
+          ) {
+            throw new HttpsError(
+              "permission-denied",
+              "Changing school or assignment scope requires staff management scope.",
+            );
+          }
+          await assertNoStudentDuplicate(
+            transaction,
+            dependencies.firestore,
+            data,
+            data.studentID,
+          );
+          await applyStudentAssignmentChanges(
+            transaction,
+            dependencies.firestore,
+            {
+              districtID: data.districtID,
+              schoolID: data.schoolID,
+              studentID: data.studentID,
+              operationID: data.idempotencyKey,
+              actorUserID: identity.userID,
+              previousMemberIDs,
+              nextMemberIDs,
+              validateAllNextMemberScopes: changesSchool,
+            },
+          );
+          const nextVersion = data.expectedRecordVersion + 1;
+          transaction.set(reference, {
+            ...studentDocumentFields(data),
+            isArchived: false,
+            schemaVersion: 1,
+            recordVersion: nextVersion,
+            createdAt: existing.createdAt ?? FieldValue.serverTimestamp(),
+            createdBy: existing.createdBy ?? identity.userID,
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedBy: identity.userID,
+          });
+          return { recordVersion: nextVersion };
+        },
+      },
+    );
+    await refreshStudentAssignmentClaims(
+      dependencies,
+      data.districtID,
+      data.idempotencyKey,
+    );
+    const membership = await readStudentMutationMembership(
+      dependencies.firestore,
+      data.districtID,
+      request.auth?.uid ?? "",
+    );
+    return { ...result, studentID: data.studentID, membership };
+  },
+
+  archiveStudent: async (
+    request: CallableRequest<ArchiveStudentRequest>,
+  ): Promise<StudentMutationResult> => {
+    const data = parseArchiveStudentRequest(request.data);
+    if (data.expectedRecordVersion < 1) {
+      throw new HttpsError(
+        "invalid-argument",
+        "An archived student must expect an existing record version.",
+      );
+    }
+    const result = await executePrivilegedOperation(
+      dependencies.firestore,
+      request,
+      data,
+      {
+        action: "student.archive",
+        targetPath: () =>
+          `districts/${data.districtID}/students/${data.studentID}`,
+        requiredCapability: null,
+        auditDetails: () => ({ studentID: data.studentID }),
+        mutate: async ({ transaction, membership, identity }) => {
+          const reference = dependencies.firestore.doc(
+            `districts/${data.districtID}/students/${data.studentID}`,
+          );
+          const snapshot = await transaction.get(reference);
+          const existing = requireCanonicalStudent(
+            snapshot,
+            data.districtID,
+          );
+          assertStudentRecordVersion(
+            existing.recordVersion,
+            data.expectedRecordVersion,
+          );
+          const schoolID = requireSchoolID(existing, "Student");
+          const assignedMemberIDs = new Set(
+            requireStoredIdentifierArray(
+              existing.assignedMemberIDs,
+              "student.assignedMemberIDs",
+            ),
+          );
+          if (
+            !canWriteCanonicalStudent(
+              membership,
+              data.studentID,
+              schoolID,
+              assignedMemberIDs,
+            )
+          ) {
+            throw new HttpsError(
+              "permission-denied",
+              "The member cannot archive this student.",
+            );
+          }
+          if (existing.isArchived === true) {
+            throw new HttpsError(
+              "failed-precondition",
+              "The student is already archived.",
+            );
+          }
+          const nextVersion = data.expectedRecordVersion + 1;
+          transaction.update(reference, {
+            isArchived: true,
+            recordVersion: nextVersion,
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedBy: identity.userID,
+          });
+          return { recordVersion: nextVersion };
+        },
+      },
+    );
+    const membership = await readStudentMutationMembership(
+      dependencies.firestore,
+      data.districtID,
+      request.auth?.uid ?? "",
+    );
+    return { ...result, studentID: data.studentID, membership };
+  },
+});
+
+const refreshCurrentTrustedClaimsForUser = async (
+  userID: string,
+  districtID: string,
+): Promise<void> => {
+  const membership = await getFirestore()
+    .doc(`districts/${districtID}/members/${userID}`)
+    .get();
+  const version = membership.get("version");
+  if (
+    !membership.exists ||
+    typeof version !== "number" ||
+    !Number.isSafeInteger(version) ||
+    version < 1
+  ) {
+    throw new HttpsError(
+      "data-loss",
+      "The affected membership version is missing after assignment.",
+    );
+  }
+  await refreshTrustedClaims(userID, districtID, version);
+};
+
+const productionStudentMutationHandlers = createStudentMutationHandlers({
+  firestore: getFirestore(),
+  refreshTrustedClaimsForUser: refreshCurrentTrustedClaimsForUser,
+});
+const productionStudentClaimRefreshHandler =
+  createStudentClaimRefreshHandler({
+    firestore: getFirestore(),
+    refreshTrustedClaimsForUser: refreshCurrentTrustedClaimsForUser,
+  });
 
 const transitionPlanHandler = async (
   request: CallableRequest<TransitionPlanRequest>,
@@ -896,6 +2017,33 @@ export const provisionStaffMembership = onCall<ProvisionStaffMembershipRequest>(
 export const grantStudentDetailAccess = onCall(
   callableOptions,
   grantStudentDetailAccessHandler,
+);
+export const createStudent = onCall(
+  callableOptions,
+  productionStudentMutationHandlers.createStudent,
+);
+export const updateStudent = onCall(
+  callableOptions,
+  productionStudentMutationHandlers.updateStudent,
+);
+export const archiveStudent = onCall(
+  callableOptions,
+  productionStudentMutationHandlers.archiveStudent,
+);
+export const drainStudentClaimRefresh = onDocumentCreated(
+  {
+    document:
+      "districts/{districtID}/studentClaimRefreshes/{operationID}",
+    region: "us-central1",
+    retry: true,
+    timeoutSeconds: 540,
+  },
+  async (event) => {
+    await productionStudentClaimRefreshHandler({
+      districtID: event.params.districtID,
+      operationID: event.params.operationID,
+    });
+  },
 );
 export const transitionPlan = onCall(callableOptions, transitionPlanHandler);
 export const issueStudentModeSession = onCall(

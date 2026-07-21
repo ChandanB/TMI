@@ -41,16 +41,19 @@ describe("canonical Firestore authorization", () => {
       await setDoc(doc(db, "districts/d1/students/student-1"), {
         districtId: "d1",
         schoolId: "school-1",
+        assignedMemberIDs: ["teacher-1"],
         name: "Assigned Student",
       });
       await setDoc(doc(db, "districts/d1/students/student-2"), {
         districtId: "d1",
         schoolId: "school-1",
+        assignedMemberIDs: [],
         name: "Unassigned Student",
       });
       await setDoc(doc(db, "districts/d2/students/student-3"), {
         districtId: "d2",
         schoolId: "school-2",
+        assignedMemberIDs: [],
         name: "Other District Student",
       });
       await setDoc(

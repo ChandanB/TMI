@@ -401,12 +401,22 @@ export function assertRecordVersion(
   if (
     typeof actual !== "number" ||
     !Number.isSafeInteger(actual) ||
-    actual < 0 ||
-    actual !== expected
+    actual < 0
   ) {
+    throw new HttpsError(
+      "data-loss",
+      "The stored record version is malformed.",
+    );
+  }
+  if (actual !== expected) {
     throw new HttpsError(
       "aborted",
       "The record changed. Refresh and retry with its current version.",
+      {
+        kind: "record-version-conflict",
+        expectedRecordVersion: expected,
+        actualRecordVersion: actual,
+      },
     );
   }
 }
@@ -471,6 +481,34 @@ export async function executePrivilegedOperation<
   );
 
   return firestore.runTransaction(async (transaction) => {
+    const priorAudit = await transaction.get(auditReference);
+    if (priorAudit.exists) {
+      const prior = priorAudit.data() ?? {};
+      const isExactReplay =
+        prior.action === spec.action &&
+        prior.actorUserID === identity.userID &&
+        prior.requestHash === requestHash;
+      if (isExactReplay) {
+        const priorResult = requireRecord(prior.result, "audit result");
+        const recordVersion = priorResult.recordVersion;
+        if (
+          typeof recordVersion !== "number" ||
+          !Number.isSafeInteger(recordVersion) ||
+          recordVersion < 0
+        ) {
+          throw new HttpsError(
+            "data-loss",
+            "The prior operation result is malformed.",
+          );
+        }
+        return {
+          operationID: data.idempotencyKey,
+          recordVersion,
+          replayed: true,
+        };
+      }
+    }
+
     const membership = await requireTrustedMembership(
       firestore,
       transaction,
@@ -480,36 +518,12 @@ export async function executePrivilegedOperation<
       requireCapability(membership, spec.requiredCapability);
     }
 
-    const priorAudit = await transaction.get(auditReference);
     if (priorAudit.exists) {
-      const prior = priorAudit.data() ?? {};
-      if (
-        prior.action !== spec.action ||
-        prior.actorUserID !== identity.userID ||
-        prior.requestHash !== requestHash
-      ) {
-        throw new HttpsError(
-          "already-exists",
-          "The idempotency key was already used for a different operation.",
-        );
-      }
-      const priorResult = requireRecord(prior.result, "audit result");
-      const recordVersion = priorResult.recordVersion;
-      if (
-        typeof recordVersion !== "number" ||
-        !Number.isSafeInteger(recordVersion) ||
-        recordVersion < 0
-      ) {
-        throw new HttpsError(
-          "data-loss",
-          "The prior operation result is malformed.",
-        );
-      }
-      return {
-        operationID: data.idempotencyKey,
-        recordVersion,
-        replayed: true,
-      };
+      throw new HttpsError(
+        "already-exists",
+        "The idempotency key was already used for a different operation.",
+        { kind: "idempotency-key-reused" },
+      );
     }
 
     const mutationResult = await spec.mutate({

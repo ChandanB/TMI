@@ -203,6 +203,156 @@ struct AuthStateModelMembershipTests {
         })
     }
 
+    @Test("A trusted store publication refreshes observable membership state")
+    func trustedStorePublicationRefreshesMembershipState() async {
+        let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: true)
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: ["user-1": trustedClaim(userID: "user-1", version: 1)]
+        )
+        let sessionStore = TrustedAuthorizationSessionStore()
+        let auditRecorder = RecordingAuditEventRecorder()
+        let profile = makeUser(id: "user-1")
+        let model = makeModel(
+            identityProvider: identityProvider,
+            profiles: ["user-1": profile],
+            membershipProvider: ImmediateMembershipProvider(
+                memberships: ["user-1": makeMembership(userID: "user-1")]
+            ),
+            auditService: auditRecorder,
+            authorizationSessionStore: sessionStore
+        )
+
+        await model.fetch()
+        #expect(auditRecorder.loginEventCount == 1)
+        let refreshedMembership = makeMembership(
+            userID: "user-1",
+            role: .counselor,
+            assignedStudentIDs: ["student-1", "student-2"],
+            version: 2
+        )
+        let refreshedSession = AuthenticatedSession(
+            profile: profile,
+            claim: trustedClaim(userID: "user-1", version: 2),
+            membership: refreshedMembership
+        )
+
+        sessionStore.publish(refreshedSession)
+
+        #expect(await eventually {
+            model.currentMembership == refreshedMembership
+                && model.currentAuthState == .authenticated(refreshedSession)
+        })
+        #expect(auditRecorder.loginEventCount == 1)
+    }
+
+    @Test("Store publications reject stale and untrusted sessions")
+    func storePublicationsRejectStaleAndUntrustedSessions() async {
+        let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: true)
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: ["user-1": trustedClaim(userID: "user-1", version: 1)]
+        )
+        let sessionStore = TrustedAuthorizationSessionStore()
+        let profile = makeUser(id: "user-1")
+        let model = makeModel(
+            identityProvider: identityProvider,
+            profiles: ["user-1": profile],
+            membershipProvider: ImmediateMembershipProvider(
+                memberships: ["user-1": makeMembership(userID: "user-1")]
+            ),
+            authorizationSessionStore: sessionStore
+        )
+
+        await model.fetch()
+        let originalSession = model.authenticatedSession
+        let rejectedSessions = [
+            AuthenticatedSession(
+                profile: profile,
+                claim: trustedClaim(userID: "user-1", version: 1),
+                membership: makeMembership(
+                    userID: "user-1",
+                    role: .counselor,
+                    version: 1
+                )
+            ),
+            AuthenticatedSession(
+                profile: makeUser(id: "user-2"),
+                claim: trustedClaim(userID: "user-2", version: 2),
+                membership: makeMembership(userID: "user-2", version: 2)
+            ),
+            AuthenticatedSession(
+                profile: profile,
+                claim: trustedClaim(
+                    userID: "user-1",
+                    districtID: "other-district",
+                    version: 2
+                ),
+                membership: makeMembership(
+                    userID: "user-1",
+                    districtID: "other-district",
+                    version: 2
+                )
+            ),
+            AuthenticatedSession(
+                profile: profile,
+                claim: trustedClaim(userID: "user-1", version: 3),
+                membership: makeMembership(userID: "user-1", version: 2)
+            ),
+            AuthenticatedSession(
+                profile: profile,
+                claim: trustedClaim(userID: "user-1", version: 2),
+                membership: makeMembership(
+                    userID: "user-1",
+                    isActive: false,
+                    version: 2
+                )
+            ),
+        ]
+
+        for rejectedSession in rejectedSessions {
+            sessionStore.publish(rejectedSession)
+
+            #expect(await remainsTrue {
+                model.authenticatedSession == originalSession
+                    && model.currentMembership == originalSession?.membership
+                    && model.currentAuthState == originalSession.map(
+                        AuthenticationState.authenticated
+                    )
+            })
+        }
+    }
+
+    @Test("Store duplicate and clear events do not sign out an active session")
+    func storeDuplicateAndClearDoNotSignOut() async throws {
+        let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: true)
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: ["user-1": trustedClaim(userID: "user-1", version: 1)]
+        )
+        let sessionStore = TrustedAuthorizationSessionStore()
+        let model = makeModel(
+            identityProvider: identityProvider,
+            profiles: ["user-1": makeUser(id: "user-1")],
+            membershipProvider: ImmediateMembershipProvider(
+                memberships: ["user-1": makeMembership(userID: "user-1")]
+            ),
+            authorizationSessionStore: sessionStore
+        )
+
+        await model.fetch()
+        let originalSession = try #require(model.authenticatedSession)
+
+        sessionStore.publish(originalSession)
+        sessionStore.clear()
+
+        #expect(await remainsTrue {
+            model.authenticatedSession == originalSession
+                && model.currentMembership == originalSession.membership
+                && model.currentAuthState == .authenticated(originalSession)
+        })
+    }
+
     @Test("Sign-out invalidates a suspended membership result")
     func signOutInvalidatesSuspendedMembership() async {
         let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: true)
@@ -384,13 +534,18 @@ struct AuthStateModelMembershipTests {
         identityProvider: FakeAuthenticationIdentityProvider,
         profiles: [String: TMIUser],
         membershipProvider: any MembershipProviding,
-        signOutOperation: (@MainActor () throws -> Void)? = nil
+        signOutOperation: (@MainActor () throws -> Void)? = nil,
+        auditService: any AuditEventRecording = NoOpAuditEventRecorder(),
+        authorizationSessionStore: TrustedAuthorizationSessionStore =
+            TrustedAuthorizationSessionStore()
     ) -> AuthStateModel {
         AuthStateModel(
+            auditService: auditService,
             signOutOperation: signOutOperation,
             identityProvider: identityProvider,
             profileProvider: FakeUserProfileProvider(profiles: profiles),
             membershipProvider: membershipProvider,
+            authorizationSessionStore: authorizationSessionStore,
             automaticallyStart: false
         )
     }
@@ -427,6 +582,7 @@ struct AuthStateModelMembershipTests {
         districtID: String = "trusted-district",
         role: StaffRole = .teacher,
         isActive: Bool = true,
+        assignedStudentIDs: Set<String> = ["student-1"],
         version: Int = 1
     ) -> MembershipContext {
         MembershipContext(
@@ -435,7 +591,7 @@ struct AuthStateModelMembershipTests {
             schoolIDs: ["school-1"],
             role: role,
             capabilities: [.studentReadDetail],
-            assignedStudentIDs: ["student-1"],
+            assignedStudentIDs: assignedStudentIDs,
             isActive: isActive,
             version: version
         )
@@ -451,6 +607,18 @@ struct AuthStateModelMembershipTests {
             try? await Task.sleep(nanoseconds: 1_000_000)
         }
         return await predicate()
+    }
+
+    private func remainsTrue(
+        _ predicate: @escaping @MainActor () async -> Bool
+    ) async -> Bool {
+        for _ in 0..<20 {
+            try? await Task.sleep(nanoseconds: 1_000_000)
+            if !(await predicate()) {
+                return false
+            }
+        }
+        return true
     }
 }
 
@@ -585,6 +753,19 @@ private enum AuthMembershipTestError: Error {
     case missingClaim
     case missingMembership
     case unavailable
+}
+
+@MainActor
+private final class RecordingAuditEventRecorder: AuditEventRecording {
+    private(set) var events: [AuditEvent] = []
+
+    var loginEventCount: Int {
+        events.count { $0.action.rawValue == AuditAction.login.rawValue }
+    }
+
+    func logEvent(_ event: AuditEvent) async {
+        events.append(event)
+    }
 }
 
 @MainActor
