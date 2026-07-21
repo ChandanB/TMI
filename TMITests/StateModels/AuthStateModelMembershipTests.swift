@@ -5,6 +5,36 @@ import Testing
 @Suite("Auth State Model Trusted Membership", .serialized)
 @MainActor
 struct AuthStateModelMembershipTests {
+    @Test("Unverified identity cannot publish a trusted staff session")
+    func unverifiedIdentityCannotPublishSession() async {
+        let identity = AuthenticatedIdentity(
+            userID: "user-1",
+            isEmailVerified: false
+        )
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: ["user-1": trustedClaim(userID: "user-1", version: 1)]
+        )
+        let model = makeModel(
+            identityProvider: identityProvider,
+            profiles: ["user-1": makeUser(id: "user-1")],
+            membershipProvider: ImmediateMembershipProvider(
+                memberships: ["user-1": makeMembership(userID: "user-1")]
+            )
+        )
+
+        await model.fetch()
+
+        #expect(model.authenticatedSession == nil)
+        #expect(model.currentUser == nil)
+        #expect(model.currentMembership == nil)
+        #expect(model.isLoggedIn == false)
+        #expect(
+            model.currentAuthState
+                == AuthenticationState.verifying(.institutionalEmail)
+        )
+    }
+
     @Test("Editable profile authority cannot elevate the trusted membership")
     func profileAuthorityCannotElevateMembership() async {
         let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: true)

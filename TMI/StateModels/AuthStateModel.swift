@@ -863,6 +863,15 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     _ identity: AuthenticatedIdentity,
     generation: UInt64
   ) async {
+    guard identity.isEmailVerified else {
+      guard isCurrentAuthorization(identity, generation: generation) else {
+        return
+      }
+      updateState(.loaded(.verifying(.institutionalEmail)))
+      authorizationTask = nil
+      return
+    }
+
     do {
       guard let profile = try await profileProvider.profile(for: identity) else {
         guard isCurrentAuthorization(identity, generation: generation) else {
