@@ -60,7 +60,6 @@ final class AppBootstrapService {
         isBootstrapping = true
         defer { isBootstrapping = false }
         
-        print("[AppBootstrap] Starting warm start for role: \(membership.role.rawValue), district: \(membership.districtID)")
         let startTime = Date()
         
         // Clear previous errors

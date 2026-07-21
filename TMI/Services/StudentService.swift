@@ -66,7 +66,6 @@ class StudentService {
                 )
             }
 
-            print("[StudentService] Successfully fetched \(visibleStudents.count) authorized students")
             return visibleStudents
         } catch let error as StudentServiceError {
             // Re-throw our custom error
@@ -113,16 +112,12 @@ class StudentService {
         let trustedStudent = mutableStudent
 
         do {
-            print("[StudentService] Adding student: \(trustedStudent.name)")
-            
             // Add the document and get the reference
             let documentID = try await withTimeout(seconds: 10) { @MainActor @Sendable in
                 let data = trustedStudent.toFirestoreData()
                 let documentRef = try await collection.addDocument(data: data)
                 return documentRef.documentID
             }
-            
-            print("[StudentService] Student added with ID: \(documentID)")
             
             // Re-fetch the document using our custom parser
             let savedStudent = try await withTimeout(seconds: 10) { @MainActor @Sendable in
@@ -168,8 +163,6 @@ class StudentService {
         let trustedStudent = mutableStudent
 
         do {
-            print("[StudentService] Updating student: \(trustedStudent.name)")
-
             try await withTimeout(seconds: 10) { @MainActor @Sendable in
                 let data = trustedStudent.toFirestoreData()
                 try await collection.document(studentId).updateData(data)

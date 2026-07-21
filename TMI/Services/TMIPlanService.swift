@@ -211,7 +211,6 @@ class TMIPlanService {
                 member: session.membership,
                 operation: .read
             )
-            print("[TMIPlanService] Successfully fetched \(visiblePlans.count) authorized TMI plans")
             return visiblePlans
         } catch {
             print("[TMIPlanService] Error fetching TMI plans: \(error)")
@@ -392,7 +391,6 @@ class TMIPlanService {
             ) else {
                 throw TMIPlanServiceError.authorizationDenied
             }
-            print("[TMIPlanService] Successfully fetched plan: \(authorizedPlan.model.rawValue)")
             return authorizedPlan
         } catch {
             print("[TMIPlanService] Error fetching plan: \(error)")
@@ -427,8 +425,6 @@ class TMIPlanService {
         trustedPlan.lastUpdated = Date()
 
         do {
-            print("[TMIPlanService] Adding TMI plan: \(trustedPlan.model.rawValue)")
-            
             // Convert plan to Firestore data (without ID)
             let data = trustedPlan.toFirestoreData()
             
@@ -624,8 +620,6 @@ class TMIPlanService {
         )
 
         do {
-            print("[TMIPlanService] Updating TMI plan: \(plan.model.rawValue)")
-            
             var updatedPlan = plan
             updatedPlan.students = canonicalStudents
             updatedPlan.districtId = session.membership.districtID
@@ -810,7 +804,6 @@ class TMIPlanService {
                 member: session.membership,
                 operation: .read
             )
-            print("[TMIPlanService] Found \(visiblePlans.count) authorized plans in district")
             return visiblePlans
         } catch {
             print("[TMIPlanService] Error fetching district plans: \(error)")
@@ -896,7 +889,6 @@ class TMIPlanService {
                 member: session.membership,
                 operation: .read
             )
-            print("[TMIPlanService] Found \(visiblePlans.count) authorized plans for counselor")
             return visiblePlans
         } catch {
             print("[TMIPlanService] Error fetching counselor plans: \(error)")

@@ -139,12 +139,10 @@ class StudentModeSession {
                 localizedReason: reason
             )
             if success {
-                print("[StudentMode] ✅ Staff authenticated successfully")
                 TMIHaptics.success()
             }
             return success
         } catch {
-            print("[StudentMode] ❌ Authentication failed: \(error.localizedDescription)")
             TMIHaptics.error()
             return false
         }
@@ -170,12 +168,10 @@ class StudentModeSession {
                 localizedReason: reason
             )
             if success {
-                print("[StudentMode] ✅ Staff authenticated with passcode")
                 TMIHaptics.success()
             }
             return success
         } catch {
-            print("[StudentMode] ❌ Passcode authentication failed: \(error.localizedDescription)")
             TMIHaptics.error()
             return false
         }

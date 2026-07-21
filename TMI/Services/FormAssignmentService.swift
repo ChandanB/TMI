@@ -49,7 +49,6 @@ class FormAssignmentService {
       }
     }
 
-    print("[FormAssignmentService] Fetched \(authorizedAssignments.count) authorized assignments")
     return authorizedAssignments
   }
 
@@ -141,7 +140,6 @@ class FormAssignmentService {
     ).addDocument(data: data)
     newAssignment.id = documentRef.documentID
 
-    print("[FormAssignmentService] Created assignment: \(documentRef.documentID)")
     return newAssignment
   }
 

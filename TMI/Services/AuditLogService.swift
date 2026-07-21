@@ -52,7 +52,6 @@ final class AuditLogService {
             .document()
         try await document.setModel(auditLog)
 
-        print("[AuditLogService] ✅ Logged: \(action.displayName) for \(entityType.displayName)")
     }
 
     /// Log an audit event with custom user context (for admin operations)

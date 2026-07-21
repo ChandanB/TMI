@@ -297,9 +297,6 @@ final class StudentContextStateModel {
             self.prefetchedCareerState = loadedCareerStates.first
             self.prefetchedPlans = loadedPlans
 
-            print("[StudentContext] Prefetched \(loadedInterests.count) interests")
-            print("[StudentContext] Prefetched \(loadedCareerStates.count) career states")
-            print("[StudentContext] Prefetched \(loadedPlans.count) plans")
         }
         
         prefetchTask = task
@@ -316,10 +313,8 @@ final class StudentContextStateModel {
             let allInterests = try await InterestLibraryService.shared.fetchAllInterests()
             return allInterests.filter { interestIds.contains($0.id ?? "") }
         } catch is CancellationError {
-            print("[StudentContext] Interest prefetch cancelled for student: \(studentId)")
             return []
         } catch {
-            print("[StudentContext] Failed to prefetch interests: \(error.localizedDescription)")
             return []
         }
     }
@@ -331,10 +326,8 @@ final class StudentContextStateModel {
         do {
             return try await StudentCareerService.shared.getStudentCareers(studentId: studentId)
         } catch is CancellationError {
-            print("[StudentContext] Career prefetch cancelled for student: \(studentId)")
             return []
         } catch {
-            print("[StudentContext] Failed to prefetch career state: \(error.localizedDescription)")
             return []
         }
     }
@@ -347,10 +340,8 @@ final class StudentContextStateModel {
                 plan.students.contains(where: { $0.id == studentId })
             }
         } catch is CancellationError {
-            print("[StudentContext] Plan prefetch cancelled for student: \(studentId)")
             return []
         } catch {
-            print("[StudentContext] Failed to prefetch plans: \(error.localizedDescription)")
             return []
         }
     }
