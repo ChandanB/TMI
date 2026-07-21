@@ -1,0 +1,78 @@
+name: Firebase CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: TypeScript and Emulator tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      GCLOUD_PROJECT: demo-tmi
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: firebase/package-lock.json
+
+      - name: Verify Firebase toolchain
+        run: |
+          node --version
+          npm --version
+          java -version
+          test "$(node -p 'process.versions.node.split(".")[0]')" = "22"
+          test "$(java -XshowSettings:properties -version 2>&1 | awk -F'= ' '/java.specification.version/ { print $2; exit }')" = "21"
+
+      - name: Install locked dependencies
+        working-directory: firebase
+        run: npm ci
+
+      - name: Run strict TypeScript typecheck
+        working-directory: firebase
+        run: npm run lint
+
+      - name: Build Cloud Functions
+        working-directory: firebase
+        run: npm run build
+
+      - name: Run Firebase Emulator tests
+        working-directory: firebase
+        run: npm test
+
+      - name: Upload Emulator logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: firebase-emulator-logs
+          path: |
+            *-debug.log
+            firebase/*-debug.log
+          if-no-files-found: ignore
+          retention-days: 7

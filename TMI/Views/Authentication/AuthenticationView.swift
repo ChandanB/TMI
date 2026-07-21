@@ -46,6 +46,7 @@ struct AuthenticationView: View {
             Text("Welcome to TMI")
               .font(.system(size: 28, weight: .bold, design: .rounded))
               .foregroundColor(Color.tmiTextPrimary)
+              .accessibilityIdentifier("authentication.signIn.screen")
 
             Text("Tangible Modification Intervention")
               .font(.system(size: 16))

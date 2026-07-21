@@ -15,6 +15,9 @@ import FirebaseAuth
 @main
 struct TMIApp: App {
     private let dependencies: AppDependencies
+#if DEBUG
+    private let uiTestingFixture: UITestingLaunchConfiguration.Fixture?
+#endif
 
     @State private var authStateModel: AuthStateModel
     @State private var studentContext: StudentContextStateModel
@@ -32,8 +35,19 @@ struct TMIApp: App {
         let authStateModel: AuthStateModel
 
         let isRunningUnitTests = Self.isRunningUnitTests
+        let usesInMemoryDependencies: Bool
 
-        if isRunningUnitTests {
+#if DEBUG
+        let uiTestingFixture = UITestingLaunchConfiguration(
+            arguments: ProcessInfo.processInfo.arguments
+        ).fixture
+        self.uiTestingFixture = uiTestingFixture
+        usesInMemoryDependencies = isRunningUnitTests || uiTestingFixture != nil
+#else
+        usesInMemoryDependencies = isRunningUnitTests
+#endif
+
+        if usesInMemoryDependencies {
             dependencies = .preview()
             authStateModel = AuthStateModel(
                 membershipProvider: dependencies.membership,
@@ -60,25 +74,25 @@ struct TMIApp: App {
         _studentContext = State(initialValue: StudentContextStateModel())
         _deepLinkRouter = State(initialValue: DeepLinkRouter())
         _notificationService = State(
-            initialValue: isRunningUnitTests ? nil : NotificationService.shared
+            initialValue: usesInMemoryDependencies ? nil : NotificationService.shared
         )
         _scheduleMeetingCoordinator = State(
-            initialValue: isRunningUnitTests ? nil : ScheduleMeetingCoordinator()
+            initialValue: usesInMemoryDependencies ? nil : ScheduleMeetingCoordinator()
         )
         _dashboardStateModel = State(
-            initialValue: isRunningUnitTests ? nil : DashboardStateModel()
+            initialValue: usesInMemoryDependencies ? nil : DashboardStateModel()
         )
         _interestsStateModel = State(
-            initialValue: isRunningUnitTests ? nil : InterestsAndHobbiesStateModel()
+            initialValue: usesInMemoryDependencies ? nil : InterestsAndHobbiesStateModel()
         )
         _meetingsStateModel = State(
-            initialValue: isRunningUnitTests ? nil : MeetingsStateModel()
+            initialValue: usesInMemoryDependencies ? nil : MeetingsStateModel()
         )
         _districtStateModel = State(
-            initialValue: isRunningUnitTests ? nil : DistrictStateModel()
+            initialValue: usesInMemoryDependencies ? nil : DistrictStateModel()
         )
         _recommendationsStateModel = State(
-            initialValue: isRunningUnitTests ? nil : RecommendationsStateModel()
+            initialValue: usesInMemoryDependencies ? nil : RecommendationsStateModel()
         )
     }
 
@@ -94,6 +108,19 @@ struct TMIApp: App {
 
     @ViewBuilder
     private var rootContent: some View {
+#if DEBUG
+        if uiTestingFixture == .signedOut {
+            signedOutUITestingContent
+        } else {
+            standardRootContent
+        }
+#else
+        standardRootContent
+#endif
+    }
+
+    @ViewBuilder
+    private var standardRootContent: some View {
         if let notificationService,
            let scheduleMeetingCoordinator,
            let dashboardStateModel,
@@ -130,6 +157,16 @@ struct TMIApp: App {
                 .accessibilityHidden(true)
         }
     }
+
+#if DEBUG
+    private var signedOutUITestingContent: some View {
+        AuthenticationView()
+            .environment(\.appDependencies, dependencies)
+            .environment(\.authStateModel, authStateModel)
+            .tint(TMIColors.teal)
+            .preferredColorScheme(.light)
+    }
+#endif
 }
 
 struct ContentView: View {

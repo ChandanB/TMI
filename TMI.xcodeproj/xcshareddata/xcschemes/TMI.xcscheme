@@ -35,6 +35,20 @@
                ReferencedContainer = "container:TMI.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "B1C2D3E4F5A6012345678903"
+               BuildableName = "TMIUITests.xctest"
+               BlueprintName = "TMIUITests"
+               ReferencedContainer = "container:TMI.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -51,6 +65,16 @@
                BlueprintIdentifier = "A1B2C3D4E5F6012345678903"
                BuildableName = "TMITests.xctest"
                BlueprintName = "TMITests"
+               ReferencedContainer = "container:TMI.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "B1C2D3E4F5A6012345678903"
+               BuildableName = "TMIUITests.xctest"
+               BlueprintName = "TMIUITests"
                ReferencedContainer = "container:TMI.xcodeproj">
             </BuildableReference>
          </TestableReference>
