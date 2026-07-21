@@ -11,6 +11,7 @@ struct AuthenticationView: View {
   @State private var showingForgotPassword = false
   @State private var showingSupportResources = false
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @FocusState private var focusedField: Field?
   @State private var appearAnimation = false
 
@@ -44,12 +45,18 @@ struct AuthenticationView: View {
           // Welcome Text
           VStack(spacing: 8) {
             Text("Welcome to TMI")
-              .font(.system(size: 28, weight: .bold, design: .rounded))
+              .font(
+                .system(
+                  size: 28 * dynamicTypeSize.tmiFontScale,
+                  weight: .bold,
+                  design: .rounded
+                )
+              )
               .foregroundColor(Color.tmiTextPrimary)
               .accessibilityIdentifier("authentication.signIn.screen")
 
             Text("Tangible Modification Intervention")
-              .font(.system(size: 16))
+              .font(.system(size: 16 * dynamicTypeSize.tmiFontScale))
               .foregroundColor(Color.tmiTextSecondary)
           }
           .padding(.bottom, 20)
@@ -118,7 +125,12 @@ struct AuthenticationView: View {
                     showingForgotPassword = true
                   }) {
                     Text("Forgot Password?")
-                      .font(.system(size: 13, weight: .medium))
+                      .font(
+                        .system(
+                          size: 13 * dynamicTypeSize.tmiFontScale,
+                          weight: .medium
+                        )
+                      )
                       .foregroundColor(Color.tmiSecondary)
                   }
                   .padding(.top, 4)
@@ -147,6 +159,7 @@ struct AuthenticationView: View {
                   isLoading: stateModel.isAuthenticating,
                   action: authenticate
                 )
+                .accessibilityIdentifier("authentication.signIn.logIn")
                 .disabled(stateModel.isAuthenticating)
                 .padding(.top, 10)
                 .opacity(animateButtons ? 1.0 : 0)
@@ -161,14 +174,28 @@ struct AuthenticationView: View {
                   Button(action: {
                     showingRegistration = true
                   }) {
-                    HStack(spacing: 0) {
-                      Text("Don't have an account? ")
-                        .foregroundColor(Color.tmiTextSecondary)
-                      Text("Create Account")
-                        .foregroundColor(Color.tmiSecondary)
-                        .fontWeight(.semibold)
+                    ViewThatFits(in: .horizontal) {
+                      HStack(spacing: 0) {
+                        Text("Don't have an account? ")
+                          .foregroundColor(Color.tmiTextSecondary)
+                        Text("Create Account")
+                          .foregroundColor(Color.tmiSecondary)
+                          .fontWeight(.semibold)
+                      }
+
+                      VStack(spacing: 4) {
+                        Text("Don't have an account?")
+                          .foregroundColor(Color.tmiTextSecondary)
+                        Text("Create Account")
+                          .foregroundColor(Color.tmiSecondary)
+                          .fontWeight(.semibold)
+                      }
                     }
+                    .font(.system(size: 17 * dynamicTypeSize.tmiFontScale))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
                   }
+                  .accessibilityIdentifier("authentication.signIn.createAccount")
                 }
                 .padding(.top, 10)
                 .opacity(animateButtons ? 1.0 : 0)
@@ -233,11 +260,6 @@ struct AuthenticationView: View {
       }
       .errorBoundary()
       .onAppear {
-        // Set initial focus to email field after a slight delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-          focusedField = .email
-        }
-
         // Trigger animations
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
           appearAnimation = true

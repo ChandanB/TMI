@@ -16,7 +16,7 @@ import FirebaseAuth
 struct TMIApp: App {
     private let dependencies: AppDependencies
 #if DEBUG
-    private let uiTestingFixture: UITestingLaunchConfiguration.Fixture?
+    private let uiTestingConfiguration: UITestingLaunchConfiguration
 #endif
 
     @State private var authStateModel: AuthStateModel
@@ -38,11 +38,11 @@ struct TMIApp: App {
         let usesInMemoryDependencies: Bool
 
 #if DEBUG
-        let uiTestingFixture = UITestingLaunchConfiguration(
+        let uiTestingConfiguration = UITestingLaunchConfiguration(
             arguments: ProcessInfo.processInfo.arguments
-        ).fixture
-        self.uiTestingFixture = uiTestingFixture
-        usesInMemoryDependencies = isRunningUnitTests || uiTestingFixture != nil
+        )
+        self.uiTestingConfiguration = uiTestingConfiguration
+        usesInMemoryDependencies = isRunningUnitTests || uiTestingConfiguration.fixture != nil
 #else
         usesInMemoryDependencies = isRunningUnitTests
 #endif
@@ -101,15 +101,23 @@ struct TMIApp: App {
     }
     
     var body: some Scene {
+#if os(macOS)
+        WindowGroup {
+            rootContent
+                .frame(minWidth: 900, minHeight: 700)
+        }
+        .defaultSize(width: 900, height: 800)
+#else
         WindowGroup {
             rootContent
         }
+#endif
     }
 
     @ViewBuilder
     private var rootContent: some View {
 #if DEBUG
-        if uiTestingFixture == .signedOut {
+        if uiTestingConfiguration.fixture == .signedOut {
             signedOutUITestingContent
         } else {
             standardRootContent
@@ -159,7 +167,23 @@ struct TMIApp: App {
     }
 
 #if DEBUG
+    @ViewBuilder
     private var signedOutUITestingContent: some View {
+        if uiTestingConfiguration.contentSize == .accessibility5 {
+#if os(macOS)
+            signedOutUITestingBase
+                .environment(\.sizeCategory, .accessibilityExtraExtraExtraLarge)
+                .dynamicTypeSize(.accessibility5)
+#else
+            signedOutUITestingBase
+                .dynamicTypeSize(.accessibility5)
+#endif
+        } else {
+            signedOutUITestingBase
+        }
+    }
+
+    private var signedOutUITestingBase: some View {
         AuthenticationView()
             .environment(\.appDependencies, dependencies)
             .environment(\.authStateModel, authStateModel)

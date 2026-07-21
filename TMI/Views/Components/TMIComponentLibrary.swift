@@ -9,6 +9,33 @@ import Charts
 import Combine
 import SwiftUI
 
+extension DynamicTypeSize {
+    var tmiFontScale: CGFloat {
+        switch self {
+        case .xSmall, .small, .medium, .large:
+            1
+        case .xLarge:
+            1.1
+        case .xxLarge:
+            1.2
+        case .xxxLarge:
+            1.3
+        case .accessibility1:
+            1.4
+        case .accessibility2:
+            1.55
+        case .accessibility3:
+            1.7
+        case .accessibility4:
+            1.85
+        case .accessibility5:
+            2
+        @unknown default:
+            1
+        }
+    }
+}
+
 // MARK: - Component Library Overview
 /*
  This file serves as the single source of truth for all reusable UI components
@@ -193,6 +220,8 @@ struct TMICard<Content: View>: View {
 // MARK: - Logo View
 
 struct TMILogoView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         VStack(spacing: 5) {
             Image(systemName: "building.columns")
@@ -203,13 +232,25 @@ struct TMILogoView: View {
                 .padding(.bottom, 10)
 
             Text("TMI")
-                .font(.system(size: 36, weight: .bold, design: .rounded))
+                .font(
+                    .system(
+                        size: 36 * dynamicTypeSize.tmiFontScale,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
                 .foregroundColor(Color.tmiTextPrimary)
                 .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
 
             Text("TANGIBLE MODIFICATION INTERVENTION")
-                .font(.system(size: 12, weight: .semibold))
+                .font(
+                    .system(
+                        size: 12 * dynamicTypeSize.tmiFontScale,
+                        weight: .semibold
+                    )
+                )
                 .foregroundColor(Color.tmiTextBrand)
+                .multilineTextAlignment(.center)
         }
     }
 }
@@ -227,6 +268,7 @@ struct TMIButton: View {
 
     @State private var isPressed = false
     @State private var isHovered = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     enum TMIButtonStyle: Equatable {
         case primary
@@ -348,12 +390,22 @@ struct TMIButton: View {
                 } else {
                     if let icon = icon {
                         Image(systemName: icon)
-                            .font(.system(size: 18, weight: .medium))
+                            .font(
+                                .system(
+                                    size: 18 * dynamicTypeSize.tmiFontScale,
+                                    weight: .medium
+                                )
+                            )
                     }
 
                     if style != .icon {
                         Text(text)
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(
+                                .system(
+                                    size: 17 * dynamicTypeSize.tmiFontScale,
+                                    weight: .semibold
+                                )
+                            )
                     }
                 }
             }
@@ -380,7 +432,7 @@ struct TMIButton: View {
                     }
                 }()
             )
-            .frame(height: style.height)
+            .frame(minHeight: style.height)
             .background(
                 RoundedRectangle(cornerRadius: style.cornerRadius)
                     .fill(style.backgroundColor)
@@ -433,6 +485,7 @@ struct TMITextField: View {
     var onSubmit: (() -> Void)? = nil
 
     @FocusState private var isFocused: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         HStack(spacing: 12) {
@@ -457,6 +510,7 @@ struct TMITextField: View {
                 }
             }
             .focused($isFocused)
+            .font(.system(size: 17 * dynamicTypeSize.tmiFontScale))
             .foregroundColor(Color.tmiTextPrimary)
             .autocorrectionDisabled()
             .textInputAutocapitalization(.never)
