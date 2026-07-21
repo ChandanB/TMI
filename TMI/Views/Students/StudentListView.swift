@@ -9,6 +9,7 @@ import SwiftUI
 
 struct StudentListView: View {
     @Environment(\.authStateModel) private var authStateModel
+    @Environment(AppRouter.self) private var router
     @State private var stateModel = StudentListStateModel()
     @State private var searchText = ""
     @State private var selectedGradeFilter: String? = nil
@@ -190,10 +191,8 @@ struct StudentListView: View {
     private var studentList: some View {
         List {
             ForEach(filteredStudents) { student in
-                if let studentId = student.id {
-                    NavigationLink(destination: StudentDetailView(studentId: studentId)) {
-                        studentRow(student)
-                    }
+                if student.id != nil {
+                    studentRow(student)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 6, leading: TMISpacing.screenPadding, bottom: 6, trailing: TMISpacing.screenPadding))
@@ -256,6 +255,24 @@ struct StudentListView: View {
     }
 
     private func studentRow(_ student: Student) -> some View {
+        HStack(spacing: TMISpacing.sm) {
+            Button {
+                openStudent(student)
+            } label: {
+                studentRowContent(student)
+            }
+            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+
+            quickActionsMenu(for: student)
+        }
+        .padding(.vertical, TMISpacing.sm)
+        .padding(.horizontal, TMISpacing.md)
+        .background(Color.tmiSurface)
+        .cornerRadius(TMIRadius.md)
+    }
+
+    private func studentRowContent(_ student: Student) -> some View {
         HStack(spacing: TMISpacing.md) {
             // Avatar
             TMIAvatar(
@@ -303,14 +320,8 @@ struct StudentListView: View {
             }
 
             Spacer()
-
-            // Quick actions menu
-            quickActionsMenu(for: student)
         }
-        .padding(.vertical, TMISpacing.sm)
-        .padding(.horizontal, TMISpacing.md)
-        .background(Color.tmiSurface)
-        .cornerRadius(TMIRadius.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func engagementBadge(for student: Student) -> some View {
@@ -381,8 +392,10 @@ struct StudentListView: View {
 
     private func quickActionsMenu(for student: Student) -> some View {
         Menu {
-            if let studentId = student.id {
-                NavigationLink(destination: StudentDetailView(studentId: studentId)) {
+            if student.id != nil {
+                Button {
+                    openStudent(student)
+                } label: {
                     Label("View Details", systemImage: "person.circle")
                 }
             }
@@ -429,6 +442,12 @@ struct StudentListView: View {
                 .foregroundColor(.tmiTextSecondary)
         }
         .buttonStyle(.plain)
+    }
+
+    private func openStudent(_ student: Student) {
+        guard (try? router.open(student)) != nil else {
+            return
+        }
     }
 
     // MARK: - Helper Methods
@@ -529,10 +548,12 @@ extension TMIPlanModel {
     NavigationStack {
         StudentListView()
     }
+    .environment(AppRouter())
 }
 
 #Preview("Empty") {
     NavigationStack {
         StudentListView()
     }
+    .environment(AppRouter())
 }

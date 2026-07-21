@@ -11,75 +11,24 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @State private var selectedTab: Tab = .dashboard
     @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) private var authStateModel
     @Environment(\.studentContext) private var studentContext
-    @Environment(DeepLinkRouter.self) private var deepLinkRouter
+    @Environment(AppRouter.self) private var router
     @Environment(\.notificationService) private var notificationService
     
     // Student Mode
     @State private var studentModeSession = StudentModeSession()
     
     // Sheet state
-    @State private var showingUserProfile = false
     @State private var showingSignOutConfirmation = false
     @State private var showingSignOutFailure = false
-    @State private var showingWorkspacePanel = false
+    @SceneStorage("tmi.staff.selectedTab") private var restoredTab = AppTab.dashboard.rawValue
     
     // State models
     @State private var meetingsStateModel = MeetingsStateModel()
     @State private var recommendationsStateModel = RecommendationsStateModel()
 
-    // Navigation paths per tab
-    @State private var dashboardPath = NavigationPath()
-    @State private var studentsPath = NavigationPath()
-    @State private var plansPath = NavigationPath()
-    
-    nonisolated enum Tab: String, CaseIterable, Identifiable {
-        case dashboard, students, tmiPlans, district
-        var id: Self { self }
-
-        static func mvpTabs(for role: StaffRole?) -> [Tab] {
-            switch role {
-            case .districtAdministrator:
-                return [.dashboard, .students, .tmiPlans, .district]
-            case .teacher, .counselor, .schoolAdministrator, .socialWorker:
-                return [.dashboard, .students, .tmiPlans]
-            default:
-                return [.dashboard]
-            }
-        }
-
-        var label: String {
-            switch self {
-            case .dashboard: return "Dashboard"
-            case .students: return "Students"
-            case .tmiPlans: return "TMI Plans"
-            case .district: return "District"
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .dashboard: return "chart.bar.fill"
-            case .students: return "person.3.fill"
-            case .tmiPlans: return "doc.text.fill"
-            case .district: return "building.2.fill"
-            }
-        }
-    }
-    
-    // Computed property to get tabs for the current MVP role
-    var availableTabs: [Tab] {
-        Tab.mvpTabs(for: authStateModel.currentMembership?.role)
-    }
-    
-    // Default tab - use first available or dashboard
-    var defaultTab: Tab {
-        availableTabs.first ?? .dashboard
-    }
-    
     var body: some View {
         Group {
             if let activeStudent = studentModeSession.activeStudent {
@@ -105,54 +54,321 @@ struct MainTabView: View {
             }
         }
         .task {
-            // Process pending deep links
-            if deepLinkRouter.pendingNavigation != nil {
-                await deepLinkRouter.executePendingNavigation(
-                    context: studentContext,
-                    tabSelection: $selectedTab
-                )
-            }
+            updateNavigationPolicy()
+            restoreSelectedTab()
+            try? router.resumePendingDeepLink()
+            syncStudentContext()
+        }
+        .onChange(of: authStateModel.currentMembership) { _, _ in
+            updateNavigationPolicy()
+            try? router.resumePendingDeepLink()
+        }
+        .onChange(of: studentContext.selectedStudentId) { _, _ in
+            syncStudentContext()
+        }
+        .onChange(of: studentContext.cachedStudent) { _, _ in
+            syncStudentContext()
+        }
+        .onChange(of: studentContext.selectedPlanId) { _, planID in
+            router.setActivePlan(id: planID)
+        }
+        .onChange(of: router.selectedTab) { _, tab in
+            // Persist only the non-sensitive tab. Record IDs are reloaded and
+            // reauthorized after every scene or process reconstruction.
+            restoredTab = tab.rawValue
         }
     }
     
     // MARK: - Staff Tab View
 
+    @ViewBuilder
     private var staffTabView: some View {
-        TabView(selection: $selectedTab) {
-            ForEach(availableTabs, id: \.self) { tab in
-                NavigationStack {
+#if os(macOS)
+        macStaffNavigation
+            .modifier(StaffShellModifier(
+                notificationService: notificationService,
+                showingSignOutConfirmation: $showingSignOutConfirmation,
+                showingSignOutFailure: $showingSignOutFailure,
+                attemptSignOut: attemptSignOut
+            ))
+#else
+        mobileStaffNavigation
+            .modifier(StaffShellModifier(
+                notificationService: notificationService,
+                showingSignOutConfirmation: $showingSignOutConfirmation,
+                showingSignOutFailure: $showingSignOutFailure,
+                attemptSignOut: attemptSignOut
+            ))
+#endif
+    }
+
+    private var mobileStaffNavigation: some View {
+        @Bindable var router = router
+
+        return NavigationStack(path: $router.path) {
+            TabView(selection: $router.selectedTab) {
+                ForEach(router.availableTabs) { tab in
                     destinationView(for: tab)
-                        .navigationTitle(tab.label)
-                        .toolbar {
-                            ToolbarItem(placement: .automatic) {
-                                if studentContext.hasActiveStudent {
-                                    workspaceButton
-                                }
-                            }
-                            ToolbarItemGroup(placement: .automatic) {
-                                if self.notificationService != nil {
-                                    NotificationBellButton()
-                                }
-                                profileMenu
-                            }
+                        .tabItem {
+                            Label(tab.title, systemImage: tab.systemImage)
                         }
+                        .tag(tab)
                 }
-                .tabItem {
-                    Label(tab.label, systemImage: tab.icon)
+            }
+            .tabViewStyle(.sidebarAdaptable)
+            .navigationTitle(router.selectedTab.title)
+            .navigationDestination(for: AppRoute.self) { route in
+                routeDestination(route)
+            }
+            .toolbar { staffToolbar }
+        }
+    }
+
+#if os(macOS)
+    private var macStaffNavigation: some View {
+        @Bindable var router = router
+
+        return NavigationSplitView {
+            List {
+                ForEach(Array(router.availableTabs.enumerated()), id: \.element) { index, tab in
+                    Button {
+                        try? router.select(tab)
+                    } label: {
+                        Label(tab.title, systemImage: tab.systemImage)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(
+                        router.selectedTab == tab
+                            ? Color.tmiPrimary.opacity(0.18)
+                            : Color.clear
+                    )
+                    .keyboardShortcut(
+                        KeyEquivalent(Character(String(index + 1))),
+                        modifiers: .command
+                    )
+                    .accessibilityAddTraits(
+                        router.selectedTab == tab ? .isSelected : []
+                    )
                 }
-                .tag(tab)
+            }
+            .navigationTitle("TMI")
+        } detail: {
+            NavigationStack(path: $router.path) {
+                destinationView(for: router.selectedTab)
+                    .navigationTitle(router.selectedTab.title)
+                    .navigationDestination(for: AppRoute.self) { route in
+                        routeDestination(route)
+                    }
+                    .toolbar { staffToolbar }
             }
         }
-        .tabViewStyle(.sidebarAdaptable)
-        .tint(.tmiPrimary)
-        .sheet(isPresented: $showingUserProfile) {
+    }
+#endif
+
+    @ToolbarContentBuilder
+    private var staffToolbar: some ToolbarContent {
+        ToolbarItem(placement: .automatic) {
+            if router.activeStudent != nil {
+                workspaceButton
+            }
+        }
+        ToolbarItemGroup(placement: .automatic) {
+            if notificationService != nil {
+                NotificationBellButton()
+            }
+            profileMenu
+        }
+    }
+
+    @MainActor
+    private func attemptSignOut() {
+        guard authStateModel.signOut() else {
+            showingSignOutFailure = true
+            return
+        }
+
+        studentContext.clearContext()
+        router.reset()
+    }
+
+    private func updateNavigationPolicy() {
+        router.updatePolicy(AppNavigationPolicy(membership: authStateModel.currentMembership))
+        guard let studentID = studentContext.selectedStudentId else {
+            return
+        }
+
+        let isAuthorized = if let student = studentContext.cachedStudent,
+                              student.id == studentID {
+            router.setActiveStudent(student)
+        } else {
+            router.setActiveStudent(id: studentID, displayName: "")
+        }
+        if !isAuthorized {
+            studentContext.clearContext()
+        }
+    }
+
+    private func restoreSelectedTab() {
+        guard let tab = AppTab(rawValue: restoredTab) else {
+            restoredTab = AppTab.dashboard.rawValue
+            return
+        }
+        try? router.select(tab)
+    }
+
+    private func syncStudentContext() {
+        guard let studentID = studentContext.selectedStudentId else {
+            router.clearActiveStudent()
+            return
+        }
+
+        let isAuthorized = if let student = studentContext.cachedStudent,
+                              student.id == studentID {
+            router.setActiveStudent(student)
+        } else {
+            router.setActiveStudent(id: studentID, displayName: "")
+        }
+        guard isAuthorized else {
+            studentContext.clearContext()
+            return
+        }
+        router.setActivePlan(id: studentContext.selectedPlanId)
+    }
+
+    private var workspaceButton: some View {
+        Button {
+            try? router.present(.workspace)
+        } label: {
+            HStack(spacing: 6) {
+                if let student = router.activeStudent {
+                    TMIAvatar(
+                        initials: student.initials,
+                        color: .tmiPrimary,
+                        size: 28
+                    )
+                } else {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 20))
+                }
+
+                Text(router.activeStudentName ?? "Selected Student")
+                    .font(.system(size: 14, weight: .medium))
+                    .lineLimit(1)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundColor(Color.tmiTextPrimary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(Color.tmiPrimary.opacity(0.3))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open workspace for \(router.activeStudentName ?? "selected student")")
+    }
+
+    private var profileMenu: some View {
+        Menu {
+            Button {
+                try? router.open(.profile)
+            } label: {
+                Label("Profile", systemImage: "person.crop.circle")
+            }
+
+            Button {
+                try? router.open(.settings)
+            } label: {
+                Label("Settings", systemImage: "gearshape")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                showingSignOutConfirmation = true
+            } label: {
+                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+            }
+        } label: {
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: 22))
+                .foregroundColor(Color.tmiTextPrimary)
+        }
+        .accessibilityLabel("Account")
+    }
+
+    @ViewBuilder
+    private func destinationView(for tab: AppTab) -> some View {
+        switch tab {
+        case .dashboard:
+            DashboardView()
+        case .students:
+            StudentListView()
+        case .plans:
+            TMIPlanListView()
+        case .district:
+            DistrictDashboardView()
+        }
+    }
+
+    @ViewBuilder
+    private func routeDestination(_ route: AppRoute) -> some View {
+        switch route {
+        case .student(let studentID):
+            StudentDetailView(studentId: studentID)
+        case .editStudent(let studentID):
+            if let student = router.activeStudent,
+               student.id == studentID {
+                StudentProfileView(existingStudent: student) {
+                    router.pop()
+                }
+            } else {
+                ContentUnavailableView(
+                    "Student Unavailable",
+                    systemImage: "person.crop.circle.badge.exclamationmark",
+                    description: Text("Return to the student record and try again.")
+                )
+            }
+        case .plan(let planID):
+            if let plan = router.activePlan, plan.id == planID {
+                TMIPlanDetailView(plan: plan)
+            } else {
+                ContentUnavailableView(
+                    "Plan Unavailable",
+                    systemImage: "doc.text.magnifyingglass",
+                    description: Text("Return to the TMI Plans list and try again.")
+                )
+            }
+        case .profile:
             UserProfileView()
-                .tmiSheetStyle()
+        case .settings:
+            SettingsView()
         }
-        .sheet(isPresented: $showingWorkspacePanel) {
-            WorkspacePanelView()
-                .tmiSheetStyle()
-        }
+    }
+}
+
+private struct StaffShellModifier: ViewModifier {
+    @Environment(AppRouter.self) private var router
+    let notificationService: NotificationService?
+    @Binding var showingSignOutConfirmation: Bool
+    @Binding var showingSignOutFailure: Bool
+    let attemptSignOut: @MainActor () -> Void
+
+    func body(content: Content) -> some View {
+        @Bindable var router = router
+
+        content
+            .tint(.tmiPrimary)
+            .sheet(item: $router.presentedSheet) { sheet in
+                switch sheet {
+                case .workspace:
+                    WorkspacePanelView()
+                        .tmiSheetStyle()
+                }
+            }
         .alert("Sign Out", isPresented: $showingSignOutConfirmation) {
             Button("Sign Out", role: .destructive) {
                 attemptSignOut()
@@ -168,109 +384,14 @@ struct MainTabView: View {
             Text("Your account is still signed in. Check your connection and try again.")
         }
         .onAppear {
-            // Set appropriate default tab for user role
-            if !availableTabs.contains(selectedTab) {
-                selectedTab = defaultTab
-            }
-
-            guard let notificationService = self.notificationService else {
+            guard let notificationService else {
                 return
             }
             notificationService.startListening()
             Task { try? await notificationService.fetchNotifications() }
         }
         .onDisappear {
-            self.notificationService?.stopListening()
-        }
-        .onChange(of: selectedTab) { _, newTab in
-            // Clear deep link when manually changing tabs
-            studentContext.clearPendingDeepLink()
-        }
-    }
-
-    @MainActor
-    private func attemptSignOut() {
-        guard authStateModel.signOut() else {
-            showingSignOutFailure = true
-            return
-        }
-
-        studentContext.clearContext()
-    }
-    
-    // MARK: - Workspace Button
-    
-    private var workspaceButton: some View {
-        Button {
-            showingWorkspacePanel = true
-        } label: {
-            HStack(spacing: 6) {
-                if let student = studentContext.cachedStudent {
-                    TMIAvatar(
-                        initials: student.initials,
-                        color: .tmiPrimary,
-                        size: 28
-                    )
-                } else {
-                    Image(systemName: "person.crop.circle")
-                        .font(.system(size: 20))
-                }
-                
-                Text(studentContext.contextDisplayName)
-                    .font(.system(size: 14, weight: .medium))
-                    .lineLimit(1)
-                
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .foregroundColor(Color.tmiTextPrimary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(Color.tmiPrimary.opacity(0.3))
-            )
-        }
-        .buttonStyle(.plain)
-    }
-    
-    // MARK: - Profile Menu
-    
-    private var profileMenu: some View {
-        Menu {
-            Button {
-                showingUserProfile = true
-            } label: {
-                Label("Profile", systemImage: "person.crop.circle")
-            }
-            
-            Divider()
-            
-            Button(role: .destructive) {
-                showingSignOutConfirmation = true
-            } label: {
-                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-            }
-        } label: {
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 22))
-                .foregroundColor(Color.tmiTextPrimary)
-        }
-    }
-    
-    // MARK: - Destination Views
-    
-    @ViewBuilder
-    func destinationView(for tab: Tab) -> some View {
-        switch tab {
-        case .dashboard:
-            DashboardView()
-        case .students:
-            StudentListView()
-        case .tmiPlans:
-            TMIPlanListView()
-        case .district:
-            DistrictDashboardView()
+            notificationService?.stopListening()
         }
     }
 }
@@ -279,7 +400,14 @@ struct MainTabView: View {
 
 struct WorkspacePanelView: View {
     @Environment(\.studentContext) private var context
+    @Environment(AppRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
+
+    private var contextMatchesRouter: Bool {
+        guard let activeStudentID = router.activeStudentID else { return false }
+        return context.selectedStudentId == activeStudentID
+            && context.cachedStudent?.id == activeStudentID
+    }
     
     var body: some View {
         NavigationStack {
@@ -289,19 +417,19 @@ struct WorkspacePanelView: View {
                 ScrollView {
                     VStack(spacing: TMISpacing.lg) {
                         // Active Student Section
-                        if let student = context.cachedStudent {
+                        if let student = router.activeStudent {
                             activeStudentSection(student)
                         } else {
                             noStudentSection
                         }
-                        
+
                         // Active Plan Section
-                        if let plan = context.cachedPlan {
+                        if let plan = router.activePlan {
                             activePlanSection(plan)
                         }
                         
                         // Quick Stats
-                        if context.hasActiveStudent {
+                        if contextMatchesRouter {
                             quickStatsSection
                         }
                         
@@ -346,9 +474,8 @@ struct WorkspacePanelView: View {
                     Spacer()
                     
                     Button {
-                        Task {
-                            context.clearContext()
-                        }
+                        context.clearContext()
+                        router.clearActiveStudent()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 24))
@@ -357,18 +484,20 @@ struct WorkspacePanelView: View {
                 }
                 
                 // Prefetched data indicators
-                HStack(spacing: TMISpacing.md) {
-                    DataIndicator(
-                        icon: "heart.fill",
-                        label: "Interests",
-                        count: context.prefetchedInterests.count
-                    )
-                    
-                    DataIndicator(
-                        icon: "doc.text.fill",
-                        label: "Plans",
-                        count: context.prefetchedPlans.count
-                    )
+                if contextMatchesRouter {
+                    HStack(spacing: TMISpacing.md) {
+                        DataIndicator(
+                            icon: "heart.fill",
+                            label: "Interests",
+                            count: context.prefetchedInterests.count
+                        )
+
+                        DataIndicator(
+                            icon: "doc.text.fill",
+                            label: "Plans",
+                            count: context.prefetchedPlans.count
+                        )
+                    }
                 }
             }
             .padding()
@@ -445,7 +574,7 @@ struct WorkspacePanelView: View {
     
     private var actionsSection: some View {
         VStack(spacing: TMISpacing.sm) {
-            if context.hasActiveStudent {
+            if router.activeStudent != nil {
                 Button {
                     // Would navigate to plan creation
                 } label: {
@@ -517,10 +646,10 @@ private struct QuickStatCard: View {
 
 #Preview("iPhone") {
   MainTabView()
-    .environment(DeepLinkRouter())
+    .environment(AppRouter())
 }
 
 #Preview("iPad") {
   MainTabView()
-    .environment(DeepLinkRouter())
+    .environment(AppRouter())
 }

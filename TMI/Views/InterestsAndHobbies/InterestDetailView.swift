@@ -13,6 +13,7 @@ struct InterestDetailView: View {
     let interest: Interest
 
     @Environment(\.interestsStateModel) var stateModel
+    @Environment(AppRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var associatedData: InterestAssociatedData?
@@ -247,9 +248,9 @@ struct InterestDetailView: View {
     private func studentsContent(_ students: [Student]) -> some View {
         VStack(spacing: 10) {
             ForEach(Array(students.prefix(3))) { student in
-                if let studentId = student.id {
-                    NavigationLink {
-                        StudentDetailView(studentId: studentId)
+                if student.id != nil {
+                    Button {
+                        try? router.open(student)
                     } label: {
                         StudentRowView(student: student, color: interest.color)
                     }
@@ -1379,5 +1380,6 @@ struct InterestDetailBlob: View {
         InterestDetailView(interest: Interest.sampleInterests.first!)
             .environment(\.interestsStateModel, InterestsAndHobbiesStateModel())
     }
+    .environment(AppRouter())
 }
 #endif

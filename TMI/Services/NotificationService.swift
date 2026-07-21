@@ -415,7 +415,7 @@ class NotificationService {
                 type: .planApproval,
                 title: "Plan Needs Approval",
                 message: "TMI Plan for \(studentName) is ready for your review",
-                actionUrl: "tmi://plans/\(planId)",
+                actionUrl: nil,
                 targetId: planId,
                 forUserId: approverId
             )

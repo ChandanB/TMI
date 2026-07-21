@@ -16,6 +16,7 @@ import FirebaseAuth
 struct TMIPlanDetailView: View {
     let initialPlan: TMIPlan
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppRouter.self) private var router
 
     // Reactive plan state
     @State private var plan: TMIPlan
@@ -23,7 +24,6 @@ struct TMIPlanDetailView: View {
     // UI States
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
-    @State private var selectedStudent: Student?
     @State private var showingAddInterest = false
     @State private var showingAddGoal = false
     @State private var showingCompleteSurvey = false
@@ -219,14 +219,6 @@ struct TMIPlanDetailView: View {
             Button("Delete", role: .destructive) { deletePlan() }
         } message: {
             Text("Are you sure you want to delete this TMI plan? This action cannot be undone.")
-        }
-        .sheet(item: $selectedStudent) { student in
-            if let studentId = student.id {
-                NavigationStack {
-                    StudentDetailView(studentId: studentId)
-                }
-                .tmiSheetStyle()
-            }
         }
         .sheet(isPresented: $showingAddInterest) {
             NavigationStack {
@@ -440,7 +432,7 @@ struct TMIPlanDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: TMISpacing.sm) {
                         ForEach(plan.students) { student in
-                            Button(action: { selectedStudent = student }) {
+                            Button(action: { try? router.open(student) }) {
                                 StudentMiniCard(student: student, modelColor: modelColor)
                             }
                             .buttonStyle(.plain)
@@ -3303,6 +3295,7 @@ struct ActivityShareSheet: View {
     NavigationStack {
         TMIPlanDetailView(plan: TMIPlan.samplePlan)
     }
+    .environment(AppRouter())
 }
 
 // MARK: - Supporting Views for Edit

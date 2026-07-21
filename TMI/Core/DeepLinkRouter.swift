@@ -1,191 +1,41 @@
-//
-//  DeepLinkRouter.swift
-//  TMI
-//
-//  Handles deep link routing and navigation coordination.
-//  Translates deep links into (tab, path, context) for consistent navigation.
-//
-
 import Foundation
-import SwiftUI
 
-// MARK: - Deep Link Router
-
-/// Handles deep link routing and navigation coordination
-@MainActor
-@Observable
-final class DeepLinkRouter {
-    
-    // MARK: - State
-    
-    /// Pending navigation action
-    private(set) var pendingNavigation: NavigationAction?
-    
-    /// Whether a navigation is currently being processed
-    private(set) var isProcessing: Bool = false
-    
-    // MARK: - Navigation Action
-    
-    struct NavigationAction: Equatable {
-        let targetTab: MainTabView.Tab
-        let destination: DeepLinkDestination
-        let studentId: String?
-        let planId: String?
-    }
-    
-    // MARK: - Route Processing
-    
-    /// Process a deep link URL and return the navigation action
-    func processDeepLink(url: URL) -> NavigationAction? {
-        guard let destination = DeepLinkDestination.from(url: url) else {
-            Log.ui.warning("deep_link_parse_failed")
+/// Converts supported external URLs into typed routes. Navigation state and
+/// authorization remain owned by ``AppRouter``.
+nonisolated enum DeepLinkRouter {
+    static func route(for url: URL) -> AppRoute? {
+        guard url.scheme?.lowercased() == "tmi",
+              let host = url.host?.lowercased() else {
             return nil
         }
-        
-        return createNavigationAction(for: destination)
-    }
-    
-    /// Create a navigation action for a destination
-    func createNavigationAction(for destination: DeepLinkDestination) -> NavigationAction {
-        switch destination {
-        case .student(let id):
-            return NavigationAction(
-                targetTab: .students,
-                destination: destination,
-                studentId: id,
-                planId: nil
-            )
-            
-        case .plan(let id):
-            return NavigationAction(
-                targetTab: .tmiPlans,
-                destination: destination,
-                studentId: nil,
-                planId: id
-            )
-            
-        case .meeting:
-            // Meetings are accessed through plans
-            return NavigationAction(
-                targetTab: .tmiPlans,
-                destination: destination,
-                studentId: nil,
-                planId: nil // Would need to look up the plan for this meeting
-            )
-            
-        case .resource:
-            return NavigationAction(
-                targetTab: .students,
-                destination: destination,
-                studentId: nil,
-                planId: nil
-            )
 
-        case .studentInterests(let studentId):
-            return NavigationAction(
-                targetTab: .students,
-                destination: destination,
-                studentId: studentId,
-                planId: nil
-            )
+        let components = url.pathComponents.filter { $0 != "/" }
 
-        case .studentCareers(let studentId):
-            return NavigationAction(
-                targetTab: .students,
-                destination: destination,
-                studentId: studentId,
-                planId: nil
-            )
-            
-        case .planRecommendations(let planId):
-            return NavigationAction(
-                targetTab: .tmiPlans,
-                destination: destination,
-                studentId: nil,
-                planId: planId
-            )
-            
-        case .districtApprovals:
-            return NavigationAction(
-                targetTab: .district,
-                destination: destination,
-                studentId: nil,
-                planId: nil
-            )
-            
-        case .districtCompliance:
-            return NavigationAction(
-                targetTab: .district,
-                destination: destination,
-                studentId: nil,
-                planId: nil
-            )
-            
-        case .scheduleMeeting(let planId):
-            return NavigationAction(
-                targetTab: .tmiPlans,
-                destination: destination,
-                studentId: nil,
-                planId: planId
-            )
-        }
-    }
-    
-    /// Queue a navigation action for processing
-    func queueNavigation(_ action: NavigationAction) {
-        pendingNavigation = action
-    }
-    
-    /// Clear the pending navigation
-    func clearPendingNavigation() {
-        pendingNavigation = nil
-    }
-    
-    /// Execute the pending navigation
-    func executePendingNavigation(
-        context: StudentContextStateModel,
-        tabSelection: Binding<MainTabView.Tab>
-    ) async {
-        guard let action = pendingNavigation else { return }
-        
-        isProcessing = true
-        defer { 
-            isProcessing = false
-            clearPendingNavigation()
-        }
-        
-        // Set context if needed
-        if let studentId = action.studentId {
-            await context.setActiveStudent(studentId, scope: .staff)
-        }
-        
-        if let planId = action.planId {
-            context.setActivePlan(planId)
-        }
-        
-        // Navigate to tab
-        tabSelection.wrappedValue = action.targetTab
-        
-        // Queue the deep link destination for the tab to handle
-        context.queueDeepLink(action.destination)
-        
-        Log.ui.info(
-            "deep_link_navigation_completed",
-            metadata: ["targetTab": action.targetTab.rawValue]
-        )
-    }
-}
+        switch host {
+        case "student", "students":
+            guard let studentID = identifier(at: 0, in: components) else {
+                return nil
+            }
+            if components.count == 2, components[1].lowercased() == "edit" {
+                return .editStudent(studentID)
+            }
+            guard components.count == 1 else { return nil }
+            return .student(studentID)
 
-// MARK: - URL Scheme Handler
+        case "profile":
+            return components.isEmpty ? .profile : nil
 
-extension DeepLinkRouter {
-    /// Handle an incoming URL
-    func handleIncomingURL(_ url: URL) async -> Bool {
-        guard let action = processDeepLink(url: url) else {
-            return false
+        case "settings":
+            return components.isEmpty ? .settings : nil
+
+        default:
+            return nil
         }
-        
-        queueNavigation(action)
-        return true
+    }
+
+    private static func identifier(at index: Int, in components: [String]) -> String? {
+        guard components.indices.contains(index) else { return nil }
+        let identifier = components[index]
+        return TrustedIdentifier.isValid(identifier) ? identifier : nil
     }
 }

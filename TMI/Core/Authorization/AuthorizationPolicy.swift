@@ -33,6 +33,22 @@ nonisolated struct PlanAuthorizationScope: Codable, Sendable, Equatable {
     let students: [StudentAuthorizationScope]
 }
 
+nonisolated extension PlanAuthorizationScope {
+    init?(plan: TMIPlan) {
+        guard let planID = plan.id,
+              let districtID = plan.districtId else {
+            return nil
+        }
+
+        let students = plan.students.compactMap(StudentAuthorizationScope.init(student:))
+        guard students.count == plan.students.count else {
+            return nil
+        }
+
+        self.init(planID: planID, districtID: districtID, students: students)
+    }
+}
+
 nonisolated struct FormAssignmentAuthorizationScope: Codable, Sendable, Equatable {
     let districtID: String
     let schoolID: String?

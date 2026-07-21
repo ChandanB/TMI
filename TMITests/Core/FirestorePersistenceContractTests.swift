@@ -38,7 +38,7 @@ struct FirestorePersistenceContractTests {
 
         #expect(
             mainTabSource.components(
-                separatedBy: ".environment(DeepLinkRouter())"
+                separatedBy: ".environment(AppRouter())"
             ).count - 1 == 2
         )
         #expect(

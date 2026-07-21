@@ -21,7 +21,7 @@ struct TMIApp: App {
 
     @State private var authStateModel: AuthStateModel
     @State private var studentContext: StudentContextStateModel
-    @State private var deepLinkRouter: DeepLinkRouter
+    @State private var appRouter: AppRouter
     @State private var notificationService: NotificationService?
     @State private var scheduleMeetingCoordinator: ScheduleMeetingCoordinator?
     @State private var dashboardStateModel: DashboardStateModel?
@@ -73,7 +73,7 @@ struct TMIApp: App {
 
         _authStateModel = State(initialValue: authStateModel)
         _studentContext = State(initialValue: StudentContextStateModel())
-        _deepLinkRouter = State(initialValue: DeepLinkRouter())
+        _appRouter = State(initialValue: AppRouter())
         _notificationService = State(
             initialValue: usesInMemoryDependencies ? nil : NotificationService.shared
         )
@@ -142,7 +142,7 @@ struct TMIApp: App {
                 .environment(\.appDependencies, dependencies)
                 .environment(\.authStateModel, authStateModel)
                 .environment(\.studentContext, studentContext)
-                .environment(deepLinkRouter)
+                .environment(appRouter)
                 .environment(scheduleMeetingCoordinator)
                 .environment(\.notificationService, notificationService)
                 
@@ -156,9 +156,13 @@ struct TMIApp: App {
                 .tint(TMIColors.teal)
                 .preferredColorScheme(.light)
                 .onOpenURL { url in
-                    // Handle deep links
-                    Task {
-                        await deepLinkRouter.handleIncomingURL(url)
+                    do {
+                        appRouter.updatePolicy(
+                            AppNavigationPolicy(membership: authStateModel.currentMembership)
+                        )
+                        try appRouter.enqueueDeepLink(url)
+                    } catch {
+                        dependencies.logger.warning("deep_link_rejected")
                     }
                 }
         } else {
@@ -199,6 +203,7 @@ struct ContentView: View {
     @Environment(\.authStateModel) var authStateModel
     @Environment(\.studentContext) var studentContext
     @Environment(\.districtStateModel) var districtStateModel
+    @Environment(AppRouter.self) private var appRouter
     
     @State private var hasBootstrapped = false
 
@@ -225,6 +230,7 @@ struct ContentView: View {
                     await MainActor.run {
                         studentContext.clearContext()
                         districtStateModel.clearState()
+                        appRouter.reset()
                         hasBootstrapped = false
                     }
                 }
@@ -340,4 +346,5 @@ struct LoadingView: View {
         )
         .environment(\.studentContext, StudentContextStateModel())
         .environment(\.dashboardStateModel, DashboardStateModel())
+        .environment(AppRouter())
 }

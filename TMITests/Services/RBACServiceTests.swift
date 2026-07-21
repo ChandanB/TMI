@@ -19,7 +19,7 @@ struct RBACServiceTests {
 
         #expect(profile.requestedRole == .administrator)
         #expect(FeatureFlags.production.authenticatedAccountAccess(for: member).destination == .staff)
-        #expect(MainTabView.Tab.mvpTabs(for: member.role) == [.dashboard, .students, .tmiPlans])
+        #expect(AppNavigationPolicy(membership: member).availableTabs == [.dashboard, .students, .plans])
         #expect(service.canReadStudent(member: member, student: student))
         #expect(!service.canViewDistrict(member: member))
     }

@@ -67,11 +67,6 @@ final class StudentContextStateModel {
     /// Prefetched student plans
     private(set) var prefetchedPlans: [TMIPlan] = []
     
-    // MARK: - Navigation State
-    
-    /// Pending deep link to process after context is set
-    private(set) var pendingDeepLink: DeepLinkDestination?
-    
     private var prefetchTask: Task<Void, Never>?
     
     // MARK: - Computed Properties
@@ -154,7 +149,13 @@ final class StudentContextStateModel {
             await prefetchStudentEdges(studentId: studentId)
         }
         
-        print("[StudentContext] Set active student: \(studentId ?? "nil"), scope: \(scope.rawValue)")
+        Log.student.info(
+            "student_context_updated",
+            metadata: [
+                "hasStudent": studentId != nil,
+                "scope": scope.rawValue,
+            ]
+        )
     }
     
     /// Set the active plan context
@@ -167,7 +168,10 @@ final class StudentContextStateModel {
         cachedPlan = plan
         lastContextChange = Date()
         
-        print("[StudentContext] Set active plan: \(planId ?? "nil")")
+        Log.student.info(
+            "student_plan_context_updated",
+            metadata: ["hasPlan": planId != nil]
+        )
     }
     
     /// Clear all context (e.g., on sign out or tab change)
@@ -187,7 +191,7 @@ final class StudentContextStateModel {
         scope = .staff
         lastContextChange = Date()
         
-        print("[StudentContext] Context cleared")
+        Log.student.info("student_context_cleared")
     }
     
     /// Update scope without changing the selected student/plan
@@ -196,7 +200,10 @@ final class StudentContextStateModel {
         scope = newScope
         lastContextChange = Date()
         
-        print("[StudentContext] Scope updated to: \(newScope.rawValue)")
+        Log.student.info(
+            "student_context_scope_updated",
+            metadata: ["scope": newScope.rawValue]
+        )
     }
     
     // MARK: - Cache Management
@@ -205,7 +212,7 @@ final class StudentContextStateModel {
     @MainActor
     func updateCachedStudent(_ student: Student) {
         guard student.id == selectedStudentId else {
-            print("[StudentContext] Warning: Attempted to update cache with mismatched student ID")
+            Log.student.warning("student_cache_update_context_mismatch")
             return
         }
         cachedStudent = student
@@ -215,7 +222,7 @@ final class StudentContextStateModel {
     @MainActor
     func updateCachedPlan(_ plan: TMIPlan) {
         guard plan.id == selectedPlanId else {
-            print("[StudentContext] Warning: Attempted to update cache with mismatched plan ID")
+            Log.student.warning("plan_cache_update_context_mismatch")
             return
         }
         cachedPlan = plan
@@ -277,7 +284,7 @@ final class StudentContextStateModel {
                 }
             }
         
-            print("[StudentContext] Prefetching edges for student: \(studentId)")
+            Log.student.debug("student_context_prefetch_started")
 
             async let interests = Self.loadPrefetchedInterests(for: studentId)
             async let careerStates = Self.loadPrefetchedCareerStates(for: studentId)
@@ -346,97 +353,6 @@ final class StudentContextStateModel {
         }
     }
     
-    // MARK: - Deep Link Handling
-    
-    /// Queue a deep link for processing after context is ready
-    func queueDeepLink(_ destination: DeepLinkDestination) {
-        pendingDeepLink = destination
-    }
-    
-    /// Clear pending deep link after processing
-    func clearPendingDeepLink() {
-        pendingDeepLink = nil
-    }
-}
-
-// MARK: - Deep Link Destinations
-
-/// Represents navigable destinations via deep links
-enum DeepLinkDestination: Equatable {
-    case student(id: String)
-    case plan(id: String)
-    case meeting(id: String)
-    case resource(id: String)
-    case studentInterests(studentId: String)
-    case studentCareers(studentId: String)
-    case planRecommendations(planId: String)
-    case districtApprovals(districtId: String)
-    case districtCompliance(districtId: String)
-    case scheduleMeeting(planId: String)
-    
-    /// Parse a deep link URL into a destination
-    static func from(url: URL) -> DeepLinkDestination? {
-        guard url.scheme == "tmi" else { return nil }
-        
-        let pathComponents = url.pathComponents.filter { $0 != "/" }
-        
-        switch url.host {
-        case "student":
-            if pathComponents.count >= 1 {
-                let studentId = pathComponents[0]
-                if pathComponents.count >= 2 {
-                    switch pathComponents[1] {
-                    case "interests":
-                        return .studentInterests(studentId: studentId)
-                    case "careers":
-                        return .studentCareers(studentId: studentId)
-                    default:
-                        break
-                    }
-                }
-                return .student(id: studentId)
-            }
-        case "plan":
-            if pathComponents.count >= 1 {
-                let planId = pathComponents[0]
-                if pathComponents.count >= 2 {
-                    switch pathComponents[1] {
-                    case "recommendations":
-                        return .planRecommendations(planId: planId)
-                    case "schedule":
-                        return .scheduleMeeting(planId: planId)
-                    default:
-                        break
-                    }
-                }
-                return .plan(id: planId)
-            }
-        case "meeting":
-            if pathComponents.count >= 1 {
-                return .meeting(id: pathComponents[0])
-            }
-        case "resource":
-            if pathComponents.count >= 1 {
-                return .resource(id: pathComponents[0])
-            }
-        case "district":
-            if pathComponents.count >= 2 {
-                let districtId = pathComponents[0]
-                switch pathComponents[1] {
-                case "approvals":
-                    return .districtApprovals(districtId: districtId)
-                case "compliance":
-                    return .districtCompliance(districtId: districtId)
-                default:
-                    break
-                }
-            }
-        default:
-            break
-        }
-        
-        return nil
-    }
 }
 
 // MARK: - Environment Key

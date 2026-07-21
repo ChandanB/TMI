@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct TMIPlanListView: View {
+    @Environment(AppRouter.self) private var router
     @State private var stateModel = TMIPlanListStateModel()
     @State private var selectedTab: PlanTab = .active
     @State private var searchText = ""
@@ -94,35 +95,26 @@ struct TMIPlanListView: View {
         }
         .sheet(item: $selectedPlanForStudents) { plan in
             NavigationStack {
-                if let student = plan.students.first,
-                   let studentId = student.id,
-                   plan.students.count == 1 {
-                    StudentDetailView(studentId: studentId)
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Close") {
-                                    selectedPlanForStudents = nil
-                                }
+                List(plan.students) { student in
+                    if student.id != nil {
+                        Button {
+                            guard (try? router.open(student)) != nil else { return }
+                            selectedPlanForStudents = nil
+                        } label: {
+                            HStack {
+                                TMIAvatar(initials: student.initials, color: .blue, size: 32)
+                                Text(student.name)
+                                    .font(.tmiBody)
                             }
                         }
-                } else {
-                    List(plan.students) { student in
-                        if let studentId = student.id {
-                            NavigationLink(destination: StudentDetailView(studentId: studentId)) {
-                                HStack {
-                                    TMIAvatar(initials: student.initials, color: .blue, size: 32)
-                                    Text(student.name)
-                                        .font(.tmiBody)
-                                }
-                            }
-                        }
+                        .buttonStyle(.plain)
                     }
-                    .navigationTitle("Students in Plan")
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Close") {
-                                selectedPlanForStudents = nil
-                            }
+                }
+                .navigationTitle("Students in Plan")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") {
+                            selectedPlanForStudents = nil
                         }
                     }
                 }
@@ -179,9 +171,12 @@ struct TMIPlanListView: View {
     private var plansList: some View {
         List {
             ForEach(filteredPlans) { plan in
-                NavigationLink(destination: TMIPlanDetailView(plan: plan)) {
+                Button {
+                    try? router.open(plan)
+                } label: {
                     planRow(plan)
                 }
+                .buttonStyle(.plain)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 4, leading: TMISpacing.screenPadding, bottom: 4, trailing: TMISpacing.screenPadding))
@@ -378,5 +373,5 @@ struct TMIPlanListView: View {
     NavigationStack {
         TMIPlanListView()
     }
+    .environment(AppRouter())
 }
-

@@ -263,6 +263,7 @@ struct QuickActionsGrid: View {
 
 struct StudentsNeedingSupportView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppRouter.self) private var router
     @State private var stateModel = StudentListStateModel()
 
     var studentsNeedingSupport: [Student] {
@@ -281,8 +282,11 @@ struct StudentsNeedingSupportView: View {
                 )
             } else {
                 List(studentsNeedingSupport) { student in
-                    if let studentId = student.id {
-                        NavigationLink(destination: StudentDetailView(studentId: studentId)) {
+                    if student.id != nil {
+                        Button {
+                            guard (try? router.open(student)) != nil else { return }
+                            dismiss()
+                        } label: {
                             HStack(spacing: TMISpacing.md) {
                                 TMIAvatar(
                                     initials: student.initials,
@@ -312,6 +316,7 @@ struct StudentsNeedingSupportView: View {
                             }
                             .padding(.vertical, TMISpacing.sm)
                         }
+                        .buttonStyle(.plain)
                         .listRowBackground(Color.tmiBackground)
                     }
                 }

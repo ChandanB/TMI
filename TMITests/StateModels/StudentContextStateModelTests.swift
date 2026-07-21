@@ -73,7 +73,7 @@ struct StudentContextStateModelTests {
         guard
             let prefetchStart = source.range(of: "private func prefetchStudentEdges"),
             let prefetchEnd = source.range(
-                of: "// MARK: - Deep Link Handling",
+                of: "// MARK: - Environment Key",
                 range: prefetchStart.upperBound..<source.endIndex
             )
         else {

@@ -13,7 +13,6 @@ struct StudentDetailView: View {
     let studentId: String
     @State private var stateModel: StudentDetailStateModel
     @State private var showingCreatePlan = false
-    @State private var showingEditStudent = false
     @State private var showingAddInterest = false
     @State private var showingAllPlans = false
     @State private var showingProgress = false
@@ -36,6 +35,7 @@ struct StudentDetailView: View {
     // Environment dependencies
     @Environment(\.studentModeSession) private var studentModeSession
     @Environment(\.studentContext) private var studentContext
+    @Environment(AppRouter.self) private var router
     @Environment(ScheduleMeetingCoordinator.self) private var scheduleMeetingCoordinator
 
     private let meetingService = MeetingService.shared
@@ -59,10 +59,11 @@ struct StudentDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: { showingEditStudent = true }) {
+                Button(action: openEditor) {
                     Image(systemName: "pencil")
                         .foregroundColor(.tmiPrimary)
                 }
+                .accessibilityLabel("Edit \(stateModel.student?.displayName ?? "student")")
             }
         }
         .task {
@@ -76,6 +77,7 @@ struct StudentDetailView: View {
         .onChange(of: stateModel.student?.id) { _, newStudentId in
             // Set shared student context when student loads
             if let student = stateModel.student, newStudentId != nil {
+                guard router.setActiveStudent(student) else { return }
                 Task {
                     await studentContext.setActiveStudent(
                         studentId,
@@ -98,16 +100,6 @@ struct StudentDetailView: View {
                             await stateModel.refreshTMIPlans()
                         }
                     })
-                }
-                .tmiSheetStyle()
-            }
-        }
-        .sheet(isPresented: $showingEditStudent) {
-            if let student = stateModel.student {
-                NavigationStack {
-                    StudentProfileView(existingStudent: student) {
-                        // No need to manually refresh - listener will update automatically
-                    }
                 }
                 .tmiSheetStyle()
             }
@@ -145,6 +137,14 @@ struct StudentDetailView: View {
                 .tmiSheetStyle()
             }
         }
+    }
+
+    private func openEditor() {
+        guard let student = stateModel.student,
+              router.setActiveStudent(student) else {
+            return
+        }
+        try? router.open(.editStudent(studentId))
     }
 
     // MARK: - Content View
@@ -1255,4 +1255,5 @@ private struct StudentInterestBadge: View {
         StudentDetailView(studentId: Student.sampleStudent.id ?? "preview-student-id")
     }
     .environment(ScheduleMeetingCoordinator())
+    .environment(AppRouter())
 }

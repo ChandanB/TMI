@@ -5,20 +5,20 @@ import Testing
 struct MainTabViewTests {
     @Test("Teacher sees only the MVP teacher tabs")
     func teacherTabs() {
-        let tabs = MainTabView.Tab.mvpTabs(for: .teacher)
+        let tabs = AppNavigationPolicy(role: .teacher).availableTabs
 
-        #expect(tabs == [.dashboard, .students, .tmiPlans])
+        #expect(tabs == [.dashboard, .students, .plans])
     }
 
     @Test("District admin sees district evidence tab in addition to teacher workflow")
     func districtAdminTabs() {
-        let tabs = MainTabView.Tab.mvpTabs(for: .districtAdministrator)
+        let tabs = AppNavigationPolicy(role: .districtAdministrator).availableTabs
 
-        #expect(tabs == [.dashboard, .students, .tmiPlans, .district])
+        #expect(tabs == [.dashboard, .students, .plans, .district])
     }
 
     @Test("Nil or unsupported role falls back to dashboard only")
     func fallbackTabs() {
-        #expect(MainTabView.Tab.mvpTabs(for: nil) == [.dashboard])
+        #expect(AppNavigationPolicy(role: nil).availableTabs == [.dashboard])
     }
 }

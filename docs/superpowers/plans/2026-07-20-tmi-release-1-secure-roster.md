@@ -141,7 +141,7 @@ Expected: focused tests pass.
 - Modify: `TMI/Core/DeepLinkRouter.swift`
 - Create: `TMITests/Features/Navigation/AppRouterTests.swift`
 
-- [ ] **Step 1: Write failing route tests**
+- [x] **Step 1: Write failing route tests**
 
 ```swift
 @Test func districtTabRequiresDistrictRole() {
@@ -158,7 +158,7 @@ Expected: focused tests pass.
 }
 ```
 
-- [ ] **Step 2: Implement route values**
+- [x] **Step 2: Implement route values**
 
 ```swift
 enum AppTab: Hashable, Sendable { case dashboard, students, plans, district }
@@ -181,11 +181,11 @@ final class AppRouter {
 
 Use `TabView(.sidebarAdaptable)` on iPhone/iPad and `NavigationSplitView` with commands/keyboard shortcuts on macOS. The account menu owns Profile and Settings. Student/plan mutations show the active student's name.
 
-- [ ] **Step 3: Remove competing navigation state**
+- [x] **Step 3: Remove competing navigation state**
 
 Migrate supported routes from `DeepLinkRouter`, `NavigationManager`, per-tab `NavigationPath` values, and student context caches into `AppRouter`. Delete an obsolete coordinator only after `rg` proves no production caller remains.
 
-- [ ] **Step 4: Run navigation tests and commit**
+- [x] **Step 4: Run navigation tests and commit**
 
 ```bash
 git add TMI/Features/Navigation TMI/Views/MainTabView.swift TMI/Core/DeepLinkRouter.swift TMITests/Features/Navigation

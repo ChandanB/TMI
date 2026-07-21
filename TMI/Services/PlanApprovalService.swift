@@ -140,7 +140,7 @@ final class PlanApprovalService {
                     type: .planUpdate,
                     title: "Plan Approved",
                     message: "Your TMI plan '\(plan.title)' has been approved",
-                    actionUrl: "tmi://plans/\(planId)",
+                    actionUrl: nil,
                     targetId: planId,
                     forUserId: submittedBy
                 )
@@ -202,7 +202,7 @@ final class PlanApprovalService {
                     type: .planUpdate,
                     title: "Plan Rejected",
                     message: "Your TMI plan '\(plan.title)' was rejected. Reason: \(reason)",
-                    actionUrl: "tmi://plans/\(planId)",
+                    actionUrl: nil,
                     targetId: planId,
                     forUserId: submittedBy
                 )
@@ -264,7 +264,7 @@ final class PlanApprovalService {
                     type: .planUpdate,
                     title: "Changes Requested",
                     message: "Changes have been requested for your TMI plan '\(plan.title)'. Feedback: \(feedback)",
-                    actionUrl: "tmi://plans/\(planId)",
+                    actionUrl: nil,
                     targetId: planId,
                     forUserId: submittedBy
                 )
