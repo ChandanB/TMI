@@ -11,21 +11,41 @@ nonisolated struct AppDependencies: Sendable {
     let runtime: Runtime
     let flags: FeatureFlags
     let membership: any MembershipProviding
+    let authentication: (any AuthenticationProviding)?
     let logger: TMILogger
 
+    @MainActor
     static func production(firestore: Firestore) -> AppDependencies {
-        production(
-            membershipStore: FirebaseMembershipStore(firestore: firestore)
+        let membership = MembershipRepository(
+            store: FirebaseMembershipStore(firestore: firestore)
+        )
+        let authentication = AuthenticationRepository(
+            backend: FirebaseAuthenticationBackend(),
+            sessionLoader: FirebaseAuthenticationSessionLoader(
+                membershipProvider: membership
+            ),
+            invitationProvisioner: FirebaseStaffInvitationProvisioner(),
+            pendingRegistrationStore: SecurePendingStaffRegistrationStore()
+        )
+
+        return AppDependencies(
+            runtime: .production,
+            flags: .production,
+            membership: membership,
+            authentication: authentication,
+            logger: .production
         )
     }
 
     static func production(
-        membershipStore: any MembershipStore
+        membershipStore: any MembershipStore,
+        authentication: (any AuthenticationProviding)? = nil
     ) -> AppDependencies {
         AppDependencies(
             runtime: .production,
             flags: .production,
             membership: MembershipRepository(store: membershipStore),
+            authentication: authentication,
             logger: .production
         )
     }
@@ -37,6 +57,7 @@ nonisolated struct AppDependencies: Sendable {
             runtime: .preview,
             flags: .production,
             membership: InMemoryMembershipProvider(memberships: memberships),
+            authentication: nil,
             logger: TMILogger(category: "Preview")
         )
     }
@@ -46,6 +67,7 @@ nonisolated struct AppDependencies: Sendable {
         runtime: .unconfigured,
         flags: .production,
         membership: UnavailableMembershipProvider(),
+        authentication: nil,
         logger: .production
     )
 }

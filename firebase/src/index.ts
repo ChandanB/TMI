@@ -38,8 +38,13 @@ import {
 import {
   createProductionDeletePersonalAccountDataHandler,
 } from "./accountDeletion.js";
+import {
+  createProductionProvisionStaffMembershipHandler,
+  type ProvisionStaffMembershipRequest,
+} from "./invitations.js";
 
 export type { DeletePersonalAccountDataRequest } from "./accountDeletion.js";
+export type { ProvisionStaffMembershipRequest } from "./invitations.js";
 
 if (getApps().length === 0) {
   const projectID =
@@ -771,6 +776,8 @@ const issueStudentModeSessionHandler = async (
 
 const deletePersonalAccountDataHandler =
   createProductionDeletePersonalAccountDataHandler();
+const provisionStaffMembershipHandler =
+  createProductionProvisionStaffMembershipHandler();
 
 const requestSensitiveExportHandler = async (
   request: CallableRequest<RequestSensitiveExportRequest>,
@@ -881,6 +888,10 @@ const recordPrivilegedAuditEventHandler = async (
 export const mutateMembership = onCall(
   callableOptions,
   mutateMembershipHandler,
+);
+export const provisionStaffMembership = onCall<ProvisionStaffMembershipRequest>(
+  callableOptions,
+  provisionStaffMembershipHandler,
 );
 export const grantStudentDetailAccess = onCall(
   callableOptions,

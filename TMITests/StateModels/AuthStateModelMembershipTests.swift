@@ -5,6 +5,42 @@ import Testing
 @Suite("Auth State Model Trusted Membership", .serialized)
 @MainActor
 struct AuthStateModelMembershipTests {
+    @Test("Visible sign-in uses the injected authentication repository")
+    func signInUsesInjectedAuthentication() async {
+        let authentication = AuthenticationProviderSpy()
+        let model = AuthStateModel(
+            authentication: authentication,
+            identityProvider: FakeAuthenticationIdentityProvider(
+                identity: nil,
+                claims: [:]
+            ),
+            profileProvider: FakeUserProfileProvider(profiles: [:]),
+            membershipProvider: ImmediateMembershipProvider(memberships: [:]),
+            automaticallyStart: false
+        )
+        model.updateEmail("educator@example.edu")
+        model.updatePassword("Correct-Horse-9")
+
+        await model.signIn()
+
+        #expect(authentication.signInCallCount == 1)
+        #expect(authentication.lastEmail == "educator@example.edu")
+    }
+
+    @Test("Production profile loading uses the canonical private profile path")
+    func productionProfileUsesCanonicalPath() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appending(path: "TMI/StateModels/AuthStateModel.swift"),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("FirestorePaths.privateProfile(userID: identity.userID)"))
+    }
+
     @Test("Unverified identity cannot publish a trusted staff session")
     func unverifiedIdentityCannotPublishSession() async {
         let identity = AuthenticatedIdentity(
@@ -549,4 +585,26 @@ private enum AuthMembershipTestError: Error {
     case missingClaim
     case missingMembership
     case unavailable
+}
+
+@MainActor
+private final class AuthenticationProviderSpy: AuthenticationProviding {
+    private(set) var signInCallCount = 0
+    private(set) var lastEmail: String?
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        signInCallCount += 1
+        lastEmail = email
+        return .signedOut
+    }
+
+    func register(_ request: StaffRegistrationRequest) async throws -> AuthSession {
+        .signedOut
+    }
+
+    func sendPasswordReset(email: String) async throws {}
+    func sendVerification() async throws {}
+    func refresh() async throws -> AuthSession { .signedOut }
+    func reauthenticate(password: String) async throws {}
+    func signOut() async throws {}
 }

@@ -90,3 +90,25 @@ nonisolated struct AuthSession: Sendable, Equatable {
         }
     }
 }
+
+nonisolated enum StaffPolicyVersions {
+    static let privacyPolicyVersion = "2026-07-20"
+    static let acceptableUsePolicyVersion = "2026-07-20"
+}
+
+nonisolated enum AuthenticationPresentationPolicy {
+    static let signInFailureMessage =
+        "We couldn't sign you in. Check your credentials and try again."
+    static let registrationFailureMessage =
+        "We couldn't create the account. Check the invitation and entered information, then try again."
+    static let passwordResetConfirmation =
+        "If an account matches that email, a password reset link will be sent."
+
+    static func registrationMessage(for error: Error) -> String {
+        if let repositoryError = error as? AuthenticationRepositoryError,
+           repositoryError == .invitationRequired {
+            return "Enter the staff invitation code provided by your institution."
+        }
+        return registrationFailureMessage
+    }
+}

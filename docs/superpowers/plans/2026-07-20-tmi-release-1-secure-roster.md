@@ -49,7 +49,7 @@
 - Modify: `TMI/Views/Authentication/SimplifiedRegistrationView.swift`
 - Create: `TMITests/Features/Authentication/AuthSessionTests.swift`
 
-- [ ] **Step 1: Write failing access-state tests**
+- [x] **Step 1: Write failing access-state tests**
 
 ```swift
 @Test func unverifiedEmailCannotEnterStudentRecords() {
@@ -65,11 +65,11 @@
 
 Also test missing invitation, inactive membership, tenant mismatch, token refresh failure, and registration rollback after provisioning failure.
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Expected: `AuthSession` and repository contracts are missing.
 
-- [ ] **Step 3: Implement the auth contract**
+- [x] **Step 3: Implement the auth contract**
 
 ```swift
 enum AppAccessState: Sendable, Equatable {
@@ -105,11 +105,11 @@ protocol AuthenticationProviding: Sendable {
 
 The Firebase adapter provisions membership only through the invitation callable. If profile or membership creation fails irrecoverably, delete the new Auth account before reporting failure.
 
-- [ ] **Step 4: Implement administrator TOTP MFA**
+- [x] **Step 4: Implement administrator TOTP MFA**
 
 Create `MFARepository` methods `enrollTOTP()`, `confirmEnrollment(code:)`, `challenge(code:)`, and `unenroll(factorID:)`. School and district administrators must enroll before privileged access and complete a current challenge before staff management, retention, audit, drill-down, or sensitive export. Write tests for invalid/expired/replayed codes, recovery after sign-out, role promotion requiring enrollment, role demotion retaining but not requiring the factor, and recent-auth failure.
 
-- [ ] **Step 5: Add the disabled institutional SSO seam**
+- [x] **Step 5: Add the disabled institutional SSO seam**
 
 ```swift
 protocol InstitutionalSSOProvider: Sendable {
@@ -119,11 +119,11 @@ protocol InstitutionalSSOProvider: Sendable {
 
 Inject no production implementation and expose no SSO control while `FeatureFlags.production.institutionalSSO` is false. A missing provider must resolve to `.unavailable`, never a partial web flow.
 
-- [ ] **Step 6: Replace the visible flows**
+- [x] **Step 6: Replace the visible flows**
 
 Registration collects professional role request and invitation code, verifies email, records privacy/acceptable-use document versions, then creates preferences. Hide student/guardian roles and SSO. Error messages preserve entered non-secret fields and never reveal whether another user's email exists.
 
-- [ ] **Step 7: Run focused tests and commit**
+- [x] **Step 7: Run focused tests and commit**
 
 ```bash
 git add TMI/Features/Authentication TMI/Views/Authentication TMITests/Features/Authentication

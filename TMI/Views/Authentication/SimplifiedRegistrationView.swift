@@ -2,10 +2,9 @@
 //  SimplifiedRegistrationView.swift
 //  TMI
 //
-//  Single-page registration with Student, Staff, or Guardian selection
+//  Invitation-based staff registration.
 //
 
-import FirebaseAuth
 import SwiftUI
 
 nonisolated enum AccountType: String, CaseIterable, Identifiable {
@@ -27,19 +26,28 @@ nonisolated enum AccountType: String, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
-        case .teacher: return .blue
-        case .counselor: return .purple
-        case .administrator: return .orange
-        case .socialWorker: return .pink
+        case .teacher, .administrator: return TMIColors.aubergine
+        case .counselor, .socialWorker: return TMIColors.teal
         }
     }
 
+    /// Registration-only compatibility mapping. Trusted access is always
+    /// derived from `StaffRole` membership after authentication.
     var userRole: UserRole {
         switch self {
-        case .teacher: return .teacher
-        case .counselor: return .counselor
-        case .administrator: return .administrator
-        case .socialWorker: return .socialWorker
+        case .teacher: .teacher
+        case .counselor: .counselor
+        case .administrator: .administrator
+        case .socialWorker: .socialWorker
+        }
+    }
+
+    var staffRole: StaffRole {
+        switch self {
+        case .teacher: .teacher
+        case .counselor: .counselor
+        case .administrator: .schoolAdministrator
+        case .socialWorker: .socialWorker
         }
     }
 }
@@ -51,6 +59,7 @@ struct SimplifiedRegistrationView: View {
 
     @State private var displayName = ""
     @State private var email = ""
+    @State private var invitationCode = ""
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var selectedAccountType: AccountType = .teacher
@@ -58,11 +67,12 @@ struct SimplifiedRegistrationView: View {
     @State private var errorMessage: String?
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) private var authStateModel
     @FocusState private var focusedField: Field?
 
     enum Field: Hashable {
-        case displayName, email, password, confirmPassword
+        case displayName, email, invitationCode, password, confirmPassword
     }
 
     var body: some View {
@@ -83,7 +93,7 @@ struct SimplifiedRegistrationView: View {
                                 .font(.system(size: 28, weight: .bold))
                                 .foregroundColor(Color.tmiTextPrimary)
 
-                            Text("Join the TMI community")
+                            Text("Create an account with your staff invitation")
                                 .font(.system(size: 16))
                                 .foregroundColor(Color.tmiTextSecondary)
                         }
@@ -124,9 +134,17 @@ struct SimplifiedRegistrationView: View {
                                     placeholder: "Email",
                                     text: $email,
                                     keyboardType: .emailAddress,
-                                    onSubmit: { focusedField = .password }
+                                    onSubmit: { focusedField = .invitationCode }
                                 )
                                 .focused($focusedField, equals: .email)
+
+                                TMITextField(
+                                    icon: "building.2.crop.circle",
+                                    placeholder: "Staff Invitation Code",
+                                    text: $invitationCode,
+                                    onSubmit: { focusedField = .password }
+                                )
+                                .focused($focusedField, equals: .invitationCode)
 
                                 TMITextField(
                                     icon: "lock.fill",
@@ -204,6 +222,11 @@ struct SimplifiedRegistrationView: View {
             return
         }
 
+        guard !invitationCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Enter the staff invitation code provided by your institution"
+            return
+        }
+
         guard password.count >= 8 else {
             errorMessage = "Password must be at least 8 characters"
             return
@@ -219,33 +242,37 @@ struct SimplifiedRegistrationView: View {
 
         Task {
             do {
-                // Split full name into first and last
-                let nameParts = displayName.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ")
-                let firstName = String(nameParts.first ?? "")
-                let lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
-
-                // Use AuthenticationService for unified registration
-                _ = try await AuthenticationService.shared.signUp(
-                    email: email,
-                    password: password,
-                    firstName: firstName,
-                    lastName: lastName,
-                    role: selectedAccountType.userRole,
-                    institutionCode: nil
+                guard let authentication = dependencies.authentication else {
+                    throw AuthenticationRepositoryError.registrationRollbackFailed
+                }
+                _ = try await authentication.register(
+                    StaffRegistrationRequest(
+                        displayName: displayName,
+                        email: email,
+                        password: password,
+                        requestedRole: selectedAccountType.staffRole,
+                        invitationCode: invitationCode,
+                        privacyPolicyVersion: StaffPolicyVersions.privacyPolicyVersion,
+                        acceptableUsePolicyVersion: StaffPolicyVersions.acceptableUsePolicyVersion
+                    )
                 )
 
-                // Force AuthStateModel to reload and fetch the TMIUser from Firestore
+                password = ""
+                confirmPassword = ""
+                invitationCode = ""
+
+                // The Auth listener presents email verification or authorized access.
                 await authStateModel.fetch()
 
-                await MainActor.run {
-                    isRegistering = false
-                    dismiss()
-                }
+                isRegistering = false
+                dismiss()
             } catch {
-                await MainActor.run {
-                    isRegistering = false
-                    errorMessage = error.localizedDescription
-                }
+                password = ""
+                confirmPassword = ""
+                isRegistering = false
+                errorMessage = AuthenticationPresentationPolicy.registrationMessage(
+                    for: error
+                )
             }
         }
     }

@@ -5,6 +5,12 @@ import Testing
 @Suite("Verified staff authentication")
 @MainActor
 struct AuthSessionTests {
+    @Test("Client policy versions match the invitation callable contract")
+    func policyVersionsMatchCallableContract() {
+        #expect(StaffPolicyVersions.privacyPolicyVersion == "2026-07-20")
+        #expect(StaffPolicyVersions.acceptableUsePolicyVersion == "2026-07-20")
+    }
+
     @Test("Unverified email cannot enter student records")
     func unverifiedEmailCannotEnterStudentRecords() {
         let session = AuthSession(
@@ -125,6 +131,155 @@ struct AuthSessionTests {
         #expect(backend.deleteCurrentUserCallCount == 1)
     }
 
+    @Test("Invitation provisioning waits for verified email and resumes on refresh")
+    func invitationProvisioningWaitsForVerification() async throws {
+        let backend = AuthenticationBackendSpy()
+        backend.identityIsVerified = false
+        let provisioner = InvitationProvisionerStub(
+            result: .success(membership())
+        )
+        let pendingStore = InMemoryPendingStaffRegistrationStore()
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: provisioner,
+            pendingRegistrationStore: pendingStore
+        )
+
+        let pendingSession = try await repository.register(
+            registrationRequest(invitationCode: "invite-a")
+        )
+
+        #expect(pendingSession.access == .emailVerificationRequired)
+        #expect(backend.sendVerificationCallCount == 1)
+        #expect(provisioner.provisionCallCount == 0)
+        #expect(await pendingStore.pendingRegistration() != nil)
+
+        backend.identityIsVerified = true
+        let authorizedSession = try await repository.refresh()
+
+        #expect(authorizedSession.access == .authorized)
+        #expect(provisioner.provisionCallCount == 1)
+        #expect(await pendingStore.pendingRegistration() == nil)
+    }
+
+    @Test("Signing in after email verification completes pending invitation provisioning")
+    func signInCompletesPendingRegistration() async throws {
+        let backend = AuthenticationBackendSpy()
+        backend.identityIsVerified = true
+        let provisioner = InvitationProvisionerStub(
+            result: .success(membership())
+        )
+        let pendingStore = InMemoryPendingStaffRegistrationStore()
+        await pendingStore.save(
+            PendingStaffRegistration(
+                identity: AuthIdentity(
+                    userID: "staff-1",
+                    email: "staff@example.edu",
+                    isEmailVerified: false
+                ),
+                request: registrationRequest(invitationCode: "invite-a")
+            )
+        )
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: provisioner,
+            pendingRegistrationStore: pendingStore
+        )
+
+        let session = try await repository.signIn(
+            email: "staff@example.edu",
+            password: "Correct-Horse-9"
+        )
+
+        #expect(session.access == .authorized)
+        #expect(provisioner.provisionCallCount == 1)
+        #expect(await pendingStore.pendingRegistration() == nil)
+    }
+
+    @Test("Ambiguous provisioning failure preserves Auth and pending registration")
+    func ambiguousProvisioningFailureRemainsRepairable() async throws {
+        let backend = AuthenticationBackendSpy()
+        backend.identityIsVerified = false
+        let pendingStore = InMemoryPendingStaffRegistrationStore()
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: InvitationProvisionerStub(
+                result: .failure(StaffInvitationProvisioningError.claimRefreshPending)
+            ),
+            pendingRegistrationStore: pendingStore
+        )
+
+        _ = try await repository.register(
+            registrationRequest(invitationCode: "invite-a")
+        )
+        backend.identityIsVerified = true
+
+        await #expect(throws: StaffInvitationProvisioningError.claimRefreshPending) {
+            _ = try await repository.refresh()
+        }
+        #expect(backend.deleteCurrentUserCallCount == 0)
+        #expect(await pendingStore.pendingRegistration() != nil)
+    }
+
+    @Test("Disabled or unconfigured institutional SSO is unavailable")
+    func institutionalSSOIsFailClosed() async {
+        let disabled = InstitutionalSSOCoordinator(
+            flags: .production,
+            provider: nil
+        )
+        let enabledWithoutProvider = InstitutionalSSOCoordinator(
+            flags: FeatureFlags(
+                independentStudentAccounts: false,
+                guardianAccounts: false,
+                aiSuggestions: false,
+                institutionalSSO: true
+            ),
+            provider: nil
+        )
+
+        #expect(disabled.availability == .unavailable)
+        #expect(enabledWithoutProvider.availability == .unavailable)
+        await #expect(throws: InstitutionalSSOError.unavailable) {
+            _ = try await disabled.beginSignIn(configurationID: "district-a")
+        }
+    }
+
+    @Test("Authentication presentation errors never reveal account existence")
+    func presentationErrorsDoNotEnumerateAccounts() {
+        let existingEmailError = NSError(
+            domain: "test",
+            code: 1,
+            userInfo: [
+                NSLocalizedDescriptionKey: "The email address is already in use."
+            ]
+        )
+        let missingEmailError = NSError(
+            domain: "test",
+            code: 2,
+            userInfo: [
+                NSLocalizedDescriptionKey: "No account exists for that email."
+            ]
+        )
+
+        #expect(
+            AuthenticationPresentationPolicy.registrationMessage(
+                for: existingEmailError
+            ) == AuthenticationPresentationPolicy.registrationFailureMessage
+        )
+        #expect(
+            AuthenticationPresentationPolicy.registrationMessage(
+                for: missingEmailError
+            ) == AuthenticationPresentationPolicy.registrationFailureMessage
+        )
+        #expect(
+            AuthenticationPresentationPolicy.passwordResetConfirmation
+                .contains("If an account matches")
+        )
+    }
+
     private func membership(
         userID: String = "staff-1",
         districtID: String = "district-a",
@@ -159,7 +314,9 @@ struct AuthSessionTests {
 private final class AuthenticationBackendSpy: AuthenticationBackend {
     var createUserCallCount = 0
     var deleteCurrentUserCallCount = 0
+    var sendVerificationCallCount = 0
     var refreshError: Error?
+    var identityIsVerified = true
 
     func signIn(email: String, password: String) async throws -> AuthIdentity {
         identity
@@ -175,7 +332,9 @@ private final class AuthenticationBackendSpy: AuthenticationBackend {
     }
 
     func sendPasswordReset(email: String) async throws {}
-    func sendVerification() async throws {}
+    func sendVerification() async throws {
+        sendVerificationCallCount += 1
+    }
 
     func refreshIdentity() async throws -> AuthIdentity {
         if let refreshError {
@@ -191,7 +350,7 @@ private final class AuthenticationBackendSpy: AuthenticationBackend {
         AuthIdentity(
             userID: "staff-1",
             email: "staff@example.edu",
-            isEmailVerified: true,
+            isEmailVerified: identityIsVerified,
             districtID: "district-a"
         )
     }
@@ -205,14 +364,21 @@ private struct SessionLoaderStub: AuthenticationSessionLoading {
     }
 }
 
-private struct InvitationProvisionerStub: StaffInvitationProvisioning {
+@MainActor
+private final class InvitationProvisionerStub: StaffInvitationProvisioning {
     let result: Result<MembershipContext, Error>
+    private(set) var provisionCallCount = 0
+
+    init(result: Result<MembershipContext, Error>) {
+        self.result = result
+    }
 
     func provision(
         request: StaffRegistrationRequest,
         identity: AuthIdentity
     ) async throws -> MembershipContext {
-        try result.get()
+        provisionCallCount += 1
+        return try result.get()
     }
 }
 

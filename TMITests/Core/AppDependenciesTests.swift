@@ -19,6 +19,10 @@ struct AppDependenciesTests {
         #expect(dependencies.membership is MembershipRepository)
         #expect(dependencies.logger === TMILogger.production)
         #expect(source.contains("FirebaseMembershipStore(firestore: firestore)"))
+        #expect(source.contains("FirebaseAuthenticationBackend"))
+        #expect(source.contains("FirebaseAuthenticationSessionLoader"))
+        #expect(source.contains("FirebaseStaffInvitationProvisioner"))
+        #expect(source.contains("SecurePendingStaffRegistrationStore"))
     }
 
     @Test("Preview composes an in-memory membership fixture")

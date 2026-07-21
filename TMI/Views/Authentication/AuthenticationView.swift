@@ -7,9 +7,11 @@ import SwiftUI
 
 struct AuthenticationView: View {
   @Environment(\.authStateModel) var stateModel
+  @Environment(\.appDependencies) private var dependencies
   @State private var showingRegistration = false
   @State private var showingForgotPassword = false
-  @State private var showingSupportResources = false
+  @State private var isRefreshingVerification = false
+  @State private var verificationMessage: String?
   @Environment(\.dismiss) private var dismiss
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @FocusState private var focusedField: Field?
@@ -74,6 +76,10 @@ struct AuthenticationView: View {
             // Login Card - Using unified TMICard
             TMICard(style: .elevated) {
               VStack(spacing: 24) {
+                if stateModel.requiresVerification {
+                  emailVerificationStatus
+                }
+
                 // Email field - Using unified TMITextField
                 TMITextField(
                   icon: "envelope.fill",
@@ -142,12 +148,9 @@ struct AuthenticationView: View {
                   value: animateButtons
                 )
 
-                // Enhanced Error Message with Trauma-Informed Design
+                // Authentication error
                 if let errorMessage = stateModel.errorMessage {
-                  TraumaInformedErrorView(
-                    message: errorMessage,
-                    showingSupportResources: $showingSupportResources
-                  )
+                  AuthenticationErrorView(message: errorMessage)
                   .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
 
@@ -231,10 +234,6 @@ struct AuthenticationView: View {
         SimplifiedRegistrationView()
           .tmiSheetStyle()
       }
-      .sheet(isPresented: $showingSupportResources) {
-        SupportResourcesView()
-          .tmiSheetStyle()
-      }
       .alert("Reset Password", isPresented: $showingForgotPassword) {
         TextField("Email", text: Binding(
           get: { stateModel.email },
@@ -285,207 +284,111 @@ struct AuthenticationView: View {
       await stateModel.signIn()
     }
   }
+
+  private var emailVerificationStatus: some View {
+    VStack(spacing: 12) {
+      Image(systemName: "envelope.badge.shield.half.filled")
+        .font(.system(size: 28, weight: .semibold))
+        .foregroundColor(Color.tmiSecondary)
+
+      Text("Verify Your Email")
+        .font(.headline)
+        .foregroundColor(Color.tmiTextPrimary)
+
+      Text("Open the verification link we sent, then return here to finish setting up your staff access.")
+        .font(.subheadline)
+        .foregroundColor(Color.tmiTextSecondary)
+        .multilineTextAlignment(.center)
+
+      if let verificationMessage {
+        Text(verificationMessage)
+          .font(.footnote)
+          .foregroundColor(Color.tmiTextSecondary)
+          .multilineTextAlignment(.center)
+      }
+
+      TMIButton(
+        text: "I've Verified My Email",
+        icon: "checkmark.shield",
+        style: .secondary,
+        isLoading: isRefreshingVerification,
+        action: completeEmailVerification
+      )
+      .disabled(isRefreshingVerification)
+
+      Button("Resend Verification Email", action: resendVerificationEmail)
+        .font(.subheadline.weight(.semibold))
+        .foregroundColor(Color.tmiSecondary)
+        .disabled(isRefreshingVerification)
+    }
+    .padding(.bottom, 8)
+    .accessibilityElement(children: .contain)
+  }
+
+  private func completeEmailVerification() {
+    Task { @MainActor in
+      guard let authentication = dependencies.authentication else {
+        verificationMessage = "Email verification is temporarily unavailable."
+        return
+      }
+
+      isRefreshingVerification = true
+      defer { isRefreshingVerification = false }
+      do {
+        let session = try await authentication.refresh()
+        if session.access == .emailVerificationRequired {
+          verificationMessage = "We haven't detected the verification yet. Open the link and try again."
+          return
+        }
+        verificationMessage = nil
+        await stateModel.fetch()
+      } catch {
+        verificationMessage = "We couldn't finish verifying your account. Try again."
+      }
+    }
+  }
+
+  private func resendVerificationEmail() {
+    Task { @MainActor in
+      guard let authentication = dependencies.authentication else {
+        verificationMessage = "Email verification is temporarily unavailable."
+        return
+      }
+
+      isRefreshingVerification = true
+      defer { isRefreshingVerification = false }
+      do {
+        try await authentication.sendVerification()
+        verificationMessage = "A new verification email was sent."
+      } catch {
+        verificationMessage = "We couldn't send another verification email. Try again."
+      }
+    }
+  }
 }
 
-// MARK: - Trauma-Informed Error View
+// MARK: - Authentication Error View
 
-struct TraumaInformedErrorView: View {
+struct AuthenticationErrorView: View {
   let message: String
-  @Binding var showingSupportResources: Bool
 
   var body: some View {
     TMICard(style: .default) {
-      VStack(spacing: 16) {
-        // Gentle, non-threatening icon
-        Image(systemName: "heart.circle")
-          .font(.system(size: 32))
-          .foregroundColor(Color.tmiSecondary)
+      HStack(alignment: .top, spacing: 12) {
+        Image(systemName: "exclamationmark.circle.fill")
+          .font(.system(size: 20))
+          .foregroundColor(TMIColors.errorText)
 
-        // Gentle error message
         Text(message)
           .font(.system(size: 14))
-          .foregroundColor(Color.tmiTextSecondary)
-          .multilineTextAlignment(.center)
+          .foregroundColor(TMIColors.errorText)
+          .multilineTextAlignment(.leading)
 
-        // Support options
-        HStack(spacing: 16) {
-          Button(action: {
-            showingSupportResources = true
-          }) {
-            HStack(spacing: 4) {
-              Image(systemName: "heart")
-              Text("Get Support")
-            }
-            .font(.system(size: 12))
-            .foregroundColor(Color.tmiSecondary)
-          }
-
-          Button(action: {
-            // Clear error (would be handled by state model)
-          }) {
-            Text("I'm Ready to Try Again")
-              .font(.system(size: 12))
-              .foregroundColor(Color.tmiTextSecondary)
-          }
-        }
-        .padding(.top, 8)
+        Spacer(minLength: 0)
       }
       .padding(.vertical, 8)
     }
     .padding(.horizontal, 20)
-  }
-}
-
-// MARK: - Support Resources View
-
-struct SupportResourcesView: View {
-  @Environment(\.dismiss) private var dismiss
-
-  var body: some View {
-    NavigationView {
-      ZStack {
-        TMIBackgroundView(variant: .auth)
-
-        ScrollView {
-          VStack(spacing: 20) {
-            // Header
-            VStack(spacing: 12) {
-              Image(systemName: "heart.circle.fill")
-                .font(.system(size: 40))
-                .foregroundColor(Color.tmiSecondary)
-
-              Text("We're Here to Help")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundColor(Color.tmiTextPrimary)
-
-              Text(
-                "Your safety and wellbeing are our top priorities. Here are some resources that might help."
-              )
-              .font(.system(size: 16))
-              .foregroundColor(Color.tmiTextSecondary)
-              .multilineTextAlignment(.center)
-              .padding(.horizontal, 30)
-            }
-            .padding(.top, 20)
-
-            // Support resources
-            LazyVStack(spacing: 16) {
-              SupportResourceCard(
-                icon: "message.circle",
-                title: "Chat Support",
-                description: "Get real-time help from our support team",
-                action: {}
-              )
-
-              SupportResourceCard(
-                icon: "phone.circle",
-                title: "Call Support",
-                description: "Speak directly with someone who can help",
-                action: {}
-              )
-
-              SupportResourceCard(
-                icon: "questionmark.circle",
-                title: "Help Center",
-                description: "Find answers to common questions",
-                action: {}
-              )
-
-              SupportResourceCard(
-                icon: "person.2.circle",
-                title: "Crisis Support",
-                description: "24/7 crisis support and resources",
-                isEmergency: true,
-                action: {}
-              )
-
-              SupportResourceCard(
-                icon: "envelope.circle",
-                title: "Email Support",
-                description: "Send us a detailed message about your issue",
-                action: {}
-              )
-            }
-            .padding(.horizontal, 20)
-
-            Spacer(minLength: 40)
-          }
-        }
-      }
-      .navigationTitle("Support Resources")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .navigationBarTrailing) {
-          Button("Done") {
-            dismiss()
-          }
-          .foregroundColor(Color.tmiSecondary)
-        }
-      }
-    }
-  }
-}
-
-// MARK: - Support Resource Card
-
-struct SupportResourceCard: View {
-  let icon: String
-  let title: String
-  let description: String
-  let isEmergency: Bool
-  let action: () -> Void
-
-  init(
-    icon: String, title: String, description: String, isEmergency: Bool = false,
-    action: @escaping () -> Void
-  ) {
-    self.icon = icon
-    self.title = title
-    self.description = description
-    self.isEmergency = isEmergency
-    self.action = action
-  }
-
-  var body: some View {
-    Button(action: action) {
-      TMICard(style: .default) {
-        HStack(spacing: 16) {
-          Image(systemName: icon)
-            .font(.system(size: 24))
-            .foregroundColor(isEmergency ? .red : Color.tmiSecondary)
-
-          VStack(alignment: .leading, spacing: 4) {
-            HStack {
-              Text(title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(Color.tmiTextPrimary)
-
-              if isEmergency {
-                Text("URGENT")
-                  .font(.system(size: 10, weight: .bold))
-                  .padding(.horizontal, 6)
-                  .padding(.vertical, 2)
-                  .background(Color.red)
-                  .foregroundColor(Color.tmiTextPrimary)
-                  .cornerRadius(4)
-              }
-
-              Spacer()
-            }
-
-            Text(description)
-              .font(.system(size: 14))
-              .foregroundColor(Color.tmiTextSecondary)
-              .multilineTextAlignment(.leading)
-          }
-
-          Image(systemName: "arrow.right")
-            .font(.system(size: 14))
-            .foregroundColor(Color.tmiTextSecondary)
-        }
-        .padding(.horizontal, 4)
-      }
-    }
   }
 }
 

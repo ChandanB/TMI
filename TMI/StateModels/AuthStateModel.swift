@@ -481,7 +481,9 @@ struct FirebaseUserProfileProvider: UserProfileProviding, @unchecked Sendable {
   }
 
   func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
-    let reference = firestore.collection("users").document(identity.userID)
+    let reference = firestore.document(
+      FirestorePaths.privateProfile(userID: identity.userID)
+    )
     let snapshot = try await reference.getDocument()
     guard snapshot.exists else {
       return nil
@@ -625,11 +627,6 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     set { ui.set("showingForgotPassword", value: newValue) }
   }
 
-  var showingSupportResources: Bool {
-    get { ui.get("showingSupportResources") ?? false }
-    set { ui.set("showingSupportResources", value: newValue) }
-  }
-
   var focusedField: AuthField? {
     get { ui.get("focusedField") }
     set { ui.set("focusedField", value: newValue) }
@@ -693,7 +690,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
   override var errorMessage: String? {
     if case .loaded(.error(let error)) = state {
-      return error.traumaInformedMessage
+      return error.message
     }
     if case .error(let error) = state {
       return error.message
@@ -719,6 +716,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   // MARK: - Initialization
   init(
     firebaseManager: FirebaseManager? = nil,
+    authentication: (any AuthenticationProviding)? = nil,
     auditService: any AuditEventRecording = NoOpAuditEventRecorder(),
     signOutOperation: (@MainActor () throws -> Void)? = nil,
     identityProvider: (any AuthenticationIdentityProviding)? = nil,
@@ -739,12 +737,20 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
       try resolvedFirebaseManager.signOut()
     }
     self.signInOperation = { email, password in
+      if let authentication {
+        _ = try await authentication.signIn(email: email, password: password)
+        return
+      }
       guard let resolvedFirebaseManager else {
         throw UnconfiguredAuthenticationDependencyError.unavailable
       }
       try await resolvedFirebaseManager.signIn(withEmail: email, password: password)
     }
     self.resetPasswordOperation = { email in
+      if let authentication {
+        try await authentication.sendPasswordReset(email: email)
+        return
+      }
       guard let resolvedFirebaseManager else {
         throw UnconfiguredAuthenticationDependencyError.unavailable
       }
@@ -795,7 +801,6 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   private func setupInitialState() {
     ui.set("showingRegistration", value: false)
     ui.set("showingForgotPassword", value: false)
-    ui.set("showingSupportResources", value: false)
     ui.set("focusedField", value: nil as AuthField?)
     ui.set("currentError", value: nil as AuthenticationError?)
     sessionID = sessionID ?? UUID().uuidString
@@ -1116,7 +1121,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     } catch {
       let authError = AuthenticationError(
         type: .invalidCredentials,
-        message: error.localizedDescription
+        message: AuthenticationPresentationPolicy.signInFailureMessage
       )
       updateState(.loaded(.error(authError)))
       await logAuditEvent(.loginFailed, result: .failure)
@@ -1171,8 +1176,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
     do {
       try await resetPasswordOperation(email)
-      // Show success message
-      ui.alertMessage = "Password reset email sent. Please check your inbox."
+      ui.alertMessage = AuthenticationPresentationPolicy.passwordResetConfirmation
       ui.isShowingAlert = true
       updateState(.loaded(.unauthenticated))
 
@@ -1180,7 +1184,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     } catch {
       let authError = AuthenticationError(
         type: .serverError,
-        message: "Failed to send password reset: \(error.localizedDescription)"
+        message: "We couldn't request a password reset. Check your connection and try again."
       )
       updateState(.loaded(.error(authError)))
       await logAuditEvent(.loginFailed, result: .failure)

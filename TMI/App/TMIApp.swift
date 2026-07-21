@@ -62,6 +62,7 @@ struct TMIApp: App {
             dependencies = .production(firestore: firebaseManager.firestore)
             authStateModel = AuthStateModel(
                 firebaseManager: firebaseManager,
+                authentication: dependencies.authentication,
                 auditService: AuditService(),
                 membershipProvider: dependencies.membership,
                 authorizationSessionStore: .shared
