@@ -201,7 +201,7 @@ git commit -m "refactor: centralize typed app navigation"
 - Create: `TMI/Features/Students/StudentDuplicatePolicy.swift`
 - Create: `TMITests/Features/Students/StudentValidationTests.swift`
 
-- [ ] **Step 1: Write failing validation tests**
+- [x] **Step 1: Write failing validation tests**
 
 Test trimmed/collapsed names, normalized institutional IDs, required district/school/grade, future birth date, allowed pronoun length, and duplicate matching within the same school.
 
@@ -213,7 +213,7 @@ Test trimmed/collapsed names, normalized institutional IDs, required district/sc
 }
 ```
 
-- [ ] **Step 2: Implement focused values**
+- [x] **Step 2: Implement focused values**
 
 ```swift
 struct StudentRecord: Identifiable, Codable, Sendable, Equatable {
@@ -241,7 +241,7 @@ struct StudentDraft: Sendable, Equatable {
 
 Keep photo, guardian references, cohort tags, and support-note references in focused relationship/metadata files rather than expanding this aggregate with embedded records.
 
-- [ ] **Step 3: Run validation tests and commit**
+- [x] **Step 3: Run validation tests and commit**
 
 ```bash
 git add TMI/Features/Students/StudentRecord.swift TMI/Features/Students/StudentDraft.swift TMI/Features/Students/StudentValidation.swift TMI/Features/Students/StudentDuplicatePolicy.swift TMITests/Features/Students/StudentValidationTests.swift

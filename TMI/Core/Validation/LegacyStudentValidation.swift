@@ -10,7 +10,7 @@ import Foundation
 nonisolated extension Student: Validatable {
     func validate() async throws {
         let logger = TMILogger(category: "StudentValidation")
-        logger.debug("Validating student", metadata: ["studentId": id ?? "new", "name": name])
+        logger.debug("Validating student record")
         
         var validator = BatchValidator()
         
@@ -76,7 +76,7 @@ nonisolated extension Student: Validatable {
         // Additional business logic validations
         try await validateBusinessRules()
         
-        logger.info("Student validation completed successfully", metadata: ["studentId": id ?? "new"])
+        logger.info("Student record validation completed successfully")
     }
     
     private func validateBusinessRules() async throws {
