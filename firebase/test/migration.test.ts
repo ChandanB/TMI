@@ -27,11 +27,11 @@ import {
 import { reconcileMigrationPlan } from "../src/reconcile.js";
 import { makeTestEnvironment } from "./testEnvironment.js";
 
-const loadFixture = (): MigrationFixture =>
+const loadFixture = (name = "gate0.json"): MigrationFixture =>
   parseMigrationFixture(
     JSON.parse(
       readFileSync(
-        resolve(process.cwd(), "fixtures/gate0.json"),
+        resolve(process.cwd(), "fixtures", name),
         "utf8",
       ),
     ) as unknown,
@@ -80,6 +80,14 @@ describe("forward-only canonical migration", () => {
         "districts/district-b/students/student-top",
         "districts/district-b/plans/plan-top",
       ]),
+    );
+  });
+
+  it("keeps the universal release fixture aligned with Gate 0", () => {
+    const releaseFixture = loadFixture("release.json");
+
+    expect(buildMigrationPlan(releaseFixture)).toEqual(
+      buildMigrationPlan(fixture),
     );
   });
 
