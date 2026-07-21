@@ -14,7 +14,7 @@ extension FirebaseManager {
   func createDocument<T: Codable & Identifiable>(
     inCollection collection: FirestoreCollection, document: T
   ) async throws {
-    try collection.reference().addDocument(from: document)
+    _ = try await collection.reference().addModel(document)
   }
 
   // MARK: Update Document
@@ -22,7 +22,7 @@ extension FirebaseManager {
     inCollection collection: FirestoreCollection, document: T
   ) async throws where T.ID == String? {
     guard let documentID = document.id else { return }
-    try collection.reference().document(documentID).setData(from: document)
+    try await collection.reference().document(documentID).setModel(document)
   }
 
   // MARK: Delete Document

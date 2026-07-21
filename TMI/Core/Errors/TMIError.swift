@@ -10,7 +10,7 @@ import Foundation
 // MARK: - Modern Error Types for iOS 26
 
 /// Comprehensive error type for TMI application with iOS 26 best practices
-struct TMIError: Error, LocalizedError, Sendable, Equatable {
+nonisolated struct TMIError: Error, LocalizedError, Sendable, Equatable {
     let code: ErrorCode
     let message: String
     let underlyingError: (any Error)?
@@ -59,8 +59,8 @@ struct TMIError: Error, LocalizedError, Sendable, Equatable {
 
 // MARK: - Error Codes
 
-extension TMIError {
-    enum ErrorCode: String, CaseIterable, Sendable {
+nonisolated extension TMIError {
+    nonisolated enum ErrorCode: String, CaseIterable, Sendable {
         // Authentication Errors
         case authenticationRequired = "auth_required"
         case authenticationFailed = "auth_failed"
@@ -266,7 +266,7 @@ extension TMIError {
 
 // MARK: - Convenience Initializers
 
-extension TMIError {
+nonisolated extension TMIError {
     static func authentication(
         _ code: ErrorCode,
         message: String? = nil,
@@ -361,7 +361,7 @@ extension TMIError {
 
 // MARK: - Error Extensions for Firebase Integration
 
-extension TMIError {
+nonisolated extension TMIError {
     /// Convert Firebase errors to TMIError
     static func from(firebaseError: Error) -> TMIError {
         // This would be implemented based on specific Firebase error codes
@@ -373,4 +373,3 @@ extension TMIError {
         )
     }
 }
-

@@ -142,18 +142,67 @@ final class SecureStorageTests: XCTestCase {
         XCTAssertEqual(testData, retrievedData)
     }
 
-    func testExportAndImportBackup() async throws {
-        throw XCTSkip("Backup restore verification depends on simulator keychain clearing semantics")
+    func testExportBackupIsExplicitlyDeviceBoundAndOmitsMasterKeyMaterial() async throws {
+        let service = "com.tmi.test.secure-backup.export.\(UUID().uuidString)"
+        let keychain = KeychainManager(service: service)
+        let storage = SecureStorage(keychain: keychain)
+        let payloadKey = "encrypted-payload"
+        defer { try? keychain.deleteAll() }
+
+        try await storage.store(testData, for: payloadKey)
+
+        let backupData = try await storage.exportBackup()
+        let backup = try JSONDecoder().decode(TestSecureBackup.self, from: backupData)
+        let archiveData = try backup.data.decompressedForTesting()
+        let archivedItems = try JSONDecoder().decode([String: Data].self, from: archiveData)
+
+        XCTAssertEqual(backup.keyScope, "currentDevice")
+        XCTAssertNotNil(archivedItems[payloadKey])
+        XCTAssertNil(archivedItems["TMI_MASTER_KEY"], "A device-bound backup must not contain its raw master key")
+    }
+
+    func testImportBackupDoesNotOverwriteDeviceMasterKey() async throws {
+        let service = "com.tmi.test.secure-backup.import.\(UUID().uuidString)"
+        let keychain = KeychainManager(service: service)
+        let storage = SecureStorage(keychain: keychain)
+        let payloadKey = "existing-payload"
+        let importedPayloadKey = "imported-encrypted-payload"
+        defer { try? keychain.deleteAll() }
+
+        try await storage.store(testData, for: payloadKey)
+        let originalMasterKey = try await keychain.retrieveKey(for: "TMI_MASTER_KEY")
+        let replacementMasterKey = Data(repeating: 0x5A, count: 32)
+        let importedPayload = Data("encrypted payload".utf8)
+        let archiveData = try JSONEncoder().encode([
+            "TMI_MASTER_KEY": replacementMasterKey,
+            importedPayloadKey: importedPayload,
+        ])
+        let compressedArchive = try archiveData.compressedForTesting()
+        let backup = TestSecureBackup(
+            data: compressedArchive,
+            checksum: SHA256.hash(data: compressedArchive).description,
+            timestamp: Date(),
+            version: "1.0",
+            keyScope: "currentDevice"
+        )
+
+        try await storage.importBackup(JSONEncoder().encode(backup))
+
+        let retainedMasterKey = try await keychain.retrieveKey(for: "TMI_MASTER_KEY")
+        let restoredPayload = try await keychain.retrieve(for: importedPayloadKey)
+        XCTAssertEqual(retainedMasterKey.withUnsafeBytes { Data($0) }, originalMasterKey.withUnsafeBytes { Data($0) })
+        XCTAssertEqual(restoredPayload, importedPayload)
     }
 
     func testConcurrentStorage() async throws {
         let concurrentKeys = Array(0..<10).map { "concurrentKey\($0)" }
+        let storage = try XCTUnwrap(secureStorage)
 
         await withTaskGroup(of: Void.self) { group in
             for (index, key) in concurrentKeys.enumerated() {
                 group.addTask {
                     let data = "Concurrent data \(index)".data(using: .utf8)!
-                    try? await self.secureStorage.store(data, for: key)
+                    try? await storage.store(data, for: key)
                 }
             }
         }
@@ -168,10 +217,12 @@ final class SecureStorageTests: XCTestCase {
 
     func testConcurrentRetrievalOfSameKey() async throws {
         try await secureStorage.store(testData, for: testKey)
+        let storage = try XCTUnwrap(secureStorage)
+        let key = testKey
 
         let tasks = (0..<5).map { _ in
             Task {
-                try await self.secureStorage.retrieve(Data.self, for: self.testKey)
+                try await storage.retrieve(Data.self, for: key)
             }
         }
 
@@ -237,6 +288,24 @@ final class SecureStorageTests: XCTestCase {
 
         XCTAssertEqual(testData, retrievedData)
         try secureStorage.delete(for: specialKey)
+    }
+}
+
+private struct TestSecureBackup: Codable {
+    let data: Data
+    let checksum: String
+    let timestamp: Date
+    let version: String
+    let keyScope: String
+}
+
+private extension Data {
+    func compressedForTesting() throws -> Data {
+        try (self as NSData).compressed(using: .lzfse) as Data
+    }
+
+    func decompressedForTesting() throws -> Data {
+        try (self as NSData).decompressed(using: .lzfse) as Data
     }
 }
 

@@ -170,7 +170,7 @@ final class FormVersionService {
             .collection("versions")
             .document(versionId)
 
-        try docRef.setData(from: version, merge: true)
+        try await docRef.setModel(version, merge: true)
 
         print("[FormVersionService] ✅ Updated version \(version.version) for template \(version.templateId)")
     }

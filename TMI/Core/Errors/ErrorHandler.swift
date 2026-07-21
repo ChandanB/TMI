@@ -223,12 +223,12 @@ final class ErrorHandler {
 }
 
 // MARK: - Error Context
-struct ErrorContext: @unchecked Sendable {
+nonisolated struct ErrorContext: Sendable {
     let operation: String
     let userId: String?
-    let metadata: [String: Any]?
+    let metadata: [String: String]?
     
-    init(operation: String, userId: String? = nil, metadata: [String: Any]? = nil) {
+    init(operation: String, userId: String? = nil, metadata: [String: String]? = nil) {
         self.operation = operation
         self.userId = userId
         self.metadata = metadata
@@ -338,4 +338,3 @@ extension TMIError {
         }
     }
 }
-

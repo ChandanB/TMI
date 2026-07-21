@@ -1,12 +1,12 @@
 import Foundation
 
-struct StudentAuthorizationScope: Codable, Sendable, Equatable {
+nonisolated struct StudentAuthorizationScope: Codable, Sendable, Equatable {
     let studentID: String
     let districtID: String
     let schoolID: String
 }
 
-extension StudentAuthorizationScope {
+nonisolated extension StudentAuthorizationScope {
     init?(student: Student) {
         guard let studentID = student.id,
               let districtID = student.districtId,
@@ -22,29 +22,29 @@ extension StudentAuthorizationScope {
     }
 }
 
-struct SchoolAuthorizationScope: Codable, Sendable, Equatable {
+nonisolated struct SchoolAuthorizationScope: Codable, Sendable, Equatable {
     let districtID: String
     let schoolID: String
 }
 
-struct PlanAuthorizationScope: Codable, Sendable, Equatable {
+nonisolated struct PlanAuthorizationScope: Codable, Sendable, Equatable {
     let planID: String
     let districtID: String
     let students: [StudentAuthorizationScope]
 }
 
-struct FormAssignmentAuthorizationScope: Codable, Sendable, Equatable {
+nonisolated struct FormAssignmentAuthorizationScope: Codable, Sendable, Equatable {
     let districtID: String
     let schoolID: String?
     let students: [StudentAuthorizationScope]
 }
 
-struct TemplateAuthorizationScope: Codable, Sendable, Equatable {
+nonisolated struct TemplateAuthorizationScope: Codable, Sendable, Equatable {
     let districtID: String
     let schoolID: String?
 }
 
-enum AuthorizationPolicy {
+nonisolated enum AuthorizationPolicy {
     static func canCreateStudent(
         _ member: MembershipContext,
         school: SchoolAuthorizationScope

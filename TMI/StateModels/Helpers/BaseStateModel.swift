@@ -12,6 +12,7 @@ import Observation
 import Combine
 
 /// A protocol that defines common functionality for state models
+@MainActor
 protocol StateModelProtocol {
     associatedtype ModelType
     associatedtype ErrorType: Error
@@ -34,7 +35,8 @@ protocol IdentifiableStateModelError: Error, Identifiable {
 }
 
 /// Class to manage Firebase listeners with proper lifecycle handling
-class ListenerManager {
+@MainActor
+final class ListenerManager {
     private var listeners: [String: ListenerRegistration] = [:]
     private var isPaused: Bool = false
     private var pauseTime: Date?
@@ -83,7 +85,7 @@ class ListenerManager {
         return isPaused
     }
     
-    deinit {
+    isolated deinit {
         removeAllListeners()
     }
 }
@@ -125,6 +127,7 @@ struct UIState {
 
 /// A base class implementing common state model functionality
 @Observable
+@MainActor
 class BaseStateModel<T, E: Error>: StateModelProtocol {
     typealias ModelType = T
     typealias ErrorType = E
@@ -175,7 +178,7 @@ class BaseStateModel<T, E: Error>: StateModelProtocol {
     
     // MARK: - Lifecycle Methods
     
-    deinit {
+    isolated deinit {
         cancelAllTasks()
         listenerManager.removeAllListeners()
     }
@@ -456,4 +459,3 @@ extension View {
         }
     }
 }
-

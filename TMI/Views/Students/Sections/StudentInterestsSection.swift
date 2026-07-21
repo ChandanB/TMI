@@ -190,7 +190,7 @@ struct StudentInterestsSection: View {
                 .getDocuments()
 
             let fetched: [Interest] = snapshot.documents.compactMap { doc in
-                try? doc.data(as: Interest.self)
+                try? doc.decodedModel(as: Interest.self, assigningDocumentIDTo: \.id)
             }
             availableInterests = fetched
         } catch {
@@ -207,7 +207,7 @@ struct StudentInterestsSection: View {
         isCreating = true
         defer { isCreating = false }
 
-        let newInterest = Interest(
+        var newInterest = Interest(
             name: trimmed,
             category: [.other]
         )
@@ -220,7 +220,7 @@ struct StudentInterestsSection: View {
                 .collection("interests")
                 .document()
 
-            try ref.setData(from: newInterest)
+            try await ref.setModel(newInterest)
 
             // Assign the Firestore-generated ID back so chips are stable
             newInterest.id = ref.documentID

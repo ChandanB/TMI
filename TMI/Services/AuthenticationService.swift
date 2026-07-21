@@ -230,9 +230,9 @@ final class AuthenticationService {
 
     private func saveUserToFirestore(_ user: TMIUser) async throws {
         do {
-            try db.collection("users")
+            try await db.collection("users")
                 .document(user.userID)
-                .setData(from: user)
+                .setModel(user)
         } catch {
             throw AuthError.userCreationFailed(error.localizedDescription)
         }

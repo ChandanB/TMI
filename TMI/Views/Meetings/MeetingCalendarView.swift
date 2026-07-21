@@ -204,7 +204,7 @@ struct MeetingCalendarView: View {
 
     private func daysInMonth() -> [Date?] {
         guard let monthInterval = calendar.dateInterval(of: .month, for: currentMonth),
-              let monthFirstWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start) else {
+              calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start) != nil else {
             return []
         }
 

@@ -31,7 +31,7 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
 
     // MARK: - Initialization
 
-    init(firebaseManager: FirebaseManager = FIREBASE_MANAGER) {
+    init(firebaseManager: FirebaseManager = FirebaseManager.shared) {
         self.firebaseManager = firebaseManager
         super.init()
 

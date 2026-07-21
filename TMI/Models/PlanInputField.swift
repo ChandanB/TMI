@@ -5,11 +5,10 @@
 //  Plan-scoped inputs captured from plan rules.
 //
 
-import FirebaseFirestore
 import Foundation
 
 struct PlanInputField: Codable, Identifiable, Hashable, Sendable {
-    @DocumentID var id: String?
+    var id: String? = nil
     var planId: String
     var key: String
     var label: String
@@ -17,6 +16,16 @@ struct PlanInputField: Codable, Identifiable, Hashable, Sendable {
     var createdAt: Date
     var updatedAt: Date
     var updatedBy: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case planId
+        case key
+        case label
+        case value
+        case createdAt
+        case updatedAt
+        case updatedBy
+    }
 
     init(
         id: String? = nil,

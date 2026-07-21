@@ -3,7 +3,7 @@ import CryptoKit
 import LocalAuthentication
 
 /// Central security configuration and utilities for the TMI application
-struct SecurityConfig {
+nonisolated struct SecurityConfig {
     
     // MARK: - Security Constants
     
@@ -64,6 +64,7 @@ struct SecurityConfig {
     }
     
     /// Get appropriate access control for data type
+    @MainActor
     static func accessControl(for dataType: DataClassification) throws -> SecAccessControl {
         let keychain = KeychainManager()
         
@@ -79,7 +80,7 @@ struct SecurityConfig {
 
 // MARK: - Data Classification
 
-enum DataClassification: String, CaseIterable, Codable, Identifiable, Sendable {
+nonisolated enum DataClassification: String, CaseIterable, Codable, Identifiable, Sendable {
   case publicData = "public"
   case internalData = "internal"
   case personal = "personal"
@@ -202,7 +203,7 @@ actor SecurityAuditLogger {
 }
 
 // MARK: - Security Event Types
-enum SecurityEvent: String, Sendable, Codable {
+nonisolated enum SecurityEvent: String, Sendable, Codable {
     // Authentication events
     case login = "auth.login"
     case logout = "auth.logout"
@@ -249,7 +250,7 @@ enum SecurityEvent: String, Sendable, Codable {
 }
 
 // MARK: - Security Audit Entry
-struct SecurityAuditEntry: Sendable, Codable {
+nonisolated struct SecurityAuditEntry: Sendable, Codable {
     let id: UUID
     let timestamp: Date
     let event: SecurityEvent

@@ -13,7 +13,8 @@ import FirebaseAuth
 import FirebaseFirestore
 
 /// Service responsible for warming up the app after authentication
-actor AppBootstrapService {
+@MainActor
+final class AppBootstrapService {
     static let shared = AppBootstrapService()
     
     private init() {}
@@ -224,4 +225,3 @@ actor AppBootstrapService {
         cachedResources
     }
 }
-

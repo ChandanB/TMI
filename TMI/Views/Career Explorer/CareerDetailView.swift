@@ -1486,7 +1486,7 @@ struct CareerDetailView: View {
 
     do {
       // Load related careers
-      relatedCareers = try await careerService.getRelatedCareers(to: career, limit: 3)
+      relatedCareers = careerService.getRelatedCareers(to: career, limit: 3)
 
       // Load career-specific resources
       careerResources = await careerService.getCareerResources(for: career)
@@ -1562,7 +1562,7 @@ struct CareerDetailView: View {
 
     do {
       // If career state exists, update last viewed timestamp
-      if let existingState = careerState {
+      if careerState != nil {
         try await studentCareerService.markAsViewed(studentId: studentId, careerId: careerId)
         print("[CareerDetailView] Updated career view timestamp for \(student.name)")
       } else {

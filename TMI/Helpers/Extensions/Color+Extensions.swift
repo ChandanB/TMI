@@ -10,7 +10,7 @@ import SwiftUI
 // MARK: - Color Definitions
 // Compatibility aliases for existing views. New UI should use TMIColors directly.
 
-extension Color {
+nonisolated extension Color {
     // MARK: - Brand Colors
     static let tmiPrimary = TMIColors.aubergine
     static let tmiPrimaryDeep = TMIColors.aubergine

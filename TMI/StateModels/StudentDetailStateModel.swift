@@ -13,6 +13,12 @@ import FirebaseFirestore
 @MainActor
 @Observable
 class StudentDetailStateModel {
+    typealias StudentListenerStarter = (
+        _ studentID: String,
+        _ onChange: @escaping (Result<Student, Error>) -> Void
+    ) -> ListenerRegistration?
+    typealias PlanLoader = (_ studentID: String) async throws -> [TMIPlan]
+
     struct Summary: Equatable, Sendable {
         enum FollowUpStatus: Equatable, Sendable {
             case surveyPending
@@ -126,15 +132,25 @@ class StudentDetailStateModel {
     }
 
     private let studentId: String
-    private let studentService = StudentService.shared
-    private let planService = TMIPlanService.shared
-    nonisolated(unsafe) private var studentListener: ListenerRegistration?
+    private let startStudentListener: StudentListenerStarter
+    private let loadPlans: PlanLoader
+    private var studentListener: ListenerRegistration?
 
-    init(studentId: String) {
+    init(
+        studentId: String,
+        startStudentListener: @escaping StudentListenerStarter = { studentID, onChange in
+            StudentService.shared.listenToStudent(id: studentID, onChange: onChange)
+        },
+        loadPlans: @escaping PlanLoader = { studentID in
+            try await TMIPlanService.shared.getPlansForStudent(studentID)
+        }
+    ) {
         self.studentId = studentId
+        self.startStudentListener = startStudentListener
+        self.loadPlans = loadPlans
     }
 
-    deinit {
+    isolated deinit {
         stopListening()
     }
 
@@ -142,7 +158,7 @@ class StudentDetailStateModel {
         print("[StudentDetailStateModel] Starting listener for student: \(studentId)")
         state = .loading
 
-        studentListener = studentService.listenToStudent(id: studentId) { [weak self] result in
+        studentListener = startStudentListener(studentId) { [weak self] result in
             Task { @MainActor in
                 guard let self else { return }
 
@@ -165,7 +181,7 @@ class StudentDetailStateModel {
         }
     }
 
-    nonisolated func stopListening() {
+    func stopListening() {
         print("[StudentDetailStateModel] Stopping listener for student: \(studentId)")
         studentListener?.remove()
         studentListener = nil
@@ -173,7 +189,7 @@ class StudentDetailStateModel {
 
     func refreshTMIPlans() async {
         do {
-            tmiPlans = try await planService.getPlansForStudent(studentId)
+            tmiPlans = try await loadPlans(studentId)
             print("[StudentDetailStateModel] Fetched \(tmiPlans.count) TMI plans")
         } catch {
             print("[StudentDetailStateModel] Failed to fetch TMI plans: \(error)")

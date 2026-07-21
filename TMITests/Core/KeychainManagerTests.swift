@@ -7,6 +7,7 @@
 
 import XCTest
 import CryptoKit
+import Security
 @testable import TMI
 
 final class KeychainManagerTests: XCTestCase {
@@ -72,16 +73,14 @@ final class KeychainManagerTests: XCTestCase {
         }
     }
     
-    func testStoreSynchronizableItem() async throws {
-        do {
-            try await keychainManager.store(testData, for: testKey, synchronizable: true)
-            let retrievedData = try await keychainManager.retrieve(for: testKey)
-            XCTAssertEqual(testData, retrievedData, "Synchronizable data should be retrieved correctly")
-        } catch KeychainError.itemNotFound {
-            throw XCTSkip("Synchronizable keychain items are not reliably available in the simulator environment")
-        } catch KeychainError.storeFailed(let status) where status == -25299 {
-            throw XCTSkip("Synchronizable keychain items are not reliably available in the simulator environment")
-        }
+    func testStoreSynchronizableItemCanBeOverwrittenAndRetrieved() async throws {
+        let replacementData = "Replacement synchronizable data".data(using: .utf8)!
+
+        try await keychainManager.store(testData, for: testKey, synchronizable: true)
+        try await keychainManager.store(replacementData, for: testKey, synchronizable: true)
+
+        let retrievedData = try await keychainManager.retrieve(for: testKey)
+        XCTAssertEqual(replacementData, retrievedData, "Synchronizable data should be overwritten without a duplicate-item error")
     }
     
     // MARK: - Error Handling Tests
@@ -194,6 +193,63 @@ final class KeychainManagerTests: XCTestCase {
             XCTFail("Should throw keyNotFound error, got \(error)")
         }
     }
+
+    func testSecureStorageRetrievalMigratesLegacyKeyClassWithoutChangingBytes() async throws {
+        try await assertSecureStorageUpgrade(applicationTagUsesData: false)
+        try await assertSecureStorageUpgrade(applicationTagUsesData: true)
+    }
+
+    private func assertSecureStorageUpgrade(applicationTagUsesData: Bool) async throws {
+        let identifier = "legacy-symmetric-key-\(UUID().uuidString)"
+        let payloadKey = "legacy-encrypted-payload"
+        let keyData = Data((0..<32).map(UInt8.init))
+        let applicationTag: Any = applicationTagUsesData ? Data(identifier.utf8) : identifier
+        var legacyQuery: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: applicationTag,
+        ]
+        var legacyAddQuery = legacyQuery
+        legacyAddQuery[kSecValueData as String] = keyData
+        legacyAddQuery[kSecAttrKeySizeInBits as String] = keyData.count * 8
+        legacyAddQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+#if os(macOS)
+        legacyAddQuery[kSecUseDataProtectionKeychain as String] = true
+        legacyAddQuery[kSecAttrKeyType as String] = kSecAttrKeyTypeAES
+        legacyAddQuery[kSecAttrKeyClass as String] = kSecAttrKeyClassSymmetric
+        legacyQuery[kSecUseDataProtectionKeychain as String] = true
+        legacyQuery[kSecAttrKeyType as String] = kSecAttrKeyTypeAES
+        legacyQuery[kSecAttrKeyClass as String] = kSecAttrKeyClassSymmetric
+#endif
+
+        SecItemDelete(legacyQuery as CFDictionary)
+        defer { SecItemDelete(legacyQuery as CFDictionary) }
+        XCTAssertEqual(SecItemAdd(legacyAddQuery as CFDictionary, nil), errSecSuccess)
+
+        var seededRetrievalQuery = legacyQuery
+        seededRetrievalQuery[kSecReturnData as String] = true
+        seededRetrievalQuery[kSecMatchLimit as String] = kSecMatchLimitOne
+        var seededResult: AnyObject?
+        XCTAssertEqual(SecItemCopyMatching(seededRetrievalQuery as CFDictionary, &seededResult), errSecSuccess)
+        let legacyStoredData = try XCTUnwrap(seededResult as? Data)
+        let payload = Data("data encrypted before the key representation upgrade".utf8)
+        let encodedPayload = try JSONEncoder().encode(payload)
+        let sealedPayload = try AES.GCM.seal(
+            encodedPayload,
+            using: SymmetricKey(data: legacyStoredData)
+        )
+        let combinedPayload = try XCTUnwrap(sealedPayload.combined)
+        try await keychainManager.store(combinedPayload, for: payloadKey)
+
+        let storage = SecureStorage(keychain: keychainManager, encryptionKeyTag: identifier)
+        let restoredPayload = try await storage.retrieve(Data.self, for: payloadKey)
+        let retrievedData = try await keychainManager.retrieveKey(for: identifier)
+        let migratedStoredData = try await keychainManager.retrieve(for: identifier)
+
+        XCTAssertEqual(restoredPayload, payload)
+        XCTAssertEqual(retrievedData.withUnsafeBytes { Data($0) }, legacyStoredData)
+        XCTAssertEqual(SecItemCopyMatching(legacyQuery as CFDictionary, nil), errSecItemNotFound)
+        XCTAssertEqual(migratedStoredData, legacyStoredData)
+    }
     
     // MARK: - Bulk Operations Tests
     
@@ -259,6 +315,35 @@ final class KeychainManagerTests: XCTestCase {
         
         // Clean up
         try await keychainManager.clearAll()
+    }
+
+    func testExportAndImportAllExcludeRawKeyMaterial() async throws {
+        let excludedKey = "TMI_MASTER_KEY"
+        let rawKeyMaterial = Data(repeating: 0xA5, count: 32)
+        let payloadKey = "device-bound-payload"
+        let payload = Data("encrypted payload".utf8)
+
+        try keychainManager.storeKey(rawKeyMaterial, for: excludedKey)
+        try await keychainManager.store(payload, for: payloadKey)
+
+        let exportedData = try await keychainManager.exportAll(excluding: [excludedKey])
+        let exportedItems = try JSONDecoder().decode([String: Data].self, from: exportedData)
+
+        XCTAssertNil(exportedItems[excludedKey], "Raw key material must never be present in an exported archive")
+        XCTAssertEqual(exportedItems[payloadKey], payload)
+
+        try await keychainManager.clearAll()
+
+        let archiveWithRawKeyMaterial = try JSONEncoder().encode([
+            excludedKey: rawKeyMaterial,
+            payloadKey: payload,
+        ])
+        try await keychainManager.importAll(archiveWithRawKeyMaterial, excluding: [excludedKey])
+
+        let excludedKeyExists = await keychainManager.exists(for: excludedKey)
+        let importedPayload = try await keychainManager.retrieve(for: payloadKey)
+        XCTAssertFalse(excludedKeyExists, "Excluded raw key material must not be imported")
+        XCTAssertEqual(importedPayload, payload)
     }
     
     // MARK: - Access Control Tests
@@ -347,13 +432,14 @@ final class KeychainManagerTests: XCTestCase {
     
     func testConcurrentStorage() async throws {
         let concurrentKeys = Array(0..<10).map { "concurrent\($0)" }
+        let manager = try XCTUnwrap(keychainManager)
         
         // Store data concurrently
         await withTaskGroup(of: Void.self) { group in
             for (index, key) in concurrentKeys.enumerated() {
                 group.addTask {
                     let data = "Concurrent data \(index)".data(using: .utf8)!
-                    try? await self.keychainManager.store(data, for: key)
+                    try? await manager.store(data, for: key)
                 }
             }
         }

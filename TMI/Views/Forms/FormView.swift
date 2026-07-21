@@ -71,7 +71,7 @@ final class DynamicFormStateModel: BaseStateModel<FormTemplate, IdentifiableErro
     updateState(.loading)
 
     do {
-      let template: FormTemplate = try await FIREBASE_MANAGER
+      let template: FormTemplate = try await FirebaseManager.shared
         .fetchDocument(inCollection: .formTemplates, withId: id)
       updateState(.loaded(template))
 
@@ -97,7 +97,7 @@ final class DynamicFormStateModel: BaseStateModel<FormTemplate, IdentifiableErro
 
     isSubmitting = true
     do {
-      try await FIREBASE_MANAGER.handleFormSubmission(
+      try await FirebaseManager.shared.handleFormSubmission(
         formId: formId,
         submissionData: formData
       )
@@ -239,7 +239,7 @@ struct DynamicFormFieldView: View {
   }
 
   // Helper to pull any type safely out of stateModel.formData
-  private func binding<V: Codable>(_: V.Type, for key: String) -> Binding<V> {
+  private func binding<V: Codable & Sendable>(_: V.Type, for key: String) -> Binding<V> {
     Binding<V>(
       get: {
         (stateModel.formData[key]?.value as? V)

@@ -22,7 +22,7 @@ class MyFormsViewModel {
     
     func fetchFormTemplates() {
         Task {
-//            listener = FIREBASE_MANAGER.fetchCollectionData(
+//            listener = FirebaseManager.shared.fetchCollectionData(
 //                collectionReference: FirestoreCollection.formTemplates.reference(),
 //                orderBy: FirestoreConstants.timestamp,
 //                descending: true
@@ -42,7 +42,7 @@ class MyFormsViewModel {
     func createFormTemplate(_ template: FormTemplate) {
         Task {
             do {
-                try await FIREBASE_MANAGER.createDocument(inCollection: .formTemplates, document: template)
+                try await FirebaseManager.shared.createDocument(inCollection: .formTemplates, document: template)
             } catch {
                 print(error.localizedDescription)
             }
@@ -52,7 +52,7 @@ class MyFormsViewModel {
     func updateFormTemplate(_ template: FormTemplate) {
         Task {
             do {
-                try await FIREBASE_MANAGER.updateDocument(inCollection: .formTemplates, document: template)
+                try await FirebaseManager.shared.updateDocument(inCollection: .formTemplates, document: template)
             } catch {
                 print(error.localizedDescription)
             }
@@ -63,7 +63,7 @@ class MyFormsViewModel {
         guard let documentID = template.id else { return }
         Task {
             do {
-                try await FIREBASE_MANAGER.deleteDocument(inCollection: .formTemplates, withId: documentID)
+                try await FirebaseManager.shared.deleteDocument(inCollection: .formTemplates, withId: documentID)
             } catch {
                 print(error.localizedDescription)
             }

@@ -169,7 +169,7 @@ struct StudentResourcesSection: View {
                 .getDocuments()
 
             let fetched = snapshot.documents.compactMap { doc -> Resource? in
-                try? doc.data(as: Resource.self)
+                try? doc.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
             }
 
             // Fall back to sample data when the user collection is empty

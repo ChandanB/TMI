@@ -46,6 +46,7 @@ enum TaskResult<T> {
 
 /// A class to manage async task execution with state transitions
 @Observable
+@MainActor
 final class AsyncTaskHandler<State, Result> {
     typealias TaskFunction = () async throws -> Result
     typealias StateTransformer = (State, TaskResult<Result>) -> State
@@ -143,7 +144,7 @@ final class AsyncTaskHandler<State, Result> {
         isRunning = false
     }
     
-    deinit {
+    isolated deinit {
         cancel()
     }
 }

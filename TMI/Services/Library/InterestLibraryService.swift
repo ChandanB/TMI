@@ -54,12 +54,11 @@ final class InterestLibraryService {
     /// Fetch all interests from the global library
     func fetchAllInterests() async throws -> [Interest] {
         do {
-            let querySnapshot = try await withTimeout(seconds: 10) {
-                try await self.globalCollection.getDocuments()
-            }
-
-            let interests = querySnapshot.documents.compactMap { document -> Interest? in
-                Interest.fromFirestore(id: document.documentID, data: document.data())
+            let interests = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let querySnapshot = try await self.globalCollection.getDocuments()
+                return querySnapshot.documents.compactMap { document -> Interest? in
+                    Interest.fromFirestore(id: document.documentID, data: document.data())
+                }
             }
 
             print("[InterestLibraryService] Fetched \(interests.count) interests from global library")
@@ -73,15 +72,15 @@ final class InterestLibraryService {
     /// Fetch a single interest by ID
     func fetchInterest(id: String) async throws -> Interest? {
         do {
-            let document = try await withTimeout(seconds: 10) {
-                try await self.globalCollection.document(id).getDocument()
-            }
+            return try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let document = try await self.globalCollection.document(id).getDocument()
 
-            guard document.exists, let data = document.data() else {
-                return nil
-            }
+                guard document.exists, let data = document.data() else {
+                    return nil
+                }
 
-            return Interest.fromFirestore(id: document.documentID, data: data)
+                return Interest.fromFirestore(id: document.documentID, data: data)
+            }
         } catch {
             print("[InterestLibraryService] Error fetching interest \(id): \(error.localizedDescription)")
             throw InterestLibraryError.fetchFailed(error.localizedDescription)
@@ -120,7 +119,7 @@ final class InterestLibraryService {
     /// Add or update an interest in the global library
     func saveInterest(_ interest: Interest) async throws -> Interest {
         do {
-            let updatedInterest = interest
+            var updatedInterest = interest
             let data = updatedInterest.toFirestoreData()
 
             if let id = interest.id {
@@ -200,23 +199,4 @@ final class InterestLibraryService {
         }
     }
 
-    // MARK: - Helper Methods
-
-    /// Timeout wrapper for async operations
-    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
-            }
-
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw InterestLibraryError.fetchFailed("Operation timed out after \(seconds) seconds")
-            }
-
-            let result = try await group.next()!
-            group.cancelAll()
-            return result
-        }
-    }
 }

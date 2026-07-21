@@ -354,6 +354,7 @@ final class WCAGComplianceTests: XCTestCase {
     
     // MARK: - View Extension Tests
     
+    @MainActor
     func testWCAGComplianceViewModifier() {
         let testView = Rectangle()
             .wcagCompliant()
@@ -361,6 +362,7 @@ final class WCAGComplianceTests: XCTestCase {
         XCTAssertNotNil(testView, "WCAG compliance modifier should apply successfully")
     }
     
+    @MainActor
     func testMinimumTouchTargetModifier() {
         let testView = Rectangle()
             .minimumTouchTarget()
@@ -368,6 +370,7 @@ final class WCAGComplianceTests: XCTestCase {
         XCTAssertNotNil(testView, "Minimum touch target modifier should apply successfully")
     }
     
+    @MainActor
     func testAdaptiveContrastModifier() {
         let testView = Rectangle()
             .adaptiveContrast(foreground: .black, background: .white)

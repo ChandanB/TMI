@@ -16,7 +16,7 @@ enum UIKeyboardType: Sendable {
     case URL
 }
 
-struct UIRectCorner: OptionSet, Sendable {
+nonisolated struct UIRectCorner: OptionSet, Sendable {
     let rawValue: Int
 
     static let topLeft = UIRectCorner(rawValue: 1 << 0)
@@ -197,6 +197,6 @@ extension UIColor {
 }
 
 extension UIImage {
-    var scale: CGFloat { 1 }
+    nonisolated var scale: CGFloat { 1 }
 }
 #endif

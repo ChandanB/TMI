@@ -47,43 +47,7 @@ final class ResourceAssignmentService {
         )
         
         let collection = db.collection("users").document(uid).collection("resourceAssignments")
-        var data: [String: Any] = [
-            "studentId": assignment.studentId,
-            "resourceId": assignment.resourceId,
-            "assignedBy": assignment.assignedBy,
-            "assignedAt": Timestamp(date: assignment.assignedAt),
-            "resourceTitle": assignment.resourceTitle,
-            "resourceCategory": assignment.resourceCategory,
-            "resourceURL": assignment.resourceURL,
-            "status": assignment.status.rawValue
-        ]
-        
-        if let reason = assignment.reason {
-            data["reason"] = reason
-        }
-        if let relatedCareer = assignment.relatedCareer {
-            data["relatedCareer"] = relatedCareer
-        }
-        if let relatedInterest = assignment.relatedInterest {
-            data["relatedInterest"] = relatedInterest
-        }
-        if let viewedAt = assignment.viewedAt {
-            data["viewedAt"] = Timestamp(date: viewedAt)
-        }
-        if let completedAt = assignment.completedAt {
-            data["completedAt"] = Timestamp(date: completedAt)
-        }
-        if let notes = assignment.notes {
-            data["notes"] = notes
-        }
-        if let planId = assignment.planId {
-            data["planId"] = planId
-        }
-        if let metrics = assignment.engagementMetrics {
-            data["engagementMetrics"] = encodeEngagementMetrics(metrics)
-        }
-        
-        try await collection.addDocument(data: data)
+        _ = try await collection.addModel(assignment)
         
         print("[ResourceAssignmentService] Assigned resource \(resourceId) to student \(studentId)")
     }
@@ -296,21 +260,6 @@ final class ResourceAssignmentService {
             notes: data["notes"] as? String,
             engagementMetrics: engagementMetrics
         )
-    }
-
-    private func encodeEngagementMetrics(_ metrics: ResourceAssignment.EngagementMetrics) -> [String: Any] {
-        var data: [String: Any] = [
-            "viewCount": metrics.viewCount,
-            "totalTimeSpent": metrics.totalTimeSpent,
-            "completionPercentage": metrics.completionPercentage,
-            "interactionEvents": metrics.interactionEvents.map { encodeInteractionEvent($0) }
-        ]
-
-        if let lastViewedAt = metrics.lastViewedAt {
-            data["lastViewedAt"] = Timestamp(date: lastViewedAt)
-        }
-
-        return data
     }
 
     private func encodeInteractionEvent(_ event: ResourceAssignment.EngagementMetrics.InteractionEvent) -> [String: Any] {

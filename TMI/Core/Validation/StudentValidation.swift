@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension Student: Validatable {
+nonisolated extension Student: Validatable {
     func validate() async throws {
         let logger = TMILogger(category: "StudentValidation")
         logger.debug("Validating student", metadata: ["studentId": id ?? "new", "name": name])
@@ -149,7 +149,7 @@ extension Student: Validatable {
 }
 
 // MARK: - Convenience Validation Methods
-extension Student {
+nonisolated extension Student {
     /// Quick validation check for form inputs
     static func validateField(_ field: StudentField, value: Any) -> ValidationResult {
         switch field {
@@ -215,7 +215,7 @@ extension Student {
 }
 
 // MARK: - Student Field Enum
-enum StudentField: String, CaseIterable, Sendable {
+nonisolated enum StudentField: String, CaseIterable, Sendable {
     case name = "name"
     case grade = "grade"
     case school = "school"
@@ -243,4 +243,3 @@ enum StudentField: String, CaseIterable, Sendable {
         }
     }
 }
-

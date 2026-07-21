@@ -46,10 +46,11 @@ final class AuditLogService {
             metadata: metadata
         )
 
-        try await db.collection("districts")
+        let document = db.collection("districts")
             .document(session.membership.districtID)
             .collection("auditLogs")
-            .addDocument(data: auditLog.toFirestoreData())
+            .document()
+        try await document.setModel(auditLog)
 
         print("[AuditLogService] ✅ Logged: \(action.displayName) for \(entityType.displayName)")
     }
@@ -124,9 +125,7 @@ final class AuditLogService {
 
         let snapshot = try await query.getDocuments()
 
-        let logs = snapshot.documents.compactMap { doc -> AuditLog? in
-            try? doc.data(as: AuditLog.self)
-        }
+        let logs = snapshot.documents.compactMap(decodeAuditLog)
 
         print("[AuditLogService] 📖 Fetched \(logs.count) audit logs")
         return logs
@@ -143,9 +142,7 @@ final class AuditLogService {
             .order(by: "timestamp", descending: true)
             .getDocuments()
 
-        let logs = snapshot.documents.compactMap { doc -> AuditLog? in
-            try? doc.data(as: AuditLog.self)
-        }
+        let logs = snapshot.documents.compactMap(decodeAuditLog)
 
         print("[AuditLogService] 📖 Fetched \(logs.count) logs for entity: \(entityId)")
         return logs
@@ -271,6 +268,14 @@ final class AuditLogService {
         }
 
         return csv
+    }
+
+    private func decodeAuditLog(_ document: QueryDocumentSnapshot) -> AuditLog? {
+        guard var auditLog = try? document.data(as: AuditLog.self) else {
+            return nil
+        }
+        auditLog.id = document.documentID
+        return auditLog
     }
 
     private func authorizedSession() throws -> AuthenticatedSession {

@@ -175,7 +175,7 @@ final class DistrictAnalyticsService {
         let plans = try await planService.fetchPlansInDistrict(districtId)
         let schools = try await DistrictService.shared.fetchSchools(for: districtId)
         let schoolNameMap: [String: String] = Dictionary(uniqueKeysWithValues: schools.compactMap { school in
-            let key = school.id ?? school.schoolCode ?? "unknown"
+            let key = school.id ?? school.schoolCode
             return (key, school.name)
         })
 
@@ -405,7 +405,7 @@ final class DistrictAnalyticsService {
                         studentId: studentId,
                         studentName: student.name,
                         schoolId: student.schoolId ?? "",
-                        schoolName: student.school ?? "",
+                        schoolName: student.school,
                         alertType: .noRecentInteraction,
                         alertMessage: "No interaction in \(daysSince) days",
                         severity: daysSince >= 60 ? .high : .medium,
@@ -420,7 +420,7 @@ final class DistrictAnalyticsService {
                     studentId: studentId,
                     studentName: student.name,
                     schoolId: student.schoolId ?? "",
-                    schoolName: student.school ?? "",
+                    schoolName: student.school,
                     alertType: .lowEngagement,
                     alertMessage: "Engagement score below 40%",
                     severity: student.engagementScore < 0.25 ? .high : .medium,
@@ -437,7 +437,7 @@ final class DistrictAnalyticsService {
                     studentId: studentId,
                     studentName: student.name,
                     schoolId: student.schoolId ?? "",
-                    schoolName: student.school ?? "",
+                    schoolName: student.school,
                     alertType: .overduePlan,
                     alertMessage: "Plan overdue for review",
                     severity: .medium,

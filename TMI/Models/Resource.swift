@@ -7,10 +7,9 @@
 
 import Foundation
 import SwiftUI
-import FirebaseFirestore
 
-struct Resource: Identifiable, Codable, @unchecked Sendable, Hashable {
-    @DocumentID var id: String?
+nonisolated struct Resource: Identifiable, Codable, Sendable, Hashable {
+    var id: String? = nil
     let title: String
     let description: String
     let category: ResourceCategory
@@ -26,6 +25,22 @@ struct Resource: Identifiable, Codable, @unchecked Sendable, Hashable {
     let scope: ResourceScope?
     let districtId: String?
     let ownerUid: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case title
+        case description
+        case category
+        case url
+        case createdAt
+        case updatedAt
+        case tags
+        case recommendedFor
+        case isFeatured
+        case thumbnail
+        case scope
+        case districtId
+        case ownerUid
+    }
 
     enum ResourceCategory: String, CaseIterable, Codable, Sendable {
         case article, video, course, book, tool, interactiveContent

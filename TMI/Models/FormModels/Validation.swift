@@ -11,12 +11,12 @@ import CoreTransferable
 import FirebaseFirestore
 import UniformTypeIdentifiers
 
-enum ValidationKeyboardType: String, Codable, Sendable {
+nonisolated enum ValidationKeyboardType: String, Codable, Sendable {
     case `default`
     case numberPad
 }
 
-enum ValidationType: String, Codable, CaseIterable, Sendable {
+nonisolated enum ValidationType: String, Codable, CaseIterable, Sendable {
     case minLength = "Minimum Length"
     case maxLength = "Maximum Length"
     case minValue = "Minimum Numeric Value"
@@ -132,7 +132,7 @@ enum ValidationType: String, Codable, CaseIterable, Sendable {
     }
 }
 
-enum FieldType: String, Codable, CaseIterable, Sendable {
+nonisolated enum FieldType: String, Codable, CaseIterable, Sendable {
     case text
     case longText
     case number
@@ -209,12 +209,12 @@ enum FieldType: String, Codable, CaseIterable, Sendable {
     }
 }
 
-extension UTType {
+nonisolated extension UTType {
     static var formSection: UTType { UTType(exportedAs: "com.example.formSection") }
     static var sectionField: UTType { UTType(exportedAs: "com.example.sectionField") }
 }
 
-extension FieldType {
+nonisolated extension FieldType {
     var iconName: String {
         switch self {
         case .text:
@@ -254,4 +254,3 @@ extension FieldType {
         }
     }
 }
-

@@ -424,7 +424,8 @@ extension AccessibilityManagerTests {
 // MARK: - ContentSizeCategory Extension Tests
 
 extension AccessibilityManagerTests {
-    
+
+    #if canImport(UIKit)
     func testContentSizeCategoryInitialization() {
         let uiCategories: [UIContentSizeCategory] = [
             .extraSmall,
@@ -449,6 +450,7 @@ extension AccessibilityManagerTests {
             XCTAssertNotNil(contentSizeCategory, "ContentSizeCategory should initialize from UIContentSizeCategory")
         }
     }
+    #endif
     
     func testUnknownContentSizeCategoryFallback() {
         // This tests the default case in the ContentSizeCategory initializer

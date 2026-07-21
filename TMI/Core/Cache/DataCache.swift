@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Cache Entry
 
-private struct CacheEntry<T: Sendable>: Sendable {
+nonisolated private struct CacheEntry<T: Sendable>: Sendable {
     let value: T
     let timestamp: Date
     let accessCount: Int
@@ -39,7 +39,7 @@ private struct CacheEntry<T: Sendable>: Sendable {
 
 // MARK: - Cache Configuration
 
-struct CacheConfiguration: Sendable {
+nonisolated struct CacheConfiguration: Sendable {
     let maxMemorySize: Int // in MB
     let defaultExpiration: TimeInterval
     let cleanupInterval: TimeInterval
@@ -322,7 +322,7 @@ actor DataCache: Sendable {
 
 // MARK: - Cache Statistics
 
-struct CacheStatistics: Sendable {
+nonisolated struct CacheStatistics: Sendable {
     let entryCount: Int
     let totalSizeMB: Double
     let expiredEntries: Int

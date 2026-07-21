@@ -25,11 +25,10 @@ final class MeetingService {
 
         print("[MeetingService] 📅 Scheduling meeting: \(meeting.title)")
 
-        let meetingData = meeting.toFirestoreData()
-
-        let docRef = try await db.collection("users").document(userId)
+        let docRef = db.collection("users").document(userId)
             .collection("meetings")
-            .addDocument(data: meetingData)
+            .document()
+        try await docRef.setModel(meeting)
 
         print("[MeetingService] ✅ Meeting scheduled with ID: \(docRef.documentID)")
 
@@ -59,9 +58,7 @@ final class MeetingService {
             .order(by: "startTime", descending: false)
             .getDocuments()
 
-        let meetings = snapshot.documents.compactMap { doc -> Meeting? in
-            try? doc.data(as: Meeting.self)
-        }
+        let meetings = snapshot.documents.compactMap(decodeMeeting)
 
         print("[MeetingService] 📖 Fetched \(meetings.count) meetings")
         return meetings
@@ -78,9 +75,7 @@ final class MeetingService {
             .whereField("relatedPlanId", isEqualTo: planId)
             .getDocuments()
 
-        let meetings = snapshot.documents.compactMap { doc -> Meeting? in
-            try? doc.data(as: Meeting.self)
-        }
+        let meetings = snapshot.documents.compactMap(decodeMeeting)
 
         print("[MeetingService] 📖 Fetched \(meetings.count) meetings for plan: \(planId)")
         return meetings
@@ -317,5 +312,13 @@ final class MeetingService {
         let meetings = try await fetchMeetings()
         return meetings.flatMap { $0.actionItems }
             .filter { $0.isOverdue }
+    }
+
+    private func decodeMeeting(_ document: QueryDocumentSnapshot) -> Meeting? {
+        guard var meeting = try? document.data(as: Meeting.self) else {
+            return nil
+        }
+        meeting.id = document.documentID
+        return meeting
     }
 }

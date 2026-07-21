@@ -26,7 +26,7 @@ final class ComplianceService {
         let docRef = db.collection("districts").document(districtId).collection("settings").document("compliance")
         let document = try await docRef.getDocument()
         
-        if document.exists, let data = document.data() {
+        if document.exists {
             return try? document.data(as: ComplianceSettings.self)
         }
         

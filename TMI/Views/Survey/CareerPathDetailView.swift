@@ -263,7 +263,10 @@ struct CareerPathDetailView: View {
                 .document(studentId)
                 .getDocument()
 
-            if let student = try? studentDoc.data(as: Student.self) {
+            if let student = try? studentDoc.decodedModel(
+                as: Student.self,
+                assigningDocumentIDTo: \.id
+            ) {
                 students = [student]
                 print("[CareerPlan] Found student: \(student.name)")
             } else {

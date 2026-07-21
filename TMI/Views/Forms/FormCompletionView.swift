@@ -184,7 +184,7 @@ struct FormCompletionView: View {
     errorMessage = nil
 
     do {
-      if let existing = existingSubmission, let id = existing.id {
+      if let existing = existingSubmission, existing.id != nil {
         // Update existing draft
         var updated = existing
         updated.data = formData

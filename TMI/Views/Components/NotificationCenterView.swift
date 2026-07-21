@@ -15,22 +15,25 @@ struct NotificationCenterView: View {
     var body: some View {
         NavigationStack {
             List {
-                if notificationService.notifications.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(notificationService.notifications) { notification in
-                        NotificationRow(notification: notification)
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    // Mark as read on swipe
-                                    Task {
-                                        try? await notificationService.markAsRead(notification.id)
+                if let notificationService {
+                    if notificationService.notifications.isEmpty {
+                        emptyState
+                    } else {
+                        ForEach(notificationService.notifications) { notification in
+                            NotificationRow(notification: notification)
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        Task {
+                                            try? await notificationService.markAsRead(notification.id)
+                                        }
+                                    } label: {
+                                        Label("Mark Read", systemImage: "checkmark.circle")
                                     }
-                                } label: {
-                                    Label("Mark Read", systemImage: "checkmark.circle")
                                 }
-                            }
+                        }
                     }
+                } else {
+                    unavailableState
                 }
             }
             .listStyle(.plain)
@@ -44,7 +47,9 @@ struct NotificationCenterView: View {
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    if !notificationService.notifications.isEmpty && notificationService.unreadCount > 0 {
+                    if let notificationService,
+                       !notificationService.notifications.isEmpty,
+                       notificationService.unreadCount > 0 {
                         Button("Mark All Read") {
                             Task {
                                 try? await notificationService.markAllAsRead()
@@ -54,6 +59,9 @@ struct NotificationCenterView: View {
                 }
             }
             .task {
+                guard let notificationService = self.notificationService else {
+                    return
+                }
                 try? await notificationService.fetchNotifications()
             }
         }
@@ -74,6 +82,15 @@ struct NotificationCenterView: View {
                 .foregroundColor(.tmiTextTertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .listRowBackground(Color.clear)
+    }
+
+    private var unavailableState: some View {
+        ContentUnavailableView(
+            "Notifications Unavailable",
+            systemImage: "bell.slash",
+            description: Text("Notification services are not configured for this view.")
+        )
         .listRowBackground(Color.clear)
     }
 }
@@ -145,8 +162,8 @@ struct NotificationBadge: View {
     @Environment(\.notificationService) private var notificationService
     
     var body: some View {
-        if notificationService.unreadCount > 0 {
-            Text("\(min(notificationService.unreadCount, 99))")
+        if let unreadCount = notificationService?.unreadCount, unreadCount > 0 {
+            Text("\(min(unreadCount, 99))")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(Color.tmiTextPrimary)
                 .padding(.horizontal, 6)
@@ -172,12 +189,12 @@ struct NotificationBellButton: View {
                     .font(.system(size: 18))
                     .foregroundColor(.tmiTextPrimary)
                 
-                if notificationService.unreadCount > 0 {
+                if let unreadCount = notificationService?.unreadCount, unreadCount > 0 {
                     Circle()
                         .fill(Color.red)
                         .frame(width: 12, height: 12)
                         .overlay(
-                            Text("\(min(notificationService.unreadCount, 9))")
+                            Text("\(min(unreadCount, 9))")
                                 .font(.system(size: 8, weight: .bold))
                                 .foregroundColor(Color.tmiTextPrimary)
                         )
@@ -185,6 +202,7 @@ struct NotificationBellButton: View {
                 }
             }
         }
+        .disabled(notificationService == nil)
         .sheet(isPresented: $showingNotifications) {
             NotificationCenterView()
                 .tmiSheetStyle()
@@ -233,10 +251,17 @@ struct NotificationSettingsView: View {
         }
         .navigationTitle("Notification Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .disabled(notificationService == nil)
         .onAppear {
+            guard let notificationService = self.notificationService else {
+                return
+            }
             preferences = notificationService.preferences
         }
         .onChange(of: preferences.inAppEnabled) { _, _ in
+            guard let notificationService = self.notificationService else {
+                return
+            }
             Task {
                 isSaving = true
                 try? await notificationService.updatePreferences(preferences)

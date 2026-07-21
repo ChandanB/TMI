@@ -15,6 +15,7 @@ import FirebaseAuth
 
 /// Unified coordinator for meeting scheduling.
 /// Used from Dashboard, Student Detail, Plan Detail, and any other context.
+@MainActor
 @Observable
 final class ScheduleMeetingCoordinator {
     
@@ -54,7 +55,6 @@ final class ScheduleMeetingCoordinator {
     // MARK: - Public API
     
     /// Start scheduling a new meeting
-    @MainActor
     func startScheduling(
         forStudentId studentId: String? = nil,
         forPlanId planId: String? = nil,
@@ -85,22 +85,29 @@ final class ScheduleMeetingCoordinator {
         
         isShowingScheduler = true
         
-        print("[ScheduleMeetingCoordinator] Started scheduling for student: \(studentId ?? "nil"), plan: \(planId ?? "nil")")
+        Log.ui.info(
+            "meeting_scheduling_started",
+            metadata: [
+                "studentID": studentId ?? "none",
+                "planID": planId ?? "none",
+            ]
+        )
     }
     
     /// Edit an existing meeting
-    @MainActor
     func editMeeting(_ meeting: Meeting) {
         draftMeeting = DraftMeeting(from: meeting)
         studentId = meeting.relatedStudentIds.first
         planId = meeting.relatedPlanId
         isShowingScheduler = true
         
-        print("[ScheduleMeetingCoordinator] Editing meeting: \(meeting.id ?? "unknown")")
+        Log.ui.info(
+            "meeting_editing_started",
+            metadata: ["meetingID": meeting.id ?? "missing"]
+        )
     }
     
     /// Save the current draft meeting
-    @MainActor
     func saveMeeting() async throws -> Meeting {
         guard let draft = draftMeeting else {
             throw SchedulingError.noDraft
@@ -112,7 +119,7 @@ final class ScheduleMeetingCoordinator {
         isSaving = true
         defer { isSaving = false }
         
-        let meeting = try draft.toMeeting()
+        let meeting = try draft.toMeeting(organizerID: Auth.auth().currentUser?.uid)
         
         let savedMeeting: Meeting
         if let existingId = draft.existingId {
@@ -128,12 +135,14 @@ final class ScheduleMeetingCoordinator {
         // Reset state
         dismiss()
         
-        print("[ScheduleMeetingCoordinator] Saved meeting: \(savedMeeting.id ?? "unknown")")
+        Log.ui.info(
+            "meeting_save_completed",
+            metadata: ["meetingID": savedMeeting.id ?? "missing"]
+        )
         return savedMeeting
     }
     
     /// Dismiss the scheduler
-    @MainActor
     func dismiss() {
         isShowingScheduler = false
         draftMeeting = nil
@@ -144,7 +153,6 @@ final class ScheduleMeetingCoordinator {
     }
     
     /// Update draft meeting field
-    @MainActor
     func updateDraft(_ update: (inout DraftMeeting) -> Void) {
         guard var draft = draftMeeting else { return }
         update(&draft)
@@ -155,7 +163,7 @@ final class ScheduleMeetingCoordinator {
 // MARK: - Draft Meeting
 
 /// Mutable draft meeting for the scheduling form
-struct DraftMeeting {
+nonisolated struct DraftMeeting: Sendable {
     var existingId: String?
     var title: String
     var startTime: Date
@@ -223,8 +231,8 @@ struct DraftMeeting {
         }
     }
     
-    func toMeeting() throws -> Meeting {
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
+    func toMeeting(organizerID: String?) throws -> Meeting {
+        guard let organizerID else {
             throw MeetingCreationError.notAuthenticated
         }
         
@@ -236,7 +244,7 @@ struct DraftMeeting {
             endTime: endTime,
             location: location,
             meetingType: meetingType,
-            organizer: currentUserId,
+            organizer: organizerID,
             participants: [],
             relatedStudentIds: studentIds,
             relatedPlanId: relatedPlanId,
@@ -252,7 +260,7 @@ struct DraftMeeting {
 
 // MARK: - Meeting Creation Errors
 
-enum MeetingCreationError: Error, LocalizedError {
+nonisolated enum MeetingCreationError: Error, LocalizedError, Sendable {
     case notAuthenticated
     var errorDescription: String? {
         switch self {
@@ -264,7 +272,7 @@ enum MeetingCreationError: Error, LocalizedError {
 
 // MARK: - Scheduling Errors
 
-enum SchedulingError: LocalizedError {
+nonisolated enum SchedulingError: LocalizedError, Sendable {
     case noDraft
     case titleRequired
     case studentRequired
@@ -289,18 +297,3 @@ enum SchedulingError: LocalizedError {
         }
     }
 }
-
-// MARK: - Environment Key
-
-private struct ScheduleMeetingCoordinatorKey: EnvironmentKey {
-    static let defaultValue = ScheduleMeetingCoordinator()
-}
-
-extension EnvironmentValues {
-    var scheduleMeetingCoordinator: ScheduleMeetingCoordinator {
-        get { self[ScheduleMeetingCoordinatorKey.self] }
-        set { self[ScheduleMeetingCoordinatorKey.self] = newValue }
-    }
-}
-
-

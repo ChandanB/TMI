@@ -25,7 +25,10 @@ enum ConcurrencyError: LocalizedError {
 ///   - operation: The asynchronous operation to execute.
 /// - Returns: The result of the operation.
 /// - Throws: `ConcurrencyError.timeout` if the operation exceeds the specified duration, or any error thrown by the operation.
-func withTimeout<T>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
+func withTimeout<T: Sendable>(
+    seconds: TimeInterval,
+    operation: @escaping @MainActor @Sendable () async throws -> T
+) async throws -> T {
     try await withThrowingTaskGroup(of: T.self) { group in
         group.addTask {
             return try await operation()

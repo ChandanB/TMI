@@ -1,6 +1,6 @@
 import Foundation
 
-enum LegacyMigrationRelease: String, Codable, Sendable {
+nonisolated enum LegacyMigrationRelease: String, Codable, Sendable {
     case release1SecureRoster
     case release2Discovery
     case release3Intervention
@@ -8,7 +8,7 @@ enum LegacyMigrationRelease: String, Codable, Sendable {
     case release6OptionalAI
 }
 
-struct LegacyCollectionMigration: Codable, Sendable, Equatable {
+nonisolated struct LegacyCollectionMigration: Codable, Sendable, Equatable {
     let collectionTemplate: String
     let owner: LegacyMigrationRelease
 }
@@ -18,7 +18,7 @@ struct LegacyCollectionMigration: Codable, Sendable, Equatable {
 /// Production repositories must never depend on this type. Canonical writes
 /// always use `FirestorePaths`; unresolved ownership is quarantined by the
 /// migration runner instead of being guessed by an app client.
-enum LegacyFirestorePaths {
+nonisolated enum LegacyFirestorePaths {
     static func userStudents(userID: String) -> String {
         "users/\(userID)/students"
     }

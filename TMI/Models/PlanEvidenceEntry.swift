@@ -5,7 +5,6 @@
 //  Evidence tracking entries captured per plan.
 //
 
-import FirebaseFirestore
 import Foundation
 
 enum PlanEvidenceKind: String, Codable, CaseIterable, Sendable {
@@ -22,7 +21,7 @@ enum PlanEvidenceKind: String, Codable, CaseIterable, Sendable {
 }
 
 struct PlanEvidenceEntry: Codable, Identifiable, Hashable, Sendable {
-    @DocumentID var id: String?
+    var id: String? = nil
     var planId: String
     var type: PlanEvidenceKind
     var category: String?
@@ -32,6 +31,18 @@ struct PlanEvidenceEntry: Codable, Identifiable, Hashable, Sendable {
     var createdAt: Date
     var createdBy: String?
     var metadata: [String: String]?
+
+    private enum CodingKeys: String, CodingKey {
+        case planId
+        case type
+        case category
+        case title
+        case details
+        case numericValue
+        case createdAt
+        case createdBy
+        case metadata
+    }
 
     init(
         id: String? = nil,

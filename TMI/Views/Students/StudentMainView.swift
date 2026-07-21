@@ -282,6 +282,6 @@ struct MyProfileTabView: View {
 
 #Preview {
     StudentMainView()
-        .environment(\.authStateModel, AuthStateModel())
+        .environment(\.authStateModel, AuthStateModel(automaticallyStart: false))
         .environment(\.interestsStateModel, InterestsAndHobbiesStateModel())
 }

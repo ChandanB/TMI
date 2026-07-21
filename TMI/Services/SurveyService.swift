@@ -9,7 +9,8 @@ import Foundation
 import FirebaseFirestore
 import FirebaseAuth
 
-final class SurveyService: @unchecked Sendable {
+@MainActor
+final class SurveyService {
   static let shared = SurveyService()
   private let firestore = FirebaseManager.shared.firestore
   
@@ -22,15 +23,17 @@ final class SurveyService: @unchecked Sendable {
     }
     
     // Don't manually set @DocumentID - let Firestore manage it
-    var surveyToSave = survey
-    surveyToSave.completed = true
-    
-    return try await withTimeout(seconds: 10) {
+    var completedSurvey = survey
+    completedSurvey.completed = true
+    let surveyToSave = completedSurvey
+
+    let userID = currentUser.uid
+    return try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let collection = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
-      
+
       let data = try Firestore.Encoder().encode(surveyToSave)
       let docRef = try await collection.addDocument(data: data)
       return docRef.documentID
@@ -44,15 +47,17 @@ final class SurveyService: @unchecked Sendable {
     }
     
     // Don't manually set @DocumentID - let Firestore manage it
-    var surveyToSave = survey
-    surveyToSave.completed = false
-    
-    return try await withTimeout(seconds: 10) {
+    var draftSurvey = survey
+    draftSurvey.completed = false
+    let surveyToSave = draftSurvey
+
+    let userID = currentUser.uid
+    return try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let collection = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
-      
+
       let data = try Firestore.Encoder().encode(surveyToSave)
       let docRef = try await collection.addDocument(data: data)
       return docRef.documentID
@@ -65,20 +70,21 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
     
-    return try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    return try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let document = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
         .document(id)
-      
+
       let snapshot = try await document.getDocument()
-      
+
       guard snapshot.exists else {
         throw SurveyServiceError.surveyNotFound
       }
-      
-      return try snapshot.data(as: Survey.self)
+
+      return try self.decodeSurvey(snapshot)
     }
   }
   
@@ -88,19 +94,18 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
     
-    return try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    return try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let collection = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
-      
+
       let snapshot = try await collection
         .order(by: "date", descending: true)
         .getDocuments()
-      
-      return try snapshot.documents.compactMap { document in
-        try document.data(as: Survey.self)
-      }
+
+      return try snapshot.documents.map(self.decodeSurvey)
     }
   }
   
@@ -110,20 +115,19 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
     
-    return try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    return try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let collection = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
-      
+
       let snapshot = try await collection
         .whereField("surveyType", isEqualTo: type.rawValue)
         .order(by: "date", descending: true)
         .getDocuments()
-      
-      return try snapshot.documents.compactMap { document in
-        try document.data(as: Survey.self)
-      }
+
+      return try snapshot.documents.map(self.decodeSurvey)
     }
   }
   
@@ -133,20 +137,19 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
     
-    return try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    return try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let collection = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
-      
+
       let snapshot = try await collection
         .whereField("studentId", isEqualTo: studentID)
         .order(by: "date", descending: true)
         .getDocuments()
-      
-      return try snapshot.documents.compactMap { document in
-        try document.data(as: Survey.self)
-      }
+
+      return try snapshot.documents.map(self.decodeSurvey)
     }
   }
   
@@ -156,20 +159,19 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
     
-    return try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    return try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let collection = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
-      
+
       let snapshot = try await collection
         .whereField("completed", isEqualTo: true)
         .order(by: "date", descending: true)
         .getDocuments()
-      
-      return try snapshot.documents.compactMap { document in
-        try document.data(as: Survey.self)
-      }
+
+      return try snapshot.documents.map(self.decodeSurvey)
     }
   }
   
@@ -179,20 +181,19 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
     
-    return try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    return try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let collection = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
-      
+
       let snapshot = try await collection
         .whereField("completed", isEqualTo: false)
         .order(by: "date", descending: true)
         .getDocuments()
-      
-      return try snapshot.documents.compactMap { document in
-        try document.data(as: Survey.self)
-      }
+
+      return try snapshot.documents.map(self.decodeSurvey)
     }
   }
   
@@ -206,14 +207,15 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.invalidSurveyID
     }
     
-    try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let document = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
         .document(surveyID)
-      
-      try document.setData(from: survey, merge: true)
+
+      try await document.setModel(survey, merge: true)
     }
   }
   
@@ -223,23 +225,22 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
     
-    try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let document = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
         .document(surveyID)
-      
-      // First fetch the survey to update the specific question
+
       let snapshot = try await document.getDocument()
-      guard var survey = try? snapshot.data(as: Survey.self) else {
+      guard var survey = try? self.decodeSurvey(snapshot) else {
         throw SurveyServiceError.surveyNotFound
       }
-      
-      // Update the specific question's answer
+
       if let questionIndex = survey.questions.firstIndex(where: { $0.id == questionID }) {
         survey.questions[questionIndex].answer = answer
-        try document.setData(from: survey)
+        try await document.setModel(survey)
       } else {
         throw SurveyServiceError.questionNotFound
       }
@@ -252,13 +253,14 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
     
-    try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let document = self.firestore
         .collection(FirestoreCollection.users.rawValue)
-        .document(currentUser.uid)
+        .document(userID)
         .collection(FirestoreCollection.surveys.rawValue)
         .document(id)
-      
+
       try await document.delete()
     }
   }
@@ -303,9 +305,7 @@ final class SurveyService: @unchecked Sendable {
         }
         
         do {
-          let surveys = try documents.compactMap { document in
-            try document.data(as: Survey.self)
-          }
+          let surveys = try documents.map(self.decodeSurvey)
           completion(.success(surveys))
         } catch {
           completion(.failure(error))
@@ -343,26 +343,24 @@ final class SurveyService: @unchecked Sendable {
       completionTime: duration
     )
 
-    // Save to Firestore
-    try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let docRef = self.firestore
-        .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
+        .collection(FirestoreCollection.users.rawValue).document(userID)
         .collection(FirestoreCollection.students.rawValue).document(studentId)
         .collection("interestSurveys").document(surveyResponse.id.uuidString)
-      
+
       try await docRef.setData(surveyResponse.toFirestoreData())
-      
-      // Update student document with latest survey reference AND interests
+
       let studentRef = self.firestore
-        .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
+        .collection(FirestoreCollection.users.rawValue).document(userID)
         .collection(FirestoreCollection.students.rawValue).document(studentId)
-      
+
       try await studentRef.updateData([
         "latestSurveyId": surveyResponse.id.uuidString,
         "lastSurveyDate": Timestamp(date: surveyResponse.completedAt),
         "interestClusters": clusters.map { $0.toFirestoreData() },
         "topInterests": topInterests
-        // Interests are NOT written to student doc - they go to StudentInterestService edge collection
       ])
     }
 
@@ -397,19 +395,20 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.userNotAuthenticated
     }
 
-    return try await withTimeout(seconds: 10) {
+    let userID = currentUser.uid
+    return try await withTimeout(seconds: 10) { @MainActor @Sendable in
       let querySnapshot = try await self.firestore
-        .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
+        .collection(FirestoreCollection.users.rawValue).document(userID)
         .collection(FirestoreCollection.students.rawValue).document(studentId)
         .collection("interestSurveys")
         .order(by: "completedAt", descending: true)
         .limit(to: 1)
         .getDocuments()
-      
+
       guard let document = querySnapshot.documents.first else {
         return nil
       }
-      
+
       return try document.data(as: SurveyResponse.self)
     }
   }
@@ -637,10 +636,16 @@ final class SurveyService: @unchecked Sendable {
       throw SurveyServiceError.deleteFailed(error.localizedDescription)
     }
   }
+
+  private func decodeSurvey(_ document: DocumentSnapshot) throws -> Survey {
+    var survey = try document.data(as: Survey.self)
+    survey.id = document.documentID
+    return survey
+  }
 }
 
 // MARK: - Survey Analytics Model
-struct SurveyAnalytics: Codable, Sendable {
+nonisolated struct SurveyAnalytics: Codable, Sendable {
   let totalSurveys: Int
   let completedSurveys: Int
   let draftSurveys: Int
@@ -685,7 +690,7 @@ extension SurveyService {
 
 // MARK: - Firestore Conversion Extensions
 
-extension SurveyResponse {
+nonisolated extension SurveyResponse {
   func toFirestoreData() -> [String: Any] {
     var data: [String: Any] = [
       "id": id.uuidString,
@@ -714,7 +719,7 @@ extension SurveyResponse {
   }
 }
 
-extension InterestCluster {
+nonisolated extension InterestCluster {
   func toFirestoreData() -> [String: Any] {
     return [
       "id": id.uuidString,

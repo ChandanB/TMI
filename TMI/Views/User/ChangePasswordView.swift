@@ -31,7 +31,7 @@ final class ChangePasswordStateModel: BaseStateModel<PasswordChangeData, Identif
     
     // MARK: - Initialization
     
-    init(firebaseManager: FirebaseManager = FIREBASE_MANAGER) {
+    init(firebaseManager: FirebaseManager = FirebaseManager.shared) {
         self.firebaseManager = firebaseManager
         super.init()
     }

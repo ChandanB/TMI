@@ -183,8 +183,18 @@ actor AuditEventQueue {
 // MARK: - Audit Service
 
 @MainActor
+protocol AuditEventRecording {
+  func logEvent(_ event: AuditEvent) async
+}
+
+@MainActor
+struct NoOpAuditEventRecorder: AuditEventRecording {
+  func logEvent(_ event: AuditEvent) async {}
+}
+
+@MainActor
 @Observable
-final class AuditService {
+final class AuditService: AuditEventRecording {
 
   // MARK: - Dependencies
   private let deviceInfoProvider: DeviceInfoProvider
@@ -198,7 +208,7 @@ final class AuditService {
 
   // MARK: - State
   private var isProcessingBatch = false
-    private nonisolated(unsafe) var batchProcessingTask: Task<Void, Never>?
+  private var batchProcessingTask: Task<Void, Never>?
 
   // MARK: - Initialization
 
@@ -212,7 +222,7 @@ final class AuditService {
     startBatchProcessing()
   }
 
-  deinit {
+  isolated deinit {
     // Cancel background processing when service is deallocated
     batchProcessingTask?.cancel()
   }
@@ -407,8 +417,3 @@ final class DeviceInfoProvider: Sendable {
     )
   }
 }
-
-// MARK: - Global Instance
-
-@MainActor
-let AUDIT_SERVICE = AuditService()

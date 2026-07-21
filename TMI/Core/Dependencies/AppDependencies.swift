@@ -1,7 +1,7 @@
 import FirebaseFirestore
 import SwiftUI
 
-struct AppDependencies: Sendable {
+nonisolated struct AppDependencies: Sendable {
     enum Runtime: Sendable, Equatable {
         case production
         case preview
@@ -14,12 +14,18 @@ struct AppDependencies: Sendable {
     let logger: TMILogger
 
     static func production(firestore: Firestore) -> AppDependencies {
+        production(
+            membershipStore: FirebaseMembershipStore(firestore: firestore)
+        )
+    }
+
+    static func production(
+        membershipStore: any MembershipStore
+    ) -> AppDependencies {
         AppDependencies(
             runtime: .production,
             flags: .production,
-            membership: MembershipRepository(
-                store: FirebaseMembershipStore(firestore: firestore)
-            ),
+            membership: MembershipRepository(store: membershipStore),
             logger: .production
         )
     }
@@ -48,7 +54,7 @@ extension EnvironmentValues {
     @Entry var appDependencies: AppDependencies = .unconfigured
 }
 
-struct InMemoryMembershipProvider: MembershipProviding {
+nonisolated struct InMemoryMembershipProvider: MembershipProviding {
     private struct Key: Hashable, Sendable {
         let userID: String
         let districtID: String
@@ -83,7 +89,7 @@ struct InMemoryMembershipProvider: MembershipProviding {
     }
 }
 
-private struct UnavailableMembershipProvider: MembershipProviding {
+nonisolated private struct UnavailableMembershipProvider: MembershipProviding {
     func membership(for claim: TrustedTenantClaim) async throws -> MembershipContext {
         throw MembershipRepositoryError.unavailable
     }

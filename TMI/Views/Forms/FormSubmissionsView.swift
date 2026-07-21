@@ -20,7 +20,7 @@ class FormSubmissionsViewModel {
         errorMessage = nil
         
         do {
-            submissions = try await FIREBASE_MANAGER.fetchStudentFormSubmissions(studentId: studentId)
+            submissions = try await FirebaseManager.shared.fetchStudentFormSubmissions(studentId: studentId)
             await loadTemplatesForSubmissions()
         } catch {
             errorMessage = "Failed to load form submissions: \(error.localizedDescription)"
@@ -34,7 +34,7 @@ class FormSubmissionsViewModel {
         errorMessage = nil
         
         do {
-            submissions = try await FIREBASE_MANAGER.fetchUserFormSubmissions(userId: userId)
+            submissions = try await FirebaseManager.shared.fetchUserFormSubmissions(userId: userId)
             await loadTemplatesForSubmissions()
         } catch {
             errorMessage = "Failed to load form submissions: \(error.localizedDescription)"
@@ -48,7 +48,7 @@ class FormSubmissionsViewModel {
         
         for templateId in templateIds {
             do {
-                let template: FormTemplate = try await FIREBASE_MANAGER.fetchDocument(
+                let template: FormTemplate = try await FirebaseManager.shared.fetchDocument(
                     inCollection: .formTemplates,
                     withId: templateId
                 )

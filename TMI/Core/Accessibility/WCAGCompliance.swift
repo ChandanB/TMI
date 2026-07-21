@@ -4,7 +4,7 @@ import AppKit
 #endif
 
 /// WCAG 2.1 compliance checker and utilities
-struct WCAGCompliance {
+nonisolated struct WCAGCompliance {
     private static let logger = Log.accessibility
     
     // MARK: - Color Contrast Compliance
@@ -284,13 +284,13 @@ struct WCAGCompliance {
 
 // MARK: - Supporting Types
 
-struct HeadingInfo {
+nonisolated struct HeadingInfo {
     let text: String
     let level: Int
     let elementId: String
 }
 
-struct FormFieldInfo {
+nonisolated struct FormFieldInfo {
     let id: String
     let label: String
     let isRequired: Bool
@@ -299,24 +299,24 @@ struct FormFieldInfo {
     let hasErrorMessage: Bool
 }
 
-struct FormInfo {
+nonisolated struct FormInfo {
     let id: String
     let fields: [FormFieldInfo]
 }
 
-struct ColorPair {
+nonisolated struct ColorPair {
     let foreground: Color
     let background: Color
     let isLargeText: Bool
     let elementId: String
 }
 
-struct TouchTarget {
+nonisolated struct TouchTarget {
     let size: CGSize
     let elementId: String
 }
 
-protocol AccessibilityAuditableView {
+nonisolated protocol AccessibilityAuditableView {
     var identifier: String { get }
     var totalElements: Int { get }
     var colorPairs: [ColorPair] { get }
@@ -325,7 +325,7 @@ protocol AccessibilityAuditableView {
     var form: FormInfo? { get }
 }
 
-struct WCAGViolation {
+nonisolated struct WCAGViolation {
     let guideline: String
     let description: String
     let element: String
@@ -346,7 +346,7 @@ struct WCAGViolation {
     }
 }
 
-struct AccessibilityAuditReport {
+nonisolated struct AccessibilityAuditReport {
     let timestamp: Date
     let viewIdentifier: String
     let violations: [WCAGViolation]
@@ -379,7 +379,7 @@ struct AccessibilityAuditReport {
     }
 }
 
-enum ComplianceLevel {
+nonisolated enum ComplianceLevel {
     case aaa
     case aa
     case partial

@@ -43,17 +43,16 @@ class StudentService {
         
         do {
             print("[StudentService] Fetching students...")
-            let querySnapshot = try await withTimeout(seconds: 10) {
-                try await collection.getDocuments()
-            }
-            
-            let students: [Student] = try querySnapshot.documents.compactMap { document in
-                do {
-                    // Using a helper function to decode the document
-                    return try parseStudent(from: document)
-                } catch {
-                    // If parsing fails for one document, we throw the specific error
-                    throw StudentServiceError.dataParsingFailed(documentID: document.documentID, underlyingError: error)
+            let students: [Student] = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let querySnapshot = try await collection.getDocuments()
+                return try querySnapshot.documents.compactMap { document in
+                    do {
+                        // Using a helper function to decode the document
+                        return try self.parseStudent(from: document)
+                    } catch {
+                        // If parsing fails for one document, we throw the specific error
+                        throw StudentServiceError.dataParsingFailed(documentID: document.documentID, underlyingError: error)
+                    }
                 }
             }
             
@@ -105,31 +104,31 @@ class StudentService {
             )
         )
 
-        var trustedStudent = student
-        trustedStudent.districtId = session.membership.districtID
-        trustedStudent.schoolId = schoolID
-        trustedStudent.createdBy = session.membership.userID
-        trustedStudent.createdAt = Date()
-        trustedStudent.updatedAt = Date()
+        var mutableStudent = student
+        mutableStudent.districtId = session.membership.districtID
+        mutableStudent.schoolId = schoolID
+        mutableStudent.createdBy = session.membership.userID
+        mutableStudent.createdAt = Date()
+        mutableStudent.updatedAt = Date()
+        let trustedStudent = mutableStudent
 
         do {
             print("[StudentService] Adding student: \(trustedStudent.name)")
             
-            // Convert student to Firestore data (without ID)
-            let data = trustedStudent.toFirestoreData()
-            
             // Add the document and get the reference
-            let documentRef = try await withTimeout(seconds: 10) {
-                try await collection.addDocument(data: data)
+            let documentID = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let data = trustedStudent.toFirestoreData()
+                let documentRef = try await collection.addDocument(data: data)
+                return documentRef.documentID
             }
             
-            print("[StudentService] Student added with ID: \(documentRef.documentID)")
+            print("[StudentService] Student added with ID: \(documentID)")
             
             // Re-fetch the document using our custom parser
-            let document = try await withTimeout(seconds: 10) {
-                try await documentRef.getDocument()
+            let savedStudent = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let document = try await collection.document(documentID).getDocument()
+                return try self.parseStudent(from: document)
             }
-            let savedStudent = try parseStudent(from: document)
             return savedStudent
         } catch {
             print("[StudentService] Error adding student: \(error)")
@@ -160,18 +159,19 @@ class StudentService {
             authorization.canWriteStudent(member: session.membership, student: scope)
         )
 
-        var trustedStudent = student
-        trustedStudent.districtId = storedStudent.districtId
-        trustedStudent.schoolId = storedStudent.schoolId
-        trustedStudent.createdBy = storedStudent.createdBy
-        trustedStudent.createdAt = storedStudent.createdAt
-        trustedStudent.updatedAt = Date()
+        var mutableStudent = student
+        mutableStudent.districtId = storedStudent.districtId
+        mutableStudent.schoolId = storedStudent.schoolId
+        mutableStudent.createdBy = storedStudent.createdBy
+        mutableStudent.createdAt = storedStudent.createdAt
+        mutableStudent.updatedAt = Date()
+        let trustedStudent = mutableStudent
 
         do {
             print("[StudentService] Updating student: \(trustedStudent.name)")
 
-            let data = trustedStudent.toFirestoreData()
-            try await withTimeout(seconds: 10) {
+            try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let data = trustedStudent.toFirestoreData()
                 try await collection.document(studentId).updateData(data)
             }
 
@@ -276,15 +276,19 @@ class StudentService {
 
         do {
             print("[StudentService] Fetching student with ID: \(id)")
-            let document = try await withTimeout(seconds: 10) {
-                try await collection.document(id).getDocument()
+            let student: Student? = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let document = try await collection.document(id).getDocument()
+
+                guard document.exists else {
+                    return nil
+                }
+
+                return try self.parseStudent(from: document)
             }
 
-            guard document.exists else {
+            guard let student else {
                 return nil
             }
-
-            let student = try parseStudent(from: document)
             guard let scope = StudentAuthorizationScope(student: student),
                   authorization.canReadStudent(
                     member: session.membership,
@@ -370,15 +374,6 @@ class StudentService {
         let studentID = data["studentID"] as? String
         let photoURL = (data["photoURL"] as? String).flatMap { URL(string: $0) }
         let lastInteractionDate = (data["lastInteractionDate"] as? Double).map { Date(timeIntervalSince1970: $0) }
-        
-        // Parse interests
-        let interests = (data["interests"] as? [[String: Any]] ?? []).compactMap { interestData -> Interest? in
-            guard let name = interestData["name"] as? String else { return nil }
-            let id = interestData["id"] as? String
-            return Interest(id: id, name: name, category: [.academics])
-        }
-        
-        // Note: Hobbies are now included in interests above
         
         // Parse survey results
         let surveyResults = (data["surveyResults"] as? [[String: Any]])?.compactMap { surveyData -> SurveyResult? in
@@ -498,15 +493,6 @@ class StudentService {
         let photoURL = (data["photoURL"] as? String).flatMap { URL(string: $0) }
         let lastInteractionDate = (data["lastInteractionDate"] as? Double).map { Date(timeIntervalSince1970: $0) }
         
-        // Parse interests
-        let interests = (data["interests"] as? [[String: Any]] ?? []).compactMap { interestData -> Interest? in
-            guard let name = interestData["name"] as? String else { return nil }
-            let id = interestData["id"] as? String
-            return Interest(id: id, name: name, category: [.academics])
-        }
-        
-        // Note: Hobbies are now included in interests above
-        
         // Parse survey results
         let surveyResults = (data["surveyResults"] as? [[String: Any]])?.compactMap { surveyData -> SurveyResult? in
             guard let id = surveyData["id"] as? String,
@@ -620,18 +606,17 @@ class StudentService {
         }
         print("[StudentService] Fetching students for district: \(districtId)")
         
-        // Query global students collection filtered by districtId
-        let query = db.collection("students")
-            .whereField("districtId", isEqualTo: districtId)
-        
         do {
-            let snapshot = try await withTimeout(seconds: 15) {
-                try await query.getDocuments()
+            let fetchedStudents = try await withTimeout(seconds: 15) { @MainActor @Sendable in
+                let snapshot = try await self.db.collection("students")
+                    .whereField("districtId", isEqualTo: districtId)
+                    .getDocuments()
+                return try snapshot.documents.compactMap { document in
+                    try self.parseStudent(from: document)
+                }
             }
-            
-            let students = try snapshot.documents.compactMap { document in
-                try parseStudent(from: document)
-            }.filter {
+
+            let students = fetchedStudents.filter {
                 guard let scope = StudentAuthorizationScope(student: $0) else {
                     return false
                 }
@@ -658,17 +643,17 @@ class StudentService {
         }
         print("[StudentService] Fetching caseload for counselor: \(counselorId)")
         
-        let query = db.collection("students")
-            .whereField("assignedCounselorId", isEqualTo: counselorId)
-        
         do {
-            let snapshot = try await withTimeout(seconds: 15) {
-                try await query.getDocuments()
+            let fetchedStudents = try await withTimeout(seconds: 15) { @MainActor @Sendable in
+                let snapshot = try await self.db.collection("students")
+                    .whereField("assignedCounselorId", isEqualTo: counselorId)
+                    .getDocuments()
+                return try snapshot.documents.compactMap { document in
+                    try self.parseStudent(from: document)
+                }
             }
-            
-            let students = try snapshot.documents.compactMap { document in
-                try parseStudent(from: document)
-            }.filter {
+
+            let students = fetchedStudents.filter {
                 guard let scope = StudentAuthorizationScope(student: $0) else {
                     return false
                 }
@@ -695,17 +680,17 @@ class StudentService {
         }
         print("[StudentService] Fetching students for teacher: \(teacherId)")
         
-        let query = db.collection("students")
-            .whereField("primaryTeacherId", isEqualTo: teacherId)
-        
         do {
-            let snapshot = try await withTimeout(seconds: 15) {
-                try await query.getDocuments()
+            let fetchedStudents = try await withTimeout(seconds: 15) { @MainActor @Sendable in
+                let snapshot = try await self.db.collection("students")
+                    .whereField("primaryTeacherId", isEqualTo: teacherId)
+                    .getDocuments()
+                return try snapshot.documents.compactMap { document in
+                    try self.parseStudent(from: document)
+                }
             }
-            
-            let students = try snapshot.documents.compactMap { document in
-                try parseStudent(from: document)
-            }.filter {
+
+            let students = fetchedStudents.filter {
                 guard let scope = StudentAuthorizationScope(student: $0) else {
                     return false
                 }

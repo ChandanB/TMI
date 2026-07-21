@@ -331,7 +331,7 @@ actor PlanRepository {
 
 // MARK: - Plan Status
 
-enum PlanStatus: String, Codable, CaseIterable {
+nonisolated enum PlanStatus: String, Codable, CaseIterable {
     case draft = "draft"
     case active = "active"
     case pendingApproval = "pending_approval"
@@ -344,7 +344,7 @@ enum PlanStatus: String, Codable, CaseIterable {
 
 // MARK: - Resource Extensions
 
-extension Resource {
+nonisolated extension Resource {
     static func fromFirestoreData(_ data: [String: Any]) -> Resource? {
         guard let title = data["title"] as? String,
               let description = data["description"] as? String,
@@ -396,4 +396,3 @@ enum PlanRepositoryError: LocalizedError {
         }
     }
 }
-

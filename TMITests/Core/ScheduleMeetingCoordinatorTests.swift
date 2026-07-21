@@ -17,7 +17,7 @@ struct ScheduleMeetingCoordinatorTests {
             relatedPlanId: nil
         )
         #expect(throws: MeetingCreationError.self) {
-            try draft.toMeeting()
+            try draft.toMeeting(organizerID: nil)
         }
     }
 }

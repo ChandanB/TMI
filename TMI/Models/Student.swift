@@ -3,12 +3,11 @@
 import Foundation
 import SwiftData
 import SwiftUI
-import FirebaseFirestore
 import Combine
 
-struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
+nonisolated struct Student: Codable, Identifiable, Hashable, Sendable {
     // MARK: - Firebase Properties
-    @DocumentID var id: String?
+    var id: String?
     
     // MARK: - Core Properties
     let name: String
@@ -404,13 +403,13 @@ struct Student: Codable, Identifiable, Hashable, @unchecked Sendable {
 
 // MARK: - Supporting Types
 
-enum EngagementTrend: String, Codable, Sendable {
+nonisolated enum EngagementTrend: String, Codable, Sendable {
     case improving = "Improving"
     case stable = "Stable"
     case declining = "Declining"
 }
 
-enum AvatarColor: String, Codable, Sendable {
+nonisolated enum AvatarColor: String, Codable, Sendable {
     case blue
     case green
     case orange
@@ -420,7 +419,7 @@ enum AvatarColor: String, Codable, Sendable {
     case indigo
 }
 
-struct EngagementRecord: Codable, Hashable, Sendable {
+nonisolated struct EngagementRecord: Codable, Hashable, Sendable {
     var date: Date
     var score: Double
     var source: EngagementSource
@@ -434,21 +433,21 @@ struct EngagementRecord: Codable, Hashable, Sendable {
     }
 }
 
-struct AcademicPerformance: Codable, Hashable, Sendable {
+nonisolated struct AcademicPerformance: Codable, Hashable, Sendable {
     var gpa: Double?
     var subjects: [SubjectPerformance]
     var strengths: [String]
     var areasForImprovement: [String]
 }
 
-struct SubjectPerformance: Codable, Hashable, Sendable {
+nonisolated struct SubjectPerformance: Codable, Hashable, Sendable {
     var name: String
     var grade: String
     var score: Double
     var interestAlignment: Double
 }
 
-struct StudentNote: Codable, Hashable, Identifiable, Sendable {
+nonisolated struct StudentNote: Codable, Hashable, Identifiable, Sendable {
     var id = UUID()
     var date: Date
     var author: String
@@ -463,7 +462,7 @@ struct StudentNote: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-struct SurveyResult: Codable, Hashable, Identifiable, Sendable {
+nonisolated struct SurveyResult: Codable, Hashable, Identifiable, Sendable {
     var id: String
     var surveyName: String
     var date: Date
@@ -556,7 +555,7 @@ extension Student {
 
 // MARK: - Student Validation Errors
 
-enum StudentValidationError: LocalizedError, Equatable {
+nonisolated enum StudentValidationError: LocalizedError, Equatable {
     case invalidName(String)
     case invalidGrade(String)
     case invalidSchool(String)

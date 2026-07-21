@@ -3,7 +3,7 @@ import Security
 import CryptoKit
 
 // MARK: - Keychain Error
-enum KeychainError: Error, LocalizedError, Sendable {
+nonisolated enum KeychainError: Error, LocalizedError, Sendable {
     case storeFailed(status: OSStatus)
     case retrieveFailed(status: OSStatus)
     case deleteFailed(status: OSStatus)
@@ -99,7 +99,7 @@ enum KeychainError: Error, LocalizedError, Sendable {
 }
 
 // MARK: - Keychain Statistics
-struct KeychainStatistics: Sendable {
+nonisolated struct KeychainStatistics: Sendable {
     let totalItems: Int
     let accessibleItems: Int
     let totalSize: Int
@@ -121,7 +121,7 @@ struct KeychainStatistics: Sendable {
 }
 
 // MARK: - Advanced Keychain Manager
-final class KeychainManager: Sendable {
+nonisolated final class KeychainManager: Sendable {
     private let service: String
     private let accessGroup: String?
     private let logger: TMILogger
@@ -143,107 +143,34 @@ final class KeychainManager: Sendable {
         synchronizable: Bool = false,
         requiresBiometric: Bool = false
     ) async throws {
-        logger.debug("Storing keychain item for key '\(key)' with size \(data.count)")
-        
-        var query = baseQuery(for: key)
-        query[kSecValueData as String] = data
-        
-        // Handle access control
-        if let accessControl = accessControl {
-            query[kSecAttrAccessControl as String] = accessControl
-        } else if requiresBiometric {
-            let biometricAccessControl = try createBiometricAccessControl()
-            query[kSecAttrAccessControl as String] = biometricAccessControl
-        } else {
-            query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        }
-        
-        if synchronizable {
-            query[kSecAttrSynchronizable as String] = true
-        }
-        
-        if let accessGroup = accessGroup {
-            query[kSecAttrAccessGroup as String] = accessGroup
-        }
-        
-        // Delete existing item first
-        let deleteQuery = baseQuery(for: key)
-        SecItemDelete(deleteQuery as CFDictionary)
-        
-        let status = SecItemAdd(query as CFDictionary, nil)
-        
-        guard status == errSecSuccess else {
-            logger.error("Failed to store keychain item for key '\(key)' with status \(status): \(keychainErrorDescription(status))")
-            throw KeychainError.storeFailed(status: status)
-        }
-        
-        logger.info("Successfully stored keychain item for key '\(key)'")
+        try storeSynchronously(
+            data,
+            for: key,
+            accessControl: accessControl,
+            synchronizable: synchronizable,
+            requiresBiometric: requiresBiometric
+        )
     }
     
     /// Legacy store method for compatibility
     func store(_ data: Data, for key: String, requiresBiometric: Bool = false) throws {
-        Task {
-            try await store(data, for: key, requiresBiometric: requiresBiometric)
-        }
+        try storeSynchronously(
+            data,
+            for: key,
+            accessControl: nil,
+            synchronizable: false,
+            requiresBiometric: requiresBiometric
+        )
     }
     
     /// Retrieve data from keychain
     func retrieve(for key: String) async throws -> Data {
-        logger.debug("Retrieving keychain item for key '\(key)'")
-        
-        var query = baseQuery(for: key)
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        guard status == errSecSuccess else {
-            if status == errSecItemNotFound {
-                logger.debug("Keychain item not found for key '\(key)'")
-                throw KeychainError.itemNotFound
-            }
-            logger.error("Failed to retrieve keychain item for key '\(key)' with status \(status): \(keychainErrorDescription(status))")
-            throw KeychainError.retrieveFailed(status: status)
-        }
-        
-        guard let data = result as? Data else {
-            logger.error("Invalid keychain data format for key '\(key)'")
-            throw KeychainError.invalidData
-        }
-        
-        logger.debug("Successfully retrieved keychain item for key '\(key)' with size \(data.count)")
-        return data
+        try retrieveSynchronously(for: key)
     }
     
     /// Legacy retrieve method for compatibility
     func retrieve(for key: String) throws -> Data {
-        var retrievedData: Data?
-        var retrieveError: Error?
-        
-        let group = DispatchGroup()
-        group.enter()
-        
-        Task {
-            do {
-                retrievedData = try await retrieve(for: key)
-            } catch {
-                retrieveError = error
-            }
-            group.leave()
-        }
-        
-        group.wait()
-        
-        if let error = retrieveError {
-            throw error
-        }
-        
-        guard let data = retrievedData else {
-            throw KeychainError.itemNotFound
-        }
-        
-        return data
+        try retrieveSynchronously(for: key)
     }
     
     /// Check if item exists
@@ -262,54 +189,22 @@ final class KeychainManager: Sendable {
     
     /// Delete item from keychain
     func delete(for key: String) async throws {
-        logger.debug("Deleting keychain item for key '\(key)'")
-        
-        let query = baseQuery(for: key)
-        let status = SecItemDelete(query as CFDictionary)
-        
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            logger.error("Failed to delete keychain item for key '\(key)' with status \(status): \(keychainErrorDescription(status))")
-            throw KeychainError.deleteFailed(status: status)
-        }
-        
-        logger.info("Successfully deleted keychain item for key '\(key)'")
+        try deleteSynchronously(for: key)
     }
     
     /// Legacy delete method for compatibility
     func delete(for key: String) throws {
-        Task {
-            try await delete(for: key)
-        }
+        try deleteSynchronously(for: key)
     }
     
     /// Clear all items for this service
     func clearAll() async throws {
-        logger.warning("Clearing all keychain items for service: \(service)")
-        
-        var query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service
-        ]
-        
-        if let accessGroup = accessGroup {
-            query[kSecAttrAccessGroup as String] = accessGroup
-        }
-        
-        let status = SecItemDelete(query as CFDictionary)
-        
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            logger.error("Failed to clear all keychain items with status \(status): \(keychainErrorDescription(status))")
-            throw KeychainError.clearFailed(status: status)
-        }
-        
-        logger.info("Successfully cleared all keychain items")
+        try clearAllSynchronously()
     }
     
     /// Legacy deleteAll method for compatibility
     func deleteAll() throws {
-        Task {
-            try await clearAll()
-        }
+        try clearAllSynchronously()
     }
     
     // MARK: - Cryptographic Key Storage
@@ -317,35 +212,12 @@ final class KeychainManager: Sendable {
     /// Store a symmetric key
     func storeKey(_ key: SymmetricKey, for identifier: String) async throws {
         let keyData = key.withUnsafeBytes { Data($0) }
-        try await storeKeyData(keyData, for: identifier)
+        try storeKeyDataSynchronously(keyData, for: identifier)
     }
     
     /// Store raw key data
     func storeKey(_ keyData: Data, for tag: String) throws {
-        logger.debug("Storing cryptographic key for tag '\(tag)'")
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: tag,
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        ]
-        
-        // Delete existing key first
-        let deleteQuery: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: tag
-        ]
-        SecItemDelete(deleteQuery as CFDictionary)
-        
-        let status = SecItemAdd(query as CFDictionary, nil)
-        
-        guard status == errSecSuccess else {
-            logger.error("Failed to store cryptographic key for tag '\(tag)'")
-            throw KeychainError.keyStoreFailed(status: status)
-        }
-        
-        logger.info("Successfully stored cryptographic key for tag '\(tag)'")
+        try storeKeyDataSynchronously(keyData, for: tag)
     }
     
     /// Retrieve a symmetric key
@@ -356,101 +228,17 @@ final class KeychainManager: Sendable {
     
     /// Retrieve raw key data
     func retrieveKey(for tag: String) throws -> Data {
-        logger.debug("Retrieving cryptographic key for tag '\(tag)'")
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: tag,
-            kSecReturnData as String: true
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        guard status == errSecSuccess else {
-            if status == errSecItemNotFound {
-                logger.debug("Cryptographic key not found for tag '\(tag)'")
-                throw KeychainError.keyNotFound
-            }
-            logger.error("Failed to retrieve cryptographic key for tag '\(tag)'")
-            throw KeychainError.keyRetrieveFailed(status: status)
-        }
-        
-        guard let data = result as? Data else {
-            logger.error("Invalid key data format for tag '\(tag)'")
-            throw KeychainError.invalidKeyData
-        }
-        
-        logger.debug("Successfully retrieved cryptographic key for tag '\(tag)'")
-        return data
+        try retrieveKeyDataSynchronously(for: tag)
     }
     
     /// Store raw key data (private method for async version)
     private func storeKeyData(_ keyData: Data, for identifier: String) async throws {
-        logger.debug("Storing cryptographic key for identifier '\(identifier)'")
-        
-        var query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: identifier,
-            kSecAttrKeySizeInBits as String: keyData.count * 8,
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        ]
-        
-        if let accessGroup = accessGroup {
-            query[kSecAttrAccessGroup as String] = accessGroup
-        }
-        
-        // Delete existing key
-        let deleteQuery: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: identifier
-        ]
-        SecItemDelete(deleteQuery as CFDictionary)
-        
-        let status = SecItemAdd(query as CFDictionary, nil)
-        
-        guard status == errSecSuccess else {
-            logger.error("Failed to store cryptographic key for identifier '\(identifier)' with status \(status): \(keychainErrorDescription(status))")
-            throw KeychainError.keyStoreFailed(status: status)
-        }
-        
-        logger.info("Successfully stored cryptographic key for identifier '\(identifier)'")
+        try storeKeyDataSynchronously(keyData, for: identifier)
     }
     
     /// Retrieve raw key data (private method for async version)
     private func retrieveKeyData(for identifier: String) async throws -> Data {
-        logger.debug("Retrieving cryptographic key for identifier '\(identifier)'")
-        
-        var query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: identifier,
-            kSecReturnData as String: true
-        ]
-        
-        if let accessGroup = accessGroup {
-            query[kSecAttrAccessGroup as String] = accessGroup
-        }
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        guard status == errSecSuccess else {
-            if status == errSecItemNotFound {
-                logger.debug("Cryptographic key not found for identifier '\(identifier)'")
-                throw KeychainError.keyNotFound
-            }
-            logger.error("Failed to retrieve cryptographic key for identifier '\(identifier)' with status \(status): \(keychainErrorDescription(status))")
-            throw KeychainError.keyRetrieveFailed(status: status)
-        }
-        
-        guard let keyData = result as? Data else {
-            logger.error("Invalid key data format for identifier '\(identifier)'")
-            throw KeychainError.invalidKeyData
-        }
-        
-        logger.debug("Successfully retrieved cryptographic key for identifier '\(identifier)'")
-        return keyData
+        try retrieveKeyDataSynchronously(for: identifier)
     }
     
     // MARK: - Bulk Operations
@@ -462,6 +250,7 @@ final class KeychainManager: Sendable {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
             kSecReturnAttributes as String: true,
             kSecMatchLimit as String: kSecMatchLimitAll
         ]
@@ -486,19 +275,19 @@ final class KeychainManager: Sendable {
             throw KeychainError.invalidData
         }
         
-        let keys = items.compactMap { $0[kSecAttrAccount as String] as? String }
+        let keys = Array(Set(items.compactMap { $0[kSecAttrAccount as String] as? String }))
         logger.debug("Successfully retrieved all keys, count: \(keys.count)")
         return keys
     }
     
     /// Export all data (for backup purposes)
-    func exportAll() async throws -> Data {
+    func exportAll(excluding excludedKeys: Set<String> = []) async throws -> Data {
         logger.info("Exporting all keychain data")
         
         let keys = try await getAllKeys()
         var exportData: [String: Data] = [:]
         
-        for key in keys {
+        for key in keys where !excludedKeys.contains(key) {
             if let data = try? await retrieve(for: key) {
                 exportData[key] = data
             }
@@ -510,18 +299,22 @@ final class KeychainManager: Sendable {
     }
     
     /// Legacy exportAll method for compatibility
-    func exportAll() throws -> Data {
-        // Simplified implementation for legacy compatibility
-        return Data()
+    func exportAll(excluding excludedKeys: Set<String> = []) throws -> Data {
+        let keys = try getAllKeysSynchronously()
+        var exportData: [String: Data] = [:]
+        for key in keys where !excludedKeys.contains(key) {
+            exportData[key] = try? retrieveSynchronously(for: key)
+        }
+        return try JSONEncoder().encode(exportData)
     }
     
     /// Import data from backup
-    func importAll(_ data: Data) async throws {
+    func importAll(_ data: Data, excluding excludedKeys: Set<String> = []) async throws {
         logger.info("Importing keychain data")
         
         let exportData = try JSONDecoder().decode([String: Data].self, from: data)
         
-        for (key, itemData) in exportData {
+        for (key, itemData) in exportData where !excludedKeys.contains(key) {
             try await store(itemData, for: key)
         }
         
@@ -529,9 +322,16 @@ final class KeychainManager: Sendable {
     }
     
     /// Legacy importAll method for compatibility
-    func importAll(_ data: Data) throws {
-        Task {
-            try await importAll(data)
+    func importAll(_ data: Data, excluding excludedKeys: Set<String> = []) throws {
+        let exportData = try JSONDecoder().decode([String: Data].self, from: data)
+        for (key, itemData) in exportData where !excludedKeys.contains(key) {
+            try storeSynchronously(
+                itemData,
+                for: key,
+                accessControl: nil,
+                synchronizable: false,
+                requiresBiometric: false
+            )
         }
     }
     
@@ -611,12 +411,283 @@ final class KeychainManager: Sendable {
     }
     
     // MARK: - Helper Methods
+
+    /// CryptoKit symmetric keys are raw secret bytes rather than `SecKey` objects.
+    /// Storing those bytes as a generic-password item is supported consistently by
+    /// both the iOS data-protection keychain and the macOS keychain.
+    private func storeKeyDataSynchronously(_ keyData: Data, for identifier: String) throws {
+        logger.debug("Storing cryptographic key for identifier '\(identifier)'")
+
+        var query = baseQuery(for: identifier)
+        query[kSecValueData as String] = keyData
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        query[kSecAttrSynchronizable as String] = false
+
+        SecItemDelete(baseQuery(for: identifier) as CFDictionary)
+        let status = SecItemAdd(query as CFDictionary, nil)
+
+        guard status == errSecSuccess else {
+            logger.error(
+                "Failed to store cryptographic key for identifier '\(identifier)' with status \(status): \(keychainErrorDescription(status))"
+            )
+            throw KeychainError.keyStoreFailed(status: status)
+        }
+
+        logger.info("Successfully stored cryptographic key for identifier '\(identifier)'")
+    }
+
+    private func retrieveKeyDataSynchronously(for identifier: String) throws -> Data {
+        logger.debug("Retrieving cryptographic key for identifier '\(identifier)'")
+
+        var query = baseQuery(for: identifier)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        guard status == errSecSuccess else {
+            if status == errSecItemNotFound,
+               let legacyKeyData = try migrateLegacyKeyDataIfNeeded(for: identifier) {
+                return legacyKeyData
+            }
+            if status == errSecItemNotFound {
+                logger.debug("Cryptographic key not found for identifier '\(identifier)'")
+                throw KeychainError.keyNotFound
+            }
+            logger.error(
+                "Failed to retrieve cryptographic key for identifier '\(identifier)' with status \(status): \(keychainErrorDescription(status))"
+            )
+            throw KeychainError.keyRetrieveFailed(status: status)
+        }
+
+        guard let keyData = result as? Data else {
+            logger.error("Invalid key data format for identifier '\(identifier)'")
+            throw KeychainError.invalidKeyData
+        }
+
+        logger.debug("Successfully retrieved cryptographic key for identifier '\(identifier)'")
+        return keyData
+    }
+
+    /// Task 11 moved raw symmetric-key bytes from `kSecClassKey` to a generic-password
+    /// record. Preserve existing encrypted data by moving legacy bytes before callers
+    /// decide that no key exists and generate a replacement.
+    private func migrateLegacyKeyDataIfNeeded(for identifier: String) throws -> Data? {
+        for matchQuery in legacyKeyQueries(for: identifier) {
+            var retrievalQuery = matchQuery
+            retrievalQuery[kSecReturnData as String] = true
+            retrievalQuery[kSecMatchLimit as String] = kSecMatchLimitOne
+
+            var result: AnyObject?
+            let status = SecItemCopyMatching(retrievalQuery as CFDictionary, &result)
+            if status == errSecItemNotFound {
+                continue
+            }
+            guard status == errSecSuccess else {
+                throw KeychainError.keyRetrieveFailed(status: status)
+            }
+            guard let keyData = result as? Data else {
+                throw KeychainError.invalidKeyData
+            }
+
+            try storeKeyDataSynchronously(keyData, for: identifier)
+
+            let deleteStatus = SecItemDelete(matchQuery as CFDictionary)
+            guard deleteStatus == errSecSuccess || deleteStatus == errSecItemNotFound else {
+                try? deleteSynchronously(for: identifier)
+                throw KeychainError.keyStoreFailed(status: deleteStatus)
+            }
+
+            logger.info("Migrated legacy cryptographic key for identifier '\(identifier)'")
+            return keyData
+        }
+
+        return nil
+    }
+
+    private func legacyKeyQueries(for identifier: String) -> [[String: Any]] {
+        // The pre-upgrade writer supplied a String even though Security documents
+        // application tags as Data. Query both forms because normalization differs
+        // across Keychain implementations and OS versions.
+        let applicationTags: [Any] = [identifier, Data(identifier.utf8)]
+#if os(macOS)
+        return applicationTags.flatMap { applicationTag in
+            var dataProtectionQuery = legacyKeyQuery(applicationTag: applicationTag)
+            dataProtectionQuery[kSecUseDataProtectionKeychain as String] = true
+            return [dataProtectionQuery, legacyKeyQuery(applicationTag: applicationTag)]
+        }
+#else
+        return applicationTags.map { legacyKeyQuery(applicationTag: $0) }
+#endif
+    }
+
+    private func legacyKeyQuery(applicationTag: Any) -> [String: Any] {
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: applicationTag,
+        ]
+#if os(macOS)
+        query[kSecAttrKeyType as String] = kSecAttrKeyTypeAES
+        query[kSecAttrKeyClass as String] = kSecAttrKeyClassSymmetric
+#endif
+        if let accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+        return query
+    }
+
+    private func storeSynchronously(
+        _ data: Data,
+        for key: String,
+        accessControl: SecAccessControl?,
+        synchronizable: Bool,
+        requiresBiometric: Bool
+    ) throws {
+        logger.debug("Storing keychain item for key '\(key)' with size \(data.count)")
+
+        var query = baseQuery(for: key)
+        query[kSecValueData as String] = data
+
+        if let accessControl {
+            query[kSecAttrAccessControl as String] = accessControl
+        } else if requiresBiometric {
+            query[kSecAttrAccessControl as String] = try createBiometricAccessControl()
+        } else {
+            query[kSecAttrAccessible as String] = synchronizable
+                ? kSecAttrAccessibleWhenUnlocked
+                : kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        }
+
+        query[kSecAttrSynchronizable as String] = synchronizable
+        if let accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+
+        SecItemDelete(baseQuery(for: key) as CFDictionary)
+        let status = SecItemAdd(query as CFDictionary, nil)
+
+        guard status == errSecSuccess else {
+            logger.error(
+                "Failed to store keychain item for key '\(key)' with status \(status): \(keychainErrorDescription(status))"
+            )
+            throw KeychainError.storeFailed(status: status)
+        }
+
+        logger.info("Successfully stored keychain item for key '\(key)'")
+    }
+
+    private func retrieveSynchronously(for key: String) throws -> Data {
+        logger.debug("Retrieving keychain item for key '\(key)'")
+
+        var query = baseQuery(for: key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        guard status == errSecSuccess else {
+            if status == errSecItemNotFound {
+                logger.debug("Keychain item not found for key '\(key)'")
+                throw KeychainError.itemNotFound
+            }
+            logger.error(
+                "Failed to retrieve keychain item for key '\(key)' with status \(status): \(keychainErrorDescription(status))"
+            )
+            throw KeychainError.retrieveFailed(status: status)
+        }
+
+        guard let data = result as? Data else {
+            logger.error("Invalid keychain data format for key '\(key)'")
+            throw KeychainError.invalidData
+        }
+
+        logger.debug("Successfully retrieved keychain item for key '\(key)' with size \(data.count)")
+        return data
+    }
+
+    private func deleteSynchronously(for key: String) throws {
+        logger.debug("Deleting keychain item for key '\(key)'")
+
+        let status = SecItemDelete(baseQuery(for: key) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            logger.error(
+                "Failed to delete keychain item for key '\(key)' with status \(status): \(keychainErrorDescription(status))"
+            )
+            throw KeychainError.deleteFailed(status: status)
+        }
+
+        logger.info("Successfully deleted keychain item for key '\(key)'")
+    }
+
+    private func clearAllSynchronously() throws {
+        logger.warning("Clearing all keychain items for service: \(service)")
+
+        // Exact-account deletion avoids a macOS Keychain behavior where a broad
+        // service query can report success after deleting only its first match.
+        for key in try getAllKeysSynchronously() {
+            let itemStatus = SecItemDelete(baseQuery(for: key) as CFDictionary)
+            guard itemStatus == errSecSuccess || itemStatus == errSecItemNotFound else {
+                logger.error(
+                    "Failed to clear keychain item '\(key)' with status \(itemStatus): \(keychainErrorDescription(itemStatus))"
+                )
+                throw KeychainError.clearFailed(status: itemStatus)
+            }
+        }
+
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+        ]
+        if let accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            logger.error(
+                "Failed to clear all keychain items with status \(status): \(keychainErrorDescription(status))"
+            )
+            throw KeychainError.clearFailed(status: status)
+        }
+
+        logger.info("Successfully cleared all keychain items")
+    }
+
+    private func getAllKeysSynchronously() throws -> [String] {
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+        ]
+        if let accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound {
+            return []
+        }
+        guard status == errSecSuccess else {
+            throw KeychainError.bulkRetrieveFailed(status: status)
+        }
+        guard let items = result as? [[String: Any]] else {
+            throw KeychainError.invalidData
+        }
+        return Array(Set(items.compactMap { $0[kSecAttrAccount as String] as? String }))
+    }
     
     private func baseQuery(for key: String) -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: key
+            kSecAttrAccount as String: key,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
         ]
         
         if let accessGroup = accessGroup {

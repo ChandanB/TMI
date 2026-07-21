@@ -170,7 +170,8 @@ struct StudentModeView: View {
     private func exitStudentMode() {
         isExiting = true
 
-        session.exitStudentMode { success in
+        Task { @MainActor in
+            let success = await session.exitStudentMode()
             isExiting = false
             if !success {
                 // Show error if authentication failed

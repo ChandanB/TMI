@@ -79,16 +79,16 @@ actor LogContext {
 
 // MARK: - Supporting Types
 
-struct LogEntry: @unchecked Sendable {
+nonisolated struct LogEntry: Sendable {
     let level: TMILogger.Level
     let category: String
     let message: String
-    let metadata: [String: Any]?
+    let metadata: [String: String]?
     let timestamp: Date
     let file: String
     let line: Int
     
-    init(level: TMILogger.Level, category: String, message: String, metadata: [String: Any]? = nil, file: String = #file, line: Int = #line) {
+    init(level: TMILogger.Level, category: String, message: String, metadata: [String: String]? = nil, file: String = #file, line: Int = #line) {
         self.level = level
         self.category = category
         self.message = message
@@ -99,14 +99,14 @@ struct LogEntry: @unchecked Sendable {
     }
 }
 
-struct Breadcrumb: Sendable {
+nonisolated struct Breadcrumb: Sendable {
     let timestamp: Date
     let message: String
     let category: String
     let level: Level
     let data: [String: String]?
     
-    enum Level: String, Sendable {
+    nonisolated enum Level: String, Sendable {
         case debug = "debug"
         case info = "info"
         case warning = "warning"
@@ -123,7 +123,7 @@ struct Breadcrumb: Sendable {
     }
 }
 
-struct CrashReport: Sendable {
+nonisolated struct CrashReport: Sendable {
     let error: Error?
     let timestamp: Date
     let recentLogs: [LogEntry]
@@ -133,7 +133,7 @@ struct CrashReport: Sendable {
     let appInfo: AppInfo
 }
 
-struct AppInfo: Sendable {
+nonisolated struct AppInfo: Sendable {
     let version: String
     let buildNumber: String
     let bundleIdentifier: String

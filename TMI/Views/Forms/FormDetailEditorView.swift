@@ -24,7 +24,7 @@ class FormDetailEditorViewModel {
                 "updatedAt": Timestamp(date: Date()),
             ]
 
-//            try await FIREBASE_MANAGER.updateDocument(inCollection: .formTemplates, document: updatedData)
+//            try await FirebaseManager.shared.updateDocument(inCollection: .formTemplates, document: updatedData)
             
         }
     }
@@ -64,5 +64,4 @@ struct FormDetailEditorView: View {
 #Preview {
     FormDetailEditorView(template: DefaultFormTemplates.studentEnrollmentFormTemplate)
 }
-
 

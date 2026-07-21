@@ -79,17 +79,21 @@ class TMIHaptics {
 /// Extension to make haptics available via View modifier
 extension View {
     /// Performs a light impact haptic when the condition changes to true
-    func hapticOnChange<Value: Equatable>(of value: Value, hapticType: @escaping () -> Void = TMIHaptics.lightImpact) -> some View {
+    func hapticOnChange<Value: Equatable>(
+        of value: Value,
+        hapticType: @MainActor @escaping () -> Void = TMIHaptics.lightImpact
+    ) -> some View {
         onChange(of: value) { _, _ in
             hapticType()
         }
     }
     
     /// Performs a haptic when the view appears
-    func hapticOnAppear(hapticType: @escaping () -> Void = TMIHaptics.lightImpact) -> some View {
+    func hapticOnAppear(
+        hapticType: @MainActor @escaping () -> Void = TMIHaptics.lightImpact
+    ) -> some View {
         onAppear {
             hapticType()
         }
     }
 }
-

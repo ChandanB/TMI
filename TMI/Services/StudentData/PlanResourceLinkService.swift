@@ -62,14 +62,13 @@ final class PlanResourceLinkService {
         }
 
         do {
-            let querySnapshot = try await withTimeout(seconds: 10) {
-                try await self.planResourcesCollection(for: planId)
+            let links = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let querySnapshot = try await self.planResourcesCollection(for: planId)
                     .order(by: "orderIndex", descending: false)
                     .getDocuments()
-            }
-
-            let links = querySnapshot.documents.compactMap { document -> PlanResourceLink? in
-                PlanResourceLink.fromFirestore(id: document.documentID, data: document.data())
+                return querySnapshot.documents.compactMap { document -> PlanResourceLink? in
+                    PlanResourceLink.fromFirestore(id: document.documentID, data: document.data())
+                }
             }
 
             print("[PlanResourceLinkService] Fetched \(links.count) resources for plan \(planId)")
@@ -91,15 +90,17 @@ final class PlanResourceLinkService {
         }
 
         do {
-            let document = try await withTimeout(seconds: 10) {
-                try await self.planResourcesCollection(for: planId).document(resourceId).getDocument()
-            }
+            return try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let document = try await self.planResourcesCollection(for: planId)
+                    .document(resourceId)
+                    .getDocument()
 
-            guard document.exists, let data = document.data() else {
-                return nil
-            }
+                guard document.exists, let data = document.data() else {
+                    return nil
+                }
 
-            return PlanResourceLink.fromFirestore(id: document.documentID, data: data)
+                return PlanResourceLink.fromFirestore(id: document.documentID, data: data)
+            }
         } catch {
             print("[PlanResourceLinkService] Error fetching plan resource: \(error.localizedDescription)")
             throw PlanResourceLinkError.fetchFailed(error.localizedDescription)
@@ -260,21 +261,4 @@ final class PlanResourceLinkService {
         }
     }
 
-    /// Timeout wrapper for async operations
-    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
-            }
-
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw PlanResourceLinkError.fetchFailed("Operation timed out after \(seconds) seconds")
-            }
-
-            let result = try await group.next()!
-            group.cancelAll()
-            return result
-        }
-    }
 }

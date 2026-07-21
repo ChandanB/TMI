@@ -62,12 +62,11 @@ final class StudentCareerService {
         }
 
         do {
-            let querySnapshot = try await withTimeout(seconds: 10) {
-                try await self.studentCareersCollection(for: studentId).getDocuments()
-            }
-
-            let careers = querySnapshot.documents.compactMap { document -> StudentCareerState? in
-                StudentCareerState.fromFirestore(id: document.documentID, data: document.data())
+            let careers = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let querySnapshot = try await self.studentCareersCollection(for: studentId).getDocuments()
+                return querySnapshot.documents.compactMap { document -> StudentCareerState? in
+                    StudentCareerState.fromFirestore(id: document.documentID, data: document.data())
+                }
             }
 
             print("[StudentCareerService] Fetched \(careers.count) careers for student \(studentId)")
@@ -89,15 +88,17 @@ final class StudentCareerService {
         }
 
         do {
-            let document = try await withTimeout(seconds: 10) {
-                try await self.studentCareersCollection(for: studentId).document(careerId).getDocument()
-            }
+            return try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let document = try await self.studentCareersCollection(for: studentId)
+                    .document(careerId)
+                    .getDocument()
 
-            guard document.exists, let data = document.data() else {
-                return nil
-            }
+                guard document.exists, let data = document.data() else {
+                    return nil
+                }
 
-            return StudentCareerState.fromFirestore(id: document.documentID, data: data)
+                return StudentCareerState.fromFirestore(id: document.documentID, data: data)
+            }
         } catch {
             print("[StudentCareerService] Error fetching student career: \(error.localizedDescription)")
             throw StudentCareerError.fetchFailed(error.localizedDescription)
@@ -306,21 +307,4 @@ final class StudentCareerService {
         }
     }
 
-    /// Timeout wrapper for async operations
-    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
-            }
-
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw StudentCareerError.fetchFailed("Operation timed out after \(seconds) seconds")
-            }
-
-            let result = try await group.next()!
-            group.cancelAll()
-            return result
-        }
-    }
 }

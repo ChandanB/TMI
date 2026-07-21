@@ -104,7 +104,6 @@ class PlanExportService {
 
                 let bodyFont = PlatformFont.systemFont(ofSize: 12)
                 let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
-                let descRect = CGRect(x: margin, y: yPosition, width: contentWidth, height: 200)
                 let descString = description as NSString
                 let descSize = descString.boundingRect(with: CGSize(width: contentWidth, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: bodyAttributes, context: nil)
                 descString.draw(in: CGRect(x: margin, y: yPosition, width: contentWidth, height: descSize.height), withAttributes: bodyAttributes)
@@ -126,7 +125,6 @@ class PlanExportService {
                     checkPageBreak(requiredSpace: 20)
                     let value = input.value.isEmpty ? "[Not provided]" : input.value
                     let inputText = "\(input.label): \(value)" as NSString
-                    let inputRect = CGRect(x: margin + 10, y: yPosition, width: contentWidth - 20, height: 100)
                     let inputSize = inputText.boundingRect(
                         with: CGSize(width: contentWidth - 20, height: .greatestFiniteMagnitude),
                         options: .usesLineFragmentOrigin,
@@ -207,7 +205,6 @@ class PlanExportService {
                     checkPageBreak(requiredSpace: 40)
 
                     let goalHeader = "\(index + 1). \(goal.description)" as NSString
-                    let goalRect = CGRect(x: margin + 10, y: yPosition, width: contentWidth - 20, height: 100)
                     let goalSize = goalHeader.boundingRect(with: CGSize(width: contentWidth - 20, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: bodyAttributes, context: nil)
                     goalHeader.draw(in: CGRect(x: margin + 10, y: yPosition, width: contentWidth - 20, height: goalSize.height), withAttributes: bodyAttributes)
                     yPosition += goalSize.height + 5
@@ -233,7 +230,6 @@ class PlanExportService {
                 let bodyAttributes: [NSAttributedString.Key: Any] = [.font: bodyFont]
 
                 let interestNames = plan.interests.map { $0.name }.joined(separator: ", ")
-                let interestRect = CGRect(x: margin + 10, y: yPosition, width: contentWidth - 20, height: 100)
                 let interestString = interestNames as NSString
                 let interestSize = interestString.boundingRect(with: CGSize(width: contentWidth - 20, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: bodyAttributes, context: nil)
                 interestString.draw(in: CGRect(x: margin + 10, y: yPosition, width: contentWidth - 20, height: interestSize.height), withAttributes: bodyAttributes)
@@ -266,7 +262,6 @@ class PlanExportService {
                     if let comment = entry.comment, !comment.isEmpty {
                         let commentAttributes: [NSAttributedString.Key: Any] = [.font: italicSystemFont(ofSize: 10), .foregroundColor: PlatformColor.gray]
                         let commentText = "  \"\(comment)\"" as NSString
-                        let commentRect = CGRect(x: margin + 20, y: yPosition, width: contentWidth - 30, height: 100)
                         let commentSize = commentText.boundingRect(with: CGSize(width: contentWidth - 30, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: commentAttributes, context: nil)
                         commentText.draw(in: CGRect(x: margin + 20, y: yPosition, width: contentWidth - 30, height: commentSize.height), withAttributes: commentAttributes)
                         yPosition += commentSize.height + 5

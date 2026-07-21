@@ -674,7 +674,7 @@ struct InterestDetailView: View {
 
     @MainActor
     private func connectStudentToInterest(_ student: Student) async {
-        guard let studentId = student.id, let interestId = interest.id else {
+        guard student.id != nil, let interestId = interest.id else {
             print("Failed to connect: Missing student or interest ID")
             return
         }
@@ -973,7 +973,7 @@ struct ConnectStudentSheet: View {
             // Check each student asynchronously
             var studentsWithoutInterest: [Student] = []
             for student in students {
-                guard let studentId = student.id else { continue }
+                guard student.id != nil else { continue }
 
                 do {
                     let hasInterest = try await student.hasInterest(interestId: interestId)
@@ -1011,7 +1011,7 @@ struct ConnectStudentSheet: View {
                     continue
                 }
 
-                guard let studentId = student.id else { continue }
+                guard student.id != nil else { continue }
 
                 do {
                     let hasInterest = try await student.hasInterest(interestId: interestId)

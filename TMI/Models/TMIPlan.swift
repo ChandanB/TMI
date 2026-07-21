@@ -4,7 +4,7 @@ import FirebaseFirestore
 import Foundation
 import SwiftData
 
-enum TMIPlanModel: String, CaseIterable, Codable, Sendable {
+nonisolated enum TMIPlanModel: String, CaseIterable, Codable, Sendable {
   case chaseYourSpace = "Chase Your Space"
   case acknowledgeInterests = "Acknowledge Your Interests and Hobbies"
   case alignYourMind = "Align Your Mind"
@@ -53,8 +53,8 @@ enum TMIPlanModel: String, CaseIterable, Codable, Sendable {
   }
 }
 
-struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
-  @DocumentID var id: String?
+nonisolated struct TMIPlan: Codable, Identifiable, Hashable, Sendable {
+  var id: String?
   var title: String
   var description: String?
   var students: [Student]
@@ -271,7 +271,7 @@ struct TMIPlan: Codable, Identifiable, Hashable, @unchecked Sendable {
   }
 }
 
-struct ProgressEntry: Codable, Sendable, Hashable {
+nonisolated struct ProgressEntry: Codable, Sendable, Hashable {
   let score: Double
   let date: Date
   let notes: String?
@@ -298,7 +298,6 @@ extension TMIPlan {
   }
 
   static var samplePlans: [TMIPlan] {
-    let student = Student.sampleStudent
     let plan1 = TMIPlan.samplePlan
 
     let plan2 = TMIPlan(
@@ -336,13 +335,13 @@ extension TMIPlan {
   }
 }
 
-enum GoalStatus: String, Codable, CaseIterable, Sendable {
+nonisolated enum GoalStatus: String, Codable, CaseIterable, Sendable {
   case notStarted = "Not Started"
   case inProgress = "In Progress"
   case completed = "Completed"
 }
 
-struct Goal: Identifiable, Codable, Sendable, Hashable {
+nonisolated struct Goal: Identifiable, Codable, Sendable, Hashable {
   let id: UUID
   var description: String
   var dueDate: Date?
@@ -378,7 +377,7 @@ struct Goal: Identifiable, Codable, Sendable, Hashable {
 
 // MARK: - Approval Workflow (Phase 1: PR #6)
 
-enum PlanApprovalStatus: String, Codable, CaseIterable, Sendable {
+nonisolated enum PlanApprovalStatus: String, Codable, CaseIterable, Sendable {
   case draft = "draft"
   case pendingApproval = "pending_approval"
   case approved = "approved"
@@ -416,7 +415,7 @@ enum PlanApprovalStatus: String, Codable, CaseIterable, Sendable {
   }
 }
 
-enum ApprovalAction: String, Codable, Sendable {
+nonisolated enum ApprovalAction: String, Codable, Sendable {
   case submitted = "submitted"
   case approved = "approved"
   case rejected = "rejected"
@@ -434,7 +433,7 @@ enum ApprovalAction: String, Codable, Sendable {
   }
 }
 
-struct ApprovalHistoryEntry: Codable, Sendable, Hashable {
+nonisolated struct ApprovalHistoryEntry: Codable, Sendable, Hashable {
   let action: ApprovalAction
   let actionBy: String  // User ID
   let timestamp: Date

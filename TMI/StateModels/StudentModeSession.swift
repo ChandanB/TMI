@@ -66,22 +66,20 @@ class StudentModeSession {
     }
 
     /// Exit student mode (with optional biometric authentication)
-    func exitStudentMode(completion: @escaping (Bool) -> Void) {
+    func exitStudentMode() async -> Bool {
         guard isStudentModeActive else {
-            completion(true)
-            return
+            return true
         }
 
         if requiresBiometricExit {
-            authenticateStaff { [weak self] success in
-                if success {
-                    self?.performExit()
-                }
-                completion(success)
+            let success = await authenticateStaff()
+            if success {
+                performExit()
             }
+            return success
         } else {
             performExit()
-            completion(true)
+            return true
         }
     }
 
@@ -121,7 +119,7 @@ class StudentModeSession {
 
     // MARK: - Biometric Authentication
 
-    private func authenticateStaff(completion: @escaping (Bool) -> Void) {
+    private func authenticateStaff() async -> Bool {
         let context = LAContext()
         var error: NSError?
 
@@ -129,29 +127,30 @@ class StudentModeSession {
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
             print("[StudentMode] ⚠️ Biometric auth not available: \(error?.localizedDescription ?? "Unknown error")")
             // Fall back to device passcode
-            authenticateWithPasscode(completion: completion)
-            return
+            return await authenticateWithPasscode()
         }
 
         // Perform biometric authentication
         let reason = "Authenticate to exit student mode"
 
-        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authError in
-            DispatchQueue.main.async {
-                if success {
-                    print("[StudentMode] ✅ Staff authenticated successfully")
-                    TMIHaptics.success()
-                    completion(true)
-                } else {
-                    print("[StudentMode] ❌ Authentication failed: \(authError?.localizedDescription ?? "Unknown error")")
-                    TMIHaptics.error()
-                    completion(false)
-                }
+        do {
+            let success = try await context.evaluatePolicy(
+                .deviceOwnerAuthenticationWithBiometrics,
+                localizedReason: reason
+            )
+            if success {
+                print("[StudentMode] ✅ Staff authenticated successfully")
+                TMIHaptics.success()
             }
+            return success
+        } catch {
+            print("[StudentMode] ❌ Authentication failed: \(error.localizedDescription)")
+            TMIHaptics.error()
+            return false
         }
     }
 
-    private func authenticateWithPasscode(completion: @escaping (Bool) -> Void) {
+    private func authenticateWithPasscode() async -> Bool {
         let context = LAContext()
         var error: NSError?
 
@@ -159,25 +158,26 @@ class StudentModeSession {
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
             print("[StudentMode] ⚠️ Passcode auth not available: \(error?.localizedDescription ?? "Unknown error")")
             // If no authentication available, allow exit
-            completion(true)
-            return
+            return true
         }
 
         // Perform passcode authentication
         let reason = "Enter device passcode to exit student mode"
 
-        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, authError in
-            DispatchQueue.main.async {
-                if success {
-                    print("[StudentMode] ✅ Staff authenticated with passcode")
-                    TMIHaptics.success()
-                    completion(true)
-                } else {
-                    print("[StudentMode] ❌ Passcode authentication failed")
-                    TMIHaptics.error()
-                    completion(false)
-                }
+        do {
+            let success = try await context.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: reason
+            )
+            if success {
+                print("[StudentMode] ✅ Staff authenticated with passcode")
+                TMIHaptics.success()
             }
+            return success
+        } catch {
+            print("[StudentMode] ❌ Passcode authentication failed: \(error.localizedDescription)")
+            TMIHaptics.error()
+            return false
         }
     }
 }

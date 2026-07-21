@@ -11,7 +11,7 @@ import FirebaseAuth
 
 final class ResourceService: @unchecked Sendable {
     static let shared = ResourceService()
-    private let firestore = FIRESTORE_DATABASE
+    private let firestore = FirebaseManager.shared.firestore
 
     // Phase 4: Global Resource Library Integration
     private let resourceLibraryService = ResourceLibraryService.shared
@@ -62,7 +62,7 @@ final class ResourceService: @unchecked Sendable {
       throw ResourceServiceError.resourceNotFound
     }
     
-    return try snapshot.data(as: Resource.self)
+    return try snapshot.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
   }
   
   // MARK: - Fetch All Resources
@@ -94,7 +94,7 @@ final class ResourceService: @unchecked Sendable {
       .getDocuments()
 
     let userResources = try snapshot.documents.compactMap { document in
-      try document.data(as: Resource.self)
+      try document.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
     }
 
     allResources.append(contentsOf: userResources)
@@ -125,7 +125,7 @@ final class ResourceService: @unchecked Sendable {
       .getDocuments()
     
     return try snapshot.documents.compactMap { document in
-      try document.data(as: Resource.self)
+      try document.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
     }
   }
   
@@ -146,7 +146,7 @@ final class ResourceService: @unchecked Sendable {
       .getDocuments()
     
     return try snapshot.documents.compactMap { document in
-      try document.data(as: Resource.self)
+      try document.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
     }
   }
   
@@ -165,7 +165,7 @@ final class ResourceService: @unchecked Sendable {
     let snapshot = try await collection.getDocuments()
     
     let allResources = try snapshot.documents.compactMap { document in
-      try document.data(as: Resource.self)
+      try document.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
     }
     
     let lowercaseQuery = query.lowercased()
@@ -193,7 +193,7 @@ final class ResourceService: @unchecked Sendable {
       .getDocuments()
     
     return try snapshot.documents.compactMap { document in
-      try document.data(as: Resource.self)
+      try document.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
     }
   }
   
@@ -214,7 +214,7 @@ final class ResourceService: @unchecked Sendable {
       .getDocuments()
     
     return try snapshot.documents.compactMap { document in
-      try document.data(as: Resource.self)
+      try document.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
     }
   }
   
@@ -237,7 +237,7 @@ final class ResourceService: @unchecked Sendable {
       .collection(FirestoreCollection.resources.rawValue)
       .document(resourceID)
     
-    try document.setData(from: updatedResource, merge: true)
+    try await document.setModel(updatedResource, merge: true)
   }
   
   // MARK: - Toggle Resource Featured Status
@@ -254,7 +254,10 @@ final class ResourceService: @unchecked Sendable {
     
     // First fetch the current status
     let snapshot = try await document.getDocument()
-    guard var resource = try? snapshot.data(as: Resource.self) else {
+    guard var resource = try? snapshot.decodedModel(
+      as: Resource.self,
+      assigningDocumentIDTo: \.id
+    ) else {
       throw ResourceServiceError.resourceNotFound
     }
     
@@ -262,7 +265,7 @@ final class ResourceService: @unchecked Sendable {
     resource.isFeatured.toggle()
     resource.updatedAt = Date()
     
-    try document.setData(from: resource)
+    try await document.setModel(resource)
   }
   
   // MARK: - Delete Resource
@@ -326,7 +329,7 @@ final class ResourceService: @unchecked Sendable {
         
         do {
           let resources = try documents.compactMap { document in
-            try document.data(as: Resource.self)
+            try document.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
           }
           completion(.success(resources))
         } catch {

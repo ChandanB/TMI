@@ -6,10 +6,9 @@
 //
 
 import Foundation
-import FirebaseFirestore
 
 struct AppNotification: Codable, Identifiable, Sendable, Equatable {
-    @DocumentID var id: String?
+    var id: String? = nil
     let userId: String
     let type: NotificationType
     let title: String
@@ -19,6 +18,18 @@ struct AppNotification: Codable, Identifiable, Sendable, Equatable {
     var isRead: Bool
     var priority: NotificationPriority
     var metadata: [String: String]
+
+    private enum CodingKeys: String, CodingKey {
+        case userId
+        case type
+        case title
+        case message
+        case createdAt
+        case readAt
+        case isRead
+        case priority
+        case metadata
+    }
 
     enum NotificationType: String, Codable, CaseIterable, Sendable {
         case planApprovalRequest = "plan_approval_request"

@@ -184,7 +184,7 @@ struct PlanResourcesSection: View {
                 .getDocuments()
 
             let fetched = snapshot.documents.compactMap { doc -> Resource? in
-                try? doc.data(as: Resource.self)
+                try? doc.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
             }
             availableResources = fetched.isEmpty ? Resource.sampleResources : fetched
         } catch {

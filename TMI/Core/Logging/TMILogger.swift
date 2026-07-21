@@ -8,7 +8,7 @@
 import OSLog
 import Foundation
 
-final class TMILogger: Sendable {
+nonisolated final class TMILogger: Sendable {
     private let subsystem = "com.tmi.education"
     private let logger: Logger
     private let category: String
@@ -16,7 +16,7 @@ final class TMILogger: Sendable {
     static let production = TMILogger(category: "Application")
     
     // Log levels
-    enum Level: String, Sendable {
+    nonisolated enum Level: String, Sendable {
         case debug = "🔍"
         case info = "ℹ️"
         case warning = "⚠️"
@@ -57,7 +57,9 @@ final class TMILogger: Sendable {
             metadata["operation"] = context.operation
             metadata["userId"] = context.userId ?? "anonymous"
             if let contextMeta = context.metadata {
-                metadata.merge(contextMeta) { _, new in new }
+                for (key, value) in contextMeta {
+                    metadata[key] = value
+                }
             }
         }
         
@@ -65,8 +67,14 @@ final class TMILogger: Sendable {
         
         // Send to analytics in production
         #if !DEBUG
+        let analyticsMetadata = stringifyMetadata(metadata)
+        let errorDescription = error?.localizedDescription
         Task {
-            await Analytics.shared.trackError(message, error: error, metadata: metadata)
+            await Analytics.shared.trackError(
+                message,
+                errorDescription: errorDescription,
+                metadata: analyticsMetadata
+            )
         }
         #endif
     }
@@ -81,8 +89,9 @@ final class TMILogger: Sendable {
         log(level: .critical, message: message, metadata: metadata, file: file, line: line)
         
         // Immediately send to crash reporting
+        let errorDescription = error?.localizedDescription
         Task {
-            await CrashReporter.shared.logCritical(message, error: error)
+            await CrashReporter.shared.logCritical(message, errorDescription: errorDescription)
         }
     }
     
@@ -112,8 +121,13 @@ final class TMILogger: Sendable {
         info("User action: \(action)", metadata: actionMetadata)
         
         #if !DEBUG
+        let analyticsMetadata = stringifyMetadata(actionMetadata)
         Task {
-            await Analytics.shared.trackUserAction(action, userId: userId, metadata: actionMetadata)
+            await Analytics.shared.trackUserAction(
+                action,
+                userId: userId,
+                metadata: analyticsMetadata
+            )
         }
         #endif
     }
@@ -179,6 +193,7 @@ final class TMILogger: Sendable {
     private func log(level: Level, message: String, metadata: [String: Any]?, file: String = #file, line: Int = #line) {
         let fileName = URL(fileURLWithPath: file).lastPathComponent
         let metadataString = formatMetadata(metadata)
+        let sendableMetadata = stringifyMetadata(metadata)
         let metadataSuffix = metadataString.isEmpty ? "" : " | \(metadataString)"
 
         // Runtime messages and metadata are private by default. Categories and
@@ -211,7 +226,7 @@ final class TMILogger: Sendable {
             level: level,
             category: category,
             message: message,
-            metadata: metadata,
+            metadata: sendableMetadata,
             file: fileName,
             line: line
         )
@@ -227,7 +242,7 @@ final class TMILogger: Sendable {
                 message: message,
                 category: category,
                 level: breadcrumbLevel,
-                data: metadata?.compactMapValues { String(describing: $0) }
+                data: sendableMetadata
             )
             
             Task {
@@ -243,10 +258,14 @@ final class TMILogger: Sendable {
             "\(key)=\(String(describing: value))"
         }.joined(separator: ", ")
     }
+
+    private func stringifyMetadata(_ metadata: [String: Any]?) -> [String: String] {
+        metadata?.mapValues { String(describing: $0) } ?? [:]
+    }
 }
 
 // MARK: - Global Logger Factory
-struct Log {
+nonisolated struct Log {
     static func category(_ category: String) -> TMILogger {
         TMILogger(category: category)
     }
@@ -274,14 +293,18 @@ actor Analytics {
     private let logger = Logger(subsystem: "com.tmi.education", category: "Analytics")
     private var events: [AnalyticsEvent] = []
     
-    func trackError(_ message: String, error: Error?, metadata: [String: Any]) async {
+    func trackError(
+        _ message: String,
+        errorDescription: String?,
+        metadata: [String: String]
+    ) async {
         let event = AnalyticsEvent(
             type: .error,
             name: "error_occurred",
             properties: [
                 "message": message,
-                "error": error?.localizedDescription ?? "unknown",
-                "metadata": metadata
+                "error": errorDescription ?? "unknown",
+                "metadata": metadata.description
             ]
         )
         
@@ -289,14 +312,18 @@ actor Analytics {
         await flush()
     }
     
-    func trackUserAction(_ action: String, userId: String?, metadata: [String: Any]) async {
+    func trackUserAction(
+        _ action: String,
+        userId: String?,
+        metadata: [String: String]
+    ) async {
         let event = AnalyticsEvent(
             type: .userAction,
             name: action,
             properties: [
                 "userId": userId ?? "anonymous",
-                "timestamp": Date().timeIntervalSince1970,
-                "metadata": metadata
+                "timestamp": String(Date().timeIntervalSince1970),
+                "metadata": metadata.description
             ]
         )
         
@@ -314,8 +341,8 @@ actor Analytics {
             name: "performance_metric",
             properties: [
                 "operation": operation,
-                "duration": duration,
-                "timestamp": Date().timeIntervalSince1970
+                "duration": String(duration),
+                "timestamp": String(Date().timeIntervalSince1970)
             ]
         )
         
@@ -330,7 +357,7 @@ actor Analytics {
             properties: [
                 "event": event,
                 "element": element ?? "unknown",
-                "timestamp": Date().timeIntervalSince1970
+                "timestamp": String(Date().timeIntervalSince1970)
             ]
         )
         
@@ -357,13 +384,13 @@ actor CrashReporter {
 
     private let logger = Logger(subsystem: "com.tmi.education", category: "CrashReporter")
 
-    func logCritical(_ message: String, error: Error?) async {
+    func logCritical(_ message: String, errorDescription: String?) async {
         // In a real implementation, this would integrate with crash reporting services
         // like Firebase Crashlytics or Bugsnag
         
         #if DEBUG
         logger.critical(
-            "critical_event message=\(message, privacy: .private) error=\(error?.localizedDescription ?? "none", privacy: .private)"
+            "critical_event message=\(message, privacy: .private) error=\(errorDescription ?? "none", privacy: .private)"
         )
         #else
         // Send to crash reporting service
@@ -376,8 +403,8 @@ actor CrashReporter {
 }
 
 // MARK: - Supporting Types
-struct AnalyticsEvent: @unchecked Sendable {
-    enum EventType: String, Sendable {
+nonisolated struct AnalyticsEvent: Sendable {
+    nonisolated enum EventType: String, Sendable {
         case error = "error"
         case userAction = "user_action"
         case performance = "performance"
@@ -388,6 +415,6 @@ struct AnalyticsEvent: @unchecked Sendable {
     
     let type: EventType
     let name: String
-    let properties: [String: Any]
+    let properties: [String: String]
     let timestamp: Date = Date()
 }

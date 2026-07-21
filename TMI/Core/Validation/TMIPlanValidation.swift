@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - TMI Plan Validation Extension
 
-extension TMIPlan: Validatable {
+nonisolated extension TMIPlan: Validatable {
     // NOTE: goals is immutable (let); mutations are not allowed.
     func validate() async throws {
         let logger = Log.tmiPlan
@@ -430,4 +430,3 @@ struct ValidationSummary: Sendable {
         """
     }
 }
-

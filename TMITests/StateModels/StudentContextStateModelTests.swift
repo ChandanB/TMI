@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import TMI
 
@@ -46,5 +47,61 @@ struct StudentContextStateModelTests {
         )
 
         #expect(shouldPrefetch == false)
+    }
+
+    @Test("Edge prefetch keeps three actor-isolated branches concurrent")
+    func edgePrefetchConcurrencySourceContract() throws {
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: projectRoot.appending(path: "TMI/StateModels/StudentContextStateModel.swift"),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("async let interests = Self.loadPrefetchedInterests(for: studentId)"))
+        #expect(source.contains("async let careerStates = Self.loadPrefetchedCareerStates(for: studentId)"))
+        #expect(source.contains("async let plans = Self.loadPrefetchedPlans(for: studentId)"))
+        #expect(source.contains("let (loadedInterests, loadedCareerStates, loadedPlans) = await"))
+        #expect(source.contains("@MainActor\n    private static func loadPrefetchedInterests"))
+        #expect(source.contains("@MainActor\n    private static func loadPrefetchedCareerStates"))
+        #expect(source.contains("@MainActor\n    private static func loadPrefetchedPlans"))
+        #expect(source.components(separatedBy: "catch is CancellationError").count - 1 >= 3)
+        #expect(source.contains("withTaskGroup") == false)
+
+        guard
+            let prefetchStart = source.range(of: "private func prefetchStudentEdges"),
+            let prefetchEnd = source.range(
+                of: "// MARK: - Deep Link Handling",
+                range: prefetchStart.upperBound..<source.endIndex
+            )
+        else {
+            Issue.record("Missing prefetch implementation boundaries")
+            return
+        }
+
+        let prefetchSource = String(source[prefetchStart.lowerBound..<prefetchEnd.lowerBound])
+        guard
+            let awaitPosition = prefetchSource.range(
+                of: "let (loadedInterests, loadedCareerStates, loadedPlans) = await"
+            )?.lowerBound,
+            let interestsAssignment = prefetchSource.range(
+                of: "self.prefetchedInterests = loadedInterests"
+            )?.lowerBound,
+            let careerAssignment = prefetchSource.range(
+                of: "self.prefetchedCareerState = loadedCareerStates.first"
+            )?.lowerBound,
+            let plansAssignment = prefetchSource.range(
+                of: "self.prefetchedPlans = loadedPlans"
+            )?.lowerBound
+        else {
+            Issue.record("Missing awaited prefetch result assignments")
+            return
+        }
+
+        #expect(awaitPosition < interestsAssignment)
+        #expect(awaitPosition < careerAssignment)
+        #expect(awaitPosition < plansAssignment)
     }
 }

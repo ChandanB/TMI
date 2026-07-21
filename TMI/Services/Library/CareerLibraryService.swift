@@ -51,12 +51,11 @@ final class CareerLibraryService {
     /// Fetch all careers from the global library (optionally filtered by district)
     func fetchAllCareers(districtId: String? = nil) async throws -> [Career] {
         do {
-            let querySnapshot = try await withTimeout(seconds: 10) {
-                try await self.globalCollection.getDocuments()
-            }
-
-            var careers = querySnapshot.documents.compactMap { document -> Career? in
-                try? document.data(as: Career.self)
+            var careers = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let querySnapshot = try await self.globalCollection.getDocuments()
+                return querySnapshot.documents.compactMap { document -> Career? in
+                    try? document.data(as: Career.self)
+                }
             }
 
             // Filter by district if needed
@@ -78,15 +77,15 @@ final class CareerLibraryService {
     /// Fetch a single career by ID
     func fetchCareer(id: String) async throws -> Career? {
         do {
-            let document = try await withTimeout(seconds: 10) {
-                try await self.globalCollection.document(id).getDocument()
-            }
+            return try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let document = try await self.globalCollection.document(id).getDocument()
 
-            guard document.exists else {
-                return nil
-            }
+                guard document.exists else {
+                    return nil
+                }
 
-            return try? document.data(as: Career.self)
+                return try? document.data(as: Career.self)
+            }
         } catch {
             print("[CareerLibraryService] Error fetching career \(id): \(error.localizedDescription)")
             throw CareerLibraryError.fetchFailed(error.localizedDescription)
@@ -143,7 +142,7 @@ final class CareerLibraryService {
 
             if let id = career.id {
                 // Update existing
-                try await globalCollection.document(id).setData(from: career, merge: true)
+                try await globalCollection.document(id).setModel(career, merge: true)
                 updatedCareer.id = id
             } else {
                 // Create new
@@ -182,21 +181,4 @@ final class CareerLibraryService {
         }
     }
 
-    /// Timeout wrapper for async operations
-    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
-            }
-
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw CareerLibraryError.fetchFailed("Operation timed out after \(seconds) seconds")
-            }
-
-            let result = try await group.next()!
-            group.cancelAll()
-            return result
-        }
-    }
 }

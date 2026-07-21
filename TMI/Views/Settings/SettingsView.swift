@@ -444,7 +444,7 @@ private func clearCache() {
             }
             
             // Clear Firebase offline cache
-            try await FIREBASE_MANAGER.firestore.clearPersistence()
+            try await FirebaseManager.shared.firestore.clearPersistence()
             
             await MainActor.run {
                 // Could show success feedback

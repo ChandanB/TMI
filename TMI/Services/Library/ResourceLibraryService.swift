@@ -55,12 +55,11 @@ final class ResourceLibraryService {
     /// Fetch resources filtered by scope and optional district ID
     func fetchResources(scope: Resource.ResourceScope? = nil, districtId: String? = nil) async throws -> [Resource] {
         do {
-            let querySnapshot = try await withTimeout(seconds: 10) {
-                try await self.globalCollection.getDocuments()
-            }
-
-            var resources = querySnapshot.documents.compactMap { document -> Resource? in
-                try? document.data(as: Resource.self)
+            var resources = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let querySnapshot = try await self.globalCollection.getDocuments()
+                return querySnapshot.documents.compactMap { document -> Resource? in
+                    try? document.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
+                }
             }
 
             // Filter by scope
@@ -124,15 +123,15 @@ final class ResourceLibraryService {
     /// Fetch a single resource by ID
     func fetchResource(id: String) async throws -> Resource? {
         do {
-            let document = try await withTimeout(seconds: 10) {
-                try await self.globalCollection.document(id).getDocument()
-            }
+            return try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let document = try await self.globalCollection.document(id).getDocument()
 
-            guard document.exists else {
-                return nil
-            }
+                guard document.exists else {
+                    return nil
+                }
 
-            return try? document.data(as: Resource.self)
+                return try? document.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
+            }
         } catch {
             print("[ResourceLibraryService] Error fetching resource \(id): \(error.localizedDescription)")
             throw ResourceLibraryError.fetchFailed(error.localizedDescription)
@@ -172,7 +171,7 @@ final class ResourceLibraryService {
 
             if let id = resource.id {
                 // Update existing
-                try globalCollection.document(id).setData(from: resource, merge: true)
+                try await globalCollection.document(id).setModel(resource, merge: true)
                 updatedResource.id = id
             } else {
                 // Create new
@@ -200,23 +199,4 @@ final class ResourceLibraryService {
         }
     }
 
-    // MARK: - Helper Methods
-
-    /// Timeout wrapper for async operations
-    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
-            }
-
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw ResourceLibraryError.fetchFailed("Operation timed out after \(seconds) seconds")
-            }
-
-            let result = try await group.next()!
-            group.cancelAll()
-            return result
-        }
-    }
 }

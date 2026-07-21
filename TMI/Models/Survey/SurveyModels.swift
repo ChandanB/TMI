@@ -55,7 +55,7 @@ struct SurveyOption: Identifiable {
 
 // MARK: - Survey Response
 
-struct SurveyResponse: Codable, Identifiable {
+nonisolated struct SurveyResponse: Codable, Identifiable, Sendable {
     let id: UUID
     let studentId: String
     let responses: [String: SurveyAnswerValue]
@@ -64,7 +64,7 @@ struct SurveyResponse: Codable, Identifiable {
     let completedAt: Date
     let completionTime: TimeInterval // In seconds
 
-    enum SurveyAnswerValue: Codable {
+    nonisolated enum SurveyAnswerValue: Codable, Sendable {
         case text(String)
         case options([String])
         case scale(Int)
@@ -111,7 +111,7 @@ struct SurveyResponse: Codable, Identifiable {
 
 // MARK: - Interest Cluster
 
-struct InterestCluster: Codable, Identifiable, Hashable {
+nonisolated struct InterestCluster: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let name: String
     let displayName: String
@@ -133,7 +133,7 @@ struct InterestCluster: Codable, Identifiable, Hashable {
 
 // MARK: - Predefined Interest Categories
 
-extension InterestCluster {
+nonisolated extension InterestCluster {
     static let audioMedia = InterestCluster(
         name: "audio_media",
         displayName: "Audio & Media",

@@ -62,12 +62,11 @@ final class StudentInterestService {
         }
 
         do {
-            let querySnapshot = try await withTimeout(seconds: 10) {
-                try await self.studentInterestsCollection(for: studentId).getDocuments()
-            }
-
-            let interests = querySnapshot.documents.compactMap { document -> StudentInterest? in
-                StudentInterest.fromFirestore(id: document.documentID, data: document.data())
+            let interests = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let querySnapshot = try await self.studentInterestsCollection(for: studentId).getDocuments()
+                return querySnapshot.documents.compactMap { document -> StudentInterest? in
+                    StudentInterest.fromFirestore(id: document.documentID, data: document.data())
+                }
             }
 
             print("[StudentInterestService] Fetched \(interests.count) interests for student \(studentId)")
@@ -89,15 +88,17 @@ final class StudentInterestService {
         }
 
         do {
-            let document = try await withTimeout(seconds: 10) {
-                try await self.studentInterestsCollection(for: studentId).document(interestId).getDocument()
-            }
+            return try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let document = try await self.studentInterestsCollection(for: studentId)
+                    .document(interestId)
+                    .getDocument()
 
-            guard document.exists, let data = document.data() else {
-                return nil
-            }
+                guard document.exists, let data = document.data() else {
+                    return nil
+                }
 
-            return StudentInterest.fromFirestore(id: document.documentID, data: data)
+                return StudentInterest.fromFirestore(id: document.documentID, data: data)
+            }
         } catch {
             print("[StudentInterestService] Error fetching student interest: \(error.localizedDescription)")
             throw StudentInterestError.fetchFailed(error.localizedDescription)
@@ -118,24 +119,24 @@ final class StudentInterestService {
         
         do {
             // Use a collection group query to search across all studentInterests subcollections
-            let querySnapshot = try await withTimeout(seconds: 10) {
-                try await self.db.collectionGroup("studentInterests")
+            let studentIds = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                let querySnapshot = try await self.db.collectionGroup("studentInterests")
                     .whereField("interestId", isEqualTo: interestId)
                     .getDocuments()
-            }
-            
-            // Extract unique student IDs from the found documents
-            let studentIds = querySnapshot.documents.compactMap { document -> String? in
-                // The document data should contain studentId, or we can parse the parent path
-                if let data = try? document.data(as: StudentInterest.self) {
-                    return data.studentId
+
+                // Extract unique student IDs from the found documents
+                return querySnapshot.documents.compactMap { document -> String? in
+                    // The document data should contain studentId, or we can parse the parent path
+                    if let data = try? document.data(as: StudentInterest.self) {
+                        return data.studentId
+                    }
+                    // Fallback to parsing path if data is missing studentId (unlikely with this model)
+                    let pathComponents = document.reference.path.components(separatedBy: "/")
+                    if pathComponents.count >= 3 && pathComponents[pathComponents.count - 3] == "students" {
+                        return pathComponents[pathComponents.count - 2]
+                    }
+                    return nil
                 }
-                // Fallback to parsing path if data is missing studentId (unlikely with this model)
-                let pathComponents = document.reference.path.components(separatedBy: "/")
-                if pathComponents.count >= 3 && pathComponents[pathComponents.count - 3] == "students" {
-                    return pathComponents[pathComponents.count - 2]
-                }
-                return nil
             }
             
             return Array(Set(studentIds)) // Return unique IDs
@@ -315,21 +316,4 @@ final class StudentInterestService {
         }
     }
 
-    /// Timeout wrapper for async operations
-    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
-            }
-
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw StudentInterestError.fetchFailed("Operation timed out after \(seconds) seconds")
-            }
-
-            let result = try await group.next()!
-            group.cancelAll()
-            return result
-        }
-    }
 }

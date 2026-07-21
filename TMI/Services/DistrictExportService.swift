@@ -328,20 +328,21 @@ class DistrictExportService {
   #if canImport(UIKit)
   /// Share exported file using UIActivityViewController
   func shareFile(url: URL, from viewController: UIViewController?) {
+    guard let viewController else { return }
     let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
 
     if let popoverController = activityVC.popoverPresentationController {
-      popoverController.sourceView = viewController?.view
+      popoverController.sourceView = viewController.view
       popoverController.sourceRect = CGRect(
-        x: UIScreen.main.bounds.width / 2,
-        y: UIScreen.main.bounds.height / 2,
+        x: viewController.view.bounds.midX,
+        y: viewController.view.bounds.midY,
         width: 0,
         height: 0
       )
       popoverController.permittedArrowDirections = []
     }
 
-    viewController?.present(activityVC, animated: true)
+    viewController.present(activityVC, animated: true)
   }
   #endif
 }
@@ -371,4 +372,3 @@ private extension DistrictExportService {
     return data as Data
   }
 }
-

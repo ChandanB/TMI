@@ -1,0 +1,138 @@
+TMI Gate 0 Swift 6 migration inventory
+Captured: 2026-07-20
+
+Build settings enabled for the TMI and TMITests Debug and Release configurations:
+- SWIFT_VERSION = 6.0
+- SWIFT_STRICT_CONCURRENCY = complete
+- SWIFT_APPROACHABLE_CONCURRENCY = YES
+
+The TMI app target additionally uses:
+- SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor
+
+TMITests intentionally has no default global actor so concurrency behavior is
+exercised rather than hidden by test-target MainActor isolation.
+
+Initial iOS command:
+xcodebuild build -project TMI.xcodeproj -scheme TMI -destination 'platform=iOS Simulator,id=37D71437-A403-4461-83E2-7946B9B036DA'
+
+Initial macOS command:
+xcodebuild build -project TMI.xcodeproj -scheme TMI -destination 'platform=macOS'
+
+Initial blocking diagnostics on both platforms:
+- TMI/Helpers/ConcurrencyHelpers.swift:29:15: type 'T' does not conform to the 'Sendable' protocol
+- TMI/Helpers/ConcurrencyHelpers.swift:30:15: type 'T' does not conform to the 'Sendable' protocol
+- TMI/Helpers/ConcurrencyHelpers.swift:34:15: type 'T' does not conform to the 'Sendable' protocol
+- TMI/Helpers/ConcurrencyHelpers.swift:39:38: type 'T' does not conform to the 'Sendable' protocol
+- TMI/Helpers/ConcurrencyHelpers.swift:40:15: type 'T' does not conform to the 'Sendable' protocol
+
+The compiler reports errors incrementally. Additional categories discovered after
+unblocking the first compilation unit are appended below during the migration.
+
+Subsequent blocking categories:
+- Generic async validation helpers lacked Sendable result constraints.
+- DeepLinkRouter and ScheduleMeetingCoordinator used shared, non-Sendable
+  EnvironmentKey defaults instead of composition-root injection.
+- ProductionIntegration used four MainActor singleton EnvironmentKey defaults.
+- AppNotification, PlanEvidenceEntry, and PlanInputField mixed Firestore's
+  non-Sendable DocumentID wrapper into Sendable domain values.
+- EngagementData.sampleData was shared mutable static state.
+- Legacy singleton services had no actor isolation. The app target now uses
+  MainActor as its default isolation; true background mutable work is migrated
+  to actors as compiler diagnostics identify it.
+
+Resolution summary:
+- Added checked Sendable constraints to generic async validation helpers.
+- Replaced shared EnvironmentKey service defaults with composition-root
+  dependency injection.
+- Isolated UI-facing services and mutable state while keeping pure domain values
+  explicitly nonisolated under the app target's MainActor default.
+- Removed Firestore DocumentID wrappers from Student, TMIPlan, TMIUser,
+  AppNotification, PlanEvidenceEntry, PlanInputField, and RecentActivity domain
+  values; repository decoders remain responsible for injecting document IDs.
+- Replaced unchecked Interest reference semantics with a checked Sendable value
+  type so TMIPlan and Student are transitively checked Sendable.
+- Removed all nonisolated(unsafe) declarations used by the Task 11 baseline.
+- Updated concurrent keychain/storage tests to capture Sendable dependencies
+  instead of their XCTestCase instances.
+- Marked the macOS image compatibility scale constant nonisolated after the
+  macOS compiler identified the cross-platform shim.
+- Made the unit-test host genuinely multiplatform and selected the macOS app
+  executable path when TMITests runs on macOS.
+- Kept production Firebase composition explicit and hermetic tests fail-closed;
+  no shared notification or audit dependency is created by an EnvironmentKey.
+- Preserved the 36 existing Firebase timeout boundaries with checked-Sendable
+  results, and restored concurrent StudentContext edge prefetch without mutable
+  cross-actor captures.
+- Replaced Firestore callback continuations used for ordinary model writes with
+  documented offline local-enqueue helpers, while restoring canonical document
+  IDs at repository decode boundaries.
+- Hardened secure storage for synchronizable items, migrated both historical
+  cryptographic-key tag representations before key generation, and excluded the
+  device master key from device-bound backup payloads.
+
+Escape-hatch audit against the pre-Task-11 commit:
+- @unchecked Sendable declaration lines: 25 -> 11
+- nonisolated(unsafe) lines: 6 -> 0
+- @preconcurrency import lines: 32 -> 32
+- New @unchecked Sendable, nonisolated(unsafe), or @preconcurrency additions in
+  the Task 11 diff: 0
+
+The 11 unchecked declarations and 32 preconcurrency imports that remain are
+pre-existing legacy adapters/models. They were not used to suppress any Task 11
+compiler diagnostic; the migration's named models and their Interest dependency
+now use checked Sendable conformance.
+
+Final verification on the frozen source on 2026-07-20:
+
+Toolchain:
+- Xcode 26.6 (build 17F113)
+- Apple Swift 6.3.3; the project language mode is Swift 6 with complete strict
+  concurrency and approachable concurrency enabled.
+
+Exact full iOS suite: exit 0, ** TEST SUCCEEDED **
+  xcodebuild test -project TMI.xcodeproj -scheme TMI \
+    -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' \
+    -derivedDataPath /tmp/TMI-Full-DerivedData \
+    -resultBundlePath /tmp/TMI-Full-Results.xcresult
+- Result bundle: /tmp/TMI-Full-Results.xcresult
+- 309 total: 306 passed, 3 skipped, 0 failed, 0 expected failures.
+- XCTest: 162 tests, including 3 environment skips. Swift Testing: 147 tests
+  in 30 suites, all passed.
+- Skips were limited to two simulator-keychain nondeterminism cases and the
+  unavailable-biometric case. No test was skipped because Firebase was
+  unavailable.
+- Log: /tmp/tmi-task11-ios-full-final3.log
+
+Exact macOS unit/integration suite: exit 0, ** TEST SUCCEEDED **
+  xcodebuild test -project TMI.xcodeproj -scheme TMI \
+    -destination 'platform=macOS' \
+    -derivedDataPath /tmp/TMI-Full-Mac-DerivedData \
+    -resultBundlePath /tmp/TMI-Full-Mac-Results.xcresult \
+    -only-testing:TMITests
+- Result bundle: /tmp/TMI-Full-Mac-Results.xcresult
+- 308 total: 306 passed, 2 skipped, 0 failed, 0 expected failures.
+- XCTest: 161 tests, including 2 host-keychain environment skips. Swift
+  Testing: 147 tests in 30 suites, all passed.
+- No test was skipped because Firebase was unavailable.
+- Log: /tmp/tmi-task11-macos-full-final3.log
+
+Exact iOS Simulator Release build: exit 0, ** BUILD SUCCEEDED **
+  xcodebuild build -project TMI.xcodeproj -scheme TMI \
+    -configuration Release \
+    -destination 'generic/platform=iOS Simulator' \
+    -derivedDataPath /tmp/TMI-Release-DerivedData \
+    CODE_SIGNING_ALLOWED=NO
+- Log: /tmp/tmi-task11-release-ios-final3.log
+
+Exact macOS Release build: exit 0, ** BUILD SUCCEEDED **
+  xcodebuild build -project TMI.xcodeproj -scheme TMI \
+    -configuration Release \
+    -destination 'platform=macOS' \
+    -derivedDataPath /tmp/TMI-Release-DerivedData \
+    CODE_SIGNING_ALLOWED=NO
+- Log: /tmp/tmi-task11-release-macos-final3.log
+
+Both Release builds emitted only the non-blocking App Intents metadata message
+that extraction was skipped because the app has no AppIntents dependency. They
+emitted no Swift 6 concurrency diagnostics. Disposable DerivedData trees were
+removed after verification; both exact result bundles were preserved.

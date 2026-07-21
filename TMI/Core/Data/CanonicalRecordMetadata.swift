@@ -1,7 +1,7 @@
 import Foundation
 
 /// Version and attribution fields required on every mutable canonical root.
-struct CanonicalRecordMetadata: Codable, Sendable, Equatable {
+nonisolated struct CanonicalRecordMetadata: Codable, Sendable, Equatable {
     let schemaVersion: Int
     let recordVersion: Int
     let createdAt: Date

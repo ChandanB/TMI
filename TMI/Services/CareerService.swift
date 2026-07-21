@@ -250,7 +250,7 @@ final class CareerService: @unchecked Sendable {
             .document(currentUser.uid)
             .collection("careerBookmarks")
 
-        try collection.document(career.title).setData(from: bookmark)
+        try await collection.document(career.title).setModel(bookmark)
     }
 
     /// Fetch user's career bookmarks
@@ -304,7 +304,7 @@ final class CareerService: @unchecked Sendable {
             .collection("savedCareers")
 
         let docId = career.id ?? career.title
-        try collection.document(docId).setData(from: career)
+        try await collection.document(docId).setModel(career)
     }
 
     /// Fetch careers saved for a specific student
@@ -363,7 +363,7 @@ final class CareerService: @unchecked Sendable {
             .document(currentUser.uid)
             .collection("careerExplorations")
 
-        try collection.document().setData(from: exploration)
+        try await collection.document().setModel(exploration)
     }
 
     // MARK: - Resource Integration

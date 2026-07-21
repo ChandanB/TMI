@@ -12,6 +12,7 @@ import SwiftUI
 // MARK: - Deep Link Router
 
 /// Handles deep link routing and navigation coordination
+@MainActor
 @Observable
 final class DeepLinkRouter {
     
@@ -37,7 +38,7 @@ final class DeepLinkRouter {
     /// Process a deep link URL and return the navigation action
     func processDeepLink(url: URL) -> NavigationAction? {
         guard let destination = DeepLinkDestination.from(url: url) else {
-            print("[DeepLinkRouter] Failed to parse URL: \(url)")
+            Log.ui.warning("deep_link_parse_failed")
             return nil
         }
         
@@ -104,7 +105,7 @@ final class DeepLinkRouter {
                 planId: planId
             )
             
-        case .districtApprovals(let districtId):
+        case .districtApprovals:
             return NavigationAction(
                 targetTab: .district,
                 destination: destination,
@@ -112,7 +113,7 @@ final class DeepLinkRouter {
                 planId: nil
             )
             
-        case .districtCompliance(let districtId):
+        case .districtCompliance:
             return NavigationAction(
                 targetTab: .district,
                 destination: destination,
@@ -131,19 +132,16 @@ final class DeepLinkRouter {
     }
     
     /// Queue a navigation action for processing
-    @MainActor
     func queueNavigation(_ action: NavigationAction) {
         pendingNavigation = action
     }
     
     /// Clear the pending navigation
-    @MainActor
     func clearPendingNavigation() {
         pendingNavigation = nil
     }
     
     /// Execute the pending navigation
-    @MainActor
     func executePendingNavigation(
         context: StudentContextStateModel,
         tabSelection: Binding<MainTabView.Tab>
@@ -171,7 +169,10 @@ final class DeepLinkRouter {
         // Queue the deep link destination for the tab to handle
         context.queueDeepLink(action.destination)
         
-        print("[DeepLinkRouter] Executed navigation to \(action.targetTab.rawValue)")
+        Log.ui.info(
+            "deep_link_navigation_completed",
+            metadata: ["targetTab": action.targetTab.rawValue]
+        )
     }
 }
 
@@ -179,7 +180,6 @@ final class DeepLinkRouter {
 
 extension DeepLinkRouter {
     /// Handle an incoming URL
-    @MainActor
     func handleIncomingURL(_ url: URL) async -> Bool {
         guard let action = processDeepLink(url: url) else {
             return false
@@ -187,18 +187,5 @@ extension DeepLinkRouter {
         
         queueNavigation(action)
         return true
-    }
-}
-
-// MARK: - Environment Key
-
-private struct DeepLinkRouterKey: EnvironmentKey {
-    static let defaultValue = DeepLinkRouter()
-}
-
-extension EnvironmentValues {
-    var deepLinkRouter: DeepLinkRouter {
-        get { self[DeepLinkRouterKey.self] }
-        set { self[DeepLinkRouterKey.self] = newValue }
     }
 }

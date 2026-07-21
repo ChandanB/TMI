@@ -1,4 +1,4 @@
-struct MembershipContext: Codable, Sendable, Equatable {
+nonisolated struct MembershipContext: Codable, Sendable, Equatable {
     let userID: String
     let districtID: String
     let schoolIDs: Set<String>

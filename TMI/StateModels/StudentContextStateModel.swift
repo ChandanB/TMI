@@ -14,7 +14,7 @@ import Combine
 // MARK: - Context Scope
 
 /// Defines the scope/mode in which student context is being accessed
-enum StudentContextScope: String, Codable, Sendable {
+nonisolated enum StudentContextScope: String, Codable, Sendable {
     /// Staff member viewing/managing student data
     case staff
     /// Staff-initiated student mode session (restricted UI)
@@ -240,7 +240,7 @@ final class StudentContextStateModel {
         !prefetchedInterests.isEmpty || prefetchedCareerState != nil || !prefetchedPlans.isEmpty
     }
     
-    static func shouldPrefetchEdges(
+    nonisolated static func shouldPrefetchEdges(
         requested: Bool,
         incomingStudentId: String?,
         currentStudentId: String?,
@@ -278,66 +278,81 @@ final class StudentContextStateModel {
             }
         
             print("[StudentContext] Prefetching edges for student: \(studentId)")
-        
-            // Fetch in parallel
-            await withTaskGroup(of: Void.self) { group in
-                // Fetch interests
-                group.addTask { @MainActor in
-                    do {
-                        let edges = try await StudentInterestService.shared.getStudentInterests(studentId: studentId)
-                        let interestIds = edges.map { $0.interestId }
-                        
-                        // Fetch full interest objects from library
-                        let allInterests = try await InterestLibraryService.shared.fetchAllInterests()
-                        let interests = allInterests.filter { interestIds.contains($0.id ?? "") }
-                        self.prefetchedInterests = interests
-                        
-                        print("[StudentContext] Prefetched \(interests.count) interests")
-                    } catch is CancellationError {
-                        print("[StudentContext] Interest prefetch cancelled for student: \(studentId)")
-                    } catch {
-                        print("[StudentContext] Failed to prefetch interests: \(error.localizedDescription)")
-                    }
-                }
-                
-                // Fetch career state
-                group.addTask { @MainActor in
-                    do {
-                        let careers = try await StudentCareerService.shared.getStudentCareers(studentId: studentId)
-                        self.prefetchedCareerState = careers.first
-                        
-                        print("[StudentContext] Prefetched \(careers.count) career states")
-                    } catch is CancellationError {
-                        print("[StudentContext] Career prefetch cancelled for student: \(studentId)")
-                    } catch {
-                        print("[StudentContext] Failed to prefetch career state: \(error.localizedDescription)")
-                    }
-                }
-                
-                // Fetch plans
-                group.addTask { @MainActor in
-                    do {
-                        let planService = TMIPlanService.shared
-                        let allPlans = try await planService.fetchPlans()
-                        
-                        // Filter to plans containing this student
-                        let studentPlans = allPlans.filter { plan in
-                            plan.students.contains(where: { $0.id == studentId })
-                        }
-                        self.prefetchedPlans = studentPlans
-                        
-                        print("[StudentContext] Prefetched \(studentPlans.count) plans")
-                    } catch is CancellationError {
-                        print("[StudentContext] Plan prefetch cancelled for student: \(studentId)")
-                    } catch {
-                        print("[StudentContext] Failed to prefetch plans: \(error.localizedDescription)")
-                    }
-                }
+
+            async let interests = Self.loadPrefetchedInterests(for: studentId)
+            async let careerStates = Self.loadPrefetchedCareerStates(for: studentId)
+            async let plans = Self.loadPrefetchedPlans(for: studentId)
+
+            let (loadedInterests, loadedCareerStates, loadedPlans) = await (
+                interests,
+                careerStates,
+                plans
+            )
+
+            guard !Task.isCancelled, self.prefetchingStudentId == studentId else {
+                return
             }
+
+            self.prefetchedInterests = loadedInterests
+            self.prefetchedCareerState = loadedCareerStates.first
+            self.prefetchedPlans = loadedPlans
+
+            print("[StudentContext] Prefetched \(loadedInterests.count) interests")
+            print("[StudentContext] Prefetched \(loadedCareerStates.count) career states")
+            print("[StudentContext] Prefetched \(loadedPlans.count) plans")
         }
         
         prefetchTask = task
         await task.value
+    }
+
+    @MainActor
+    private static func loadPrefetchedInterests(for studentId: String) async -> [Interest] {
+        do {
+            let edges = try await StudentInterestService.shared.getStudentInterests(
+                studentId: studentId
+            )
+            let interestIds = Set(edges.map(\.interestId))
+            let allInterests = try await InterestLibraryService.shared.fetchAllInterests()
+            return allInterests.filter { interestIds.contains($0.id ?? "") }
+        } catch is CancellationError {
+            print("[StudentContext] Interest prefetch cancelled for student: \(studentId)")
+            return []
+        } catch {
+            print("[StudentContext] Failed to prefetch interests: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    @MainActor
+    private static func loadPrefetchedCareerStates(
+        for studentId: String
+    ) async -> [StudentCareerState] {
+        do {
+            return try await StudentCareerService.shared.getStudentCareers(studentId: studentId)
+        } catch is CancellationError {
+            print("[StudentContext] Career prefetch cancelled for student: \(studentId)")
+            return []
+        } catch {
+            print("[StudentContext] Failed to prefetch career state: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    @MainActor
+    private static func loadPrefetchedPlans(for studentId: String) async -> [TMIPlan] {
+        do {
+            let allPlans = try await TMIPlanService.shared.fetchPlans()
+            return allPlans.filter { plan in
+                plan.students.contains(where: { $0.id == studentId })
+            }
+        } catch is CancellationError {
+            print("[StudentContext] Plan prefetch cancelled for student: \(studentId)")
+            return []
+        } catch {
+            print("[StudentContext] Failed to prefetch plans: \(error.localizedDescription)")
+            return []
+        }
     }
     
     // MARK: - Deep Link Handling

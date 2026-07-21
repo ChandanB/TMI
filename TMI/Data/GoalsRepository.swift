@@ -246,7 +246,7 @@ actor GoalsRepository {
 
 // MARK: - Goal Extensions
 
-extension Goal {
+nonisolated extension Goal {
     func toFirestoreData() -> [String: Any] {
         var data: [String: Any] = [
             "id": id.uuidString,
@@ -317,4 +317,3 @@ enum GoalsRepositoryError: LocalizedError {
         }
     }
 }
-

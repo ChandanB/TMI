@@ -120,16 +120,16 @@ protocol TMIAuthService {
 // MARK: - Firebase TMI Auth Service Implementation
 /// Implementation of TMIAuthService using Firebase Authentication
 @Observable
+@MainActor
 class FirebaseTMIAuthService: TMIAuthService {
     private let auth = Auth.auth()
     private let firebaseManager: FirebaseManager
     private var authStateHandler: AuthStateDidChangeListenerHandle?
     private var _isHandlingAuthChange = false
-    private let handlingQueue = DispatchQueue(label: "com.tmi.auth.handling", attributes: .concurrent)
     
     private var isHandlingAuthChange: Bool {
-        get { return handlingQueue.sync { _isHandlingAuthChange } }
-        set { handlingQueue.async(flags: .barrier) { self._isHandlingAuthChange = newValue } }
+        get { _isHandlingAuthChange }
+        set { _isHandlingAuthChange = newValue }
     }
     
     private let userSubject = CurrentValueSubject<TMIUser?, Never>(nil)
@@ -143,57 +143,44 @@ class FirebaseTMIAuthService: TMIAuthService {
     var currentUserID: String? { auth.currentUser?.uid }
     var currentUser: User? { auth.currentUser }
     var currentTMIUser: TMIUser? {
-        get { 
-            return userQueue.sync { _currentTMIUser }
-        }
+        get { _currentTMIUser }
         set {
-            userQueue.async(flags: .barrier) {
-                self._currentTMIUser = newValue
-            }
+            _currentTMIUser = newValue
             userSubject.send(newValue)
         }
     }
     private var _currentTMIUser: TMIUser?
-    private let userQueue = DispatchQueue(label: "com.tmi.auth.user", attributes: .concurrent)
     
     // Auth state property
     private var _authState: TMIAuthState = .initializing
-    private let authStateQueue = DispatchQueue(label: "com.tmi.auth.state", attributes: .concurrent)
     
     var authState: TMIAuthState {
-        get { 
-            return authStateQueue.sync { _authState }
-        }
-        set {
-            authStateQueue.async(flags: .barrier) {
-                self._authState = newValue
-            }
-        }
+        get { _authState }
+        set { _authState = newValue }
     }
     
     // Statistics for debugging (thread-safe)
     private var _authStateChanges = 0
     private var _lastAuthChange: Date?
-    private let statsQueue = DispatchQueue(label: "com.tmi.auth.stats", attributes: .concurrent)
     
     private var authStateChanges: Int {
-        get { return statsQueue.sync { _authStateChanges } }
-        set { statsQueue.async(flags: .barrier) { self._authStateChanges = newValue } }
+        get { _authStateChanges }
+        set { _authStateChanges = newValue }
     }
     
     private var lastAuthChange: Date? {
-        get { return statsQueue.sync { _lastAuthChange } }
-        set { statsQueue.async(flags: .barrier) { self._lastAuthChange = newValue } }
+        get { _lastAuthChange }
+        set { _lastAuthChange = newValue }
     }
     
     // MARK: - Initialization
     
-    nonisolated init(firebaseManager: FirebaseManager = FirebaseManager.shared) {
+    init(firebaseManager: FirebaseManager = FirebaseManager.shared) {
         self.firebaseManager = firebaseManager
         setupAuthStateListener()
     }
     
-    deinit {
+    isolated deinit {
         removeAuthStateListener()
     }
     
@@ -546,24 +533,26 @@ class FirebaseTMIAuthService: TMIAuthService {
     /// Fetches the currently authenticated user
     /// - Returns: The current user's TMIUser
     /// - Throws: Authentication or fetch errors
-    nonisolated(nonsending) func fetchCurrentTMIUser() async throws -> TMIUser {
+    func fetchCurrentTMIUser() async throws -> TMIUser {
         guard let userID = currentUser?.uid else { throw FirebaseError.userNotAuthenticated }
         
         do {
             if let tmiUser = self.currentTMIUser {
                 return tmiUser
             } else {
-                let tmiUser = try await withTimeout(seconds: 10) {
+                let tmiUser = try await withTimeout(seconds: 10) { @MainActor @Sendable in
                     let userDoc = try await self.firebaseManager.firestore
                         .collection("users")
                         .document(userID)
                         .getDocument()
-                    
+
                     guard let userData = userDoc.data() else {
                         throw FirebaseError.documentNotFound
                     }
-                    
-                    return try Firestore.Decoder().decode(TMIUser.self, from: userData)
+
+                    var tmiUser = try Firestore.Decoder().decode(TMIUser.self, from: userData)
+                    tmiUser.id = userDoc.documentID
+                    return tmiUser
                 }
                 self.currentTMIUser = tmiUser
                 

@@ -36,7 +36,7 @@ struct StudentDetailView: View {
     // Environment dependencies
     @Environment(\.studentModeSession) private var studentModeSession
     @Environment(\.studentContext) private var studentContext
-    @Environment(\.scheduleMeetingCoordinator) private var scheduleMeetingCoordinator
+    @Environment(ScheduleMeetingCoordinator.self) private var scheduleMeetingCoordinator
 
     private let meetingService = MeetingService.shared
     private let studentInterestService = StudentInterestService.shared
@@ -1254,4 +1254,5 @@ private struct StudentInterestBadge: View {
     NavigationStack {
         StudentDetailView(studentId: Student.sampleStudent.id ?? "preview-student-id")
     }
+    .environment(ScheduleMeetingCoordinator())
 }

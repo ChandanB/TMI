@@ -4,7 +4,7 @@ import Foundation
 ///
 /// This type deliberately has no singleton and accepts only trusted membership
 /// plus typed target scopes. Callers cannot authorize with an editable profile.
-struct RBACService: Sendable {
+nonisolated struct RBACService: Sendable {
     func canCreateStudent(
         member: MembershipContext,
         school: SchoolAuthorizationScope
@@ -100,7 +100,7 @@ struct RBACService: Sendable {
     }
 }
 
-enum RBACError: LocalizedError, Equatable {
+nonisolated enum RBACError: LocalizedError, Equatable {
     case unauthorized
 
     var errorDescription: String? {

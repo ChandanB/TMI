@@ -5,7 +5,7 @@ import Foundation
 ///
 /// Migration tooling may inspect this shape. Production profiles never encode
 /// it and application authorization never consumes it.
-struct LegacyUserAuthorizationRecord: Decodable, Sendable, Equatable {
+nonisolated struct LegacyUserAuthorizationRecord: Decodable, Sendable, Equatable {
     let role: UserRole?
     let permissions: [String]
     let dataClassificationAccess: [String]

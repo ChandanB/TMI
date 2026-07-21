@@ -137,10 +137,8 @@ class NotificationService {
         }
     }
     
-    deinit {
-        Task { @MainActor in
-            listenerRegistration?.remove()
-        }
+    isolated deinit {
+        listenerRegistration?.remove()
     }
     
     // MARK: - Authorization
@@ -236,11 +234,11 @@ class NotificationService {
             targetId: targetId
         )
         
-        try db.collection("users")
+        try await db.collection("users")
             .document(userId)
             .collection("notifications")
             .document(notification.id)
-            .setData(from: notification)
+            .setModel(notification)
         
         // Also schedule local notification if enabled
         if preferences.pushEnabled && preferences.shouldNotify(for: type) {
@@ -460,5 +458,5 @@ class NotificationService {
 // MARK: - Environment Key
 
 extension EnvironmentValues {
-    @Entry var notificationService: NotificationService = NotificationService.shared
+    @Entry var notificationService: NotificationService? = nil
 }

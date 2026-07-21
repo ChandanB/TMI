@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum TMIColors {
+nonisolated enum TMIColors {
     // MARK: - Foundation
 
     static let background = Color(hex: "#F7F6FA")

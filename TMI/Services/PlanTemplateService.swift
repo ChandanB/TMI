@@ -9,7 +9,8 @@ import Foundation
 @preconcurrency import FirebaseAuth
 @preconcurrency import FirebaseFirestore
 
-actor PlanTemplateService {
+@MainActor
+final class PlanTemplateService {
     static let shared = PlanTemplateService()
 
     private let db = Firestore.firestore()
@@ -149,7 +150,7 @@ actor PlanTemplateService {
         guard let id = newTemplate.id else {
             throw PlanTemplateError.invalidTemplateId
         }
-        try await templateDocument(id: id).setData(from: newTemplate)
+        try await templateDocument(id: id).setModel(newTemplate)
         return newTemplate
     }
 
@@ -169,7 +170,7 @@ actor PlanTemplateService {
             createdAt: stored.createdAt,
             updatedAt: Date()
         )
-        try await templateDocument(id: templateID).setData(from: updated, merge: false)
+        try await templateDocument(id: templateID).setModel(updated)
     }
 
     func archiveTemplate(id: String) async throws {

@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct EngagementData: Identifiable, Equatable {
+struct EngagementData: Identifiable, Equatable, Sendable {
     let id = UUID()
     let day: String?
     let week: String
@@ -23,7 +23,7 @@ struct EngagementData: Identifiable, Equatable {
 }
 
 extension EngagementData {
-    static var sampleData: [EngagementData] = [
+    static let sampleData: [EngagementData] = [
         EngagementData(day: "Mon", week: "Week 1", engagement: 0.5),
         EngagementData(day: "Tue", week: "Week 2", engagement: 0.6),
         EngagementData(day: "Wed", week: "Week 3", engagement: 0.8),

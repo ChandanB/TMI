@@ -1,4 +1,4 @@
-struct FeatureFlags: Sendable, Equatable {
+nonisolated struct FeatureFlags: Sendable, Equatable {
     let independentStudentAccounts: Bool
     let guardianAccounts: Bool
     let aiSuggestions: Bool
@@ -12,7 +12,7 @@ struct FeatureFlags: Sendable, Equatable {
     )
 }
 
-extension FeatureFlags {
+nonisolated extension FeatureFlags {
     struct AccountAccess: Sendable, Equatable {
         enum Destination: Sendable, Equatable {
             case student

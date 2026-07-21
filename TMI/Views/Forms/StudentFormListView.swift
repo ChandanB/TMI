@@ -302,7 +302,7 @@ struct StudentFormCard: View {
               .fontWeight(.medium)
               .foregroundColor(.green)
 
-            if let feedback = submission.feedback {
+            if submission.feedback != nil {
               Spacer()
               Text("Has feedback")
                 .font(.caption2)

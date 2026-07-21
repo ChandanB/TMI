@@ -5,13 +5,12 @@
 //  Created by Chandan Brown on 9/14/24.
 //
 
-import FirebaseFirestore
 import Foundation
 
 // MARK: - TMI User Model
 
-struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
-  @DocumentID var id: String?
+nonisolated struct TMIUser: Codable, Identifiable, Equatable, Sendable {
+  var id: String?
   let userID: String
   var displayName: String
   var email: String
@@ -290,7 +289,7 @@ struct TMIUser: Codable, Identifiable, Equatable, @unchecked Sendable {
 
 // MARK: - User Role
 
-enum UserRole: String, CaseIterable, Codable, Identifiable, Sendable {
+nonisolated enum UserRole: String, CaseIterable, Codable, Identifiable, Sendable {
   case student = "student"
   case teacher = "teacher"
   case counselor = "counselor"
@@ -344,7 +343,7 @@ enum UserRole: String, CaseIterable, Codable, Identifiable, Sendable {
 
 // MARK: - Verification Types and Status
 
-enum VerificationType: String, CaseIterable, Codable, Sendable {
+nonisolated enum VerificationType: String, CaseIterable, Codable, Sendable {
   case none = "none"
   case ageVerification = "age_verification"
   case institutionalEmail = "institutional_email"
@@ -352,7 +351,7 @@ enum VerificationType: String, CaseIterable, Codable, Sendable {
   case guardianConsent = "guardian_consent"
 }
 
-struct VerificationStatus: Codable, Sendable {
+nonisolated struct VerificationStatus: Codable, Sendable {
   var isEmailVerified: Bool = false
   var isAgeVerified: Bool = false
   var isInstitutionVerified: Bool = false
@@ -365,7 +364,7 @@ struct VerificationStatus: Codable, Sendable {
   
 }
 
-enum AgeVerificationStatus: String, Codable, Sendable {
+nonisolated enum AgeVerificationStatus: String, Codable, Sendable {
   case notRequired = "not_required"
   case required = "required"
   case verified = "verified"
@@ -374,7 +373,7 @@ enum AgeVerificationStatus: String, Codable, Sendable {
 
 // MARK: - Consent Management
 
-struct ConsentRecord: Codable, Identifiable, Sendable {
+nonisolated struct ConsentRecord: Codable, Identifiable, Sendable {
   let id: String
   let consentType: ConsentType
   let grantedAt: Date
@@ -410,7 +409,7 @@ struct ConsentRecord: Codable, Identifiable, Sendable {
   }
 }
 
-enum ConsentType: String, CaseIterable, Codable, Sendable {
+nonisolated enum ConsentType: String, CaseIterable, Codable, Sendable {
   case coppa = "coppa"
   case ferpa = "ferpa"
   case dataCollection = "data_collection"
@@ -443,7 +442,7 @@ enum ConsentType: String, CaseIterable, Codable, Sendable {
 
 // MARK: - Privacy Settings
 
-struct PrivacySettings: Codable, Sendable {
+nonisolated struct PrivacySettings: Codable, Sendable {
   var dataRetentionPreference: DataRetentionPeriod
   var parentalControls: ParentalControls?
   var sensitiveDataAccess: SensitiveDataAccess
@@ -465,7 +464,7 @@ struct PrivacySettings: Codable, Sendable {
   }
 }
 
-enum DataRetentionPeriod: String, CaseIterable, Codable, Sendable {
+nonisolated enum DataRetentionPeriod: String, CaseIterable, Codable, Sendable {
   case minimal = "minimal" // 1 year
   case standard = "standard" // 3 years
   case extended = "extended" // 7 years
@@ -490,7 +489,7 @@ enum DataRetentionPeriod: String, CaseIterable, Codable, Sendable {
   }
 }
 
-struct ParentalControls: Codable, Sendable {
+nonisolated struct ParentalControls: Codable, Sendable {
   var allowDataSharing: Bool
   var requireConsentForNewFeatures: Bool
   var restrictSensitiveDataAccess: Bool
@@ -509,7 +508,7 @@ struct ParentalControls: Codable, Sendable {
   }
 }
 
-enum SensitiveDataAccess: String, CaseIterable, Codable, Sendable {
+nonisolated enum SensitiveDataAccess: String, CaseIterable, Codable, Sendable {
   case restricted = "restricted"
   case controlled = "controlled"
   case standard = "standard"
@@ -523,7 +522,7 @@ enum SensitiveDataAccess: String, CaseIterable, Codable, Sendable {
   }
 }
 
-struct EmergencyContactPermissions: Codable, Sendable {
+nonisolated struct EmergencyContactPermissions: Codable, Sendable {
   var allowCrisisIntervention: Bool
   var allowDataSharing: Bool
   var allowNotifications: Bool
@@ -539,7 +538,7 @@ struct EmergencyContactPermissions: Codable, Sendable {
   }
 }
 
-struct CommunicationPreferences: Codable, Sendable {
+nonisolated struct CommunicationPreferences: Codable, Sendable {
   var allowEmailNotifications: Bool
   var allowPushNotifications: Bool
   var allowSMSNotifications: Bool
@@ -560,7 +559,7 @@ struct CommunicationPreferences: Codable, Sendable {
 
 // MARK: - Emergency Contact
 
-struct EmergencyContact: Codable, Identifiable, Sendable {
+nonisolated struct EmergencyContact: Codable, Identifiable, Sendable {
   let id: String
   var name: String
   var relationship: String
@@ -590,7 +589,7 @@ struct EmergencyContact: Codable, Identifiable, Sendable {
 
 // MARK: - TMIUser Extensions
 
-extension TMIUser {
+nonisolated extension TMIUser {
   var age: Int? {
     guard let dateOfBirth = dateOfBirth else { return nil }
     return Calendar.current.dateComponents([.year], from: dateOfBirth, to: Date()).year
@@ -635,7 +634,7 @@ extension TMIUser {
 
 // MARK: - Legacy Compatibility
 
-struct UserProfileData: Codable, Sendable {
+nonisolated struct UserProfileData: Codable, Sendable {
   var displayName: String
   var email: String = ""
   var isEmailVerified: Bool = false
@@ -665,7 +664,7 @@ struct UserProfileData: Codable, Sendable {
 
 // MARK: - TMI User Validation Errors
 
-enum TMIUserValidationError: LocalizedError, Equatable {
+nonisolated enum TMIUserValidationError: LocalizedError, Equatable {
   case invalidDisplayName(String)
   case invalidEmail(String)
   case invalidAge(String)

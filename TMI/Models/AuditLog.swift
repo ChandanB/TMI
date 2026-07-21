@@ -10,8 +10,8 @@ import Foundation
 import FirebaseFirestore
 
 /// Audit log entry for tracking sensitive operations
-struct AuditLog: Codable, Identifiable, Hashable {
-    @DocumentID var id: String?
+nonisolated struct AuditLog: Codable, Identifiable, Hashable, Sendable {
+    var id: String?
     let action: AuditAction
     let entityType: EntityType
     let entityId: String
@@ -23,7 +23,7 @@ struct AuditLog: Codable, Identifiable, Hashable {
     let ipAddress: String?
     let metadata: [String: String]?
 
-    enum AuditAction: String, Codable, CaseIterable {
+    nonisolated enum AuditAction: String, Codable, CaseIterable, Sendable {
         // Student operations
         case studentCreated = "student_created"
         case studentUpdated = "student_updated"
@@ -160,7 +160,7 @@ struct AuditLog: Codable, Identifiable, Hashable {
         }
     }
 
-    enum EntityType: String, Codable, CaseIterable {
+    nonisolated enum EntityType: String, Codable, CaseIterable, Sendable {
         case student = "student"
         case tmiPlan = "tmi_plan"
         case form = "form"
@@ -186,7 +186,7 @@ struct AuditLog: Codable, Identifiable, Hashable {
         }
     }
 
-    enum AuditSeverity: String, Codable {
+    nonisolated enum AuditSeverity: String, Codable, Sendable {
         case low = "low"
         case medium = "medium"
         case high = "high"
@@ -263,7 +263,7 @@ struct AuditLog: Codable, Identifiable, Hashable {
 
 // MARK: - Sample Data
 
-extension AuditLog {
+nonisolated extension AuditLog {
     static var sampleLog: AuditLog {
         AuditLog(
             action: .studentViewed,

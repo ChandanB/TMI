@@ -711,12 +711,12 @@ struct CareerExplorerView: View {
       placeholder: "Search careers...",
       text: searchTextBinding
     )
-    .onChange(of: stateModel.searchText) { newValue in
+    .onChange(of: stateModel.searchText) { _, newValue in
       // Perform real-time search
       if !newValue.isEmpty {
         Task {
           // Add debouncing for search
-          try? await Task.sleep(nanoseconds: 300_000_000)  // 300ms
+          try? await Task.sleep(for: .milliseconds(300))
           if searchText == newValue {  // Check if search text hasn't changed
             // Could add live search results here
           }
@@ -2161,4 +2161,3 @@ struct StudentPickerSheet: View {
 #Preview {
   CareerExplorerView()
 }
-

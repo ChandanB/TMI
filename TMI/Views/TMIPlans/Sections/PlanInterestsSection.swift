@@ -227,7 +227,7 @@ struct PlanInterestsSection: View {
         isCreating = true
         defer { isCreating = false }
 
-        let newInterest = Interest(name: trimmed, category: [.other])
+        var newInterest = Interest(name: trimmed, category: [.other])
 
         do {
             let db = FirebaseManager.shared.firestore
@@ -236,7 +236,7 @@ struct PlanInterestsSection: View {
                 .document(uid)
                 .collection("interests")
                 .document()
-            try ref.setData(from: newInterest)
+            try await ref.setModel(newInterest)
             newInterest.id = ref.documentID
         } catch {
             // Continue without persistence — link locally only

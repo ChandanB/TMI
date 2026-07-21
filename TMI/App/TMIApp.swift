@@ -19,45 +19,96 @@ struct TMIApp: App {
     @State private var authStateModel: AuthStateModel
     @State private var studentContext: StudentContextStateModel
     @State private var deepLinkRouter: DeepLinkRouter
-    @State private var dashboardStateModel: DashboardStateModel
-    @State private var interestsStateModel: InterestsAndHobbiesStateModel
-    @State private var meetingsStateModel: MeetingsStateModel
-    @State private var districtStateModel: DistrictStateModel
-    @State private var recommendationsStateModel: RecommendationsStateModel
+    @State private var notificationService: NotificationService?
+    @State private var scheduleMeetingCoordinator: ScheduleMeetingCoordinator?
+    @State private var dashboardStateModel: DashboardStateModel?
+    @State private var interestsStateModel: InterestsAndHobbiesStateModel?
+    @State private var meetingsStateModel: MeetingsStateModel?
+    @State private var districtStateModel: DistrictStateModel?
+    @State private var recommendationsStateModel: RecommendationsStateModel?
 
     init() {
-        if FirebaseApp.app() == nil {
-            FirebaseApp.configure()
+        let dependencies: AppDependencies
+        let authStateModel: AuthStateModel
+
+        let isRunningUnitTests = Self.isRunningUnitTests
+
+        if isRunningUnitTests {
+            dependencies = .preview()
+            authStateModel = AuthStateModel(
+                membershipProvider: dependencies.membership,
+                automaticallyStart: false
+            )
+        } else {
+            if FirebaseApp.app() == nil {
+                FirebaseApp.configure()
+            }
+
+            let firebaseManager = FirebaseManager.shared
+            dependencies = .production(firestore: firebaseManager.firestore)
+            authStateModel = AuthStateModel(
+                firebaseManager: firebaseManager,
+                auditService: AuditService(),
+                membershipProvider: dependencies.membership,
+                authorizationSessionStore: .shared
+            )
         }
 
-        let firebaseManager = FirebaseManager.shared
-        let dependencies = AppDependencies.production(
-            firestore: firebaseManager.firestore
-        )
         self.dependencies = dependencies
 
-        _authStateModel = State(initialValue: AuthStateModel(
-            firebaseManager: firebaseManager,
-            membershipProvider: dependencies.membership,
-            authorizationSessionStore: .shared
-        ))
+        _authStateModel = State(initialValue: authStateModel)
         _studentContext = State(initialValue: StudentContextStateModel())
         _deepLinkRouter = State(initialValue: DeepLinkRouter())
-        _dashboardStateModel = State(initialValue: DashboardStateModel())
-        _interestsStateModel = State(initialValue: InterestsAndHobbiesStateModel())
-        _meetingsStateModel = State(initialValue: MeetingsStateModel())
-        _districtStateModel = State(initialValue: DistrictStateModel())
-        _recommendationsStateModel = State(initialValue: RecommendationsStateModel())
+        _notificationService = State(
+            initialValue: isRunningUnitTests ? nil : NotificationService.shared
+        )
+        _scheduleMeetingCoordinator = State(
+            initialValue: isRunningUnitTests ? nil : ScheduleMeetingCoordinator()
+        )
+        _dashboardStateModel = State(
+            initialValue: isRunningUnitTests ? nil : DashboardStateModel()
+        )
+        _interestsStateModel = State(
+            initialValue: isRunningUnitTests ? nil : InterestsAndHobbiesStateModel()
+        )
+        _meetingsStateModel = State(
+            initialValue: isRunningUnitTests ? nil : MeetingsStateModel()
+        )
+        _districtStateModel = State(
+            initialValue: isRunningUnitTests ? nil : DistrictStateModel()
+        )
+        _recommendationsStateModel = State(
+            initialValue: isRunningUnitTests ? nil : RecommendationsStateModel()
+        )
+    }
+
+    private static var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
     
     var body: some Scene {
         WindowGroup {
+            rootContent
+        }
+    }
+
+    @ViewBuilder
+    private var rootContent: some View {
+        if let notificationService,
+           let scheduleMeetingCoordinator,
+           let dashboardStateModel,
+           let interestsStateModel,
+           let meetingsStateModel,
+           let districtStateModel,
+           let recommendationsStateModel {
             ContentView()
                 // Core state models
                 .environment(\.appDependencies, dependencies)
                 .environment(\.authStateModel, authStateModel)
                 .environment(\.studentContext, studentContext)
-                .environment(\.deepLinkRouter, deepLinkRouter)
+                .environment(deepLinkRouter)
+                .environment(scheduleMeetingCoordinator)
+                .environment(\.notificationService, notificationService)
                 
                 // Domain state models
                 .environment(\.dashboardStateModel, dashboardStateModel)
@@ -74,6 +125,9 @@ struct TMIApp: App {
                         await deepLinkRouter.handleIncomingURL(url)
                     }
                 }
+        } else {
+            Color.clear
+                .accessibilityHidden(true)
         }
     }
 }

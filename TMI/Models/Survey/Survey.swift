@@ -6,18 +6,26 @@
 //
 
 import Foundation
-import FirebaseFirestore
 
-struct Survey: Codable, Identifiable, @unchecked Sendable {
-    @DocumentID var id: String?
+nonisolated struct Survey: Codable, Identifiable, Sendable {
+    var id: String? = nil
     var title: String
     var studentId: String
     var date: Date
     var questions: [Question]
     var completed: Bool
     var surveyType: SurveyType
+
+    private enum CodingKeys: String, CodingKey {
+        case title
+        case studentId
+        case date
+        case questions
+        case completed
+        case surveyType
+    }
     
-    enum SurveyType: String, Codable, CaseIterable, Sendable {
+    nonisolated enum SurveyType: String, Codable, CaseIterable, Sendable {
         case interests
         case hobbies
         case career
@@ -25,14 +33,14 @@ struct Survey: Codable, Identifiable, @unchecked Sendable {
         case behavioral
     }
     
-    struct Question: Codable, Identifiable, Sendable {
+    nonisolated struct Question: Codable, Identifiable, Sendable {
         var id: String
         var text: String
         var answerType: AnswerType
         var answer: String?
         var options: [String]?
         
-        enum AnswerType: String, Codable, Sendable {
+        nonisolated enum AnswerType: String, Codable, Sendable {
             case text
             case multipleChoice
             case scale
@@ -50,7 +58,7 @@ struct Survey: Codable, Identifiable, @unchecked Sendable {
     }
 }
 
-extension Survey {
+nonisolated extension Survey {
     static var sampleSurvey: Survey {
         Survey(
             id: "sample_survey_1",

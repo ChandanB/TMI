@@ -296,7 +296,7 @@ struct ConsentManagementView: View {
         defer { isLoading = false }
 
         // Load students
-        guard let userId = authState.currentUser?.userID else {
+        guard authState.currentUser?.userID != nil else {
             print("[ConsentManagementView] ⚠️ No user ID")
             return
         }

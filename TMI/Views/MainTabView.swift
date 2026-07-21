@@ -15,7 +15,7 @@ struct MainTabView: View {
     @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) private var authStateModel
     @Environment(\.studentContext) private var studentContext
-    @Environment(\.deepLinkRouter) private var deepLinkRouter
+    @Environment(DeepLinkRouter.self) private var deepLinkRouter
     @Environment(\.notificationService) private var notificationService
     
     // Student Mode
@@ -36,7 +36,7 @@ struct MainTabView: View {
     @State private var studentsPath = NavigationPath()
     @State private var plansPath = NavigationPath()
     
-    enum Tab: String, CaseIterable, Identifiable {
+    nonisolated enum Tab: String, CaseIterable, Identifiable {
         case dashboard, students, tmiPlans, district
         var id: Self { self }
 
@@ -130,7 +130,9 @@ struct MainTabView: View {
                                 }
                             }
                             ToolbarItemGroup(placement: .automatic) {
-                                NotificationBellButton()
+                                if self.notificationService != nil {
+                                    NotificationBellButton()
+                                }
                                 profileMenu
                             }
                         }
@@ -170,11 +172,15 @@ struct MainTabView: View {
             if !availableTabs.contains(selectedTab) {
                 selectedTab = defaultTab
             }
+
+            guard let notificationService = self.notificationService else {
+                return
+            }
             notificationService.startListening()
             Task { try? await notificationService.fetchNotifications() }
         }
         .onDisappear {
-            notificationService.stopListening()
+            self.notificationService?.stopListening()
         }
         .onChange(of: selectedTab) { _, newTab in
             // Clear deep link when manually changing tabs
@@ -511,8 +517,10 @@ private struct QuickStatCard: View {
 
 #Preview("iPhone") {
   MainTabView()
+    .environment(DeepLinkRouter())
 }
 
 #Preview("iPad") {
   MainTabView()
+    .environment(DeepLinkRouter())
 }

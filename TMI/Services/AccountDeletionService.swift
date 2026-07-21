@@ -3,7 +3,7 @@ import Foundation
 @preconcurrency import FirebaseFirestore
 @preconcurrency import FirebaseFunctions
 
-struct AccountDeletionPolicy: Sendable, Equatable {
+nonisolated struct AccountDeletionPolicy: Sendable, Equatable {
     let personalSubcollections: Set<String>
     let retainedSubcollections: Set<String>
 
@@ -48,12 +48,12 @@ struct AccountDeletionPolicy: Sendable, Equatable {
     )
 }
 
-struct AccountDeletionIdentity: Sendable, Equatable {
+nonisolated struct AccountDeletionIdentity: Sendable, Equatable {
     let userID: String
     let email: String
 }
 
-enum AccountDeletionError: LocalizedError, Equatable {
+nonisolated enum AccountDeletionError: LocalizedError, Equatable {
     case noAuthenticatedUser
     case missingEmail
     case incorrectPassword

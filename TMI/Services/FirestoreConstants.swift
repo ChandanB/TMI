@@ -128,7 +128,7 @@ enum FirestoreCollection: String {
     
     case generatedResources = "generatedResources"
     
-    nonisolated func reference() -> CollectionReference {
+    func reference() -> CollectionReference {
         FirebaseManager.shared.firestore.collection(self.rawValue)
     }
 }
@@ -169,3 +169,56 @@ struct FirestoreDecodingValues {
     static let contentMentionIntValue = 5
 }
 
+// MARK: - Codable document identity
+
+nonisolated extension DocumentSnapshot {
+    /// Decodes a model and restores the canonical Firestore document ID.
+    ///
+    /// Models intentionally keep persistence wrappers out of their Sendable
+    /// domain representation, so identity must be assigned at the repository
+    /// boundary after decoding.
+    func decodedModel<Value: Decodable>(
+        as type: Value.Type,
+        assigningDocumentIDTo keyPath: WritableKeyPath<Value, String?>
+    ) throws -> Value {
+        var value = try data(as: type)
+        value[keyPath: keyPath] = documentID
+        return value
+    }
+}
+
+nonisolated extension DocumentReference {
+    /// Selects Firestore's synchronous, completionless overload so the write is
+    /// queued locally even when the client has no network connection.
+    fileprivate func enqueueDataLocally(_ data: [String: Any], merge: Bool) {
+        setData(data, merge: merge, completion: nil)
+    }
+
+    /// Encodes a model and performs an offline-capable local enqueue.
+    ///
+    /// Returning from this helper means Firestore accepted the write into its
+    /// local queue; it does not confirm server acknowledgement. Operations that
+    /// require an online acknowledgement must use a separate confirmed-write contract.
+    func setModel<Value: Encodable>(
+        _ value: Value,
+        merge: Bool = false
+    ) async throws {
+        let data = try Firestore.Encoder().encode(value)
+        enqueueDataLocally(data, merge: merge)
+    }
+}
+
+nonisolated extension CollectionReference {
+    /// Encodes a model and performs an offline-capable local enqueue.
+    ///
+    /// The returned identifier is allocated locally. This helper does not
+    /// confirm server acknowledgement; online-required transitions need a
+    /// separate confirmed-write contract.
+    @discardableResult
+    func addModel<Value: Encodable>(_ value: Value) async throws -> String {
+        let data = try Firestore.Encoder().encode(value)
+        let reference = document()
+        reference.enqueueDataLocally(data, merge: false)
+        return reference.documentID
+    }
+}

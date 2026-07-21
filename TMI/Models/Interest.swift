@@ -5,7 +5,7 @@ import SwiftUI
 import SwiftData
 import FirebaseFirestore
 
-final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
+nonisolated struct Interest: Identifiable, Hashable, Codable, Sendable {
     // MARK: - Equatable Implementation
     static func == (lhs: Interest, rhs: Interest) -> Bool {
         return lhs.id == rhs.id
@@ -16,7 +16,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
     }
     
     // MARK: - Firebase Integration
-    @DocumentID var id: String?
+    var id: String?
     
     // MARK: - Core Properties
     var name: String
@@ -102,7 +102,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
     }
     
     // Simple initializer with category (update to include createdAt)
-    convenience init(name: String, category: InterestCategory) {
+    init(name: String, category: InterestCategory) {
         self.init(name: name, category: [category], createdAt: Date())
     }
     
@@ -114,7 +114,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
         case behavioralBenefits, skillsDeveloped, tierRelevance, relatedInterests, relatedStudents, schemaVersion
     }
     
-    required init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         id = try container.decode(String.self, forKey: .id)
@@ -369,14 +369,14 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
     }
     
     /// Add an intervention model if not already present
-    func addInterventionModel(_ model: InterventionModel) {
+    mutating func addInterventionModel(_ model: InterventionModel) {
         if !interventionModels.contains(model) {
             interventionModels.append(model)
         }
     }
     
     /// Add an academic subject if not already present
-    func addAcademicSubject(_ subject: AcademicSubject) {
+    mutating func addAcademicSubject(_ subject: AcademicSubject) {
         if !academicRelevance.contains(subject) {
             academicRelevance.append(subject)
         }
@@ -403,7 +403,7 @@ final class Interest: Identifiable, Hashable, Codable, @unchecked Sendable {
 
 // MARK: - Support Enums and Types
 
-enum InterestScope: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum InterestScope: String, Codable, CaseIterable, Identifiable, Sendable {
     case global = "global"
     case district = "district"
     case personal = "personal"
@@ -411,7 +411,7 @@ enum InterestScope: String, Codable, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 }
 
-enum InterventionModel: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum InterventionModel: String, Codable, CaseIterable, Identifiable, Sendable {
     case chaseYourSpace = "Chase Your Space"
     case acknowledgeInterests = "Acknowledge Your Interests"
     case alignYourMind = "Align Your Mind"
@@ -450,7 +450,7 @@ enum InterventionModel: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum InterventionTier: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum InterventionTier: String, Codable, CaseIterable, Identifiable, Sendable {
     case tier1 = "Tier 1"
     case tier2 = "Tier 2"
     
@@ -466,7 +466,7 @@ enum InterventionTier: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum AcademicSubject: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum AcademicSubject: String, Codable, CaseIterable, Identifiable, Sendable {
     case mathematics = "Mathematics"
     case english = "English Language Arts"
     case science = "Science"
@@ -496,7 +496,7 @@ enum AcademicSubject: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum CareerPathway: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum CareerPathway: String, Codable, CaseIterable, Identifiable, Sendable {
     case stem = "STEM"
     case healthcare = "Healthcare"
     case business = "Business & Entrepreneurship"
@@ -509,7 +509,7 @@ enum CareerPathway: String, Codable, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 }
 
-enum Skill: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum Skill: String, Codable, CaseIterable, Identifiable, Sendable {
     case criticalThinking = "Critical Thinking"
     case communication = "Communication"
     case teamwork = "Teamwork"
@@ -526,7 +526,7 @@ enum Skill: String, Codable, CaseIterable, Identifiable, Sendable {
 
 // MARK: - InterestCategory Extension
 
-enum InterestCategory: String, CaseIterable, Identifiable, Codable, Comparable, Equatable, Sendable {
+nonisolated enum InterestCategory: String, CaseIterable, Identifiable, Codable, Comparable, Equatable, Sendable {
     static func < (lhs: InterestCategory, rhs: InterestCategory) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
@@ -1158,4 +1158,3 @@ extension Array where Element == Interest {
         }
     }
 }
-

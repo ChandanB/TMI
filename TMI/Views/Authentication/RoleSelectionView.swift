@@ -251,7 +251,7 @@ struct TraumaInformedWelcomeSection: View {
 
 // MARK: - Simplified Role Category
 
-enum SimplifiedRoleCategory: String, CaseIterable, Identifiable {
+nonisolated enum SimplifiedRoleCategory: String, CaseIterable, Identifiable {
   case student = "student"
   case staff = "staff"
   case parentGuardian = "parent_guardian"

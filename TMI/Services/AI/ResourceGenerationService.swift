@@ -338,7 +338,7 @@ actor ResourceGenerationService {
         }
 
         let resources = try snapshot.documents.compactMap { doc in
-            try doc.data(as: Resource.self)
+            try doc.decodedModel(as: Resource.self, assigningDocumentIDTo: \.id)
         }
 
         return resources
@@ -357,7 +357,7 @@ actor ResourceGenerationService {
 
         // Upload each resource
         for resource in resources {
-            let _ = try collection.addDocument(from: resource)
+            _ = try await collection.addModel(resource)
         }
 
         // Also update the interest document to mark it as having generated resources

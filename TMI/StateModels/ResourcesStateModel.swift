@@ -130,9 +130,10 @@ final class ResourcesStateModel: BaseStateModel<ResourcesData, IdentifiableError
         
         return querySnapshot.documents.compactMap { document -> Resource? in
             do {
-                var resource = try document.data(as: Resource.self)
-                resource.id = document.documentID
-                return resource
+                return try document.decodedModel(
+                    as: Resource.self,
+                    assigningDocumentIDTo: \.id
+                )
             } catch {
                 print("[ResourcesStateModel] Failed to decode resource: \(error)")
                 return nil
@@ -150,8 +151,7 @@ final class ResourcesStateModel: BaseStateModel<ResourcesData, IdentifiableError
         var resourceToSave = resource
         resourceToSave.updatedAt = Date()
         
-        let docRef = try await collection.addDocument(data: resourceToSave.toFirestoreData())
-        resourceToSave.id = docRef.documentID
+        resourceToSave.id = try await collection.addModel(resourceToSave)
         
         return resourceToSave
     }
@@ -201,4 +201,3 @@ extension Resource {
         ]
     }
 }
-

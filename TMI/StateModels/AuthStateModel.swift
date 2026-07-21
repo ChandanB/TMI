@@ -12,14 +12,14 @@ import Observation
 import SwiftUI
 
 // Simple Field enum for compatibility with AuthenticationView
-enum Field: Hashable {
+nonisolated enum Field: Hashable {
   case email  
   case password
 }
 
 // MARK: - Authentication State
 
-enum AuthenticationState: Equatable {
+nonisolated enum AuthenticationState: Equatable {
   case unauthenticated
   case registering(RegistrationStep)
   case authenticating
@@ -55,7 +55,7 @@ enum AuthenticationState: Equatable {
 
 // MARK: - Registration Steps
 
-enum RegistrationStep: String, CaseIterable, Equatable {
+nonisolated enum RegistrationStep: String, CaseIterable, Equatable {
   case initial = "initial"
   case roleSelection = "role_selection"
   case ageVerification = "age_verification"
@@ -131,7 +131,7 @@ enum RegistrationStep: String, CaseIterable, Equatable {
 
 // MARK: - Authentication Error
 
-struct AuthenticationError: Error, Identifiable, Equatable {
+nonisolated struct AuthenticationError: Error, Identifiable, Equatable {
   let id: String
   let type: AuthenticationErrorType
   let message: String
@@ -165,7 +165,7 @@ struct AuthenticationError: Error, Identifiable, Equatable {
   }
 }
 
-enum AuthenticationErrorType: String, CaseIterable {
+nonisolated enum AuthenticationErrorType: String, CaseIterable {
   case invalidCredentials = "invalid_credentials"
   case accountNotFound = "account_not_found"
   case accountLocked = "account_locked"
@@ -284,7 +284,7 @@ enum AuthenticationErrorType: String, CaseIterable {
 
 // MARK: - Support Resources
 
-struct SupportResource: Identifiable, Equatable {
+nonisolated struct SupportResource: Identifiable, Equatable {
   let id: String
   let type: SupportResourceType
   let title: String
@@ -309,7 +309,7 @@ struct SupportResource: Identifiable, Equatable {
   }
 }
 
-enum SupportResourceType: String, CaseIterable {
+nonisolated enum SupportResourceType: String, CaseIterable {
   case helpCenter = "help_center"
   case supportChat = "support_chat"
   case emergencySupport = "emergency_support"
@@ -331,7 +331,7 @@ enum SupportResourceType: String, CaseIterable {
 
 // MARK: - Suspension Reason
 
-enum SuspensionReason: String, CaseIterable, Equatable {
+nonisolated enum SuspensionReason: String, CaseIterable, Equatable {
   case securityConcern = "security_concern"
   case policyViolation = "policy_violation"
   case complianceIssue = "compliance_issue"
@@ -376,28 +376,26 @@ enum SuspensionReason: String, CaseIterable, Equatable {
 
 // MARK: - Trusted Authentication Adapters
 
-struct AuthenticatedIdentity: Sendable, Equatable {
+nonisolated struct AuthenticatedIdentity: Sendable, Equatable {
   let userID: String
   let isEmailVerified: Bool
 }
 
-final class AuthStateListenerHandle: @unchecked Sendable {
-  private let lock = NSLock()
-  private var removalOperation: (() -> Void)?
+@MainActor
+final class AuthStateListenerHandle {
+  private var removalOperation: (@MainActor () -> Void)?
 
-  init(removalOperation: @escaping () -> Void) {
+  init(removalOperation: @MainActor @escaping () -> Void) {
     self.removalOperation = removalOperation
   }
 
   func remove() {
-    lock.lock()
     let operation = removalOperation
     removalOperation = nil
-    lock.unlock()
     operation?()
   }
 
-  deinit {
+  isolated deinit {
     remove()
   }
 }
@@ -489,7 +487,10 @@ struct FirebaseUserProfileProvider: UserProfileProviding, @unchecked Sendable {
       return nil
     }
 
-    var profile = try snapshot.data(as: TMIUser.self)
+    var profile = try snapshot.decodedModel(
+      as: TMIUser.self,
+      assigningDocumentIDTo: \.id
+    )
     guard profile.userID == identity.userID else {
       throw UserProfileLoadingError.identityMismatch
     }
@@ -513,20 +514,59 @@ private enum UserProfileLoadingError: Error {
   case identityMismatch
 }
 
+private enum UnconfiguredAuthenticationDependencyError: LocalizedError {
+  case unavailable
+
+  var errorDescription: String? {
+    "Authentication dependencies are unavailable in this runtime."
+  }
+}
+
+private final class UnavailableAuthenticationIdentityProvider: AuthenticationIdentityProviding {
+  @MainActor
+  var currentIdentity: AuthenticatedIdentity? { nil }
+
+  @MainActor
+  func trustedClaim(for identity: AuthenticatedIdentity) async throws -> TrustedTenantClaim {
+    throw UnconfiguredAuthenticationDependencyError.unavailable
+  }
+
+  @MainActor
+  func addStateDidChangeListener(
+    _ listener: @escaping @MainActor (AuthenticatedIdentity?) -> Void
+  ) -> AuthStateListenerHandle {
+    AuthStateListenerHandle(removalOperation: {})
+  }
+}
+
+private struct UnavailableUserProfileProvider: UserProfileProviding {
+  func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
+    throw UnconfiguredAuthenticationDependencyError.unavailable
+  }
+}
+
+private struct UnavailableAuthMembershipProvider: MembershipProviding {
+  func membership(for claim: TrustedTenantClaim) async throws -> MembershipContext {
+    throw MembershipRepositoryError.unavailable
+  }
+}
+
 // MARK: - Environment Key
 extension EnvironmentValues {
-  @Entry var authStateModel: AuthStateModel = AuthStateModel()
+  @Entry var authStateModel: AuthStateModel = AuthStateModel(automaticallyStart: false)
 }
 
 // MARK: - Auth State Model
 
 @Observable
+@MainActor
 final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableError> {
 
   // MARK: - Dependencies
-  private let firebaseManager: FirebaseManager
-  private let auditService: AuditService
+  private let auditService: any AuditEventRecording
+  private let signInOperation: @MainActor (String, String) async throws -> Void
   private let signOutOperation: @MainActor () throws -> Void
+  private let resetPasswordOperation: @MainActor (String) async throws -> Void
   private let identityProvider: any AuthenticationIdentityProviding
   private let profileProvider: any UserProfileProviding
   private let membershipProvider: any MembershipProviding
@@ -678,8 +718,8 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
   // MARK: - Initialization
   init(
-    firebaseManager: FirebaseManager = FIREBASE_MANAGER,
-    auditService: AuditService = AUDIT_SERVICE,
+    firebaseManager: FirebaseManager? = nil,
+    auditService: any AuditEventRecording = NoOpAuditEventRecorder(),
     signOutOperation: (@MainActor () throws -> Void)? = nil,
     identityProvider: (any AuthenticationIdentityProviding)? = nil,
     profileProvider: (any UserProfileProviding)? = nil,
@@ -687,18 +727,38 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     authorizationSessionStore: TrustedAuthorizationSessionStore = TrustedAuthorizationSessionStore(),
     automaticallyStart: Bool = true
   ) {
-    self.firebaseManager = firebaseManager
+    let resolvedFirebaseManager = firebaseManager ?? (
+      automaticallyStart ? FirebaseManager.shared : nil
+    )
+
     self.auditService = auditService
     self.signOutOperation = signOutOperation ?? {
-      try firebaseManager.signOut()
+      guard let resolvedFirebaseManager else {
+        throw UnconfiguredAuthenticationDependencyError.unavailable
+      }
+      try resolvedFirebaseManager.signOut()
     }
-    self.identityProvider = identityProvider ?? FirebaseAuthenticationIdentityProvider()
-    self.profileProvider = profileProvider ?? FirebaseUserProfileProvider(
-      firestore: firebaseManager.firestore
-    )
-    self.membershipProvider = membershipProvider ?? MembershipRepository(
-      store: FirebaseMembershipStore(firestore: firebaseManager.firestore)
-    )
+    self.signInOperation = { email, password in
+      guard let resolvedFirebaseManager else {
+        throw UnconfiguredAuthenticationDependencyError.unavailable
+      }
+      try await resolvedFirebaseManager.signIn(withEmail: email, password: password)
+    }
+    self.resetPasswordOperation = { email in
+      guard let resolvedFirebaseManager else {
+        throw UnconfiguredAuthenticationDependencyError.unavailable
+      }
+      try await resolvedFirebaseManager.resetPassword(email: email)
+    }
+    self.identityProvider = identityProvider ?? resolvedFirebaseManager.map {
+      FirebaseAuthenticationIdentityProvider(auth: $0.auth)
+    } ?? UnavailableAuthenticationIdentityProvider()
+    self.profileProvider = profileProvider ?? resolvedFirebaseManager.map {
+      FirebaseUserProfileProvider(firestore: $0.firestore)
+    } ?? UnavailableUserProfileProvider()
+    self.membershipProvider = membershipProvider ?? resolvedFirebaseManager.map {
+      MembershipRepository(store: FirebaseMembershipStore(firestore: $0.firestore))
+    } ?? UnavailableAuthMembershipProvider()
     self.authorizationSessionStore = authorizationSessionStore
     super.init()
 
@@ -709,7 +769,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     }
   }
 
-  deinit {
+  isolated deinit {
     authorizationTask?.cancel()
     authStateListenerHandle?.remove()
   }
@@ -1041,7 +1101,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     updateState(.loaded(.authenticating))
 
     do {
-      try await firebaseManager.signIn(withEmail: email, password: password)
+      try await signInOperation(email, password)
       // Firebase auth listener will handle the rest
       clearCredentials()
     } catch {
@@ -1101,7 +1161,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     updateState(.loaded(.authenticating))
 
     do {
-      try await firebaseManager.resetPassword(email: email)
+      try await resetPasswordOperation(email)
       // Show success message
       ui.alertMessage = "Password reset email sent. Please check your inbox."
       ui.isShowingAlert = true
@@ -1332,7 +1392,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
 // MARK: - Supporting Types
 
-enum AuthField: Hashable {
+nonisolated enum AuthField: Hashable {
   case email
   case password
   case confirmPassword
@@ -1361,14 +1421,14 @@ extension AuthStateModel {
   }
 }
 
-enum ConsentStatus {
+nonisolated enum ConsentStatus {
   case pending
   case granted
   case revoked
   case expired
 }
 
-enum ParentalConsentStatus: String, Codable {
+nonisolated enum ParentalConsentStatus: String, Codable {
   case notRequired = "not_required"
   case required = "required"
   case pending = "pending"
@@ -1376,21 +1436,21 @@ enum ParentalConsentStatus: String, Codable {
   case denied = "denied"
 }
 
-enum PrivacyLevel {
+nonisolated enum PrivacyLevel {
   case minimal
   case standard
   case enhanced
   case maximum
 }
 
-enum AuthenticationMethod {
+nonisolated enum AuthenticationMethod {
   case emailPassword
   case institutionalSSO
   case socialLogin
   case mfa
 }
 
-struct RegistrationData {
+nonisolated struct RegistrationData {
   var selectedRole: UserRole?
   var dateOfBirth: Date?
   /// Institution code is required for roles with institutional affiliation.

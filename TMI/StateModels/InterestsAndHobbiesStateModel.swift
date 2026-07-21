@@ -173,14 +173,13 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
         updateState(.loading)
 
         do {
-            // Add timeout protection
-            let interests = try await withTimeout(seconds: 10) {
+            let interests = try await withTimeout(seconds: 10) { @MainActor @Sendable in
                 try await self.interestLibraryService.fetchAllInterests()
             }
 
             let data = InterestsAndHobbiesData(interests: interests)
             updateState(.loaded(data))
-        } catch is TimeoutError {
+        } catch ConcurrencyError.timeout {
             print("[InterestsAndHobbiesStateModel] Fetch timed out")
             updateState(.error(IdentifiableError(message: "Fetch timed out")))
         } catch {
@@ -189,26 +188,6 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
         }
     }
 
-    // Timeout helper
-    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await operation()
-            }
-
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw TimeoutError()
-            }
-
-            let result = try await group.next()!
-            group.cancelAll()
-            return result
-        }
-    }
-
-    struct TimeoutError: Error {}
-    
     @MainActor
     func addInterest(_ interest: Interest) async {
         do {
@@ -434,4 +413,3 @@ enum InterestError: Error, LocalizedError {
         }
     }
 }
-

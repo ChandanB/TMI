@@ -1,12 +1,12 @@
 import Foundation
 
-enum TrustedAccessClass: String, Codable, Sendable, CaseIterable, Equatable {
+nonisolated enum TrustedAccessClass: String, Codable, Sendable, CaseIterable, Equatable {
     case staff
     case studentMode
     case guardianRespondent
 }
 
-struct TrustedTenantClaim: Sendable, Equatable {
+nonisolated struct TrustedTenantClaim: Sendable, Equatable {
     static let districtIDClaimKey = "tmiDistrictID"
     static let accessClassClaimKey = "tmiAccessClass"
     static let membershipVersionClaimKey = "tmiMembershipVersion"
@@ -76,18 +76,18 @@ struct TrustedTenantClaim: Sendable, Equatable {
     }
 }
 
-enum TrustedTenantClaimError: Error, Equatable {
+nonisolated enum TrustedTenantClaimError: Error, Equatable {
     case malformed
     case unsupportedAccessClass
 }
 
-struct AuthenticatedSession: Sendable, Equatable {
+nonisolated struct AuthenticatedSession: Sendable, Equatable {
     let profile: TMIUser
     let claim: TrustedTenantClaim
     let membership: MembershipContext
 }
 
-enum TrustedIdentifier {
+nonisolated enum TrustedIdentifier {
     static func isValid(_ value: String) -> Bool {
         !value.isEmpty
             && value == value.trimmingCharacters(in: .whitespacesAndNewlines)

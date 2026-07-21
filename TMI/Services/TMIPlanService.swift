@@ -670,186 +670,14 @@ class TMIPlanService {
         ) else {
             throw TMIPlanServiceError.authorizationDenied
         }
+
+        try await collection.document(planId).delete()
     }
     
     /// Get a specific TMI plan by ID
     func getPlan(by id: String) async throws -> TMIPlan? {
-        return try await fetchPlan(byId: id)
-
-        guard let collection = userPlansCollection else {
-            throw TMIPlanServiceError.userNotAuthenticated
-        }
-        
-        do {
-            print("[TMIPlanService] Fetching TMI plan with ID: \(id)")
-            let document = try await collection.document(id).getDocument()
-            
-            if document.exists {
-                // Use the same manual reconstruction logic
-                let data = document.data()!
-                
-                guard let modelRaw = data["model"] as? String,
-                      let model = TMIPlanModel(rawValue: modelRaw),
-                      let progress = data["progress"] as? Double,
-                      let notes = data["notes"] as? String,
-                      let creationTimestamp = data["creationDate"] as? Double,
-                      let lastUpdatedTimestamp = data["lastUpdated"] as? Double,
-                      let studentData = data["student"] as? [String: Any] else {
-                    return nil
-                }
-                
-                let creationDate = Date(timeIntervalSince1970: creationTimestamp)
-                let lastUpdated = Date(timeIntervalSince1970: lastUpdatedTimestamp)
-                
-                let student = Student(
-                    id: studentData["id"] as? String,
-                    name: studentData["name"] as? String ?? "Unknown",
-                    grade: studentData["grade"] as? String ?? "",
-                    school: "",
-                    dateOfBirth: Date()
-                )
-                
-                let students: [Student]
-                if let studentsData = data["students"] as? [[String: Any]] {
-                    students = studentsData.map { studentInfo in
-                        Student(
-                            id: studentInfo["id"] as? String,
-                            name: studentInfo["name"] as? String ?? "Unknown",
-                            grade: studentInfo["grade"] as? String ?? "",
-                            school: "",
-                            dateOfBirth: Date()
-                        )
-                    }
-                } else {
-                    students = [student]
-                }
-                
-                let interests: [Interest]
-                if let interestsData = data["interests"] as? [[String: Any]] {
-                    interests = interestsData.compactMap { interestData in
-                        Interest.fromFirestore(id: interestData["id"] as? String ?? "", data: interestData)
-                    }
-                } else {
-                    interests = []
-                }
-                
-                // Note: Hobbies are now included in interests
-                
-                let goals: [Goal]
-                if let goalsData = data["goals"] as? [[String: Any]] {
-                    goals = goalsData.compactMap { goalData in
-                        guard let idString = goalData["id"] as? String,
-                              let id = UUID(uuidString: idString),
-                              let description = goalData["description"] as? String,
-                              let statusString = goalData["status"] as? String,
-                              let status = GoalStatus(rawValue: statusString),
-                              let progress = goalData["progress"] as? Double else {
-                            return nil
-                        }
-                        
-                        let notes = goalData["notes"] as? String
-                        let dueDate: Date?
-                        if let dueDateTimestamp = goalData["dueDate"] as? Double {
-                            dueDate = Date(timeIntervalSince1970: dueDateTimestamp)
-                        } else {
-                            dueDate = nil
-                        }
-                        
-                        return Goal(
-                            id: id,
-                            description: description,
-                            dueDate: dueDate, status: status,
-                            progress: progress,
-                            notes: notes
-                        )
-                    }
-                } else {
-                    goals = []
-                }
-
-                // Reconstruct resources
-                let resources: [Resource]
-                if let resourcesData = data["resources"] as? [[String: Any]] {
-                    resources = resourcesData.compactMap { resourceData in
-                        guard let title = resourceData["title"] as? String,
-                              let description = resourceData["description"] as? String,
-                              let categoryRaw = resourceData["category"] as? String,
-                              let category = Resource.ResourceCategory(rawValue: categoryRaw),
-                              let url = resourceData["url"] as? String,
-                              let createdAtTimestamp = resourceData["createdAt"] as? Double,
-                              let updatedAtTimestamp = resourceData["updatedAt"] as? Double else {
-                            return nil
-                        }
-                        
-                        let tags = resourceData["tags"] as? [String] ?? []
-                        let recommendedFor = resourceData["recommendedFor"] as? [String] ?? []
-                        let isFeatured = resourceData["isFeatured"] as? Bool ?? false
-                        let thumbnail = resourceData["thumbnail"] as? String
-                        let scopeRaw = resourceData["scope"] as? String
-                        let scope = scopeRaw.flatMap { Resource.ResourceScope(rawValue: $0) }
-                        let districtId = resourceData["districtId"] as? String
-                        let ownerUid = resourceData["ownerUid"] as? String
-
-                        return Resource(
-                            id: resourceData["id"] as? String,
-                            title: title,
-                            description: description,
-                            category: category,
-                            url: url,
-                            createdAt: Date(timeIntervalSince1970: createdAtTimestamp),
-                            updatedAt: Date(timeIntervalSince1970: updatedAtTimestamp),
-                            tags: tags,
-                            recommendedFor: recommendedFor,
-                            isFeatured: isFeatured,
-                            thumbnail: thumbnail,
-                            scope: scope,
-                            districtId: districtId,
-                            ownerUid: ownerUid
-                        )
-                    }
-                } else {
-                    resources = []
-                }
-                
-                let title = data["title"] as? String ?? ""
-                let startDate = (data["startDate"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
-                let endDate = (data["endDate"] as? Double).map(Date.init(timeIntervalSince1970:))
-                let createdBy = data["createdBy"] as? String ?? ""
-                let latestInterestSurveyId = data["latestInterestSurveyId"] as? String
-                let interestIdsSnapshot = data["interestIdsSnapshot"] as? [String]
-                let snapshotUpdatedAt = (data["snapshotUpdatedAt"] as? Double).map(Date.init(timeIntervalSince1970:))
-
-                return TMIPlan(
-                    id: document.documentID,
-                    title: title,
-                    description: data["description"] as? String,
-                    students: students,
-                    model: model,
-                    interests: interests,
-                        startDate: startDate,
-                    endDate: endDate,
-                    creationDate: creationDate,
-                    lastUpdated: lastUpdated,
-                    goals: goals,
-                    progress: progress,
-                    notes: notes,
-                    strategies: data["strategies"] as? [String],
-                    progressTracking: nil,
-                    createdBy: createdBy,
-                    resources: resources,
-                    latestInterestSurveyId: latestInterestSurveyId,
-                    interestIdsSnapshot: interestIdsSnapshot,
-                    snapshotUpdatedAt: snapshotUpdatedAt
-                )
-            } else {
-                return nil
-            }
-        } catch {
-            print("[TMIPlanService] Error fetching TMI plan: \(error)")
-            throw TMIPlanServiceError.fetchFailed(error.localizedDescription)
-        }
+        try await fetchPlan(byId: id)
     }
-    
     /// Get plans for a specific student
     func getPlansForStudent(_ studentId: String) async throws -> [TMIPlan] {
         guard userPlansCollection != nil else {
@@ -1114,7 +942,11 @@ class TMIPlanService {
             .getDocuments()
 
         return snapshot.documents.compactMap { document in
-            try? document.data(as: PlanInputField.self)
+            guard var field = try? document.data(as: PlanInputField.self) else {
+                return nil
+            }
+            field.id = document.documentID
+            return field
         }
     }
 
@@ -1186,7 +1018,11 @@ class TMIPlanService {
             .getDocuments()
 
         return snapshot.documents.compactMap { document in
-            try? document.data(as: PlanEvidenceEntry.self)
+            guard var entry = try? document.data(as: PlanEvidenceEntry.self) else {
+                return nil
+            }
+            entry.id = document.documentID
+            return entry
         }
     }
 

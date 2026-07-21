@@ -10,9 +10,8 @@ import FirebaseFirestore
 
 // MARK: - Coding Keys for proper Firestore Date handling
 
-extension Meeting {
+nonisolated extension Meeting {
     enum CodingKeys: String, CodingKey {
-        case id
         case title
         case description
         case startTime
@@ -32,8 +31,8 @@ extension Meeting {
     }
 }
 
-struct Meeting: Codable, Identifiable, Hashable {
-    @DocumentID var id: String?
+nonisolated struct Meeting: Codable, Identifiable, Hashable, Sendable {
+    var id: String? = nil
     let title: String
     let description: String?
     let startTime: Date
@@ -60,7 +59,7 @@ struct Meeting: Codable, Identifiable, Hashable {
     let createdAt: Date
     var lastUpdated: Date
 
-    enum MeetingType: String, Codable, CaseIterable {
+    nonisolated enum MeetingType: String, Codable, CaseIterable, Sendable {
         case checkIn = "Check-In"
         case progressReview = "Progress Review"
         case parentConference = "Parent Conference"
@@ -91,7 +90,7 @@ struct Meeting: Codable, Identifiable, Hashable {
         }
     }
 
-    enum MeetingStatus: String, Codable, CaseIterable {
+    nonisolated enum MeetingStatus: String, Codable, CaseIterable, Sendable {
         case scheduled = "Scheduled"
         case confirmed = "Confirmed"
         case completed = "Completed"
@@ -166,14 +165,14 @@ struct Meeting: Codable, Identifiable, Hashable {
     }
 }
 
-struct MeetingParticipant: Codable, Hashable, Identifiable {
+nonisolated struct MeetingParticipant: Codable, Hashable, Identifiable, Sendable {
     var id: String { userId }
     let userId: String
     let name: String
     let role: ParticipantRole
     var responseStatus: ResponseStatus
 
-    enum ParticipantRole: String, Codable, CaseIterable {
+    nonisolated enum ParticipantRole: String, Codable, CaseIterable, Sendable {
         case teacher = "Teacher"
         case counselor = "Counselor"
         case administrator = "Administrator"
@@ -195,7 +194,7 @@ struct MeetingParticipant: Codable, Hashable, Identifiable {
         }
     }
 
-    enum ResponseStatus: String, Codable {
+    nonisolated enum ResponseStatus: String, Codable, Sendable {
         case pending = "Pending"
         case accepted = "Accepted"
         case declined = "Declined"
@@ -223,7 +222,7 @@ struct MeetingParticipant: Codable, Hashable, Identifiable {
 
 // MARK: - Action Item
 
-struct ActionItem: Codable, Hashable, Identifiable {
+nonisolated struct ActionItem: Codable, Hashable, Identifiable, Sendable {
     var id: String { itemId }
     let itemId: String
     let description: String
@@ -233,7 +232,7 @@ struct ActionItem: Codable, Hashable, Identifiable {
     var completedAt: Date?
     let createdAt: Date
 
-    enum ActionItemPriority: String, Codable, CaseIterable {
+    nonisolated enum ActionItemPriority: String, Codable, CaseIterable, Sendable {
         case low = "Low"
         case medium = "Medium"
         case high = "High"
@@ -309,7 +308,7 @@ struct ActionItem: Codable, Hashable, Identifiable {
 
 // MARK: - Sample Data
 
-extension Meeting {
+nonisolated extension Meeting {
     static var sampleMeeting: Meeting {
         Meeting(
             id: "sample-meeting-1",
@@ -358,4 +357,3 @@ extension Meeting {
         )
     }
 }
-

@@ -8,7 +8,7 @@
 import FirebaseAuth
 import SwiftUI
 
-enum AccountType: String, CaseIterable, Identifiable {
+nonisolated enum AccountType: String, CaseIterable, Identifiable {
     case teacher = "Teacher"
     case counselor = "Counselor"
     case administrator = "Administrator"
@@ -304,5 +304,5 @@ struct AccountTypeButton: View {
 
 #Preview {
     SimplifiedRegistrationView()
-        .environment(\.authStateModel, AuthStateModel())
+        .environment(\.authStateModel, AuthStateModel(automaticallyStart: false))
 }

@@ -12,7 +12,7 @@ import AppKit
 
 // MARK: - Color Tokens (Additional)
 
-extension Color {
+nonisolated extension Color {
 
     // MARK: - Helper Initializers
 

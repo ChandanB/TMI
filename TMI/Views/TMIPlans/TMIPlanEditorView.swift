@@ -1081,7 +1081,7 @@ struct TMIPlanEditorView: View {
         }
     }
 
-    static func defaultPlanTitle(for model: TMIPlanModel, students: [Student]) -> String {
+    nonisolated static func defaultPlanTitle(for model: TMIPlanModel, students: [Student]) -> String {
         let primaryStudentName = students
             .sorted { lhs, rhs in
                 let nameComparison = lhs.name.localizedStandardCompare(rhs.name)
@@ -1100,7 +1100,7 @@ struct TMIPlanEditorView: View {
         return primaryStudentName.isEmpty ? model.rawValue : "\(model.rawValue) - \(primaryStudentName)"
     }
 
-    static func normalizedStudentNextStep(_ nextStep: String) -> String {
+    nonisolated static func normalizedStudentNextStep(_ nextStep: String) -> String {
         nextStep
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -1109,7 +1109,7 @@ struct TMIPlanEditorView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    static func notes(withStudentNextStep nextStep: String, notes: String) -> String {
+    nonisolated static func notes(withStudentNextStep nextStep: String, notes: String) -> String {
         let trimmedNextStep = normalizedStudentNextStep(nextStep)
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -1128,7 +1128,7 @@ struct TMIPlanEditorView: View {
         """
     }
 
-    static func extractStudentNextStep(from storedNotes: String) -> (nextStep: String, notes: String) {
+    nonisolated static func extractStudentNextStep(from storedNotes: String) -> (nextStep: String, notes: String) {
         let lines = storedNotes.components(separatedBy: .newlines)
 
         guard let nextStepIndex = lines.firstIndex(where: { $0.hasPrefix("Student Next Step:") }) else {

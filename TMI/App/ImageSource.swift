@@ -12,7 +12,7 @@ import FirebaseStorage
 
 /// Represents an image that can come from either a URL or a direct UIImage
 /// Used for flexible image handling throughout the app
-public enum ImageSource: Codable, Identifiable {
+nonisolated public enum ImageSource: Codable, Identifiable {
     /// Remote image referenced by URL string
     case url(String)
     
@@ -216,6 +216,7 @@ public enum ImageSource: Codable, Identifiable {
     
   
     /// Resizes the image to target dimensions while maintaining aspect ratio
+    @MainActor
     public func resized(toWidth targetWidth: CGFloat) -> ImageSource {
         switch self {
         case .url:
@@ -231,7 +232,7 @@ public enum ImageSource: Codable, Identifiable {
     }
 }
 
-extension ImageSource: Equatable {
+nonisolated extension ImageSource: Equatable {
     public static func == (lhs: ImageSource, rhs: ImageSource) -> Bool {
         switch (lhs, rhs) {
         case let (.url(lhsURL), .url(rhsURL)):
@@ -244,7 +245,7 @@ extension ImageSource: Equatable {
     }
 }
 
-extension ImageSource: Hashable {
+nonisolated extension ImageSource: Hashable {
     public func hash(into hasher: inout Hasher) {
         switch self {
         case .url(let urlString):
@@ -256,8 +257,6 @@ extension ImageSource: Hashable {
         }
     }
 }
-
-extension ImageSource: @unchecked Sendable {}
 
 // MARK: - Utility Functions
 
@@ -273,9 +272,7 @@ public func convertImagesToData(images: [ImageSource], quality: CGFloat = 0.8) a
     
     for imageSource in images {
         do {
-            let data = try await Task {
-                try imageSource.asData(quality: quality)
-            }.value
+            let data = try imageSource.asData(quality: quality)
             result.append(data)
         } catch {
             errors.append(error)
@@ -308,7 +305,7 @@ extension ImageSource {
     /// - Returns: The download URL of the uploaded image
     public func uploadToFirebaseStorage(
         storagePath: String,
-        metadata: [String: Any]? = nil,
+        metadata: [String: String]? = nil,
         quality: CGFloat = 0.7
     ) async throws -> URL {
         // For remote URLs, we're already done - just return the existing URL
@@ -336,31 +333,41 @@ extension ImageSource {
             let filename = "\(UUID().uuidString).\(image.hasAlphaChannel ? "png" : "jpg")"
             let fullPath = "\(storagePath)/\(filename)"
             
-            // Get storage reference
-            let storageRef = FirebaseManager.shared.storage.reference().child(fullPath)
-            
-            // Set metadata if provided
-            var storageMetadata: StorageMetadata?
-            if let metadata = metadata {
-                storageMetadata = StorageMetadata()
-                metadata.forEach { key, value in
-                    storageMetadata?.customMetadata?[key] = value as? String
-                }
-            }
-            
             // Upload the image
             do {
-                _ = try await storageRef.putDataAsync(imageData, metadata: storageMetadata)
-                
-                // Get the download URL
-                let downloadURL = try await storageRef.downloadURL()
-                return downloadURL
+                return try await Self.uploadImageData(
+                    imageData,
+                    to: fullPath,
+                    metadata: metadata
+                )
             } catch {
                 throw UploadError.uploadFailed(error)
             }
         }
         
         throw UploadError.invalidImage
+    }
+
+    private nonisolated static func uploadImageData(
+        _ data: Data,
+        to path: String,
+        metadata: [String: String]?
+    ) async throws -> URL {
+        let storageMetadata = metadata.map { values in
+            let result = StorageMetadata()
+            result.customMetadata = values
+            return result
+        }
+
+        _ = try await Storage.storage()
+            .reference()
+            .child(path)
+            .putDataAsync(data, metadata: storageMetadata)
+
+        return try await Storage.storage()
+            .reference()
+            .child(path)
+            .downloadURL()
     }
     
     /// Upload an image to Firebase Storage as a profile image
@@ -389,7 +396,7 @@ extension ImageSource {
 #if canImport(UIKit)
 extension UIImage {
     /// Checks if the image has an alpha channel (transparency)
-    var hasAlphaChannel: Bool {
+    nonisolated var hasAlphaChannel: Bool {
         guard let cgImage = self.cgImage else { return false }
         let alphaInfo = cgImage.alphaInfo
         return alphaInfo == .first ||
@@ -398,7 +405,7 @@ extension UIImage {
                alphaInfo == .premultipliedLast
     }
 
-    var imageFingerprint: Data {
+    nonisolated var imageFingerprint: Data {
         pngData() ?? jpegData(compressionQuality: 1.0) ?? Data()
     }
 
@@ -418,7 +425,7 @@ import AppKit
 
 extension UIImage {
     /// Checks if the image has an alpha channel (transparency)
-    var hasAlphaChannel: Bool {
+    nonisolated var hasAlphaChannel: Bool {
         guard let cgImage = cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
         let alphaInfo = cgImage.alphaInfo
         return alphaInfo == .first ||
@@ -427,11 +434,11 @@ extension UIImage {
                alphaInfo == .premultipliedLast
     }
 
-    var imageFingerprint: Data {
+    nonisolated var imageFingerprint: Data {
         pngData() ?? tiffRepresentation ?? Data()
     }
 
-    func pngData() -> Data? {
+    nonisolated func pngData() -> Data? {
         guard let tiffRepresentation,
               let imageRep = NSBitmapImageRep(data: tiffRepresentation) else {
             return nil
@@ -439,7 +446,7 @@ extension UIImage {
         return imageRep.representation(using: .png, properties: [:])
     }
 
-    func jpegData(compressionQuality: CGFloat) -> Data? {
+    nonisolated func jpegData(compressionQuality: CGFloat) -> Data? {
         guard let tiffRepresentation,
               let imageRep = NSBitmapImageRep(data: tiffRepresentation) else {
             return nil

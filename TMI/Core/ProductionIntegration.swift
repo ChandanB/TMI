@@ -11,7 +11,8 @@ import Observation
 /// Production-ready integration of all TMI core systems
 /// This file demonstrates how to integrate all the production systems we've created
 @MainActor
-final class ProductionTMIManager: ObservableObject {
+@Observable
+final class ProductionTMIManager {
     
     // MARK: - Core Systems
     
@@ -58,8 +59,14 @@ final class ProductionTMIManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            Task { @MainActor in
-                self?.handleErrorRetry(notification)
+            guard let error = notification.userInfo?["error"] as? TMIError else {
+                return
+            }
+            let operation = (notification.userInfo?["context"] as? [String: Any])?["operation"] as? String
+                ?? "unknown"
+
+            Task { @MainActor [weak self] in
+                self?.handleErrorRetry(error: error, operation: operation)
             }
         }
         
@@ -97,16 +104,10 @@ final class ProductionTMIManager: ObservableObject {
     
     // MARK: - Error Recovery
     
-    private func handleErrorRetry(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let error = userInfo["error"] as? TMIError,
-              let context = userInfo["context"] as? [String: Any] else {
-            return
-        }
-        
+    private func handleErrorRetry(error: TMIError, operation: String) {
         logger.info("Handling error retry", metadata: [
             "errorCode": error.code.rawValue,
-            "operation": context["operation"] as? String ?? "unknown"
+            "operation": operation
         ])
         
         // Implement specific retry logic based on error type
@@ -122,53 +123,6 @@ final class ProductionTMIManager: ObservableObject {
     }
 }
 
-// MARK: - Production Environment Values
-
-private struct ProductionTMIManagerKey: EnvironmentKey {
-    @MainActor static var defaultValue: ProductionTMIManager {
-        // Use shared instance since class is MainActor-isolated
-        ProductionTMIManager.shared
-    }
-}
-
-private struct ErrorHandlerKey: EnvironmentKey {
-    @MainActor static var defaultValue: ErrorHandler {
-        // Use shared instance since initializer is private
-        ErrorHandler.shared
-    }
-}
-
-private struct PerformanceMonitorKey: EnvironmentKey {
-    @MainActor static var defaultValue: PerformanceMonitor {
-        PerformanceMonitor.shared
-    }
-}
-
-private struct SecureStorageKey: EnvironmentKey {
-    @MainActor static var defaultValue: SecureStorage {
-        SecureStorage.shared
-    }
-}
-
-@MainActor extension EnvironmentValues {
-    var productionManager: ProductionTMIManager {
-        get { self[ProductionTMIManagerKey.self] }
-        set { self[ProductionTMIManagerKey.self] = newValue }
-    }
-    var errorHandler: ErrorHandler {
-        get { self[ErrorHandlerKey.self] }
-        set { self[ErrorHandlerKey.self] = newValue }
-    }
-    var performanceMonitor: PerformanceMonitor {
-        get { self[PerformanceMonitorKey.self] }
-        set { self[PerformanceMonitorKey.self] = newValue }
-    }
-    var secureStorage: SecureStorage {
-        get { self[SecureStorageKey.self] }
-        set { self[SecureStorageKey.self] = newValue }
-    }
-}
-
 // MARK: - Production View Modifiers
 
 extension View {
@@ -176,7 +130,7 @@ extension View {
     func productionReady() -> some View {
         self
             .withErrorHandling()
-            .environment(\.productionManager, ProductionTMIManager.shared)
+            .environment(ProductionTMIManager.shared)
             .environment(AccessibilityManager.shared)
             .onAppear {
                 // Log view appearance for analytics
@@ -295,7 +249,7 @@ extension View {
  
  struct StudentFormView: View {
      @State private var student = Student(...)
-     @Environment(\.productionManager) private var productionManager
+     @Environment(ProductionTMIManager.self) private var productionManager
      
      var body: some View {
          Form {
@@ -339,13 +293,13 @@ struct ProductionHealthCheck {
         var issues: [HealthIssue] = []
         
         // Check error handling
-        let errorHandlerStatus = await ErrorHandler.shared.currentError == nil
+        let errorHandlerStatus = ErrorHandler.shared.currentError == nil
         if !errorHandlerStatus {
             issues.append(.init(system: "ErrorHandler", severity: .medium, description: "Active errors present"))
         }
         
         // Check performance
-        let performanceReport = await PerformanceMonitor.shared.generateReport()
+        let performanceReport = PerformanceMonitor.shared.generateReport()
         if performanceReport.summary.slowOperationPercentage > 10 {
             issues.append(.init(
                 system: "Performance",
@@ -355,7 +309,7 @@ struct ProductionHealthCheck {
         }
         
         // Check accessibility
-        let accessibilityStatus = await AccessibilityManager.shared.isVoiceOverEnabled
+        let accessibilityStatus = AccessibilityManager.shared.isVoiceOverEnabled
         Log.ui.info("Accessibility check", metadata: ["voiceOverEnabled": accessibilityStatus])
         
         let duration = Date().timeIntervalSince(startTime)

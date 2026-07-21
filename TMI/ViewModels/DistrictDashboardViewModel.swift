@@ -8,13 +8,74 @@
 import Foundation
 import Observation
 
+protocol DistrictDashboardAnalyticsProviding {
+  func fetchAnalytics(districtId: String, dateRange: ClosedRange<Date>?) async throws -> DistrictAnalytics?
+  func computeMetrics(for districtId: String, filter: DistrictFilter) async throws -> DistrictMetrics
+  func computeSchoolMetrics(for districtId: String) async throws -> [SchoolMetrics]
+  func fetchStudentsNeedingAttention(for districtId: String, limit: Int) async throws -> [StudentNeedAlert]
+  func generateInsights(for metrics: DistrictMetrics, schoolMetrics: [SchoolMetrics]) async -> [String]
+  func getSampleMetrics() -> DistrictMetrics
+  func getSampleSchoolMetrics() -> [SchoolMetrics]
+  func getSampleAlerts() -> [StudentNeedAlert]
+}
+
+protocol DistrictDashboardExportProviding {
+  func exportCSV(
+    metrics: DistrictMetrics,
+    schoolMetrics: [SchoolMetrics],
+    districtName: String
+  ) async throws -> URL
+  func exportPDF(
+    metrics: DistrictMetrics,
+    schoolMetrics: [SchoolMetrics],
+    insights: [String],
+    districtName: String
+  ) async throws -> URL
+  func exportJSON(
+    metrics: DistrictMetrics,
+    schoolMetrics: [SchoolMetrics],
+    insights: [String],
+    districtName: String
+  ) async throws -> URL
+}
+
+protocol DistrictDashboardDistrictProviding {
+  func fetchDistrict(id: String) async throws -> District
+}
+
+extension DistrictAnalyticsService: DistrictDashboardAnalyticsProviding {}
+extension DistrictExportService: DistrictDashboardExportProviding {}
+extension DistrictService: DistrictDashboardDistrictProviding {}
+
 @Observable
 @MainActor
 class DistrictDashboardViewModel {
   // Services
-  private let analyticsService = DistrictAnalyticsService.shared
-  private let exportService = DistrictExportService.shared
-  private let districtService = DistrictService.shared
+  private let injectedAnalyticsService: (any DistrictDashboardAnalyticsProviding)?
+  private let injectedExportService: (any DistrictDashboardExportProviding)?
+  private let injectedDistrictService: (any DistrictDashboardDistrictProviding)?
+
+  private var analyticsService: any DistrictDashboardAnalyticsProviding {
+    injectedAnalyticsService ?? DistrictAnalyticsService.shared
+  }
+
+  private var exportService: any DistrictDashboardExportProviding {
+    injectedExportService ?? DistrictExportService.shared
+  }
+
+  private var districtService: any DistrictDashboardDistrictProviding {
+    injectedDistrictService ?? DistrictService.shared
+  }
+
+  init(
+    analyticsService: (any DistrictDashboardAnalyticsProviding)? = nil,
+    exportService: (any DistrictDashboardExportProviding)? = nil,
+    districtService: (any DistrictDashboardDistrictProviding)? = nil
+  ) {
+    self.injectedAnalyticsService = analyticsService
+    self.injectedExportService = exportService
+    self.injectedDistrictService = districtService
+  }
 
   // State
   var districtId: String?
@@ -146,7 +207,9 @@ class DistrictDashboardViewModel {
     }
   }
 
-  private func performExport(_ exportFunction: (DistrictExportService) async throws -> URL) async {
+  private func performExport(
+    _ exportFunction: (any DistrictDashboardExportProviding) async throws -> URL
+  ) async {
     isExporting = true
     errorMessage = nil
 

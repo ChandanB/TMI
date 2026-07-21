@@ -425,7 +425,7 @@ extension View {
 }
 
 
-extension Font {
+nonisolated extension Font {
     // MARK: - Display Fonts (Large Headings)
     
     /// Display 1 - Largest display font (34pt, bold)
@@ -518,4 +518,3 @@ extension Font {
         return .system(size: 12, weight: .regular, design: .monospaced)
     }
 }
-

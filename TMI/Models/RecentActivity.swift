@@ -7,16 +7,13 @@
 
 import Foundation
 import SwiftUI
-import Firebase
-import FirebaseAuth
-import FirebaseFirestore
 
 /// Represents a recent activity in the application
-struct RecentActivity: Identifiable, Equatable, @unchecked Sendable {
+nonisolated struct RecentActivity: Identifiable, Equatable, Sendable {
     // MARK: - Properties
     
     /// Firestore document ID when persisted, otherwise a generated in-memory ID.
-    @DocumentID private var documentID: String?
+    private var documentID: String?
     
     /// Stable identifier for SwiftUI lists when no Firestore ID exists.
     private let fallbackID: String
@@ -111,7 +108,7 @@ struct RecentActivity: Identifiable, Equatable, @unchecked Sendable {
 
 // MARK: - Firestore Codable Support
 
-extension RecentActivity: Codable {
+nonisolated extension RecentActivity: Codable {
     enum CodingKeys: String, CodingKey {
         case id
         case fallbackID
@@ -153,7 +150,7 @@ extension RecentActivity: Codable {
 
 // MARK: - Sample Data
 
-extension RecentActivity {
+nonisolated extension RecentActivity {
     /// A single sample activity for previews
     static var sampleActivity: RecentActivity {
         return RecentActivity(
@@ -221,7 +218,7 @@ extension RecentActivity {
 
 // MARK: - Helper Extensions
 
-extension Date {
+nonisolated extension Date {
     /// Converts a date to a human-readable "time ago" string
     func timeAgoDisplay() -> String {
         let calendar = Calendar.current
@@ -256,7 +253,7 @@ extension Date {
     }
 }
 
-extension Color {
+nonisolated extension Color {
     /// Convert a Color to a string representation
     func toStringName() -> String {
         // This is a simplified implementation

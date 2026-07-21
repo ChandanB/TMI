@@ -215,7 +215,7 @@ extension FirebaseManager {
 
 }
 
-struct FormFieldValidator {
+nonisolated struct FormFieldValidator {
     static let validators: [FieldType: @Sendable (AnyCodable) -> Bool] = [
         .text: { $0.value is String },
         .number: { $0.value is Int || $0.value is Double },

@@ -36,7 +36,6 @@ struct FlowLayout: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let containerWidth = bounds.width
         var currentX: CGFloat = bounds.minX
         var currentY: CGFloat = bounds.minY
         var rowHeight: CGFloat = 0

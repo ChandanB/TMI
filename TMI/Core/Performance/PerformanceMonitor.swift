@@ -44,12 +44,12 @@ final class PerformanceMonitor: Sendable {
     private let maxNetworkMetrics = 500
     private let maxMemoryMetrics = 200
     
-    // Memory and system monitoring (nonisolated for deinit cleanup)
-    nonisolated(unsafe) private var memoryTimer: Timer?
-    nonisolated(unsafe) private var systemInfoTimer: Timer?
+    // Memory and system monitoring
+    private var memoryTimer: Timer?
+    private var systemInfoTimer: Timer?
     private var isMonitoringMemory = false
-    nonisolated(unsafe) private var batteryLevelObserver: NSObjectProtocol?
-    nonisolated(unsafe) private var thermalStateObserver: NSObjectProtocol?
+    private var batteryLevelObserver: NSObjectProtocol?
+    private var thermalStateObserver: NSObjectProtocol?
     
     // Metrics collection queue
     private let metricsQueue = DispatchQueue(label: "com.tmi.performance.metrics", qos: .utility)
@@ -60,7 +60,7 @@ final class PerformanceMonitor: Sendable {
         }
     }
     
-    deinit {
+    isolated deinit {
         networkMonitor.cancel()
         memoryTimer?.invalidate()
         systemInfoTimer?.invalidate()
@@ -1015,4 +1015,3 @@ struct NetworkRequestData {
     let responseSize: Int
     let duration: TimeInterval
 }
-

@@ -1,7 +1,7 @@
 import Foundation
 
 /// The only catalog identifiers permitted by the canonical product contract.
-enum CatalogName: String, Codable, CaseIterable, Sendable {
+nonisolated enum CatalogName: String, Codable, CaseIterable, Sendable {
     case careers
     case interests
     case globalResources
@@ -13,7 +13,7 @@ enum CatalogName: String, Codable, CaseIterable, Sendable {
 ///
 /// Production repositories use this district-scoped tree. Historical paths
 /// belong in `Migration/LegacyFirestorePaths.swift` and are never added here.
-enum FirestorePaths {
+nonisolated enum FirestorePaths {
     // MARK: - Personal profile
 
     static func privateProfile(userID: String) -> String {

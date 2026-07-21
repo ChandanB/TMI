@@ -8,12 +8,12 @@
 import Foundation
 
 // MARK: - Validation Protocol
-protocol Validatable: Sendable {
+nonisolated protocol Validatable: Sendable {
     func validate() async throws
 }
 
 // MARK: - Validation Result
-enum ValidationResult: Sendable, Equatable {
+nonisolated enum ValidationResult: Sendable, Equatable {
     case valid
     case error(String)
     case idle
@@ -35,7 +35,7 @@ enum ValidationResult: Sendable, Equatable {
 }
 
 // MARK: - Validation Rule Types
-enum ValidationRuleType: String, Codable, Hashable, Sendable, CaseIterable {
+nonisolated enum ValidationRuleType: String, Codable, Hashable, Sendable, CaseIterable {
     case email
     case name
     case phone
@@ -66,7 +66,7 @@ enum ValidationRuleType: String, Codable, Hashable, Sendable, CaseIterable {
 }
 
 // MARK: - Validation Configuration
-struct ValidationRule: Codable, Hashable, Identifiable, Sendable {
+nonisolated struct ValidationRule: Codable, Hashable, Identifiable, Sendable {
     var id: String = UUID().uuidString
     var ruleType: ValidationRuleType
     var message: String
@@ -175,7 +175,7 @@ struct ValidationRule: Codable, Hashable, Identifiable, Sendable {
 }
 
 // MARK: - Validation Parameters
-enum ValidationParameters: Codable, Hashable, Sendable {
+nonisolated enum ValidationParameters: Codable, Hashable, Sendable {
     case textLength(min: Int, max: Int, fieldName: String)
     case numericRange(min: Int, max: Int, fieldName: String)
     case collectionSize(min: Int, max: Int, fieldName: String)
@@ -298,7 +298,7 @@ enum ValidationParameters: Codable, Hashable, Sendable {
 }
 
 // MARK: - Field Validation Configuration
-struct FieldValidation: Codable, Hashable, Identifiable, Sendable {
+nonisolated struct FieldValidation: Codable, Hashable, Identifiable, Sendable {
     let id: String
     let fieldName: String
     let rules: [ValidationRule]
@@ -402,7 +402,7 @@ extension FieldValidation {
 }
 
 // MARK: - Validation Rules
-struct ValidationRules: Sendable {
+nonisolated struct ValidationRules: Sendable {
     private static let logger = TMILogger(category: "Validation")
     
     // MARK: - Email Validation
@@ -678,7 +678,7 @@ struct ValidationRules: Sendable {
 }
 
 // MARK: - Validation Error
-enum ValidationError: Error, LocalizedError, Sendable {
+nonisolated enum ValidationError: Error, LocalizedError, Sendable {
     case missingRequiredField(String)
     case invalidDataType(String)
     case validationFailed(field: String, message: String)
@@ -793,7 +793,7 @@ extension ValidationError {
 }
 
 // MARK: - Batch Validator
-struct BatchValidator: Sendable {
+nonisolated struct BatchValidator: Sendable {
     private let logger = TMILogger(category: "BatchValidation")
     
     private var validations: [(String, @Sendable () -> ValidationResult)] = []
@@ -829,7 +829,7 @@ struct BatchValidator: Sendable {
 }
 
 // MARK: - Sanitization
-struct Sanitizer: Sendable {
+nonisolated struct Sanitizer: Sendable {
     /// Sanitize user input to prevent XSS and other attacks
     static func sanitizeText(_ input: String) -> String {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -881,7 +881,9 @@ actor AsyncValidationManager {
     private let timeout: TimeInterval = 10.0
     
     /// Perform async validation with timeout
-    func validateWithTimeout<T>(_ operation: @escaping @Sendable () async throws -> T) async throws -> T {
+    func validateWithTimeout<T: Sendable>(
+        _ operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
         return try await withThrowingTaskGroup(of: T.self) {
             group in
             // Add the validation task
@@ -906,7 +908,7 @@ actor AsyncValidationManager {
     }
     
     /// Validate with retry logic
-    func validateWithRetry<T>(
+    func validateWithRetry<T: Sendable>(
         maxAttempts: Int = 3,
         delay: TimeInterval = 1.0,
         operation: @Sendable () async throws -> T

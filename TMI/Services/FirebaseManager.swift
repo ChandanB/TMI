@@ -10,15 +10,12 @@ import FirebaseAuth
 import FirebaseFirestore
 import FirebaseStorage
 
-let FIREBASE_MANAGER = FirebaseManager.shared
-let FIRESTORE_DATABASE = FIREBASE_MANAGER.firestore
-
+@MainActor
 struct FirebaseManager {
   let auth: Auth
   let storage: Storage
   let firestore: Firestore
   static let shared = FirebaseManager()
-  var firestoreListener: ListenerRegistration?
 
   private init() {
     if FirebaseApp.app() == nil {
@@ -75,7 +72,7 @@ extension FirebaseManager {
 
 // MARK: - User Session Service
 extension FirebaseManager {
-  nonisolated(nonsending) func signIn(withEmail email: String, password: String) async throws {
+  func signIn(withEmail email: String, password: String) async throws {
     let configStatus = FirebaseConfigurationHelper.shared.checkFirebaseConfiguration()
     
     guard configStatus.isWorking else {
@@ -110,7 +107,7 @@ extension FirebaseManager {
     }
   }
   
-  nonisolated(nonsending) func signUp(
+  func signUp(
     withEmail email: String,
     password: String,
     requestedRole: String? = nil
@@ -144,7 +141,7 @@ extension FirebaseManager {
     }
   }
   
-  nonisolated(nonsending) func resetPassword(email: String) async throws {
+  func resetPassword(email: String) async throws {
     do {
       try await auth.sendPasswordReset(withEmail: email)
     } catch {
@@ -173,7 +170,7 @@ extension FirebaseManager {
     }
   }
 
-  nonisolated(nonsending) func getCurrentUserProfile() async throws -> [String: Any]? {
+  func getCurrentUserProfile() async throws -> [String: Any]? {
     guard let currentUser = auth.currentUser else {
       throw FirebaseManagerError.userNotLoggedIn
     }
@@ -188,7 +185,7 @@ extension FirebaseManager {
     }
   }
 
-  nonisolated(nonsending) func updateUserProfile(data: [String: Any]) async throws {
+  func updateUserProfile(data: [String: Any]) async throws {
     guard let currentUser = auth.currentUser else {
       throw FirebaseManagerError.userNotLoggedIn
     }
@@ -199,7 +196,7 @@ extension FirebaseManager {
   // MARK: - User Account Management
 
   /// Reauthenticate user with current password
-  nonisolated(nonsending) func reauthenticate(with password: String) async throws {
+  func reauthenticate(with password: String) async throws {
     guard let user = auth.currentUser, let email = user.email else {
       throw FirebaseManagerError.userNotLoggedIn
     }
@@ -209,7 +206,7 @@ extension FirebaseManager {
   }
 
   /// Send email verification to current user
-  nonisolated(nonsending) func verifyEmail() async throws {
+  func verifyEmail() async throws {
     guard let user = auth.currentUser else {
       throw FirebaseManagerError.userNotLoggedIn
     }
@@ -218,7 +215,7 @@ extension FirebaseManager {
   }
 
   /// Update user's email address
-  nonisolated(nonsending) func updateEmail(to newEmail: String) async throws {
+  func updateEmail(to newEmail: String) async throws {
     guard let user = auth.currentUser else {
       throw FirebaseManagerError.userNotLoggedIn
     }

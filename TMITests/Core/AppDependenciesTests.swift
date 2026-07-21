@@ -1,5 +1,3 @@
-import FirebaseCore
-import FirebaseFirestore
 import Foundation
 import Testing
 @testable import TMI
@@ -7,19 +5,20 @@ import Testing
 @Suite("Application dependencies")
 struct AppDependenciesTests {
     @Test("Production composes Firebase membership and production logging")
-    func productionComposition() {
-        if FirebaseApp.app() == nil {
-            FirebaseApp.configure()
-        }
-
+    func productionComposition() throws {
         let dependencies = AppDependencies.production(
-            firestore: Firestore.firestore()
+            membershipStore: FailingMembershipStore()
+        )
+        let source = try self.source(
+            "TMI/Core/Dependencies/AppDependencies.swift",
+            root: self.repositoryRoot
         )
 
         #expect(dependencies.runtime == .production)
         #expect(dependencies.flags == .production)
         #expect(dependencies.membership is MembershipRepository)
         #expect(dependencies.logger === TMILogger.production)
+        #expect(source.contains("FirebaseMembershipStore(firestore: firestore)"))
     }
 
     @Test("Preview composes an in-memory membership fixture")
@@ -100,6 +99,22 @@ struct AppDependenciesTests {
             #expect(!contents.contains("debugPrint("), "Found raw logging in \(file)")
             #expect(!contents.contains("dump("), "Found raw logging in \(file)")
         }
+    }
+
+    @Test("Environment defaults never resolve production service singletons")
+    func environmentDefaultsAreInjected() throws {
+        let root = repositoryRoot
+        let notificationSource = try source("TMI/Services/NotificationService.swift", root: root)
+        let auditSource = try source("TMI/Services/AuditService.swift", root: root)
+        let authSource = try source("TMI/StateModels/AuthStateModel.swift", root: root)
+        let appSource = try source("TMI/App/TMIApp.swift", root: root)
+
+        #expect(!notificationSource.contains("@Entry var notificationService: NotificationService = NotificationService.shared"))
+        #expect(notificationSource.contains("@Entry var notificationService: NotificationService? = nil"))
+        #expect(!auditSource.contains("AUDIT_SERVICE"))
+        #expect(!authSource.contains("auditService: AuditService ="))
+        #expect(appSource.contains("auditService: AuditService()"))
+        #expect(appSource.contains(".environment(\\.notificationService, notificationService)"))
     }
 
     private func source(_ path: String, root: URL) throws -> String {

@@ -1,16 +1,16 @@
 import FirebaseFirestore
 import Foundation
 
-enum MembershipReadSource: Sendable, Equatable {
+nonisolated enum MembershipReadSource: Sendable, Equatable {
     case server
 }
 
-struct MembershipStoreRequest: Sendable, Equatable {
+nonisolated struct MembershipStoreRequest: Sendable, Equatable {
     let path: String
     let source: MembershipReadSource
 }
 
-struct MembershipStoreRecord: Codable, Sendable, Equatable {
+nonisolated struct MembershipStoreRecord: Codable, Sendable, Equatable {
     let schoolIDs: Set<String>
     let role: StaffRole
     let capabilities: Set<Capability>
@@ -19,7 +19,7 @@ struct MembershipStoreRecord: Codable, Sendable, Equatable {
     let version: Int
 }
 
-protocol MembershipStore: Sendable {
+nonisolated protocol MembershipStore: Sendable {
     func membership(for request: MembershipStoreRequest) async throws -> MembershipStoreRecord?
 }
 
@@ -43,7 +43,7 @@ struct FirebaseMembershipStore: MembershipStore, @unchecked Sendable {
     }
 }
 
-protocol MembershipProviding: Sendable {
+nonisolated protocol MembershipProviding: Sendable {
     func membership(for claim: TrustedTenantClaim) async throws -> MembershipContext
 }
 
@@ -119,7 +119,7 @@ actor MembershipRepository: MembershipProviding {
     }
 }
 
-enum MembershipRepositoryError: Error, Equatable {
+nonisolated enum MembershipRepositoryError: Error, Equatable {
     case invalidClaim
     case notFound
     case unavailable

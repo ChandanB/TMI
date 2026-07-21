@@ -1,4 +1,4 @@
-enum Capability: String, Codable, Sendable, CaseIterable, Equatable {
+nonisolated enum Capability: String, Codable, Sendable, CaseIterable, Equatable {
     case studentReadDetail = "student.read.detail"
     case studentWriteDetail = "student.write.detail"
     case studentRestrictedRead = "student.restricted.read"
@@ -9,7 +9,7 @@ enum Capability: String, Codable, Sendable, CaseIterable, Equatable {
     case auditRead = "audit.read"
 }
 
-enum StaffRole: String, Codable, Sendable, CaseIterable, Equatable {
+nonisolated enum StaffRole: String, Codable, Sendable, CaseIterable, Equatable {
     case teacher
     case counselor
     case socialWorker
@@ -17,7 +17,7 @@ enum StaffRole: String, Codable, Sendable, CaseIterable, Equatable {
     case districtAdministrator
 }
 
-extension StaffRole {
+nonisolated extension StaffRole {
     var displayName: String {
         switch self {
         case .teacher: "Teacher"

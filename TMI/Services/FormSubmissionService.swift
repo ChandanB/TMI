@@ -210,7 +210,7 @@ class FormSubmissionService {
   ) async throws {
     // Validate version if provided
     if let versionId = versionId {
-      guard let assignmentId = submission.assignmentId else {
+      guard submission.assignmentId != nil else {
         throw FormSubmissionError.invalidSubmission("Assignment ID required for versioned submission")
       }
 

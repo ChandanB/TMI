@@ -16,7 +16,7 @@ import SwiftUI
 import AppKit
 #endif
 
-enum MVPEmptyStateCopy {
+nonisolated enum MVPEmptyStateCopy {
   static let dashboardActivityTitle = "Start the core loop"
   static let dashboardActivityMessage = "Add a student, capture interests, and create the first TMI plan to start showing activity here."
   static let dashboardActivityAction = "Add Student"
@@ -89,7 +89,7 @@ struct RoleSpecificData: Equatable, Sendable {
 
 // MARK: - Next Best Action
 
-struct NextBestAction: Equatable, Sendable {
+nonisolated struct NextBestAction: Equatable, Sendable {
   let id: String
   let type: ActionType
   let title: String
@@ -146,7 +146,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     ui.set("showingInsightsSheet", value: false)
   }
 
-  deinit {
+  isolated deinit {
     cancellables.forEach { $0.cancel() }
   }
 
@@ -271,7 +271,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   
   // MARK: - Next Best Action Generation
   
-  static func prioritizedNextBestAction(
+  nonisolated static func prioritizedNextBestAction(
     membership: MembershipContext?,
     students: [Student],
     plans: [TMIPlan]
@@ -292,11 +292,11 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     }
   }
 
-  private static func urgentAttentionStudents(in students: [Student]) -> [Student] {
+  private nonisolated static func urgentAttentionStudents(in students: [Student]) -> [Student] {
     students.filter { $0.engagementScore < 0.3 }
   }
 
-  private static func studentsMissingPlans(students: [Student], plans: [TMIPlan]) -> [Student] {
+  private nonisolated static func studentsMissingPlans(students: [Student], plans: [TMIPlan]) -> [Student] {
     let studentsWithPlanIds = Set(plans.flatMap { $0.students.compactMap(\.id) })
 
     return students.filter {
@@ -305,7 +305,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     }
   }
 
-  private static func approvalAction(for pendingPlans: [TMIPlan]) -> NextBestAction? {
+  private nonisolated static func approvalAction(for pendingPlans: [TMIPlan]) -> NextBestAction? {
     guard !pendingPlans.isEmpty else { return nil }
 
     return NextBestAction(
@@ -319,7 +319,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     )
   }
 
-  private static func lowEngagementAction(for students: [Student]) -> NextBestAction? {
+  private nonisolated static func lowEngagementAction(for students: [Student]) -> NextBestAction? {
     guard let firstStudent = urgentAttentionStudents(in: students).first else { return nil }
 
     return NextBestAction(
@@ -333,7 +333,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     )
   }
 
-  private static func missingPlanAction(for students: [Student], plans: [TMIPlan]) -> NextBestAction? {
+  private nonisolated static func missingPlanAction(for students: [Student], plans: [TMIPlan]) -> NextBestAction? {
     guard let firstStudent = studentsMissingPlans(students: students, plans: plans).first else { return nil }
 
     return NextBestAction(
@@ -347,7 +347,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     )
   }
 
-  private static func surveyFollowUpAction(for students: [Student], role: StaffRole?) -> NextBestAction? {
+  private nonisolated static func surveyFollowUpAction(for students: [Student], role: StaffRole?) -> NextBestAction? {
     guard role == .teacher || role == .counselor else { return nil }
     guard let firstStudent = students.first(where: { $0.surveyResults?.isEmpty ?? true }) else { return nil }
 

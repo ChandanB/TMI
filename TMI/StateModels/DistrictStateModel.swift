@@ -138,7 +138,10 @@ final class DistrictStateModel: BaseStateModel<District, IdentifiableError> {
     private func fetchMetrics(districtId: String) async throws {
         do {
             // Fetch metrics from analytics service
-            if let analytics = try? await DistrictAnalyticsService.shared.fetchAnalytics(districtId: districtId, dateRange: nil) {
+            if let analytics = try await DistrictAnalyticsService.shared.fetchAnalytics(
+                districtId: districtId,
+                dateRange: nil
+            ) {
                 metrics = analytics.metrics
                 print("[DistrictStateModel] Loaded metrics for district")
             }
