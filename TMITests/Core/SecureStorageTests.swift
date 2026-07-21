@@ -124,6 +124,11 @@ final class SecureStorageTests: XCTestCase {
     }
 
     func testStoreWithBiometricProtection() async throws {
+#if os(macOS)
+        throw XCTSkip(
+            "Biometric retrieval requires an interactive Local Authentication prompt on macOS."
+        )
+#else
         do {
             try await secureStorage.store(testData, for: testKey, requiresBiometric: true)
             let retrievedData = try await secureStorage.retrieve(Data.self, for: testKey, requiresBiometric: true)
@@ -133,6 +138,7 @@ final class SecureStorageTests: XCTestCase {
         } catch SecureStorageError.authenticationFailed {
             throw XCTSkip("Biometric authentication could not complete in this environment")
         }
+#endif
     }
 
     func testDataEncryptionRoundTrip() async throws {

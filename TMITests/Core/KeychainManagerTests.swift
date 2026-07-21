@@ -58,6 +58,11 @@ final class KeychainManagerTests: XCTestCase {
     }
     
     func testStoreWithAccessControl() async throws {
+#if os(macOS)
+        throw XCTSkip(
+            "Passcode-protected retrieval requires an interactive Local Authentication prompt on macOS."
+        )
+#else
         // Given
         do {
             let accessControl = try keychainManager.createPasscodeAccessControl()
@@ -71,6 +76,7 @@ final class KeychainManagerTests: XCTestCase {
         } catch KeychainError.accessControlCreationFailed {
             throw XCTSkip("Access control creation failed - may not be supported in test environment")
         }
+#endif
     }
     
     func testStoreSynchronizableItemCanBeOverwrittenAndRetrieved() async throws {
