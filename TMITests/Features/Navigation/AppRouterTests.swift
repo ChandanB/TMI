@@ -234,6 +234,41 @@ struct AppRouterTests {
         }
     }
 
+    @Test("A canonical roster record uses trusted administrator scope")
+    func canonicalRecordUsesTrustedAdministratorScope() throws {
+        let member = MembershipContext(
+            userID: "administrator-a",
+            districtID: "district-a",
+            schoolIDs: ["school-a"],
+            role: .schoolAdministrator,
+            capabilities: [.studentReadDetail, .studentWriteDetail],
+            assignedStudentIDs: [],
+            isActive: true,
+            version: 1
+        )
+        let router = AppRouter(policy: AppNavigationPolicy(membership: member))
+        let authorized = studentRecord(
+            id: "student-a",
+            districtID: "district-a",
+            schoolID: "school-a"
+        )
+
+        try router.open(authorized)
+
+        #expect(router.path == [.student("student-a")])
+        #expect(router.activeStudentRecord == authorized)
+        #expect(router.activeStudent == nil)
+
+        let otherSchool = studentRecord(
+            id: "student-b",
+            districtID: "district-a",
+            schoolID: "school-b"
+        )
+        #expect(throws: NavigationError.unauthorizedRoute) {
+            try router.open(otherSchool)
+        }
+    }
+
     @Test("Signing out clears route and student context")
     func resetClearsSensitiveNavigationState() throws {
         let router = AppRouter(
@@ -312,7 +347,7 @@ struct AppRouterTests {
         let interestDetailSource = try sourceFile(
             at: "TMI/Views/InterestsAndHobbies/InterestDetailView.swift"
         )
-        #expect(studentListSource.contains("router.open(student)"))
+        #expect(studentListSource.contains("router.open(record)"))
         #expect(!studentListSource.contains("NavigationLink(destination: StudentDetailView"))
         #expect(!studentListSource.contains("label: {\n                        studentRow(student)"))
         #expect(studentDetailSource.contains("router.open(.editStudent(studentId))"))
@@ -370,6 +405,33 @@ struct AppRouterTests {
         student.districtId = districtID
         student.schoolId = schoolID
         return student
+    }
+
+    private func studentRecord(
+        id: String,
+        districtID: String,
+        schoolID: String
+    ) -> StudentRecord {
+        StudentRecord(
+            id: id,
+            districtID: districtID,
+            schoolID: schoolID,
+            displayName: "Ava Stone",
+            grade: "7",
+            studentIdentifier: "S-001",
+            dateOfBirth: nil,
+            pronouns: nil,
+            assignedMemberIDs: [],
+            isArchived: false,
+            metadata: CanonicalRecordMetadata(
+                schemaVersion: 1,
+                recordVersion: 1,
+                createdAt: Date(timeIntervalSince1970: 1),
+                createdBy: "administrator-a",
+                updatedAt: Date(timeIntervalSince1970: 1),
+                updatedBy: "administrator-a"
+            )
+        )
     }
 
     private var repositoryRoot: URL {

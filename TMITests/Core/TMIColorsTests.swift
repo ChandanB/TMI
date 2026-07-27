@@ -12,6 +12,7 @@ struct TMIColorsTests {
         assertColor(TMIColors.textPrimary, equals: 0x1F1A24)
         assertColor(TMIColors.textSecondary, equals: 0x514A57)
         assertColor(TMIColors.border, equals: 0xC7C0CF)
+        assertColor(TMIColors.interactiveBorder, equals: 0x8A8191)
         assertColor(TMIColors.aubergine, equals: 0x5B2A5B)
         assertColor(TMIColors.teal, equals: 0x0F766E)
         assertColor(TMIColors.aubergineSoft, equals: 0xEDE1ED)
@@ -41,6 +42,7 @@ struct TMIColorsTests {
         #expect(contrastRatio(0x514A57, 0xFFFFFF) >= 4.5)
         #expect(contrastRatio(0xFFFFFF, 0x5B2A5B) >= 4.5)
         #expect(contrastRatio(0xFFFFFF, 0x0F766E) >= 4.5)
+        #expect(contrastRatio(0x8A8191, 0xFFFFFF) >= 3)
     }
 
     @Test("Legacy color aliases resolve through the approved semantic palette")

@@ -318,9 +318,23 @@ struct MainTabView: View {
     private func routeDestination(_ route: AppRoute) -> some View {
         switch route {
         case .student(let studentID):
-            StudentDetailView(studentId: studentID)
+            if let record = router.activeStudentRecord,
+               record.id == studentID {
+                CanonicalStudentRoutePlaceholder(record: record)
+            } else {
+                StudentDetailView(studentId: studentID)
+            }
         case .editStudent(let studentID):
-            if let student = router.activeStudent,
+            if let record = router.activeStudentRecord,
+               record.id == studentID {
+                ContentUnavailableView(
+                    "Edit From the Roster",
+                    systemImage: "person.crop.circle.badge.checkmark",
+                    description: Text(
+                        "Return to Students and choose Edit from \(record.displayName)’s action menu."
+                    )
+                )
+            } else if let student = router.activeStudent,
                student.id == studentID {
                 StudentProfileView(existingStudent: student) {
                     router.pop()
@@ -347,6 +361,24 @@ struct MainTabView: View {
         case .settings:
             SettingsView()
         }
+    }
+}
+
+private struct CanonicalStudentRoutePlaceholder: View {
+    let record: StudentRecord
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(record.displayName, systemImage: "person.crop.circle")
+        } description: {
+            Text(
+                "Grade \(record.grade) • \(record.schoolID)\n"
+                    + "The student operational hub is the next blueprint milestone."
+            )
+        }
+        .foregroundStyle(TMIColors.textPrimary)
+        .navigationTitle(record.displayName)
+        .accessibilityIdentifier("studentHub.placeholder")
     }
 }
 

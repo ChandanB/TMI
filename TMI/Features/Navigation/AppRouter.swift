@@ -19,6 +19,7 @@ final class AppRouter {
     private(set) var activeStudentID: String?
     private(set) var activeStudentName: String?
     private(set) var activeStudent: Student?
+    private(set) var activeStudentRecord: StudentRecord?
     private(set) var activePlanID: String?
     private(set) var activePlan: TMIPlan?
     private(set) var pendingDeepLink: AppRoute?
@@ -43,6 +44,7 @@ final class AppRouter {
         activeStudentID = nil
         activeStudentName = nil
         activeStudent = nil
+        activeStudentRecord = nil
         activePlanID = nil
         activePlan = nil
         pendingDeepLink = queuedDeepLink
@@ -76,6 +78,7 @@ final class AppRouter {
             if activeStudentID != studentID {
                 activeStudentName = nil
                 activeStudent = nil
+                activeStudentRecord = nil
             }
             activeStudentID = studentID
         }
@@ -103,9 +106,28 @@ final class AppRouter {
         activeStudentID = studentID
         activeStudentName = student.displayName
         activeStudent = student
+        activeStudentRecord = nil
         activePlanID = nil
         activePlan = nil
         path.append(.student(studentID))
+    }
+
+    func open(_ record: StudentRecord) throws {
+        guard TrustedIdentifier.isValid(record.id) else {
+            throw NavigationError.invalidIdentifier
+        }
+        guard policy.canReadStudent(record) else {
+            throw NavigationError.unauthorizedRoute
+        }
+
+        selectedTab = .students
+        activeStudentID = record.id
+        activeStudentName = record.displayName
+        activeStudent = nil
+        activeStudentRecord = record
+        activePlanID = nil
+        activePlan = nil
+        path.append(.student(record.id))
     }
 
     func open(_ plan: TMIPlan) throws {
@@ -162,6 +184,9 @@ final class AppRouter {
         if activeStudent?.id != id {
             activeStudent = nil
         }
+        if activeStudentRecord?.id != id {
+            activeStudentRecord = nil
+        }
         activePlanID = nil
         activePlan = nil
         return true
@@ -179,6 +204,24 @@ final class AppRouter {
         activeStudentID = studentID
         activeStudentName = student.displayName
         activeStudent = student
+        activeStudentRecord = nil
+        activePlanID = nil
+        activePlan = nil
+        return true
+    }
+
+    @discardableResult
+    func setActiveStudent(_ record: StudentRecord) -> Bool {
+        guard TrustedIdentifier.isValid(record.id),
+              policy.canReadStudent(record) else {
+            clearActiveStudent()
+            return false
+        }
+
+        activeStudentID = record.id
+        activeStudentName = record.displayName
+        activeStudent = nil
+        activeStudentRecord = record
         activePlanID = nil
         activePlan = nil
         return true
@@ -206,13 +249,16 @@ final class AppRouter {
         activeStudentID = nil
         activeStudentName = nil
         activeStudent = nil
+        activeStudentRecord = nil
         activePlanID = nil
         activePlan = nil
     }
 
     func present(_ sheet: AppSheet) throws {
         if sheet == .workspace {
-            let mayReadStudent = if let activeStudent {
+            let mayReadStudent = if let activeStudentRecord {
+                policy.canReadStudent(activeStudentRecord)
+            } else if let activeStudent {
                 policy.canReadStudent(activeStudent)
             } else if let activeStudentID {
                 policy.canReadStudent(activeStudentID)
@@ -259,7 +305,9 @@ final class AppRouter {
             guard activeStudentID == identifier else {
                 throw NavigationError.staleStudentContext
             }
-            let mayEdit = if let activeStudent {
+            let mayEdit = if let activeStudentRecord {
+                policy.canEditStudent(activeStudentRecord)
+            } else if let activeStudent {
                 policy.canEditStudent(activeStudent)
             } else {
                 policy.canEditStudent(identifier)

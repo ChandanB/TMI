@@ -15,6 +15,7 @@ nonisolated enum TMIColors {
     static let textPrimary = Color(hex: "#1F1A24")
     static let textSecondary = Color(hex: "#514A57")
     static let border = Color(hex: "#C7C0CF")
+    static let interactiveBorder = Color(hex: "#8A8191")
 
     // MARK: - Brand and action
 

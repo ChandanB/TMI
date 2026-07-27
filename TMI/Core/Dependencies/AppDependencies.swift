@@ -1,4 +1,5 @@
 import FirebaseFirestore
+import Foundation
 import SwiftUI
 
 nonisolated struct AppDependencies: Sendable {
@@ -12,6 +13,7 @@ nonisolated struct AppDependencies: Sendable {
     let flags: FeatureFlags
     let membership: any MembershipProviding
     let authentication: (any AuthenticationProviding)?
+    let studentRepository: any StudentRepository
     let logger: TMILogger
 
     @MainActor
@@ -33,6 +35,7 @@ nonisolated struct AppDependencies: Sendable {
             flags: .production,
             membership: membership,
             authentication: authentication,
+            studentRepository: CanonicalStudentRepository.firebase(firestore: firestore),
             logger: .production
         )
     }
@@ -46,18 +49,21 @@ nonisolated struct AppDependencies: Sendable {
             flags: .production,
             membership: MembershipRepository(store: membershipStore),
             authentication: authentication,
+            studentRepository: UnavailableStudentRepository(),
             logger: .production
         )
     }
 
     static func preview(
-        memberships: [MembershipContext] = []
+        memberships: [MembershipContext] = [],
+        studentRepository: any StudentRepository = UnavailableStudentRepository()
     ) -> AppDependencies {
         AppDependencies(
             runtime: .preview,
             flags: .production,
             membership: InMemoryMembershipProvider(memberships: memberships),
             authentication: nil,
+            studentRepository: studentRepository,
             logger: TMILogger(category: "Preview")
         )
     }
@@ -68,6 +74,7 @@ nonisolated struct AppDependencies: Sendable {
         flags: .production,
         membership: UnavailableMembershipProvider(),
         authentication: nil,
+        studentRepository: UnavailableStudentRepository(),
         logger: .production
     )
 }
@@ -114,5 +121,54 @@ nonisolated struct InMemoryMembershipProvider: MembershipProviding {
 nonisolated private struct UnavailableMembershipProvider: MembershipProviding {
     func membership(for claim: TrustedTenantClaim) async throws -> MembershipContext {
         throw MembershipRepositoryError.unavailable
+    }
+}
+
+nonisolated struct UnavailableStudentRepository: StudentRepository {
+    func page(
+        _ request: StudentPageRequest,
+        member: MembershipContext
+    ) async throws -> StudentPage {
+        throw StudentRepositoryError.unavailable
+    }
+
+    func student(
+        id: String,
+        member: MembershipContext
+    ) async throws -> StudentRecord {
+        throw StudentRepositoryError.unavailable
+    }
+
+    func create(
+        _ draft: StudentDraft,
+        operationID: UUID,
+        member: MembershipContext
+    ) async throws -> StudentRecord {
+        throw StudentRepositoryError.unavailable
+    }
+
+    func reconcilePendingCreates(
+        member: MembershipContext
+    ) async throws -> [StudentRecord] {
+        throw StudentRepositoryError.unavailable
+    }
+
+    func update(
+        id: String,
+        draft: StudentDraft,
+        expectedVersion: Int,
+        operationID: UUID,
+        member: MembershipContext
+    ) async throws -> StudentRecord {
+        throw StudentRepositoryError.unavailable
+    }
+
+    func archive(
+        id: String,
+        expectedVersion: Int,
+        operationID: UUID,
+        member: MembershipContext
+    ) async throws {
+        throw StudentRepositoryError.unavailable
     }
 }

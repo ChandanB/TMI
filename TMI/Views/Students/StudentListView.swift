@@ -1,559 +1,1201 @@
-//
-//  StudentListView.swift
-//  TMI
-//
-//  Simplified student list with integrated search and filters
-//
-
 import SwiftUI
 
 struct StudentListView: View {
+    @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) private var authStateModel
-    @Environment(AppRouter.self) private var router
-    @State private var stateModel = StudentListStateModel()
-    @State private var searchText = ""
-    @State private var selectedGradeFilter: String? = nil
-    @State private var selectedEngagementFilter: EngagementFilter? = nil
-    @State private var showingAddStudent = false
-    @State private var studentToDelete: Student? = nil
-    @State private var showingDeleteConfirmation = false
-    @State private var studentForNewPlan: Student? = nil
-    @State private var studentsWithInterests: Set<String> = []  // Student IDs who have interests
 
-    enum EngagementFilter: String, CaseIterable {
-        case all = "All Students"
-        case engaged = "Engaged"
-        case growing = "Growing"
-        case needsSupport = "Needs Support"
+    @State private var state: StudentListState?
+    @State private var loadedAuthority: Authority?
 
-        var icon: String {
-            switch self {
-            case .all: return "person.3"
-            case .engaged: return "checkmark.circle.fill"
-            case .growing: return "chart.line.uptrend.xyaxis"
-            case .needsSupport: return "heart.fill"
-            }
-        }
+    private let memberOverride: MembershipContext?
 
-        var description: String {
-            switch self {
-            case .all: return "Show all students"
-            case .engaged: return "Students with 70%+ engagement"
-            case .growing: return "Students with 40-70% engagement"
-            case .needsSupport: return "Students below 40% engagement"
-            }
-        }
-    }
-
-    var filteredStudents: [Student] {
-        var students = stateModel.filteredStudents
-
-        // Apply search filter
-        if !searchText.isEmpty {
-            students = students.filter { student in
-                student.name.localizedCaseInsensitiveContains(searchText) ||
-                student.grade.localizedCaseInsensitiveContains(searchText) ||
-                student.school.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-
-        // Apply grade filter
-        if let gradeFilter = selectedGradeFilter {
-            students = students.filter { $0.grade == gradeFilter }
-        }
-
-        // Apply engagement filter
-        if let engagementFilter = selectedEngagementFilter, engagementFilter != .all {
-            students = students.filter { student in
-                let engagement = student.engagementScore
-                switch engagementFilter {
-                case .engaged: return engagement >= 0.7
-                case .growing: return engagement >= 0.4 && engagement < 0.7
-                case .needsSupport: return engagement < 0.4
-                case .all: return true
-                }
-            }
-        }
-
-        return students
-    }
-
-    var availableGrades: [String] {
-        let grades = Set(stateModel.filteredStudents.map { $0.grade })
-        return grades.sorted()
-    }
-
-    private func canDelete(_ student: Student) -> Bool {
-        guard let member = authStateModel.currentMembership,
-              let scope = StudentAuthorizationScope(student: student) else {
-            return false
-        }
-        return AuthorizationPolicy.canDeleteStudent(member, student: scope)
+    init(
+        state: StudentListState? = nil,
+        member: MembershipContext? = nil
+    ) {
+        _state = State(initialValue: state)
+        _loadedAuthority = State(initialValue: member.map(Authority.init))
+        memberOverride = member
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            TMIBackgroundView(variant: .base)
-                .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // Search Bar
-                TMISearchBar(text: $searchText, placeholder: "Search students...")
-                    .padding(.horizontal, TMISpacing.screenPadding)
-                    .padding(.top, TMISpacing.md)
-
-                // Filter Chips
-                if !availableGrades.isEmpty {
-                    filterChipsRow
-                        .padding(.top, TMISpacing.md)
+        Group {
+            if let member {
+                if let state {
+                    StudentRosterContent(state: state, member: member)
+                } else {
+                    ProgressView("Loading student access…")
+                        .tint(TMIColors.teal)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .accessibilityIdentifier("studentRoster.loading")
                 }
-
-                // Student List
-                Group {
-                    switch stateModel.state {
-                    case .idle, .loading:
-                        loadingView
-                    case .loaded:
-                        if filteredStudents.isEmpty {
-                            emptyStateView
-                        } else {
-                            studentList
-                        }
-                    case .error(let error):
-                        errorView(error)
-                    }
-                }
+            } else {
+                ContentUnavailableView(
+                    "Student Access Unavailable",
+                    systemImage: "person.crop.circle.badge.exclamationmark",
+                    description: Text("A verified staff membership is required to view students.")
+                )
+                .accessibilityIdentifier("studentRoster.permissionDenied")
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-            // FAB for Add Student
-            TMIFAB(
-                icon: "plus",
-                label: "Add Student",
-                action: { showingAddStudent = true }
-            )
-            .padding(TMISpacing.md)
         }
+        .background(TMIColors.background)
         .navigationTitle("Students")
-        .navigationBarTitleDisplayMode(.large)
-        .sheet(isPresented: $showingAddStudent) {
-            NavigationStack {
-                StudentProfileView {
-                    Task { await stateModel.fetch() }
-                    showingAddStudent = false
-                }
-            }
-            .tmiSheetStyle()
-        }
-        .task {
-            await stateModel.fetch()
-            await loadStudentsWithInterests()
-        }
-        .refreshable {
-            await stateModel.fetch()
-            await loadStudentsWithInterests()
+        .task(id: authority) {
+            await configureState()
         }
     }
 
-    // MARK: - Filter Chips Row
-
-    private var filterChipsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: TMISpacing.sm) {
-                // Grade Filters
-                ForEach(availableGrades, id: \.self) { grade in
-                    TMIFilterChip(
-                        label: "Grade \(grade)",
-                        isSelected: selectedGradeFilter == grade,
-                        action: {
-                            selectedGradeFilter = selectedGradeFilter == grade ? nil : grade
-                        }
-                    )
-                }
-
-                // Engagement Filters
-                ForEach(EngagementFilter.allCases, id: \.self) { filter in
-                    TMIFilterChip(
-                        label: filter.rawValue,
-                        isSelected: selectedEngagementFilter == filter,
-                        action: {
-                            selectedEngagementFilter = selectedEngagementFilter == filter ? nil : filter
-                        }
-                    )
-                }
-            }
-            .padding(.horizontal, TMISpacing.screenPadding)
-        }
+    private var member: MembershipContext? {
+        memberOverride ?? authStateModel.currentMembership
     }
 
-    // MARK: - Student List
-
-    private var studentList: some View {
-        List {
-            ForEach(filteredStudents) { student in
-                if student.id != nil {
-                    studentRow(student)
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 6, leading: TMISpacing.screenPadding, bottom: 6, trailing: TMISpacing.screenPadding))
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        if canDelete(student) {
-                            Button(role: .destructive) {
-                                studentToDelete = student
-                                showingDeleteConfirmation = true
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                    }
-                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                        // Create Plan action
-                        Button {
-                            studentForNewPlan = student
-                            TMIHaptics.lightImpact()
-                        } label: {
-                            Label("Create Plan", systemImage: "doc.badge.plus")
-                        }
-                        .tint(.tmiSuccess)
-                    }
-                }
-            }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .alert("Delete Student", isPresented: $showingDeleteConfirmation) {
-            Button("Delete", role: .destructive) {
-                if let student = studentToDelete {
-                    Task {
-                        TMIHaptics.mediumImpact()
-                        _ = await stateModel.deleteStudent(student)
-                        studentToDelete = nil
-                    }
-                }
-            }
-            Button("Cancel", role: .cancel) {
-                studentToDelete = nil
-            }
-        } message: {
-            if let student = studentToDelete {
-                Text("Are you sure you want to delete \(student.name)? This action cannot be undone.")
-            }
-        }
-        .sheet(item: $studentForNewPlan) { student in
-            NavigationStack {
-                TMIPlanEditorView(preselectedStudent: student)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") {
-                                studentForNewPlan = nil
-                            }
-                        }
-                    }
-            }
-            .tmiSheetStyle()
-        }
+    private var authority: Authority? {
+        member.map(Authority.init)
     }
-
-    private func studentRow(_ student: Student) -> some View {
-        HStack(spacing: TMISpacing.sm) {
-            Button {
-                openStudent(student)
-            } label: {
-                studentRowContent(student)
-            }
-            .buttonStyle(.plain)
-            .contentShape(Rectangle())
-
-            quickActionsMenu(for: student)
-        }
-        .padding(.vertical, TMISpacing.sm)
-        .padding(.horizontal, TMISpacing.md)
-        .background(Color.tmiSurface)
-        .cornerRadius(TMIRadius.md)
-    }
-
-    private func studentRowContent(_ student: Student) -> some View {
-        HStack(spacing: TMISpacing.md) {
-            // Avatar
-            TMIAvatar(
-                initials: student.initials,
-                color: avatarColor(for: student),
-                size: TMISizing.avatarSm
-            )
-
-            // Student Info
-            VStack(alignment: .leading, spacing: 6) {
-                // Name with alert indicator
-                HStack(spacing: 6) {
-                    Text(student.name)
-                        .font(.tmiBody)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.tmiTextPrimary)
-
-                    if student.engagementScore < 0.4 {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(.tmiWarning)
-                    }
-                }
-
-                // Grade and School
-                Text("Grade \(student.grade) • \(student.school)")
-                    .font(.tmiCaption)
-                    .foregroundColor(.tmiTextSecondary)
-
-                // Status indicators row
-                HStack(spacing: 8) {
-                    // Engagement badge
-                    engagementBadge(for: student)
-
-                    // TMI Plan indicator
-                    if let plan = activePlanForStudent(student) {
-                        tmiPlanBadge(plan: plan)
-                    }
-
-                    // Survey status
-                    if let studentId = student.id, studentsWithInterests.contains(studentId) {
-                        surveyCompleteBadge()
-                    }
-                }
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func engagementBadge(for student: Student) -> some View {
-        let engagement = student.engagementScore
-        let color: Color
-        let label: String
-
-        // Trauma-sensitive language: focus on support needs, not deficits
-        if engagement >= 0.7 {
-            color = .tmiSuccess
-            label = "Engaged"
-        } else if engagement >= 0.4 {
-            color = .tmiWarning
-            label = "Growing"
-        } else {
-            color = Color(hex: "#FB923C") // Soft orange, not harsh red
-            label = "Support"
-        }
-
-        return TMIBadge(text: label, color: color, style: .solid)
-    }
-
-    private func avatarColor(for student: Student) -> Color {
-        switch student.avatarColor {
-        case .blue: return .blue
-        case .green: return .green
-        case .orange: return .orange
-        case .purple: return .purple
-        case .teal: return .teal
-        case .pink: return .pink
-        case .indigo: return .indigo
-        }
-    }
-
-    // MARK: - Additional Badge Components
-
-    private func tmiPlanBadge(plan: TMIPlan) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: "doc.fill")
-                .font(.system(size: 10))
-                .foregroundColor(modelColor(for: plan.model))
-
-            Text(plan.model.shortName)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(modelColor(for: plan.model))
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(modelColor(for: plan.model).opacity(0.1))
-        .cornerRadius(4)
-    }
-
-    private func surveyCompleteBadge() -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 10))
-                .foregroundColor(.tmiSuccess)
-
-            Text("Survey")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.tmiSuccess)
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(Color.tmiSuccess.opacity(0.1))
-        .cornerRadius(4)
-    }
-
-    private func quickActionsMenu(for student: Student) -> some View {
-        Menu {
-            if student.id != nil {
-                Button {
-                    openStudent(student)
-                } label: {
-                    Label("View Details", systemImage: "person.circle")
-                }
-            }
-
-            Button {
-                // Create new plan
-                studentForNewPlan = student
-            } label: {
-                Label("Create TMI Plan", systemImage: "doc.badge.plus")
-            }
-
-            // TODO: Implement survey delivery when backend service is ready
-            // Button {
-            //     Task {
-            //         do {
-            //             let result = try await SurveyDeliveryService.shared.sendSurvey(
-            //                 to: student,
-            //                 deliveryMethod: .link
-            //             )
-            //             print("[StudentList] \(result.message)")
-            //             TMIHaptics.success()
-            //         } catch {
-            //             print("[StudentList] Survey send failed: \(error.localizedDescription)")
-            //             TMIHaptics.error()
-            //         }
-            //     }
-            // } label: {
-            //     Label("Send Survey", systemImage: "envelope")
-            // }
-
-            Divider()
-
-            if canDelete(student) {
-                Button(role: .destructive) {
-                    studentToDelete = student
-                    showingDeleteConfirmation = true
-                } label: {
-                    Label("Delete Student", systemImage: "trash")
-                }
-            }
-        } label: {
-            Image(systemName: "ellipsis.circle")
-                .font(.system(size: 22))
-                .foregroundColor(.tmiTextSecondary)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func openStudent(_ student: Student) {
-        guard (try? router.open(student)) != nil else {
-            return
-        }
-    }
-
-    // MARK: - Helper Methods
-
-    private func activePlanForStudent(_ student: Student) -> TMIPlan? {
-        guard let studentId = student.id else { return nil }
-        return stateModel.activePlans[studentId]
-    }
-
-    private func modelColor(for model: TMIPlanModel) -> Color {
-        switch model {
-        case .chaseYourSpace: return .blue
-        case .acknowledgeInterests: return .pink
-        case .alignYourMind: return .purple
-        case .directAndCorrect: return .orange
-        case .bullyToBoss: return .red
-        case .meekToProtector: return .green
-        }
-    }
-
-    // MARK: - Empty/Loading States
-
-    private var loadingView: some View {
-        VStack(spacing: TMISpacing.lg) {
-            ProgressView()
-                .tint(.tmiPrimary)
-
-            Text("Loading students...")
-                .font(.tmiBody)
-                .foregroundColor(.tmiTextSecondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var emptyStateView: some View {
-        TMIEmptyState(
-            icon: searchText.isEmpty ? "heart.circle" : "magnifyingglass",
-            title: searchText.isEmpty ? "Ready to Make an Impact" : "No Matches Found",
-            message: searchText.isEmpty ?
-                "Add your first student to begin creating personalized, trauma-informed intervention plans" :
-                "Try adjusting your search terms or remove some filters to see more students",
-            action: searchText.isEmpty ? { showingAddStudent = true } : nil,
-            actionLabel: searchText.isEmpty ? "Add Your First Student" : nil
-        )
-    }
-
-    private func errorView(_ error: IdentifiableError) -> some View {
-        TMIEmptyState(
-            icon: "exclamationmark.triangle",
-            title: "Unable to Load",
-            message: error.message,
-            action: {
-                Task { await stateModel.fetch() }
-            },
-            actionLabel: "Try Again"
-        )
-    }
-
-    // MARK: - Data Loading
 
     @MainActor
-    private func loadStudentsWithInterests() async {
-        var studentIds: Set<String> = []
+    private func configureState() async {
+        guard let member, let authority else {
+            state = nil
+            loadedAuthority = nil
+            return
+        }
 
-        for student in stateModel.students {
-            guard let studentId = student.id else { continue }
+        if let state {
+            if let loadedAuthority, loadedAuthority != authority {
+                state.updateMember(member)
+            }
+        } else {
+            state = StudentListState(
+                repository: dependencies.studentRepository,
+                member: member
+            )
+        }
+        loadedAuthority = authority
+        await state?.load()
+    }
 
-            do {
-                let count = try await student.getInterestCount()
-                if count > 0 {
-                    studentIds.insert(studentId)
-                }
-            } catch {
-                print("[StudentListView] Error loading interest count for student \(student.name): \(error.localizedDescription)")
+    private struct Authority: Hashable {
+        let userID: String
+        let districtID: String
+        let membershipVersion: Int
+
+        init(_ member: MembershipContext) {
+            userID = member.userID
+            districtID = member.districtID
+            membershipVersion = member.version
+        }
+    }
+}
+
+private struct StudentRosterContent: View {
+    @Environment(AppRouter.self) private var router
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    @Bindable var state: StudentListState
+    let member: MembershipContext
+
+    @State private var editor: EditorPresentation?
+    @State private var showingFilters = false
+    @State private var selectedStudentIDs: Set<String> = []
+    @State private var isSelecting = false
+    @State private var showingBulkAssignment = false
+    @State private var navigationError: String?
+    @State private var showingNavigationError = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                TMIColors.background.ignoresSafeArea()
+
+                phaseContent(
+                    usesGrid: proxy.size.width >= 700 && !dynamicTypeSize.isAccessibilitySize
+                )
             }
         }
-
-        studentsWithInterests = studentIds
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("studentRoster.screen")
+        .searchable(
+            text: $state.searchText,
+            placement: .automatic,
+            prompt: "Search by student name or identifier"
+        )
+        .toolbar { rosterToolbar }
+        .safeAreaInset(edge: .bottom) {
+            if isSelecting {
+                StudentBulkSelectionBar(
+                    selectedCount: selectedStudentIDs.count,
+                    canAssign: canManageAssignments,
+                    assign: { showingBulkAssignment = true },
+                    finish: finishSelecting
+                )
+            }
+        }
+        .sheet(item: $editor) { presentation in
+            NavigationStack {
+                editorView(for: presentation)
+            }
+            .tmiSheetStyle()
+        }
+        .sheet(isPresented: $showingFilters) {
+            NavigationStack {
+                StudentRosterFilterView(
+                    filters: state.filters,
+                    member: member,
+                    records: state.students,
+                    apply: applyFilters
+                )
+            }
+            .tmiSheetStyle()
+        }
+        .sheet(isPresented: $showingBulkAssignment) {
+            NavigationStack {
+                StudentBulkAssignmentView(
+                    selectedCount: selectedStudentIDs.count,
+                    isSubmitting: state.isSubmitting,
+                    protectedMemberID: member.userID,
+                    apply: applyBulkAssignment
+                )
+            }
+            .tmiSheetStyle()
+        }
+        .alert("Unable to Open Student", isPresented: $showingNavigationError) {
+        } message: {
+            Text(navigationError ?? "This student record is not available.")
+        }
+        .onChange(of: state.students) { _, records in
+            let visibleIDs = Set(records.map(\.id))
+            selectedStudentIDs.formIntersection(visibleIDs)
+        }
+        .onChange(of: state.phase) { _, phase in
+            if phase == .permissionDenied {
+                finishSelecting()
+                editor = nil
+            }
+        }
     }
-}
 
-// MARK: - TMIPlanModel Extension
+    @ViewBuilder
+    private func phaseContent(usesGrid: Bool) -> some View {
+        switch state.phase {
+        case .idle, .loading:
+            ProgressView("Loading students…")
+                .tint(TMIColors.teal)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier("studentRoster.loading")
 
-extension TMIPlanModel {
-    var shortName: String {
-        switch self {
-        case .chaseYourSpace: return "Chase"
-        case .acknowledgeInterests: return "Acknowledge"
-        case .alignYourMind: return "Align"
-        case .directAndCorrect: return "Direct"
-        case .bullyToBoss: return "Boss"
-        case .meekToProtector: return "Protector"
+        case .permissionDenied:
+            ContentUnavailableView(
+                "Student Access Changed",
+                systemImage: "lock.fill",
+                description: Text("Your current staff membership does not allow access to this roster.")
+            )
+            .accessibilityIdentifier("studentRoster.permissionDenied")
+
+        case .empty:
+            VStack(spacing: 0) {
+                pendingCreateReviewBanner
+                emptyContent
+            }
+
+        case .loaded:
+            rosterWithMutationFeedback(records: state.students, usesGrid: usesGrid)
+
+        case .refreshing:
+            VStack(spacing: 0) {
+                ProgressView()
+                    .tint(TMIColors.teal)
+                    .padding(.vertical, TMISpacing.sm)
+                    .accessibilityLabel("Refreshing students")
+                rosterWithMutationFeedback(records: state.students, usesGrid: usesGrid)
+            }
+
+        case .offline:
+            VStack(spacing: 0) {
+                StudentRosterStatusBanner(
+                    title: "Offline — showing saved students",
+                    systemImage: "wifi.slash",
+                    foreground: TMIColors.infoText,
+                    background: TMIColors.infoSurface,
+                    identifier: "studentRoster.offline"
+                )
+                if state.students.isEmpty {
+                    ContentUnavailableView(
+                        "No Saved Students",
+                        systemImage: "tray",
+                        description: Text("Reconnect to load this roster.")
+                    )
+                } else {
+                    rosterWithMutationFeedback(records: state.students, usesGrid: usesGrid)
+                }
+            }
+
+        case .failed(let message):
+            if state.students.isEmpty {
+                ContentUnavailableView {
+                    Label("Couldn’t Load Students", systemImage: "exclamationmark.triangle.fill")
+                } description: {
+                    Text(message)
+                } actions: {
+                    Button("Try Again", action: refresh)
+                        .buttonStyle(.borderedProminent)
+                        .tint(TMIColors.teal)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("studentRoster.retry")
+                }
+                .accessibilityIdentifier("studentRoster.error")
+            } else {
+                VStack(spacing: 0) {
+                    StudentRosterStatusBanner(
+                        title: message,
+                        systemImage: "exclamationmark.triangle.fill",
+                        foreground: TMIColors.errorText,
+                        background: TMIColors.errorSurface,
+                        identifier: "studentRoster.error"
+                    )
+                    rosterWithMutationFeedback(records: state.students, usesGrid: usesGrid)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var emptyContent: some View {
+        if !state.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            ContentUnavailableView.search
+                .accessibilityIdentifier("studentRoster.empty.search")
+        } else if state.filters != StudentListFilters() {
+            ContentUnavailableView {
+                Label("No Students Match These Filters", systemImage: "line.3.horizontal.decrease.circle")
+            } description: {
+                Text("Clear the roster filters to see the full authorized list.")
+            } actions: {
+                Button("Clear Filters") {
+                    Task { await state.setFilters(StudentListFilters()) }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(TMIColors.teal)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("studentRoster.empty.clearFilters")
+            }
+            .accessibilityIdentifier("studentRoster.empty.filters")
+        } else {
+            VStack(spacing: TMISpacing.md) {
+                Image(systemName: "person.3")
+                    .font(.system(size: 52, weight: .regular))
+                    .foregroundStyle(TMIColors.textSecondary)
+                    .accessibilityHidden(true)
+
+                Text("No Students Yet")
+                    .font(.title2.bold())
+                    .foregroundStyle(TMIColors.textPrimary)
+
+                Text("Add the first student record for this roster, or adjust the active filters.")
+                    .font(.body)
+                    .foregroundStyle(TMIColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 440)
+
+                if canCreateStudent {
+                    Button("Add Student", systemImage: "plus", action: presentCreateEditor)
+                        .buttonStyle(.borderedProminent)
+                        .tint(TMIColors.teal)
+                        .frame(minHeight: 44)
+                        .accessibilityLabel("Add first student")
+                        .accessibilityIdentifier("studentRoster.empty.addStudent")
+                }
+            }
+            .padding(TMISpacing.screenPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityIdentifier("studentRoster.empty")
+        }
+    }
+
+    @ViewBuilder
+    private func rosterWithMutationFeedback(
+        records: [StudentRecord],
+        usesGrid: Bool
+    ) -> some View {
+        VStack(spacing: 0) {
+            pendingCreateReviewBanner
+            if case nil = editor, let mutationErrorMessage {
+                StudentRosterStatusBanner(
+                    title: mutationErrorMessage,
+                    systemImage: "exclamationmark.triangle.fill",
+                    foreground: TMIColors.errorText,
+                    background: TMIColors.errorSurface,
+                    identifier: "studentRoster.mutationError"
+                )
+            }
+            roster(records: records, usesGrid: usesGrid)
+        }
+    }
+
+    @ViewBuilder
+    private var pendingCreateReviewBanner: some View {
+        if state.pendingCreateNeedsReview {
+            StudentRosterStatusBanner(
+                title: "A saved offline student could not be submitted after your access changed. Contact an administrator if the record is still needed.",
+                systemImage: "exclamationmark.shield.fill",
+                foreground: TMIColors.warningText,
+                background: TMIColors.warningSurface,
+                identifier: "studentRoster.pendingCreateNeedsReview"
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func roster(records: [StudentRecord], usesGrid: Bool) -> some View {
+        if usesGrid {
+            ScrollView {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 300, maximum: 420))],
+                    spacing: TMISpacing.md
+                ) {
+                    ForEach(records) { record in
+                        StudentRosterCard(
+                            record: record,
+                            isSelected: selectedStudentIDs.contains(record.id),
+                            isSelecting: isSelecting,
+                            isOffline: state.phase == .offline,
+                            canEdit: canEdit(record),
+                            open: { open(record) },
+                            toggleSelection: { toggleSelection(record.id) },
+                            edit: { editor = .edit(record, operationID: UUID()) },
+                            archive: { archive(record) }
+                        )
+                    }
+                    paginationProgress
+                }
+                .padding(TMISpacing.screenPadding)
+            }
+            .refreshable { await state.refresh() }
+        } else {
+            List {
+                ForEach(records) { record in
+                    StudentRosterCard(
+                        record: record,
+                        isSelected: selectedStudentIDs.contains(record.id),
+                        isSelecting: isSelecting,
+                        isOffline: state.phase == .offline,
+                        canEdit: canEdit(record),
+                        open: { open(record) },
+                        toggleSelection: { toggleSelection(record.id) },
+                        edit: { editor = .edit(record, operationID: UUID()) },
+                        archive: { archive(record) }
+                    )
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(
+                        EdgeInsets(
+                            top: TMISpacing.xs,
+                            leading: TMISpacing.screenPadding,
+                            bottom: TMISpacing.xs,
+                            trailing: TMISpacing.screenPadding
+                        )
+                    )
+                }
+                paginationProgress
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .refreshable { await state.refresh() }
+        }
+    }
+
+    @ViewBuilder
+    private var paginationProgress: some View {
+        if state.canLoadNextPage || state.isLoadingNextPage {
+            HStack {
+                Spacer()
+                ProgressView()
+                    .tint(TMIColors.teal)
+                    .accessibilityLabel("Loading more students")
+                Spacer()
+            }
+            .frame(minHeight: 44)
+            .task {
+                await state.loadNextPage()
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var rosterToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .automatic) {
+            Button("Filters", systemImage: "line.3.horizontal.decrease.circle") {
+                showingFilters = true
+            }
+            .frame(minWidth: 44, minHeight: 44)
+            .accessibilityIdentifier("studentRoster.filters")
+
+            Menu("Sort", systemImage: "arrow.up.arrow.down") {
+                Button("Alphabetical") {
+                    setSort(.alphabetical)
+                }
+                .accessibilityAddTraits(state.sort == .alphabetical ? .isSelected : [])
+
+                Button("Recently updated") {
+                    setSort(.recentlyUpdated)
+                }
+                .disabled(nameSearchIsActive)
+                .accessibilityAddTraits(state.sort == .recentlyUpdated ? .isSelected : [])
+            }
+            .frame(minWidth: 44, minHeight: 44)
+            .accessibilityIdentifier("studentRoster.sort")
+
+            if canManageAssignments, !state.students.isEmpty {
+                Button(
+                    isSelecting ? "Done" : "Select",
+                    systemImage: isSelecting ? "checkmark.circle" : "checkmark.circle.badge.questionmark",
+                    action: toggleSelecting
+                )
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityIdentifier("studentRoster.selectStudents")
+            }
+
+            if canCreateStudent, state.phase != .permissionDenied {
+                Button("Add Student", systemImage: "plus", action: presentCreateEditor)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityIdentifier("studentRoster.addStudent")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func editorView(for presentation: EditorPresentation) -> some View {
+        switch presentation {
+        case .create(let operationID):
+            StudentEditorView(
+                mode: .create,
+                member: member,
+                draft: state.editorDraft(for: .create),
+                isSubmitting: state.isSubmitting,
+                isQueued: isCreateQueued,
+                duplicateCandidateIDs: duplicateCandidateIDs(for: .create),
+                submissionError: mutationErrorMessage(for: .create)
+            ) { draft in
+                let confirmed = await state.create(draft, operationID: operationID)
+                if confirmed {
+                    return .confirmed
+                }
+                if case .createQueued = state.mutationError(for: .create) {
+                    return .queued
+                }
+                if case .duplicate = state.mutationError(for: .create) {
+                    return .duplicate
+                }
+                return .failed
+            }
+
+        case .edit(let record, let operationID):
+            let target = StudentListState.EditorDraftTarget.edit(record.id)
+            StudentEditorView(
+                mode: .edit(record),
+                member: member,
+                draft: state.editorDraft(for: target),
+                isSubmitting: state.isSubmitting,
+                duplicateCandidateIDs: duplicateCandidateIDs(for: target),
+                submissionError: mutationErrorMessage(for: target)
+            ) { draft in
+                let confirmed = await state.update(
+                    id: record.id,
+                    draft: draft,
+                    expectedVersion: record.metadata.recordVersion,
+                    operationID: operationID
+                )
+                if confirmed {
+                    return .confirmed
+                }
+                if case .duplicate = state.mutationError(for: target) {
+                    return .duplicate
+                }
+                return .failed
+            }
+        }
+    }
+
+    private func duplicateCandidateIDs(
+        for target: StudentListState.EditorDraftTarget
+    ) -> [String] {
+        guard case .duplicate(let candidateIDs) = state.mutationError(for: target) else {
+            return []
+        }
+        return candidateIDs
+    }
+
+    private var mutationErrorMessage: String? {
+        message(for: state.mutationError)
+    }
+
+    private var isCreateQueued: Bool {
+        guard case .createQueued = state.mutationError(for: .create) else { return false }
+        return true
+    }
+
+    private func mutationErrorMessage(
+        for target: StudentListState.EditorDraftTarget
+    ) -> String? {
+        message(for: state.mutationError(for: target))
+    }
+
+    private func message(for error: StudentRepositoryError?) -> String? {
+        guard let error else { return nil }
+        switch error {
+        case .duplicate:
+            return "Review the possible duplicate records before trying again."
+        case .versionConflict:
+            return "This record changed on the server. Close the editor, refresh, and try again."
+        case .createQueued:
+            return "This draft is saved on this device and will be submitted after you reconnect."
+        case .permissionDenied, .staleMembership:
+            return "Your student access changed. Refresh your account before trying again."
+        case .onlineRequired:
+            return "This action requires an internet connection."
+        case .unavailable:
+            return "The server is unavailable. Your entries are still in the form."
+        case .invalidDraft:
+            return "Review the student fields and try again."
+        case .idempotencyKeyReused:
+            return "This save request can’t be reused. Try saving again."
+        case .notFound:
+            return "This student record is no longer available."
+        case .schoolFilterRequired:
+            return "Select a school before continuing."
+        case .invalidRequest, .invalidResponse:
+            return "The server couldn’t confirm this change. Try again."
+        }
+    }
+
+    private var canCreateStudent: Bool {
+        switch member.role {
+        case .teacher, .counselor:
+            return !member.schoolIDs.isEmpty
+        case .socialWorker:
+            return false
+        case .schoolAdministrator:
+            return member.capabilities.contains(.studentWriteDetail)
+                && !member.schoolIDs.isEmpty
+        case .districtAdministrator:
+            return member.capabilities.contains(.studentWriteDetail)
+        }
+    }
+
+    private var canManageAssignments: Bool {
+        member.capabilities.contains(.staffManage)
+            && member.capabilities.contains(.studentWriteDetail)
+            && (member.role == .schoolAdministrator || member.role == .districtAdministrator)
+            && state.phase != .offline
+            && state.phase != .permissionDenied
+    }
+
+    private var nameSearchIsActive: Bool {
+        let normalized = state.searchText
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        guard !normalized.isEmpty else { return false }
+        let isIdentifierLike = !normalized.contains(where: { $0.isWhitespace })
+            && normalized.contains(where: { $0.isNumber || "-_/".contains($0) })
+        return !isIdentifierLike
+    }
+
+    private func canEdit(_ record: StudentRecord) -> Bool {
+        AuthorizationPolicy.canWriteStudentDetail(
+            member,
+            student: StudentAuthorizationScope(
+                studentID: record.id,
+                districtID: record.districtID,
+                schoolID: record.schoolID
+            )
+        )
+    }
+
+    private func presentCreateEditor() {
+        editor = .create(operationID: UUID())
+    }
+
+    private func open(_ record: StudentRecord) {
+        guard !isSelecting else {
+            toggleSelection(record.id)
+            return
+        }
+
+        do {
+            try router.open(record)
+        } catch {
+            navigationError = "Your current access does not allow this student record to open."
+            showingNavigationError = true
+        }
+    }
+
+    private func archive(_ record: StudentRecord) {
+        Task {
+            let didArchive = await state.archive(
+                id: record.id,
+                expectedVersion: record.metadata.recordVersion,
+                operationID: UUID()
+            )
+            if didArchive {
+                AccessibilityManager.shared.announce(
+                    "\(record.displayName) archived.",
+                    priority: .high
+                )
+            }
+        }
+    }
+
+    private func refresh() {
+        Task { await state.refresh() }
+    }
+
+    private func setSort(_ sort: StudentRosterSort) {
+        Task { await state.setSort(sort) }
+    }
+
+    private func applyFilters(_ filters: StudentListFilters) {
+        showingFilters = false
+        Task { await state.setFilters(filters) }
+    }
+
+    private func toggleSelecting() {
+        if isSelecting {
+            finishSelecting()
+        } else {
+            isSelecting = true
+        }
+    }
+
+    private func toggleSelection(_ studentID: String) {
+        if selectedStudentIDs.contains(studentID) {
+            selectedStudentIDs.remove(studentID)
+        } else {
+            selectedStudentIDs.insert(studentID)
+        }
+    }
+
+    private func finishSelecting() {
+        isSelecting = false
+        selectedStudentIDs.removeAll()
+        showingBulkAssignment = false
+    }
+
+    @MainActor
+    private func applyBulkAssignment(
+        memberID: String,
+        action: StudentBulkAssignmentView.Action
+    ) async -> Bool {
+        guard memberID != member.userID else { return false }
+        let selectedRecords = state.students.filter { selectedStudentIDs.contains($0.id) }
+        guard !selectedRecords.isEmpty else { return false }
+
+        for record in selectedRecords {
+            var assignedMemberIDs = record.assignedMemberIDs
+            switch action {
+            case .assign:
+                assignedMemberIDs.insert(memberID)
+            case .unassign:
+                assignedMemberIDs.remove(memberID)
+            }
+
+            let draft = StudentDraft(
+                displayName: record.displayName,
+                schoolID: record.schoolID,
+                grade: record.grade,
+                studentIdentifier: record.studentIdentifier,
+                dateOfBirth: record.dateOfBirth,
+                pronouns: record.pronouns,
+                assignedMemberIDs: assignedMemberIDs
+            )
+            let didUpdate = await state.update(
+                id: record.id,
+                draft: draft,
+                expectedVersion: record.metadata.recordVersion,
+                operationID: UUID()
+            )
+            guard didUpdate else { return false }
+        }
+
+        finishSelecting()
+        AccessibilityManager.shared.announce("Student assignments updated.", priority: .high)
+        return true
+    }
+
+    private enum EditorPresentation: Identifiable {
+        case create(operationID: UUID)
+        case edit(StudentRecord, operationID: UUID)
+
+        var id: String {
+            switch self {
+            case .create(let operationID):
+                "create-\(operationID.uuidString)"
+            case .edit(let record, let operationID):
+                "edit-\(record.id)-\(operationID.uuidString)"
+            }
         }
     }
 }
 
-#Preview("With Students") {
-    NavigationStack {
-        StudentListView()
+private struct StudentRosterCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    let record: StudentRecord
+    let isSelected: Bool
+    let isSelecting: Bool
+    let isOffline: Bool
+    let canEdit: Bool
+    let open: () -> Void
+    let toggleSelection: () -> Void
+    let edit: () -> Void
+    let archive: () -> Void
+
+    var body: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: TMISpacing.sm))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: TMISpacing.md))
+
+        layout {
+            if isSelecting {
+                Button(
+                    isSelected ? "Deselect \(record.displayName)" : "Select \(record.displayName)",
+                    systemImage: isSelected ? "checkmark.circle.fill" : "circle",
+                    action: toggleSelection
+                )
+                .labelStyle(.iconOnly)
+                .font(.title2)
+                .foregroundStyle(isSelected ? TMIColors.teal : TMIColors.textSecondary)
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityIdentifier("studentRoster.select.\(record.id)")
+            }
+
+            Button(action: open) {
+                StudentRosterCardLabel(record: record)
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .accessibilityLabel(accessibilitySummary)
+            .accessibilityHint(isSelecting ? "Selects this student" : "Opens the student record")
+            .accessibilityIdentifier("studentRoster.student.\(record.id)")
+
+            if !isSelecting, canEdit, !isOffline {
+                StudentRosterActionMenu(
+                    record: record,
+                    edit: edit,
+                    archive: archive
+                )
+            }
+        }
+        .padding(TMISpacing.md)
+        .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+        .overlay {
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .stroke(
+                    isSelected ? TMIColors.teal : TMIColors.interactiveBorder,
+                    lineWidth: isSelected ? 2 : 1
+                )
+        }
     }
-    .environment(AppRouter())
+
+    private var accessibilitySummary: String {
+        var values = [
+            record.displayName,
+            "grade \(record.grade)",
+            "school \(record.schoolID)",
+        ]
+        if let studentIdentifier = record.studentIdentifier {
+            values.append("student identifier \(studentIdentifier)")
+        }
+        values.append("\(record.assignedMemberIDs.count) assigned staff")
+        if record.isArchived {
+            values.append("archived")
+        }
+        return values.joined(separator: ", ")
+    }
 }
 
-#Preview("Empty") {
-    NavigationStack {
-        StudentListView()
+private struct StudentRosterCardLabel: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    let record: StudentRecord
+
+    var body: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: TMISpacing.sm))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: TMISpacing.md))
+
+        layout {
+            if !dynamicTypeSize.isAccessibilitySize {
+                ZStack {
+                    Circle().fill(TMIColors.aubergineSoft)
+                    Text(initials)
+                        .font(.headline)
+                        .foregroundStyle(TMIColors.aubergine)
+                        .minimumScaleFactor(0.7)
+                }
+                .frame(width: 48, height: 48)
+                .accessibilityHidden(true)
+            }
+
+            VStack(alignment: .leading, spacing: TMISpacing.xs) {
+                Text(record.displayName)
+                    .font(.headline)
+                    .foregroundStyle(TMIColors.textPrimary)
+                if record.isArchived {
+                    Label("Archived", systemImage: "archivebox.fill")
+                        .font(.footnote)
+                        .foregroundStyle(TMIColors.warningText)
+                }
+
+                if dynamicTypeSize.isAccessibilitySize {
+                    Text("Grade: \(record.grade)")
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                    Text("School: \(record.schoolID)")
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                } else {
+                    Text("Grade \(record.grade) • \(record.schoolID)")
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                }
+
+                if let studentIdentifier = record.studentIdentifier {
+                    Text("Student ID: \(studentIdentifier)")
+                        .font(.footnote)
+                        .foregroundStyle(TMIColors.textSecondary)
+                }
+
+                Label(
+                    "\(record.assignedMemberIDs.count) assigned staff",
+                    systemImage: "person.2"
+                )
+                .font(.footnote)
+                .foregroundStyle(TMIColors.infoText)
+            }
+        }
     }
-    .environment(AppRouter())
+
+    private var initials: String {
+        record.displayName
+            .split(whereSeparator: { $0.isWhitespace })
+            .prefix(2)
+            .compactMap(\.first)
+            .map(String.init)
+            .joined()
+            .uppercased()
+    }
+}
+
+private struct StudentRosterActionMenu: View {
+    let record: StudentRecord
+    let edit: () -> Void
+    let archive: () -> Void
+
+    @State private var showingArchiveConfirmation = false
+
+    var body: some View {
+        Menu("Actions for \(record.displayName)", systemImage: "ellipsis.circle") {
+            Button("Edit Student", systemImage: "pencil", action: edit)
+                .accessibilityIdentifier("studentRoster.edit.\(record.id)")
+
+            if !record.isArchived {
+                Button("Archive Student", systemImage: "archivebox", role: .destructive) {
+                    showingArchiveConfirmation = true
+                }
+                .accessibilityIdentifier("studentRoster.archive.\(record.id)")
+            }
+        }
+        .labelStyle(.iconOnly)
+        .font(.title2)
+        .foregroundStyle(TMIColors.aubergine)
+        .frame(minWidth: 44, minHeight: 44)
+        .confirmationDialog(
+            "Archive \(record.displayName)?",
+            isPresented: $showingArchiveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Archive Student", role: .destructive, action: archive)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("The student will leave the active roster. The institutional record is retained.")
+        }
+    }
+}
+
+private struct StudentRosterStatusBanner: View {
+    let title: String
+    let systemImage: String
+    let foreground: Color
+    let background: Color
+    let identifier: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.subheadline)
+            .foregroundStyle(foreground)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, TMISpacing.screenPadding)
+            .background(background)
+            .accessibilityIdentifier(identifier)
+    }
+}
+
+private struct StudentRosterFilterView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let member: MembershipContext
+    let records: [StudentRecord]
+    let apply: (StudentListFilters) -> Void
+
+    @State private var schoolID: String
+    @State private var grade: String
+    @State private var assignedMemberID: String
+    @State private var status: StudentRecordStatusFilter
+
+    init(
+        filters: StudentListFilters,
+        member: MembershipContext,
+        records: [StudentRecord],
+        apply: @escaping (StudentListFilters) -> Void
+    ) {
+        self.member = member
+        self.records = records
+        self.apply = apply
+        _schoolID = State(initialValue: filters.schoolID ?? "")
+        _grade = State(initialValue: filters.grade ?? "")
+        _assignedMemberID = State(initialValue: filters.assignedMemberID ?? "")
+        _status = State(initialValue: filters.status)
+    }
+
+    var body: some View {
+        Form {
+            Section("Roster scope") {
+                schoolControl
+                TextField("Grade", text: $grade)
+                    .accessibilityIdentifier("studentRoster.filter.grade")
+
+                if canFilterByMember {
+                    TextField("Assigned staff member ID", text: $assignedMemberID)
+                        .accessibilityIdentifier("studentRoster.filter.assignedMember")
+                }
+
+                Picker("Record status", selection: $status) {
+                    Text("Active").tag(StudentRecordStatusFilter.active)
+                    Text("Archived").tag(StudentRecordStatusFilter.archived)
+                    Text("All").tag(StudentRecordStatusFilter.all)
+                }
+                .accessibilityIdentifier("studentRoster.filter.status")
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Filter Students")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel", action: dismiss.callAsFunction)
+            }
+            ToolbarItemGroup(placement: .confirmationAction) {
+                Button("Clear", action: clear)
+                    .accessibilityIdentifier("studentRoster.filter.clear")
+                Button("Apply", action: submit)
+                    .disabled(!canApply)
+                    .accessibilityIdentifier("studentRoster.filter.apply")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var schoolControl: some View {
+        let schools = availableSchoolIDs
+        if schools.isEmpty {
+            TextField("School identifier", text: $schoolID)
+                .accessibilityIdentifier("studentRoster.filter.school")
+        } else {
+            Picker("School", selection: $schoolID) {
+                Text("All authorized schools").tag("")
+                ForEach(schools, id: \.self) { school in
+                    Text(school).tag(school)
+                }
+            }
+            .accessibilityIdentifier("studentRoster.filter.school")
+        }
+    }
+
+    private var availableSchoolIDs: [String] {
+        Set(member.schoolIDs).union(records.map(\.schoolID)).sorted()
+    }
+
+    private var canFilterByMember: Bool {
+        member.role == .schoolAdministrator || member.role == .districtAdministrator
+    }
+
+    private var canApply: Bool {
+        guard member.role != .districtAdministrator, member.schoolIDs.count > 1 else {
+            return true
+        }
+        return normalized(schoolID) != nil
+    }
+
+    private func clear() {
+        schoolID = ""
+        grade = ""
+        assignedMemberID = ""
+        status = .active
+    }
+
+    private func submit() {
+        apply(
+            StudentListFilters(
+                schoolID: normalized(schoolID),
+                grade: normalized(grade),
+                assignedMemberID: canFilterByMember ? normalized(assignedMemberID) : nil,
+                status: status
+            )
+        )
+        dismiss()
+    }
+
+    private func normalized(_ value: String) -> String? {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : normalized
+    }
+}
+
+private struct StudentBulkSelectionBar: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    let selectedCount: Int
+    let canAssign: Bool
+    let assign: () -> Void
+    let finish: () -> Void
+
+    var body: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: TMISpacing.xs))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: TMISpacing.sm))
+
+        layout {
+            Text("\(selectedCount) selected")
+                .font(.headline)
+                .foregroundStyle(TMIColors.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Assign Staff", systemImage: "person.badge.plus", action: assign)
+                .buttonStyle(.borderedProminent)
+                .tint(TMIColors.teal)
+                .disabled(selectedCount == 0 || !canAssign)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("studentRoster.bulkAssignment")
+            Button("Done", action: finish)
+                .frame(minHeight: 44)
+        }
+        .padding(.horizontal, TMISpacing.screenPadding)
+        .padding(.vertical, TMISpacing.sm)
+        .background(.regularMaterial)
+    }
+}
+
+private struct StudentBulkAssignmentView: View {
+    enum Action: String, CaseIterable, Identifiable {
+        case assign
+        case unassign
+
+        var id: Self { self }
+        var title: String { rawValue.capitalized }
+    }
+
+    @Environment(\.dismiss) private var dismiss
+
+    let selectedCount: Int
+    let isSubmitting: Bool
+    let protectedMemberID: String
+    let apply: @MainActor (String, Action) async -> Bool
+
+    @State private var memberID = ""
+    @State private var action = Action.assign
+    @State private var isAwaitingServer = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Form {
+            Section("Assignment change") {
+                LabeledContent("Selected students", value: "\(selectedCount)")
+                TextField("Staff member ID", text: $memberID)
+                    .accessibilityIdentifier("studentRoster.bulk.memberID")
+                Picker("Action", selection: $action) {
+                    ForEach(Action.allCases) { action in
+                        Text(action.title).tag(action)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("studentRoster.bulk.action")
+
+                if isProtectedMember {
+                    Label(
+                        "Your own roster access can’t be changed in a bulk action.",
+                        systemImage: "person.badge.shield.checkmark"
+                    )
+                    .foregroundStyle(TMIColors.warningText)
+                    .accessibilityIdentifier("studentRoster.bulk.protectedMember")
+                }
+            }
+
+            Section {
+                Text("The server confirms each assignment against current district and school access.")
+                    .font(.footnote)
+                    .foregroundStyle(TMIColors.textSecondary)
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(TMIColors.errorText)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Assign Staff")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel", action: dismiss.callAsFunction)
+                    .disabled(submissionInFlight)
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Apply", action: submit)
+                    .disabled(
+                        normalizedMemberID == nil
+                            || isProtectedMember
+                            || submissionInFlight
+                    )
+                    .accessibilityIdentifier("studentRoster.bulk.apply")
+            }
+        }
+        .interactiveDismissDisabled(submissionInFlight)
+    }
+
+    private var submissionInFlight: Bool {
+        isSubmitting || isAwaitingServer
+    }
+
+    private var normalizedMemberID: String? {
+        let value = memberID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, TrustedIdentifier.isValid(value) else { return nil }
+        return value
+    }
+
+    private var isProtectedMember: Bool {
+        normalizedMemberID == protectedMemberID
+    }
+
+    private func submit() {
+        guard let memberID = normalizedMemberID, !submissionInFlight else { return }
+        isAwaitingServer = true
+        errorMessage = nil
+        Task { @MainActor in
+            let didApply = await self.apply(memberID, self.action)
+            self.isAwaitingServer = false
+            if didApply {
+                self.dismiss()
+            } else {
+                self.errorMessage = "The server did not confirm every assignment. Refresh and try again."
+            }
+        }
+    }
 }

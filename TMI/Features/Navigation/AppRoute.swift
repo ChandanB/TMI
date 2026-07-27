@@ -153,6 +153,17 @@ nonisolated struct AppNavigationPolicy: Equatable, Sendable {
         )
     }
 
+    func canReadStudent(_ record: StudentRecord) -> Bool {
+        guard let trustedMembership,
+              let scope = StudentAuthorizationScope(record: record) else {
+            return false
+        }
+        return AuthorizationPolicy.canReadStudentDetail(
+            trustedMembership,
+            student: scope
+        )
+    }
+
     func canEditStudent(_ studentID: String) -> Bool {
         guard canReadStudent(studentID) else { return false }
 
@@ -169,6 +180,17 @@ nonisolated struct AppNavigationPolicy: Equatable, Sendable {
     func canEditStudent(_ student: Student) -> Bool {
         guard let trustedMembership,
               let scope = StudentAuthorizationScope(student: student) else {
+            return false
+        }
+        return AuthorizationPolicy.canWriteStudentDetail(
+            trustedMembership,
+            student: scope
+        )
+    }
+
+    func canEditStudent(_ record: StudentRecord) -> Bool {
+        guard let trustedMembership,
+              let scope = StudentAuthorizationScope(record: record) else {
             return false
         }
         return AuthorizationPolicy.canWriteStudentDetail(

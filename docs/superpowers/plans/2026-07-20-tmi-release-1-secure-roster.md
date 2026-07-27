@@ -294,11 +294,11 @@ git commit -m "feat: add assigned-scope student repository"
 - Create: `TMITests/Features/Students/StudentListStateTests.swift`
 - Create: `TMIUITests/StudentRosterUITests.swift`
 
-- [ ] **Step 1: Write failing state tests**
+- [x] **Step 1: Write failing state tests**
 
 Test loading, empty, populated, refreshing, offline-cache, permission-denied, recoverable error, search debounce, filters, sort, next-page loading, disabled double-submit, preserved draft after failure, and success only after repository confirmation.
 
-- [ ] **Step 2: Implement observable state**
+- [x] **Step 2: Implement observable state**
 
 ```swift
 @MainActor @Observable
@@ -312,15 +312,15 @@ final class StudentListState {
 }
 ```
 
-- [ ] **Step 3: Build adaptive roster UI**
+- [x] **Step 3: Build adaptive roster UI**
 
 Use `List` at compact widths and an adaptive `LazyVGrid` where it materially improves scanning. Add `.searchable`, filter sheet, sort menu, accessible bulk assignment for authorized users, pull-to-refresh, honest states, and 44-point controls. Use Aubergine + Teal semantic components only.
 
-- [ ] **Step 4: Build shared create/edit form**
+- [x] **Step 4: Build shared create/edit form**
 
 Normalize before validation, show field-level errors, surface duplicate candidates before creation, preserve state on recoverable failure, disable duplicate submission, and announce confirmed success to VoiceOver.
 
-- [ ] **Step 5: Run state/UI tests and commit**
+- [x] **Step 5: Run state/UI tests and commit**
 
 ```bash
 git add TMI/Views/Students/StudentListView.swift TMI/Features/Students/StudentListState.swift TMI/Features/Students/StudentEditorView.swift TMITests/Features/Students/StudentListStateTests.swift TMIUITests/StudentRosterUITests.swift

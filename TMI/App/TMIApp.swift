@@ -42,7 +42,7 @@ struct TMIApp: App {
             arguments: ProcessInfo.processInfo.arguments
         )
         self.uiTestingConfiguration = uiTestingConfiguration
-        usesInMemoryDependencies = isRunningUnitTests || uiTestingConfiguration.fixture != nil
+        usesInMemoryDependencies = isRunningUnitTests || uiTestingConfiguration.isUITesting
 #else
         usesInMemoryDependencies = isRunningUnitTests
 #endif
@@ -118,8 +118,8 @@ struct TMIApp: App {
     @ViewBuilder
     private var rootContent: some View {
 #if DEBUG
-        if uiTestingConfiguration.fixture == .signedOut {
-            signedOutUITestingContent
+        if uiTestingConfiguration.isUITesting {
+            uiTestingRootContent
         } else {
             standardRootContent
         }
@@ -127,6 +127,52 @@ struct TMIApp: App {
         standardRootContent
 #endif
     }
+
+#if DEBUG
+    @ViewBuilder
+    private var uiTestingRootContent: some View {
+        switch uiTestingConfiguration.fixture {
+        case .signedOut:
+            signedOutUITestingContent
+        case .rosterPopulated,
+             .rosterEmpty,
+             .rosterOffline,
+             .rosterPermissionDenied,
+             .rosterCreateQueued,
+             .rosterCreateSaving,
+             .rosterArchived,
+             .rosterCreateDuplicate:
+            if let fixture = uiTestingConfiguration.fixture {
+                rosterUITestingContent(fixture: fixture)
+            }
+        case nil:
+            ContentUnavailableView(
+                "UI Test Fixture Unavailable",
+                systemImage: "xmark.shield.fill",
+                description: Text("Launch with a recognized fixture.")
+            )
+            .accessibilityIdentifier("uiTesting.fixtureUnavailable")
+        }
+    }
+
+    @ViewBuilder
+    private func rosterUITestingContent(
+        fixture: UITestingLaunchConfiguration.Fixture
+    ) -> some View {
+        if uiTestingConfiguration.contentSize == .accessibility5 {
+#if os(macOS)
+            StudentRosterUITestingContent(fixture: fixture.rawValue)
+                .environment(\.sizeCategory, .accessibilityExtraExtraExtraLarge)
+                .dynamicTypeSize(.accessibility5)
+#else
+            StudentRosterUITestingContent(fixture: fixture.rawValue)
+                .dynamicTypeSize(.accessibility5)
+#endif
+        } else {
+            StudentRosterUITestingContent(fixture: fixture.rawValue)
+        }
+    }
+#endif
 
     @ViewBuilder
     private var standardRootContent: some View {

@@ -20,6 +20,20 @@ nonisolated extension StudentAuthorizationScope {
             schoolID: schoolID
         )
     }
+
+    init?(record: StudentRecord) {
+        guard TrustedIdentifier.isValid(record.id),
+              TrustedIdentifier.isValid(record.districtID),
+              TrustedIdentifier.isValid(record.schoolID) else {
+            return nil
+        }
+
+        self.init(
+            studentID: record.id,
+            districtID: record.districtID,
+            schoolID: record.schoolID
+        )
+    }
 }
 
 nonisolated struct SchoolAuthorizationScope: Codable, Sendable, Equatable {

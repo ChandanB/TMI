@@ -6,6 +6,16 @@ import Testing
 
 @Suite("Assigned-scope student repository")
 struct StudentRepositoryTests {
+    @Test("Roster sort is Codable and defaults to alphabetical")
+    func rosterSortContractDefaultsToAlphabetical() throws {
+        #expect(StudentPageRequest.first.sort == .alphabetical)
+
+        let encoded = try JSONEncoder().encode(StudentRosterSort.recentlyUpdated)
+        let decoded = try JSONDecoder().decode(StudentRosterSort.self, from: encoded)
+
+        #expect(decoded == .recentlyUpdated)
+    }
+
     @Test("First and next pages normalize filters and never request more than 50 records")
     func pagesAreCappedAndNormalized() async throws {
         let store = StudentRecordStoreSpy(
@@ -49,6 +59,23 @@ struct StudentRepositoryTests {
         #expect(requests[0].limit == 50)
         #expect(requests[1].cursor == StudentPageCursor(token: "next"))
         #expect(requests[1].limit == 50)
+    }
+
+    @Test("Repository forwards roster sort and binds it to the cache key")
+    func repositoryForwardsAndCachesRosterSort() async throws {
+        let cache = StudentPageCacheSpy()
+        let store = StudentRecordStoreSpy(
+            pageResults: [.success(StudentStorePage(documents: [], nextCursor: nil))]
+        )
+        let repository = makeRepository(store: store, cache: cache)
+
+        _ = try await repository.page(
+            StudentPageRequest(sort: .recentlyUpdated),
+            member: membership()
+        )
+
+        #expect(store.pageRequests.first?.sort == .recentlyUpdated)
+        #expect(cache.savedKeys.first?.sort == .recentlyUpdated)
     }
 
     @Test("Name prefix and exact identifier search are sent to the server with admin member filters")
@@ -169,7 +196,10 @@ struct StudentRepositoryTests {
             limit: request.limit,
             source: request.source
         ))
-        #expect(next.startAfter == ["ava stone", "student-z"])
+        #expect(next.startAfter == [
+            .string("ava stone"),
+            .string("student-z"),
+        ])
 
         let mismatched = StudentPageCursor(
             token: "student-z",
@@ -190,6 +220,95 @@ struct StudentRepositoryTests {
                 source: request.source
             ))
         }
+    }
+
+    @Test("Recent query plans use updated time and bind sort to their cursor")
+    func recentQueryPlanBindsSortAndTimestampCursor() throws {
+        let timestamp = Date(timeIntervalSince1970: 1_234)
+        let request = StudentStorePageRequest(
+            districtID: "district-a",
+            scope: .district,
+            search: .normalizedStudentIdentifier("0012"),
+            schoolID: nil,
+            grade: nil,
+            assignedMemberID: nil,
+            status: .all,
+            sort: .recentlyUpdated,
+            cursor: nil,
+            limit: 25,
+            source: .server
+        )
+        let first = try StudentFirestoreQueryPlan(request: request)
+
+        #expect(first.sort == .recentlyUpdated)
+        #expect(first.order == [.updatedAtDescending, .documentID])
+
+        let cursor = try first.nextCursor(
+            documentID: "student-z",
+            normalizedDisplayName: nil,
+            updatedAt: timestamp
+        )
+        #expect(cursor.sort == .recentlyUpdated)
+        #expect(cursor.updatedAt == timestamp)
+
+        let next = try StudentFirestoreQueryPlan(request: StudentStorePageRequest(
+            districtID: request.districtID,
+            scope: request.scope,
+            search: request.search,
+            schoolID: request.schoolID,
+            grade: request.grade,
+            assignedMemberID: request.assignedMemberID,
+            status: request.status,
+            sort: request.sort,
+            cursor: cursor,
+            limit: request.limit,
+            source: request.source
+        ))
+        #expect(next.startAfter == [
+            .timestamp(timestamp),
+            .string("student-z"),
+        ])
+
+        let alphabeticalPlan = try StudentFirestoreQueryPlan(request: StudentStorePageRequest(
+            districtID: request.districtID,
+            scope: request.scope,
+            search: request.search,
+            schoolID: request.schoolID,
+            grade: request.grade,
+            assignedMemberID: request.assignedMemberID,
+            status: request.status,
+            sort: .alphabetical,
+            cursor: nil,
+            limit: request.limit,
+            source: request.source
+        ))
+        #expect(alphabeticalPlan.fingerprint != first.fingerprint)
+    }
+
+    @Test("Name prefix with recent sort fails before store access while exact ID honors it")
+    func recentSortRejectsNamePrefixButAllowsExactIdentifier() async throws {
+        let store = StudentRecordStoreSpy(
+            pageResults: [.success(StudentStorePage(
+                documents: [snapshot(id: "student-a")],
+                nextCursor: nil
+            ))]
+        )
+        let repository = makeRepository(store: store)
+
+        await expectRepositoryError(.invalidRequest) {
+            _ = try await repository.page(
+                StudentPageRequest(search: "Ava", sort: .recentlyUpdated),
+                member: membership()
+            )
+        }
+        #expect(store.pageRequests.isEmpty)
+
+        _ = try await repository.page(
+            StudentPageRequest(search: "0012", sort: .recentlyUpdated),
+            member: membership()
+        )
+        #expect(store.pageRequests.first?.search == .normalizedStudentIdentifier("0012"))
+        #expect(store.pageRequests.first?.sort == .recentlyUpdated)
     }
 
     @Test("A response containing any cross-tenant or unassigned record fails closed")
@@ -480,6 +599,16 @@ struct StudentRepositoryTests {
         let decoded = try JSONDecoder().decode(PendingStudentCreate.self, from: encoded)
 
         #expect(decoded == pending)
+        var legacyObject = try #require(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        legacyObject.removeValue(forKey: "disposition")
+        let legacyData = try JSONSerialization.data(withJSONObject: legacyObject)
+        let legacyDecoded = try JSONDecoder().decode(
+            PendingStudentCreate.self,
+            from: legacyData
+        )
+        #expect(legacyDecoded.disposition == .queued)
     }
 
     @Test("Secure outbox is durable and idempotent across outbox instances")
@@ -624,8 +753,116 @@ struct StudentRepositoryTests {
             _ = try await repository.reconcilePendingCreates(member: membership(version: 2))
         }
 
-        #expect(await outbox.items == [pending])
+        #expect(await outbox.items == [pending.quarantinedForReview()])
         #expect(backend.createRequests.isEmpty)
+    }
+
+    @Test("A durable stale head item is quarantined and cannot block a later valid item after reopen")
+    func staleHeadItemIsDurablyQuarantined() async throws {
+        let stale = PendingStudentCreate(
+            operationID: UUID(uuidString: "00000000-0000-0000-0000-000000000811")!,
+            districtID: "district-a",
+            userID: "teacher-a",
+            membershipVersion: 1,
+            draft: studentDraft(displayName: "Stale Student"),
+            enqueuedAt: Date(timeIntervalSince1970: 1)
+        )
+        let current = PendingStudentCreate(
+            operationID: UUID(uuidString: "00000000-0000-0000-0000-000000000812")!,
+            districtID: "district-a",
+            userID: "teacher-a",
+            membershipVersion: 2,
+            draft: studentDraft(displayName: "Current Student"),
+            enqueuedAt: Date(timeIntervalSince1970: 2)
+        )
+        let outbox = StudentCreateOutboxSpy(items: [stale, current])
+        let store = StudentRecordStoreSpy(
+            studentResults: [.success(snapshot(id: "student-current", recordVersion: 1))]
+        )
+        let backend = StudentMutationBackendSpy(
+            createResults: [.success(StudentMutationResult(
+                studentID: "student-current",
+                recordVersion: 1,
+                replayed: false,
+                membership: mutationMembership(
+                    assignedStudentIDs: ["student-a", "student-b", "student-current"],
+                    version: 3
+                )
+            ))]
+        )
+        let repository = makeRepository(store: store, backend: backend, outbox: outbox)
+
+        await expectRepositoryError(.staleMembership) {
+            _ = try await repository.reconcilePendingCreates(member: membership(version: 2))
+        }
+        await expectRepositoryError(.staleMembership) {
+            _ = try await repository.reconcilePendingCreates(member: membership(
+                assignedStudentIDs: ["student-a", "student-b", "student-current"],
+                version: 3
+            ))
+        }
+
+        #expect(await outbox.items == [stale.quarantinedForReview()])
+        #expect(backend.createRequests.map(\.base.idempotencyKey) == [
+            current.operationID.uuidString.lowercased(),
+        ])
+        #expect(store.studentRequests.count == 1)
+    }
+
+    @Test("A denied head item is durably quarantined and later queued work drains after reopen")
+    func permissionDeniedHeadItemIsDurablyQuarantined() async throws {
+        let denied = PendingStudentCreate(
+            operationID: UUID(uuidString: "00000000-0000-0000-0000-000000000821")!,
+            districtID: "district-a",
+            userID: "teacher-a",
+            membershipVersion: 1,
+            draft: studentDraft(displayName: "Denied Student"),
+            enqueuedAt: Date(timeIntervalSince1970: 1)
+        )
+        let allowed = PendingStudentCreate(
+            operationID: UUID(uuidString: "00000000-0000-0000-0000-000000000822")!,
+            districtID: "district-a",
+            userID: "teacher-a",
+            membershipVersion: 1,
+            draft: studentDraft(displayName: "Allowed Student"),
+            enqueuedAt: Date(timeIntervalSince1970: 2)
+        )
+        let outbox = StudentCreateOutboxSpy(items: [denied, allowed])
+        let store = StudentRecordStoreSpy(
+            studentResults: [.success(snapshot(id: "student-allowed", recordVersion: 1))]
+        )
+        let backend = StudentMutationBackendSpy(
+            createResults: [
+                .failure(.permissionDenied),
+                .success(StudentMutationResult(
+                    studentID: "student-allowed",
+                    recordVersion: 1,
+                    replayed: false,
+                    membership: mutationMembership(
+                        assignedStudentIDs: ["student-a", "student-b", "student-allowed"],
+                        version: 2
+                    )
+                )),
+            ]
+        )
+        let repository = makeRepository(store: store, backend: backend, outbox: outbox)
+
+        await expectRepositoryError(.staleMembership) {
+            _ = try await repository.reconcilePendingCreates(member: membership(version: 1))
+        }
+        await expectRepositoryError(.staleMembership) {
+            _ = try await repository.reconcilePendingCreates(member: membership(
+                assignedStudentIDs: ["student-a", "student-b", "student-allowed"],
+                version: 2
+            ))
+        }
+
+        #expect(await outbox.items == [denied.quarantinedForReview()])
+        #expect(backend.createRequests.map(\.base.idempotencyKey) == [
+            denied.operationID.uuidString.lowercased(),
+            allowed.operationID.uuidString.lowercased(),
+        ])
+        #expect(store.studentRequests.count == 1)
     }
 
     @Test("A recoverable reconciliation failure keeps the draft on refreshed authority")

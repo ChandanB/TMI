@@ -29,23 +29,40 @@ const signature = (fields: readonly IndexField[]): string =>
 
 const requiredStudentIndexSignatures = (): ReadonlySet<string> => {
   const required = new Set<string>();
+  const normalizedName = {
+    fieldPath: "normalizedDisplayName",
+    order: "ASCENDING",
+  } as const;
+  const normalizedIdentifier = {
+    fieldPath: "normalizedStudentIdentifier",
+    order: "ASCENDING",
+  } as const;
+  const recentOrder = [
+    { fieldPath: "updatedAt", order: "DESCENDING" },
+    { fieldPath: "__name__", order: "ASCENDING" },
+  ] as const;
+
   for (let mask = 0; mask < 1 << equalityFields.length; mask += 1) {
     const selected = equalityFields.filter(
       (_, index) => (mask & (1 << index)) !== 0,
     );
-    for (const searchField of [
-      null,
-      { fieldPath: "normalizedStudentIdentifier", order: "ASCENDING" } as const,
-      { fieldPath: "normalizedDisplayName", order: "ASCENDING" } as const,
-    ]) {
-      const fields =
-        searchField === null ? selected : [...selected, searchField];
-      // Zero- and one-field plans are covered by Firestore's automatic
-      // single-field indexes. Every compound shape is provisioned explicitly.
-      if (fields.length >= 2) {
-        required.add(signature(fields));
-      }
+
+    const alphabetical = [...selected, normalizedName];
+    if (alphabetical.length >= 2) {
+      required.add(signature(alphabetical));
     }
+    required.add(signature([
+      ...selected,
+      normalizedIdentifier,
+      normalizedName,
+    ]));
+
+    required.add(signature([...selected, ...recentOrder]));
+    required.add(signature([
+      ...selected,
+      normalizedIdentifier,
+      ...recentOrder,
+    ]));
   }
   return required;
 };
@@ -66,8 +83,10 @@ describe("production Firestore indexes", () => {
     );
     const expected = requiredStudentIndexSignatures();
 
-    expect(expected.size).toBe(41);
+    expect(expected.size).toBe(63);
     expect(actual).toEqual(expected);
+    expect(configuration.indexes).toHaveLength(68);
+    expect(configuration.indexes.length).toBeLessThanOrEqual(200);
     expect(
       studentIndexes.some((index) =>
         index.fields.some((field) => field.fieldPath === "name"),

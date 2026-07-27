@@ -35,18 +35,29 @@ nonisolated enum StudentRecordStatusFilter: String, Codable, Sendable, Hashable 
     case all
 }
 
+nonisolated public enum StudentRosterSort: String, Codable, Sendable, Equatable, Hashable {
+    case alphabetical
+    case recentlyUpdated
+}
+
 nonisolated struct StudentPageCursor: Codable, Sendable, Hashable {
     let token: String
+    let sort: StudentRosterSort
     let sortValue: String?
+    let updatedAt: Date?
     let queryFingerprint: String?
 
     init(
         token: String,
+        sort: StudentRosterSort = .alphabetical,
         sortValue: String? = nil,
+        updatedAt: Date? = nil,
         queryFingerprint: String? = nil
     ) {
         self.token = token
+        self.sort = sort
         self.sortValue = sortValue
+        self.updatedAt = updatedAt
         self.queryFingerprint = queryFingerprint
     }
 }
@@ -60,6 +71,7 @@ nonisolated struct StudentPageRequest: Sendable, Equatable {
     var grade: String?
     var assignedMemberID: String?
     var status: StudentRecordStatusFilter
+    var sort: StudentRosterSort
     var cursor: StudentPageCursor?
     var limit: Int
 
@@ -69,6 +81,7 @@ nonisolated struct StudentPageRequest: Sendable, Equatable {
         grade: String? = nil,
         assignedMemberID: String? = nil,
         status: StudentRecordStatusFilter = .active,
+        sort: StudentRosterSort = .alphabetical,
         cursor: StudentPageCursor? = nil,
         limit: Int = StudentPageRequest.maximumPageSize
     ) {
@@ -77,6 +90,7 @@ nonisolated struct StudentPageRequest: Sendable, Equatable {
         self.grade = grade
         self.assignedMemberID = assignedMemberID
         self.status = status
+        self.sort = sort
         self.cursor = cursor
         self.limit = limit
     }
@@ -211,9 +225,36 @@ nonisolated struct StudentStorePageRequest: Sendable, Equatable {
     let grade: String?
     let assignedMemberID: String?
     let status: StudentRecordStatusFilter
+    let sort: StudentRosterSort
     let cursor: StudentPageCursor?
     let limit: Int
     let source: StudentStoreReadSource
+
+    init(
+        districtID: String,
+        scope: StudentStoreQueryScope,
+        search: StudentSearchPredicate?,
+        schoolID: String?,
+        grade: String?,
+        assignedMemberID: String?,
+        status: StudentRecordStatusFilter,
+        sort: StudentRosterSort = .alphabetical,
+        cursor: StudentPageCursor?,
+        limit: Int,
+        source: StudentStoreReadSource
+    ) {
+        self.districtID = districtID
+        self.scope = scope
+        self.search = search
+        self.schoolID = schoolID
+        self.grade = grade
+        self.assignedMemberID = assignedMemberID
+        self.status = status
+        self.sort = sort
+        self.cursor = cursor
+        self.limit = limit
+        self.source = source
+    }
 }
 
 nonisolated struct StudentStoreRecordRequest: Sendable, Equatable {
@@ -240,7 +281,13 @@ nonisolated protocol StudentRecordStore: Sendable {
 
 nonisolated enum StudentFirestoreOrderField: String, Codable, Sendable, Equatable {
     case normalizedDisplayName
+    case updatedAtDescending
     case documentID
+}
+
+nonisolated enum StudentFirestoreCursorValue: Sendable, Equatable {
+    case string(String)
+    case timestamp(Date)
 }
 
 nonisolated private struct StudentFirestoreFingerprintBasis: Codable, Sendable {
@@ -250,6 +297,7 @@ nonisolated private struct StudentFirestoreFingerprintBasis: Codable, Sendable {
     let grade: String?
     let status: StudentRecordStatusFilter
     let search: StudentSearchPredicate?
+    let sort: StudentRosterSort
     let order: [StudentFirestoreOrderField]
     let limit: Int
 }
@@ -264,10 +312,11 @@ nonisolated struct StudentFirestoreQueryPlan: Sendable, Equatable {
     let grade: String?
     let status: StudentRecordStatusFilter
     let search: StudentSearchPredicate?
+    let sort: StudentRosterSort
     let order: [StudentFirestoreOrderField]
     let limit: Int
     let fingerprint: String
-    let startAfter: [String]?
+    let startAfter: [StudentFirestoreCursorValue]?
 
     init(request: StudentStorePageRequest) throws {
         guard request.source == .server,
@@ -298,11 +347,17 @@ nonisolated struct StudentFirestoreQueryPlan: Sendable, Equatable {
             throw StudentRepositoryError.invalidRequest
         }
 
+        if request.sort == .recentlyUpdated,
+           case .normalizedNamePrefix = request.search {
+            throw StudentRepositoryError.invalidRequest
+        }
+
         let order: [StudentFirestoreOrderField]
-        if case .normalizedNamePrefix = request.search {
+        switch request.sort {
+        case .alphabetical:
             order = [.normalizedDisplayName, .documentID]
-        } else {
-            order = [.documentID]
+        case .recentlyUpdated:
+            order = [.updatedAtDescending, .documentID]
         }
         guard let fingerprint = Self.fingerprint(
             districtID: request.districtID,
@@ -311,24 +366,30 @@ nonisolated struct StudentFirestoreQueryPlan: Sendable, Equatable {
             grade: request.grade,
             status: request.status,
             search: request.search,
+            sort: request.sort,
             order: order,
             limit: request.limit
         ) else {
             throw StudentRepositoryError.invalidRequest
         }
 
-        let startAfter: [String]?
+        let startAfter: [StudentFirestoreCursorValue]?
         if let cursor = request.cursor {
-            guard cursor.queryFingerprint == fingerprint else {
+            guard cursor.sort == request.sort,
+                  cursor.queryFingerprint == fingerprint else {
                 throw StudentRepositoryError.invalidRequest
             }
-            if order == [.normalizedDisplayName, .documentID] {
+            switch request.sort {
+            case .alphabetical:
                 guard let sortValue = cursor.sortValue, !sortValue.isEmpty else {
                     throw StudentRepositoryError.invalidRequest
                 }
-                startAfter = [sortValue, cursor.token]
-            } else {
-                startAfter = [cursor.token]
+                startAfter = [.string(sortValue), .string(cursor.token)]
+            case .recentlyUpdated:
+                guard let updatedAt = cursor.updatedAt else {
+                    throw StudentRepositoryError.invalidRequest
+                }
+                startAfter = [.timestamp(updatedAt), .string(cursor.token)]
             }
         } else {
             startAfter = nil
@@ -340,6 +401,7 @@ nonisolated struct StudentFirestoreQueryPlan: Sendable, Equatable {
         self.grade = request.grade
         self.status = request.status
         self.search = request.search
+        self.sort = request.sort
         self.order = order
         self.limit = request.limit
         self.fingerprint = fingerprint
@@ -348,22 +410,34 @@ nonisolated struct StudentFirestoreQueryPlan: Sendable, Equatable {
 
     func nextCursor(
         documentID: String,
-        normalizedDisplayName: String?
+        normalizedDisplayName: String?,
+        updatedAt: Date? = nil
     ) throws -> StudentPageCursor {
         guard TrustedIdentifier.isValid(documentID) else {
             throw StudentRepositoryError.invalidResponse
         }
-        if order == [.normalizedDisplayName, .documentID] {
+        switch sort {
+        case .alphabetical:
             guard let normalizedDisplayName, !normalizedDisplayName.isEmpty else {
                 throw StudentRepositoryError.invalidResponse
             }
             return StudentPageCursor(
                 token: documentID,
+                sort: sort,
                 sortValue: normalizedDisplayName,
                 queryFingerprint: fingerprint
             )
+        case .recentlyUpdated:
+            guard let updatedAt else {
+                throw StudentRepositoryError.invalidResponse
+            }
+            return StudentPageCursor(
+                token: documentID,
+                sort: sort,
+                updatedAt: updatedAt,
+                queryFingerprint: fingerprint
+            )
         }
-        return StudentPageCursor(token: documentID, queryFingerprint: fingerprint)
     }
 
     private static func fingerprint(
@@ -373,6 +447,7 @@ nonisolated struct StudentFirestoreQueryPlan: Sendable, Equatable {
         grade: String?,
         status: StudentRecordStatusFilter,
         search: StudentSearchPredicate?,
+        sort: StudentRosterSort,
         order: [StudentFirestoreOrderField],
         limit: Int
     ) -> String? {
@@ -385,6 +460,7 @@ nonisolated struct StudentFirestoreQueryPlan: Sendable, Equatable {
             grade: grade,
             status: status,
             search: search,
+            sort: sort,
             order: order,
             limit: limit
         )
@@ -444,12 +520,22 @@ struct FirebaseStudentRecordStore: StudentRecordStore, @unchecked Sendable {
             switch orderField {
             case .normalizedDisplayName:
                 query = query.order(by: "normalizedDisplayName")
+            case .updatedAtDescending:
+                query = query.order(by: "updatedAt", descending: true)
             case .documentID:
                 query = query.order(by: FieldPath.documentID())
             }
         }
         if let startAfter = plan.startAfter {
-            query = query.start(after: startAfter)
+            let cursorValues: [Any] = startAfter.map { value in
+                switch value {
+                case .string(let string):
+                    string
+                case .timestamp(let date):
+                    date
+                }
+            }
+            query = query.start(after: cursorValues)
         }
         query = query.limit(to: plan.limit)
 
@@ -462,10 +548,13 @@ struct FirebaseStudentRecordStore: StudentRecordStore, @unchecked Sendable {
                 )
             }
             let nextCursor: StudentPageCursor?
-            if snapshot.documents.count == plan.limit, let last = snapshot.documents.last {
+            if snapshot.documents.count == plan.limit,
+               let last = snapshot.documents.last,
+               let lastDocument = documents.last?.document {
                 nextCursor = try plan.nextCursor(
                     documentID: last.documentID,
-                    normalizedDisplayName: last.data()["normalizedDisplayName"] as? String
+                    normalizedDisplayName: last.data()["normalizedDisplayName"] as? String,
+                    updatedAt: lastDocument.updatedAt
                 )
             } else {
                 nextCursor = nil
@@ -529,6 +618,7 @@ nonisolated struct StudentPageCacheKey: Sendable, Hashable {
     let grade: String?
     let assignedMemberID: String?
     let status: StudentRecordStatusFilter
+    let sort: StudentRosterSort
     let cursor: StudentPageCursor?
     let limit: Int
 }
@@ -558,12 +648,18 @@ actor InMemoryStudentPageCache: StudentPageCache {
 }
 
 nonisolated struct PendingStudentCreate: Codable, Sendable, Equatable {
+    enum Disposition: String, Codable, Sendable {
+        case queued
+        case requiresReview
+    }
+
     let operationID: UUID
     let districtID: String
     let userID: String
     let membershipVersion: Int
     let draft: StudentDraft
     let enqueuedAt: Date
+    let disposition: Disposition
 
     init(
         operationID: UUID,
@@ -571,7 +667,8 @@ nonisolated struct PendingStudentCreate: Codable, Sendable, Equatable {
         userID: String,
         membershipVersion: Int,
         draft: StudentDraft,
-        enqueuedAt: Date = .now
+        enqueuedAt: Date = .now,
+        disposition: Disposition = .queued
     ) {
         self.operationID = operationID
         self.districtID = districtID
@@ -579,6 +676,7 @@ nonisolated struct PendingStudentCreate: Codable, Sendable, Equatable {
         self.membershipVersion = membershipVersion
         self.draft = draft
         self.enqueuedAt = enqueuedAt
+        self.disposition = disposition
     }
 
     func rebinding(to membershipVersion: Int) -> PendingStudentCreate {
@@ -588,8 +686,56 @@ nonisolated struct PendingStudentCreate: Codable, Sendable, Equatable {
             userID: userID,
             membershipVersion: membershipVersion,
             draft: draft,
-            enqueuedAt: enqueuedAt
+            enqueuedAt: enqueuedAt,
+            disposition: disposition
         )
+    }
+
+    func quarantinedForReview() -> PendingStudentCreate {
+        PendingStudentCreate(
+            operationID: operationID,
+            districtID: districtID,
+            userID: userID,
+            membershipVersion: membershipVersion,
+            draft: draft,
+            enqueuedAt: enqueuedAt,
+            disposition: .requiresReview
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case operationID
+        case districtID
+        case userID
+        case membershipVersion
+        case draft
+        case enqueuedAt
+        case disposition
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        operationID = try container.decode(UUID.self, forKey: .operationID)
+        districtID = try container.decode(String.self, forKey: .districtID)
+        userID = try container.decode(String.self, forKey: .userID)
+        membershipVersion = try container.decode(Int.self, forKey: .membershipVersion)
+        draft = try container.decode(StudentDraft.self, forKey: .draft)
+        enqueuedAt = try container.decode(Date.self, forKey: .enqueuedAt)
+        disposition = try container.decodeIfPresent(
+            Disposition.self,
+            forKey: .disposition
+        ) ?? .queued
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(operationID, forKey: .operationID)
+        try container.encode(districtID, forKey: .districtID)
+        try container.encode(userID, forKey: .userID)
+        try container.encode(membershipVersion, forKey: .membershipVersion)
+        try container.encode(draft, forKey: .draft)
+        try container.encode(enqueuedAt, forKey: .enqueuedAt)
+        try container.encode(disposition, forKey: .disposition)
     }
 }
 
@@ -1054,6 +1200,7 @@ nonisolated private struct NormalizedStudentPageRequest: Sendable, Equatable {
     let grade: String?
     let assignedMemberID: String?
     let status: StudentRecordStatusFilter
+    let sort: StudentRosterSort
     let cursor: StudentPageCursor?
     let limit: Int
 }
@@ -1092,6 +1239,7 @@ actor CanonicalStudentRepository: StudentRepository {
             grade: normalized.grade,
             assignedMemberID: normalized.assignedMemberID,
             status: normalized.status,
+            sort: normalized.sort,
             cursor: normalized.cursor,
             limit: normalized.limit,
             source: .server
@@ -1214,6 +1362,7 @@ actor CanonicalStudentRepository: StudentRepository {
 
         var currentMember = member
         var reconciled: [StudentRecord] = []
+        var hasItemsRequiringReview = false
         var index = 0
         while index < items.count {
             var item = items[index]
@@ -1221,17 +1370,37 @@ actor CanonicalStudentRepository: StudentRepository {
                   item.districtID == currentMember.districtID else {
                 throw StudentRepositoryError.permissionDenied
             }
-            guard item.membershipVersion == currentMember.version else {
-                throw StudentRepositoryError.staleMembership
+            if item.disposition == .requiresReview {
+                hasItemsRequiringReview = true
+                index += 1
+                continue
+            }
+            if item.membershipVersion != currentMember.version {
+                let quarantined = try await quarantineForReview(item)
+                items[index] = quarantined
+                hasItemsRequiringReview = true
+                index += 1
+                continue
             }
 
-            let normalizedDraft = try validated(item.draft, member: currentMember)
+            let normalizedDraft: StudentDraft
+            do {
+                normalizedDraft = try validated(item.draft, member: currentMember)
+            } catch {
+                items[index] = try await quarantineForReview(item)
+                hasItemsRequiringReview = true
+                index += 1
+                continue
+            }
             let school = SchoolAuthorizationScope(
                 districtID: currentMember.districtID,
                 schoolID: normalizedDraft.schoolID
             )
             guard AuthorizationPolicy.canCreateStudent(currentMember, school: school) else {
-                throw StudentRepositoryError.permissionDenied
+                items[index] = try await quarantineForReview(item)
+                hasItemsRequiringReview = true
+                index += 1
+                continue
             }
             let request = StudentCreateMutationRequest(
                 base: mutationBase(
@@ -1255,7 +1424,21 @@ actor CanonicalStudentRepository: StudentRepository {
             } catch StudentMutationBackendError.transportUnavailable {
                 throw StudentRepositoryError.unavailable
             } catch {
-                throw mapMutationError(error)
+                let mappedError = mapMutationError(error)
+                switch mappedError {
+                case .permissionDenied,
+                     .duplicate,
+                     .versionConflict,
+                     .idempotencyKeyReused,
+                     .invalidDraft,
+                     .invalidRequest:
+                    items[index] = try await quarantineForReview(item)
+                    hasItemsRequiringReview = true
+                    index += 1
+                    continue
+                default:
+                    throw mappedError
+                }
             }
 
             let refreshed = try await refreshedMember(
@@ -1269,7 +1452,8 @@ actor CanonicalStudentRepository: StudentRepository {
             for remainingIndex in index..<items.count {
                 let remaining = items[remainingIndex]
                 guard remaining.userID == refreshed.userID,
-                      remaining.districtID == refreshed.districtID else {
+                      remaining.districtID == refreshed.districtID,
+                      remaining.disposition == .queued else {
                     continue
                 }
                 let rebound = remaining.rebinding(to: refreshed.version)
@@ -1298,7 +1482,22 @@ actor CanonicalStudentRepository: StudentRepository {
             currentMember = refreshed
             index += 1
         }
+        if hasItemsRequiringReview {
+            throw StudentRepositoryError.staleMembership
+        }
         return reconciled
+    }
+
+    private func quarantineForReview(
+        _ item: PendingStudentCreate
+    ) async throws -> PendingStudentCreate {
+        let quarantined = item.quarantinedForReview()
+        do {
+            try await outbox.enqueue(quarantined)
+        } catch {
+            throw StudentRepositoryError.unavailable
+        }
+        return quarantined
     }
 
     func update(
@@ -1472,22 +1671,30 @@ actor CanonicalStudentRepository: StudentRepository {
         let cursor = request.cursor.map {
             StudentPageCursor(
                 token: $0.token.trimmingCharacters(in: .whitespacesAndNewlines),
+                sort: $0.sort,
                 sortValue: Self.normalizedSearchText($0.sortValue),
+                updatedAt: $0.updatedAt,
                 queryFingerprint: Self.normalizedIdentifier($0.queryFingerprint)
             )
         }
+        let search = Self.normalizedSearchPredicate(request.search)
         guard request.limit > 0,
               schoolID.map(TrustedIdentifier.isValid) ?? true,
               assignedMemberID.map(TrustedIdentifier.isValid) ?? true,
-              cursor.map({ TrustedIdentifier.isValid($0.token) }) ?? true else {
+              cursor.map({ TrustedIdentifier.isValid($0.token) && $0.sort == request.sort }) ?? true else {
+            throw StudentRepositoryError.invalidRequest
+        }
+        if request.sort == .recentlyUpdated,
+           case .normalizedNamePrefix = search {
             throw StudentRepositoryError.invalidRequest
         }
         return NormalizedStudentPageRequest(
-            search: Self.normalizedSearchPredicate(request.search),
+            search: search,
             schoolID: schoolID,
             grade: Self.normalizedText(request.grade),
             assignedMemberID: assignedMemberID,
             status: request.status,
+            sort: request.sort,
             cursor: cursor,
             limit: min(request.limit, StudentPageRequest.maximumPageSize)
         )
@@ -1551,6 +1758,7 @@ actor CanonicalStudentRepository: StudentRepository {
             grade: request.grade,
             assignedMemberID: request.assignedMemberID,
             status: request.status,
+            sort: request.sort,
             cursor: request.cursor,
             limit: request.limit
         )
