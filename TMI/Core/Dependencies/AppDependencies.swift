@@ -14,6 +14,7 @@ nonisolated struct AppDependencies: Sendable {
     let membership: any MembershipProviding
     let authentication: (any AuthenticationProviding)?
     let studentRepository: any StudentRepository
+    let studentDetailRepository: any StudentDetailRepository
     let logger: TMILogger
 
     @MainActor
@@ -29,13 +30,15 @@ nonisolated struct AppDependencies: Sendable {
             invitationProvisioner: FirebaseStaffInvitationProvisioner(),
             pendingRegistrationStore: SecurePendingStaffRegistrationStore()
         )
+        let students = CanonicalStudentRepository.firebase(firestore: firestore)
 
         return AppDependencies(
             runtime: .production,
             flags: .production,
             membership: membership,
             authentication: authentication,
-            studentRepository: CanonicalStudentRepository.firebase(firestore: firestore),
+            studentRepository: students,
+            studentDetailRepository: Release1StudentDetailRepository(students: students),
             logger: .production
         )
     }
@@ -44,19 +47,22 @@ nonisolated struct AppDependencies: Sendable {
         membershipStore: any MembershipStore,
         authentication: (any AuthenticationProviding)? = nil
     ) -> AppDependencies {
-        AppDependencies(
+        let students = UnavailableStudentRepository()
+        return AppDependencies(
             runtime: .production,
             flags: .production,
             membership: MembershipRepository(store: membershipStore),
             authentication: authentication,
-            studentRepository: UnavailableStudentRepository(),
+            studentRepository: students,
+            studentDetailRepository: Release1StudentDetailRepository(students: students),
             logger: .production
         )
     }
 
     static func preview(
         memberships: [MembershipContext] = [],
-        studentRepository: any StudentRepository = UnavailableStudentRepository()
+        studentRepository: any StudentRepository = UnavailableStudentRepository(),
+        studentDetailRepository: (any StudentDetailRepository)? = nil
     ) -> AppDependencies {
         AppDependencies(
             runtime: .preview,
@@ -64,6 +70,8 @@ nonisolated struct AppDependencies: Sendable {
             membership: InMemoryMembershipProvider(memberships: memberships),
             authentication: nil,
             studentRepository: studentRepository,
+            studentDetailRepository: studentDetailRepository
+                ?? Release1StudentDetailRepository(students: studentRepository),
             logger: TMILogger(category: "Preview")
         )
     }
@@ -75,6 +83,9 @@ nonisolated struct AppDependencies: Sendable {
         membership: UnavailableMembershipProvider(),
         authentication: nil,
         studentRepository: UnavailableStudentRepository(),
+        studentDetailRepository: Release1StudentDetailRepository(
+            students: UnavailableStudentRepository()
+        ),
         logger: .production
     )
 }

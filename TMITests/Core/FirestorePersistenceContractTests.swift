@@ -42,9 +42,10 @@ struct FirestorePersistenceContractTests {
             ).count - 1 == 2
         )
         #expect(
-            studentDetailSource.contains(
-                ".environment(ScheduleMeetingCoordinator())"
-            )
+            studentDetailSource.contains("@Environment(\\.appDependencies)")
+        )
+        #expect(
+            studentDetailSource.contains("@Environment(AppRouter.self)")
         )
     }
 

@@ -145,6 +145,13 @@ struct TMIApp: App {
             if let fixture = uiTestingConfiguration.fixture {
                 rosterUITestingContent(fixture: fixture)
             }
+        case .studentDetailPopulated,
+             .studentDetailRelease1,
+             .studentDetailOffline,
+             .studentDetailPermissionDenied:
+            if let fixture = uiTestingConfiguration.fixture {
+                studentDetailUITestingContent(fixture: fixture)
+            }
         case nil:
             ContentUnavailableView(
                 "UI Test Fixture Unavailable",
@@ -170,6 +177,24 @@ struct TMIApp: App {
 #endif
         } else {
             StudentRosterUITestingContent(fixture: fixture.rawValue)
+        }
+    }
+
+    @ViewBuilder
+    private func studentDetailUITestingContent(
+        fixture: UITestingLaunchConfiguration.Fixture
+    ) -> some View {
+        if uiTestingConfiguration.contentSize == .accessibility5 {
+#if os(macOS)
+            StudentDetailUITestingContent(fixture: fixture.rawValue)
+                .environment(\.sizeCategory, .accessibilityExtraExtraExtraLarge)
+                .dynamicTypeSize(.accessibility5)
+#else
+            StudentDetailUITestingContent(fixture: fixture.rawValue)
+                .dynamicTypeSize(.accessibility5)
+#endif
+        } else {
+            StudentDetailUITestingContent(fixture: fixture.rawValue)
         }
     }
 #endif

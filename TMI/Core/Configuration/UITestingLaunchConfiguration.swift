@@ -10,6 +10,10 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
         case rosterCreateSaving = "roster-create-saving"
         case rosterArchived = "roster-archived"
         case rosterCreateDuplicate = "roster-create-duplicate"
+        case studentDetailPopulated = "student-detail-populated"
+        case studentDetailRelease1 = "student-detail-release1"
+        case studentDetailOffline = "student-detail-offline"
+        case studentDetailPermissionDenied = "student-detail-permission-denied"
     }
 
     nonisolated enum ContentSize: String, Sendable, Equatable {

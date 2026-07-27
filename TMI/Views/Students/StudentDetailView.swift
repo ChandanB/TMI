@@ -1,1259 +1,597 @@
-//
-//  StudentDetailView.swift
-//  TMI
-//
-//  Simplified single-scroll student profile with pinned actions.
-//  Sets shared StudentContext when displayed for cross-module coordination.
-//
-
 import SwiftUI
-import Charts
 
 struct StudentDetailView: View {
-    let studentId: String
-    @State private var stateModel: StudentDetailStateModel
-    @State private var showingCreatePlan = false
-    @State private var showingAddInterest = false
-    @State private var showingAllPlans = false
-    @State private var showingProgress = false
-    @State private var showingSurvey = false
-    @State private var showRetakeConfirmation = false
-    @State private var showingScheduleMeeting = false
-    @State private var expandedSections: Set<String> = []
-    @State private var interestsStateModel = InterestsAndHobbiesStateModel()
-    @State private var studentMeetings: [Meeting] = []
-
-    // Phase 2: Student Interest Edges
-    @State private var studentInterestEdges: [StudentInterest] = []
-    @State private var resolvedInterests: [Interest] = []
-    @State private var isLoadingInterests = false
-
-    // Saved Careers
-    @State private var savedCareers: [Career] = []
-    @State private var isLoadingSavedCareers = false
-
-    // Environment dependencies
-    @Environment(\.studentModeSession) private var studentModeSession
-    @Environment(\.studentContext) private var studentContext
+    @Environment(\.appDependencies) private var dependencies
+    @Environment(\.authStateModel) private var authStateModel
     @Environment(AppRouter.self) private var router
-    @Environment(ScheduleMeetingCoordinator.self) private var scheduleMeetingCoordinator
 
-    private let meetingService = MeetingService.shared
-    private let studentInterestService = StudentInterestService.shared
-    private let interestLibraryService = InterestLibraryService.shared
-    private let careerService = CareerService.shared
+    let studentID: String
 
-    init(studentId: String) {
-        self.studentId = studentId
-        _stateModel = State(initialValue: StudentDetailStateModel(studentId: studentId))
+    @State private var state: StudentDetailState?
+    @State private var loadedAuthority: Authority?
+    @State private var selectedDestination: StudentHubDestination = .overview
+    @State private var showingEditor = false
+
+    private let memberOverride: MembershipContext?
+
+    init(
+        studentID: String,
+        member: MembershipContext? = nil
+    ) {
+        self.studentID = studentID
+        self.memberOverride = member
+        _loadedAuthority = State(initialValue: member.map(Authority.init))
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            TMIBackgroundView(variant: .base)
-                .ignoresSafeArea()
-
-            contentView
+        Group {
+            if member == nil {
+                permissionUnavailable
+            } else if let state {
+                StudentOperationalHubContent(
+                    state: state,
+                    selectedDestination: $selectedDestination,
+                    edit: { showingEditor = true },
+                    archive: {
+                        Task { @MainActor in
+                            _ = await state.archive(operationID: UUID())
+                        }
+                    }
+                )
+            } else {
+                ProgressView("Loading student access…")
+                    .tint(TMIColors.teal)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityIdentifier("studentDetail.loading")
+            }
         }
-        .navigationTitle(stateModel.student?.name ?? "Student")
+        .background(TMIColors.background)
+        .navigationTitle(state?.header?.displayName ?? "Student")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: openEditor) {
-                    Image(systemName: "pencil")
-                        .foregroundColor(.tmiPrimary)
-                }
-                .accessibilityLabel("Edit \(stateModel.student?.displayName ?? "student")")
-            }
+        .task(id: authority) {
+            await configureState()
         }
-        .task {
-            // Start listening for real-time student updates
-            stateModel.startListening()
-
-            await loadMeetings()
-            await loadStudentInterests()
-            await loadSavedCareers()
-        }
-        .onChange(of: stateModel.student?.id) { _, newStudentId in
-            // Set shared student context when student loads
-            if let student = stateModel.student, newStudentId != nil {
-                guard router.setActiveStudent(student) else { return }
-                Task {
-                    await studentContext.setActiveStudent(
-                        studentId,
-                        student: student,
-                        scope: .staff,
-                        prefetchEdges: true
-                    )
-                }
-            }
-        }
-        .onDisappear {
-            // Stop listening when view disappears
-            stateModel.stopListening()
-        }
-        .sheet(isPresented: $showingCreatePlan) {
-            if let student = stateModel.student {
+        .sheet(isPresented: $showingEditor) {
+            if let state,
+               let member,
+               let student = state.student {
                 NavigationStack {
-                    TMIPlanEditorView(preselectedStudent: student, onPlanCreated: {
-                        Task {
-                            await stateModel.refreshTMIPlans()
+                    StudentEditorView(
+                        mode: .edit(student),
+                        member: member,
+                        isSubmitting: state.isMutating,
+                        duplicateCandidateIDs: duplicateCandidateIDs,
+                        submissionError: mutationErrorMessage
+                    ) { draft in
+                        let succeeded = await state.update(
+                            draft,
+                            operationID: UUID()
+                        )
+                        if succeeded {
+                            return .confirmed
                         }
-                    })
-                }
-                .tmiSheetStyle()
-            }
-        }
-        .alert("Retake Survey?", isPresented: $showRetakeConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Retake", role: .destructive) {
-                retakeSurvey()
-            }
-        } message: {
-            if let student = stateModel.student {
-                Text("This will allow \(student.name) to take the interest survey again. Current survey results will be replaced, but manually added interests will be preserved.")
-            }
-        }
-
-        // MARK: - Interests Section Sheet: showingSurvey replaced with corrected labeled parameters
-        .sheet(isPresented: $showingSurvey, onDismiss: {
-            // Refresh interests after survey completion
-            Task {
-                await loadStudentInterests()
-            }
-        }) {
-            if let student = stateModel.student, let studentId = student.id {
-                NavigationStack {
-                    StudentSurveyFlow(studentId: studentId)
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Done") {
-                                    showingSurvey = false
-                                }
-                                .foregroundColor(.tmiPrimary)
-                            }
+                        if case .duplicate = state.mutationError {
+                            return .duplicate
                         }
+                        return .failed
+                    }
                 }
                 .tmiSheetStyle()
             }
         }
     }
 
-    private func openEditor() {
-        guard let student = stateModel.student,
-              router.setActiveStudent(student) else {
+    private var member: MembershipContext? {
+        memberOverride ?? authStateModel.currentMembership
+    }
+
+    private var authority: Authority? {
+        member.map(Authority.init)
+    }
+
+    private var duplicateCandidateIDs: [String] {
+        guard case .duplicate(let candidateIDs) = state?.mutationError else {
+            return []
+        }
+        return candidateIDs
+    }
+
+    private var mutationErrorMessage: String? {
+        guard let error = state?.mutationError else { return nil }
+        switch error {
+        case .duplicate:
+            return "A possible duplicate needs review before this update can be saved."
+        case .versionConflict:
+            return "This record changed on the server. Close the editor, refresh, and review the latest version."
+        case .onlineRequired, .unavailable:
+            return "This change requires a connection. Your current record has not been changed."
+        case .permissionDenied, .staleMembership:
+            return "Your current staff access does not allow this change."
+        default:
+            return "The update was not confirmed. Review the fields and try again."
+        }
+    }
+
+    private var permissionUnavailable: some View {
+        ContentUnavailableView(
+            "Student Access Unavailable",
+            systemImage: "lock.fill",
+            description: Text(
+                "A verified staff membership is required to open this student record."
+            )
+        )
+        .accessibilityIdentifier("studentDetail.permissionDenied")
+    }
+
+    @MainActor
+    private func configureState() async {
+        guard let member, let authority else {
+            state = nil
+            loadedAuthority = nil
             return
         }
-        try? router.open(.editStudent(studentId))
-    }
 
-    // MARK: - Content View
-
-    @ViewBuilder
-    private var contentView: some View {
-        switch stateModel.state {
-        case .loading:
-            VStack(spacing: TMISpacing.md) {
-                ProgressView()
-                    .tint(.tmiPrimary)
-                Text("Loading student...")
-                    .font(.tmiBody)
-                    .foregroundColor(.tmiTextSecondary)
+        if let state {
+            if let loadedAuthority, loadedAuthority != authority {
+                state.updateMember(member)
             }
-
-        case .error(let error):
-            VStack(spacing: TMISpacing.md) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 48))
-                    .foregroundColor(.red)
-                Text("Failed to load student")
-                    .font(.tmiTitle3)
-                    .foregroundColor(.tmiTextPrimary)
-                Text(error.localizedDescription)
-                    .font(.tmiBody)
-                    .foregroundColor(.tmiTextSecondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(TMISpacing.screenPadding)
-
-        case .loaded, .idle:
-            if let student = stateModel.student {
-                studentContentView(student: student)
-            } else {
-                VStack(spacing: TMISpacing.md) {
-                    ProgressView()
-                        .tint(.tmiPrimary)
-                    Text("Loading student...")
-                        .font(.tmiBody)
-                        .foregroundColor(.tmiTextSecondary)
-                }
-            }
-        }
-    }
-
-    // MARK: - Student Content View
-
-    @ViewBuilder
-    private func studentContentView(student: Student) -> some View {
-        let summary = stateModel.summary
-
-        ScrollView {
-            VStack(spacing: TMISpacing.lg) {
-                // Full-width header
-                headerSection(student: student)
-
-                // Quick Actions (horizontal scroll)
-                quickActionsRow(student: student)
-
-                // Two-column layout
-                HStack(alignment: .top, spacing: TMISpacing.lg) {
-                    // Left column — progress, command center, plans, meetings
-                    VStack(spacing: TMISpacing.lg) {
-                        StudentProgressView(student: student, plans: studentPlans(for: student))
-
-                        meetingsSection(student: student)
-                        
-                        interestsSection(student: student)
-                        
-                        savedCareersSection(student: student)
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    // Right column — interests, careers, academics, notes
-                    VStack(spacing: TMISpacing.lg) {
-                        commandCenterSection(student: student, summary: summary)
-
-                        tmiPlansSection(student: student)
-
-                        if let academic = student.academicPerformance {
-                            academicSection(academic)
-                        }
-
-                        if let notes = student.notes, !notes.isEmpty {
-                            notesSection(notes)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-
-                Spacer(minLength: 80)
-            }
-            .padding(.horizontal, TMISpacing.screenPadding)
-            .padding(.top, TMISpacing.md)
-        }
-    }
-    
-    // MARK: - Header
-
-    private func headerSection(student: Student) -> some View {
-        HStack(spacing: TMISpacing.md) {
-            TMIAvatar(
-                initials: student.initials,
-                color: student.avatarColor.color,
-                size: 56
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(student.name)
-                    .font(.tmiTitle2)
-                    .foregroundColor(.tmiTextPrimary)
-
-                Text("Age \(student.age) • Grade \(student.grade) • \(student.school)")
-                    .font(.tmiBody)
-            }
-
-            Spacer()
-        }
-        .tmiCard()
-    }
-
-    // MARK: - Hero Section
-
-    private func heroSection(student: Student) -> some View {
-        VStack(spacing: TMISpacing.md) {
-            // Avatar
-            TMIAvatar(
-                initials: student.initials,
-                color: avatarColor(for: student),
-                size: TMISizing.avatarLg
-            )
-
-            // Name & Grade
-            VStack(spacing: 4) {
-                Text(student.name)
-                    .font(.tmiTitle1)
-                    .foregroundColor(.tmiTextPrimary)
-
-                Text("Grade \(student.grade) • \(student.school)")
-                    .font(.tmiBody)
-                    .foregroundColor(.tmiTextSecondary)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, TMISpacing.lg)
-    }
-
-    // MARK: - Quick Actions
-
-    private func quickActionsRow(student: Student) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: TMISpacing.md) {
-                quickActionButton(
-                    icon: "person.crop.circle.badge.checkmark",
-                    label: "Student Mode",
-                    color: .tmiSuccess,
-                    action: { enableStudentMode(student: student) }
-                )
-
-                quickActionButton(
-                    icon: "doc.badge.plus",
-                    label: "Create Plan",
-                    action: { showingCreatePlan = true }
-                )
-            }
-            .padding(.horizontal, TMISpacing.screenPadding)
-        }
-        .padding(.horizontal, -TMISpacing.screenPadding)
-    }
-
-    private func quickActionButton(icon: String, label: String, color: Color = .tmiPrimary, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: TMISpacing.sm) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundColor(color)
-
-                Text(label)
-                    .font(.tmiCaption)
-                    .foregroundColor(.tmiTextSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(width: 100, height: 80)
-            .padding(.vertical, TMISpacing.md)
-            .background(Color.tmiSurface)
-            .cornerRadius(TMIRadius.md)
-            .overlay(
-                RoundedRectangle(cornerRadius: TMIRadius.md)
-                    .strokeBorder(Color.tmiBorder, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func commandCenterSection(
-        student: Student,
-        summary: StudentDetailStateModel.Summary
-    ) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
-            HStack(alignment: .top, spacing: TMISpacing.md) {
-                Image(systemName: summary.followUpStatus.symbolName)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(summary.needsFollowUp ? Color.tmiPrimary : Color.tmiSuccess)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        Circle()
-                            .fill((summary.needsFollowUp ? Color.tmiPrimary : Color.tmiSuccess).opacity(0.12))
-                    )
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Teacher Command Center")
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextSecondary)
-
-                    Text(summary.followUpStatus.title)
-                        .font(.tmiTitle3)
-                        .foregroundColor(.tmiTextPrimary)
-
-                    Text(summary.followUpStatus.detail)
-                        .font(.tmiBody)
-                        .foregroundColor(.tmiTextSecondary)
-                }
-
-                Spacer()
-
-                TMIBadge(
-                    text: summary.needsFollowUp ? "Needs Follow-Up" : "On Track",
-                    color: summary.needsFollowUp ? .tmiPrimary : .tmiSuccess,
-                    style: .solid
-                )
-            }
-
-            HStack(spacing: TMISpacing.md) {
-                statCard(
-                    value: "\(summary.activePlanCount)",
-                    label: "Active Plans"
-                )
-
-                statCard(
-                    value: "\(summary.assignedNextStepCount)",
-                    label: "Next Steps"
-                )
-
-                statCard(
-                    value: "\(Int(student.engagementScore * 100))%",
-                    label: "Engagement"
-                )
-            }
-        }
-        .tmiCard()
-    }
-    
-    private func statCard(value: String, label: String) -> some View {
-        VStack(spacing: 8) {
-            Text(value)
-                .font(.tmiTitle2)
-                .foregroundColor(.tmiTextPrimary)
-
-            Text(label)
-                .font(.tmiCaption)
-                .foregroundColor(.tmiTextSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, TMISpacing.md)
-        .tmiCard()
-    }
-
-
-    // MARK: - Interests Section
-
-    private func interestsSection(student: Student) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
-            HStack {
-                Text("Interests")
-                    .font(.tmiTitle3.bold())
-                    .foregroundColor(.tmiTextPrimary)
-
-                Spacer()
-
-                // Show "Retake Survey" button if student has completed a survey
-                if hasSurveyResults(for: student) {
-                    Button(action: {
-                        showRetakeConfirmation = true
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.clockwise.circle.fill")
-                                .font(.system(size: 16))
-                            Text("Retake")
-                                .font(.tmiCaption)
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(.orange)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                Button(action: {
-                    showingAddInterest = true
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 16))
-                        Text("Add")
-                            .font(.tmiCaption)
-                            .fontWeight(.semibold)
-                    }
-                    .foregroundColor(.tmiPrimary)
-                }
-                .buttonStyle(.plain)
-            }
-
-            Divider()
-
-            if isLoadingInterests {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .tint(.tmiPrimary)
-                    Spacer()
-                }
-                .padding(.vertical, TMISpacing.lg)
-            } else if resolvedInterests.isEmpty {
-                VStack(spacing: TMISpacing.md) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 32))
-                        .foregroundColor(.tmiTextTertiary)
-
-                    Text(MVPEmptyStateCopy.studentInterestsTitle)
-                        .font(.tmiBody)
-                        .foregroundColor(.tmiTextPrimary)
-
-                    Text(MVPEmptyStateCopy.studentInterestsMessage)
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextTertiary)
-                        .multilineTextAlignment(.center)
-
-                    HStack(spacing: TMISpacing.md) {
-                        TMIButton(
-                            text: "Add Interest",
-                            icon: "plus",
-                            style: .secondary,
-                            action: { showingAddInterest = true }
-                        )
-
-                        TMIButton(
-                            text: MVPEmptyStateCopy.studentInterestsAction,
-                            icon: "list.clipboard",
-                            style: .primary,
-                            action: { showingSurvey = true }
-                        )
-                    }
-                    .padding(.top, TMISpacing.sm)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, TMISpacing.lg)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: TMISpacing.sm) {
-                        ForEach(resolvedInterests, id: \.id) { interest in
-                            StudentInterestBadge(
-                                interest: interest,
-                                level: getInterestLevel(for: interest.id ?? "")
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        .tmiCard()
-        .sheet(isPresented: $showingAddInterest) {
-            if let student = stateModel.student {
-                NavigationStack {
-                    AddInterestToStudentView(student: student) { _ in
-                        // No need to manually refresh - listener will update automatically
-                    }
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") {
-                                showingAddInterest = false
-                            }
-                        }
-                    }
-                }
-                .tmiSheetStyle()
-            }
-        }
-    }
-
-    // MARK: - Saved Careers Section
-
-    private func savedCareersSection(student: Student) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
-            if isLoadingSavedCareers {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .tint(.tmiPrimary)
-                    Spacer()
-                }
-                .padding(.vertical, TMISpacing.lg)
-            } else if !savedCareers.isEmpty {
-                Text("Saved Careers")
-                    .font(.tmiTitle3)
-                    .foregroundColor(.tmiTextPrimary)
-
-                VStack(alignment: .leading, spacing: TMISpacing.md) {
-                    ForEach(savedCareers) { career in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(career.title)
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(.tmiTextPrimary)
-                                Text(career.field)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(career.education)
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-        }
-        .tmiCard()
-    }
-
-    // MARK: - TMI Plans Section
-
-    private func tmiPlansSection(student: Student) -> some View {
-        let studentPlans = self.studentPlans(for: student)
-
-        return VStack(alignment: .leading, spacing: TMISpacing.md) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("TMI Plans")
-                        .font(.tmiTitle3.bold())
-                        .foregroundColor(.tmiTextPrimary)
-
-                    Text("Active intervention plans for this student")
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextSecondary)
-                }
-
-                Spacer()
-
-                if !studentPlans.isEmpty {
-                    TMIBadge(
-                        text: "\(studentPlans.count)",
-                        color: .tmiPrimary,
-                        style: .solid
-                    )
-                }
-            }
-
-            Divider()
-
-            if !studentPlans.isEmpty {
-                VStack(spacing: TMISpacing.sm) {
-                    ForEach(studentPlans.prefix(3)) { plan in
-                        NavigationLink(destination: TMIPlanDetailView(plan: plan)) {
-                            planMiniCard(plan)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if studentPlans.count > 3 {
-                        Button(action: {
-                            // Navigate to plans tab filtered by student
-                        }) {
-                            HStack {
-                                Text("View All \(studentPlans.count) Plans")
-                                    .font(.tmiCaption)
-                                    .fontWeight(.medium)
-                                Spacer()
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                            }
-                            .foregroundColor(.tmiPrimary)
-                            .padding(.vertical, TMISpacing.sm)
-                            .padding(.horizontal, TMISpacing.md)
-                            .background(
-                                RoundedRectangle(cornerRadius: TMIRadius.sm)
-                                    .fill(Color.tmiPrimary.opacity(0.1))
-                            )
-                        }
-                    }
-                }
-            } else {
-                VStack(spacing: TMISpacing.md) {
-                    Image(systemName: "doc.badge.plus")
-                        .font(.system(size: 32))
-                        .foregroundColor(.tmiTextTertiary)
-
-                    Text(MVPEmptyStateCopy.studentPlansTitle)
-                        .font(.tmiBody)
-                        .foregroundColor(.tmiTextPrimary)
-
-                    Text(MVPEmptyStateCopy.studentPlansMessage)
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextTertiary)
-                        .multilineTextAlignment(.center)
-
-                    TMIButton(
-                        text: MVPEmptyStateCopy.studentPlansAction,
-                        icon: "plus",
-                        style: .primary,
-                        action: { showingCreatePlan = true }
-                    )
-                    .padding(.top, TMISpacing.sm)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, TMISpacing.lg)
-            }
-        }
-        .tmiCard()
-    }
-
-    // MARK: - Meetings Section
-
-    private func meetingsSection(student: Student) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Meetings")
-                        .font(.tmiTitle3.bold())
-                        .foregroundColor(.tmiTextPrimary)
-
-                    Text("Scheduled meetings for this student")
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextSecondary)
-                }
-
-                Spacer()
-
-                if !studentMeetings.isEmpty {
-                    TMIBadge(
-                        text: "\(studentMeetings.count)",
-                        color: .tmiPrimary,
-                        style: .solid
-                    )
-                }
-            }
-
-            Divider()
-
-            if !studentMeetings.isEmpty {
-                VStack(spacing: TMISpacing.sm) {
-                    ForEach(studentMeetings.prefix(3)) { meeting in
-                        NavigationLink(destination: MeetingDetailView(meeting: meeting, onUpdate: { Task { await loadMeetings() } })) {
-                            meetingMiniCard(meeting)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if studentMeetings.count > 3 {
-                        NavigationLink(destination: MeetingListView()) {
-                            HStack {
-                                Text("View All \(studentMeetings.count) Meetings")
-                                    .font(.tmiCaption)
-                                    .fontWeight(.medium)
-                                Spacer()
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                            }
-                            .foregroundColor(.tmiPrimary)
-                            .padding(.vertical, TMISpacing.sm)
-                            .padding(.horizontal, TMISpacing.md)
-                            .background(
-                                RoundedRectangle(cornerRadius: TMIRadius.sm)
-                                    .fill(Color.tmiPrimary.opacity(0.1))
-                            )
-                        }
-                    }
-                }
-            } else {
-                VStack(spacing: TMISpacing.md) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 32))
-                        .foregroundColor(.tmiTextTertiary)
-
-                    Text(MVPEmptyStateCopy.studentMeetingsTitle)
-                        .font(.tmiBody)
-                        .foregroundColor(.tmiTextPrimary)
-
-                    Text(MVPEmptyStateCopy.studentMeetingsMessage)
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextTertiary)
-                        .multilineTextAlignment(.center)
-
-                    TMIButton(
-                        text: MVPEmptyStateCopy.studentMeetingsAction,
-                        icon: "calendar.badge.plus",
-                        style: .primary,
-                        action: {
-                            scheduleMeetingCoordinator.startScheduling(
-                                forStudentId: student.id,
-                                withStudents: [student]
-                            )
-                        }
-                    )
-                    .padding(.top, TMISpacing.sm)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, TMISpacing.lg)
-            }
-        }
-        .tmiCard()
-        .sheet(isPresented: Binding(
-            get: { scheduleMeetingCoordinator.isShowingScheduler },
-            set: { scheduleMeetingCoordinator.isShowingScheduler = $0 }
-        )) {
-            if let studentId = student.id {
-                ScheduleMeetingView(
-                    planId: scheduleMeetingCoordinator.planId ?? "",
-                    relatedStudentIds: [studentId]
-                )
-                .tmiSheetStyle()
-            }
-        }
-    }
-
-    private func meetingMiniCard(_ meeting: Meeting) -> some View {
-        HStack(spacing: TMISpacing.md) {
-            // Meeting Type Icon
-            ZStack {
-                Circle()
-                    .fill(Color(hex: meeting.meetingType.color).opacity(0.2))
-                    .frame(width: 40, height: 40)
-
-                Image(systemName: meeting.meetingType.icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color(hex: meeting.meetingType.color))
-            }
-
-            // Meeting Info
-            VStack(alignment: .leading, spacing: 4) {
-                Text(meeting.title)
-                    .font(.tmiBody)
-                    .fontWeight(.medium)
-                    .foregroundColor(.tmiTextPrimary)
-
-                HStack(spacing: 4) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 10))
-                    Text(meeting.startTime.formatted(date: .abbreviated, time: .shortened))
-                        .font(.tmiCaption)
-                }
-                .foregroundColor(.tmiTextSecondary)
-
-                if let location = meeting.location {
-                    HStack(spacing: 4) {
-                        Image(systemName: "location.fill")
-                            .font(.system(size: 10))
-                        Text(location)
-                            .font(.tmiCaption)
-                    }
-                    .foregroundColor(.tmiTextSecondary)
-                }
-            }
-
-            Spacer()
-
-            // Status indicator
-            Circle()
-                .fill(meetingStatusColor(meeting.status))
-                .frame(width: 8, height: 8)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.tmiTextTertiary)
-        }
-        .padding(TMISpacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.md)
-                .fill(Color.tmiSurface)
-        )
-    }
-
-    private func meetingStatusColor(_ status: Meeting.MeetingStatus) -> Color {
-        switch status {
-        case .scheduled: return .orange
-        case .confirmed: return .cyan
-        case .completed: return .green
-        case .cancelled: return .red
-        case .rescheduled: return .yellow
-        }
-    }
-
-    private func planMiniCard(_ plan: TMIPlan) -> some View {
-        HStack(spacing: TMISpacing.md) {
-            // Model Icon
-            ZStack {
-                Circle()
-                    .fill(planModelColor(for: plan.model).opacity(0.2))
-                    .frame(width: 40, height: 40)
-
-                Image(systemName: planModelIcon(for: plan.model))
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(planModelColor(for: plan.model))
-            }
-
-            // Plan Info
-            VStack(alignment: .leading, spacing: 4) {
-                Text(plan.title)
-                    .font(.tmiBody)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.tmiTextPrimary)
-                    .lineLimit(1)
-
-                Text(plan.model.rawValue)
-                    .font(.tmiCaption)
-                    .foregroundColor(.tmiTextSecondary)
-            }
-
-            Spacer()
-
-            // Progress indicator
-            ZStack {
-                Circle()
-                    .stroke(Color.tmiTextTertiary.opacity(0.2), lineWidth: 3)
-                    .frame(width: 32, height: 32)
-
-                Circle()
-                    .trim(from: 0, to: plan.progress)
-                    .stroke(planModelColor(for: plan.model), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .frame(width: 32, height: 32)
-                    .rotationEffect(.degrees(-90))
-
-                Text("\(Int(plan.progress * 100))")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.tmiTextSecondary)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.tmiTextTertiary)
-        }
-        .padding(TMISpacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: TMIRadius.sm)
-                .fill(Color.tmiSurface)
-        )
-    }
-
-    private func studentPlans(for student: Student) -> [TMIPlan] {
-        stateModel.tmiPlans.filter { plan in
-            plan.students.contains(where: { $0.id == student.id })
-        }
-    }
-
-    private func planModelIcon(for model: TMIPlanModel) -> String {
-        switch model {
-        case .chaseYourSpace: return "airplane.departure"
-        case .acknowledgeInterests: return "heart.fill"
-        case .alignYourMind: return "brain.head.profile"
-        case .directAndCorrect: return "arrow.up.forward.circle.fill"
-        case .bullyToBoss: return "person.fill.badge.plus"
-        case .meekToProtector: return "shield.lefthalf.filled"
-        }
-    }
-
-    private func planModelColor(for model: TMIPlanModel) -> Color {
-        switch model {
-        case .chaseYourSpace: return .blue
-        case .acknowledgeInterests: return .pink
-        case .alignYourMind: return .purple
-        case .directAndCorrect: return .orange
-        case .bullyToBoss: return .red
-        case .meekToProtector: return .green
-        }
-    }
-
-    // MARK: - Engagement Chart
-
-    private func engagementChartSection(_ history: [EngagementRecord]) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
-            Text("Engagement Over Time")
-                .font(.tmiTitle3)
-                .foregroundColor(.tmiTextPrimary)
-
-            Chart(history.indices, id: \.self) { index in
-                let record = history[index]
-                LineMark(
-                    x: .value("Date", record.date),
-                    y: .value("Score", record.score * 100)
-                )
-                .foregroundStyle(Color.tmiPrimary)
-                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-
-                PointMark(
-                    x: .value("Date", record.date),
-                    y: .value("Score", record.score * 100)
-                )
-                .foregroundStyle(Color.tmiPrimary)
-            }
-            .frame(height: 180)
-            .chartXAxis {
-                AxisMarks { _ in
-                    AxisValueLabel()
-                        .foregroundStyle(Color.tmiTextSecondary)
-                }
-            }
-            .chartYAxis {
-                AxisMarks { _ in
-                    AxisValueLabel()
-                        .foregroundStyle(Color.tmiTextSecondary)
-                }
-            }
-        }
-        .tmiCard()
-    }
-
-    // MARK: - Academic Section
-
-    private func academicSection(_ academic: AcademicPerformance) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
-            Button(action: {
-                withAnimation {
-                    toggleSection("academic")
-                }
-            }) {
-                HStack {
-                    Text("Academic Performance")
-                        .font(.tmiTitle3)
-                        .foregroundColor(.tmiTextPrimary)
-
-                    Spacer()
-
-                    if let gpa = academic.gpa {
-                        Text("GPA: \(String(format: "%.2f", gpa))")
-                            .font(.tmiCaption)
-                            .foregroundColor(.tmiTextSecondary)
-                    }
-
-                    Image(systemName: expandedSections.contains("academic") ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.tmiTextSecondary)
-                }
-            }
-            .buttonStyle(.plain)
-
-            if expandedSections.contains("academic") {
-                VStack(alignment: .leading, spacing: TMISpacing.sm) {
-                    ForEach(academic.subjects, id: \.name) { subject in
-                        HStack {
-                            Text(subject.name)
-                                .font(.tmiBody)
-                                .foregroundColor(.tmiTextPrimary)
-
-                            Spacer()
-
-                            Text(subject.grade)
-                                .font(.tmiLabelLarge)
-                                .foregroundColor(.tmiPrimary)
-                        }
-                        .padding(.vertical, 8)
-
-                        if subject.name != academic.subjects.last?.name {
-                            TMIDivider()
-                        }
-                    }
-                }
-            }
-        }
-        .tmiCard()
-    }
-
-    // MARK: - Notes Section
-
-    private func notesSection(_ notes: [StudentNote]) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
-            Button(action: {
-                withAnimation {
-                    toggleSection("notes")
-                }
-            }) {
-                HStack {
-                    Text("Notes & History")
-                        .font(.tmiTitle3)
-                        .foregroundColor(.tmiTextPrimary)
-
-                    Spacer()
-
-                    Text("\(notes.count)")
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextSecondary)
-
-                    Image(systemName: expandedSections.contains("notes") ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.tmiTextSecondary)
-                }
-            }
-            .buttonStyle(.plain)
-
-            if expandedSections.contains("notes") {
-                VStack(alignment: .leading, spacing: TMISpacing.md) {
-                    ForEach(notes) { note in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text(note.author)
-                                    .font(.tmiCaption)
-                                    .foregroundColor(.tmiTextSecondary)
-
-                                Spacer()
-
-                                Text(note.date, style: .date)
-                                    .font(.tmiFootnote)
-                                    .foregroundColor(.tmiTextTertiary)
-                            }
-
-                            Text(note.content)
-                                .font(.tmiBody)
-                                .foregroundColor(.tmiTextPrimary)
-                        }
-                        .padding(.vertical, TMISpacing.sm)
-
-                        if note.id != notes.last?.id {
-                            TMIDivider()
-                        }
-                    }
-                }
-            }
-        }
-        .tmiCard()
-    }
-
-    // MARK: - Helpers
-
-    private func avatarColor(for student: Student) -> Color {
-        switch student.avatarColor {
-        case .blue: return .blue
-        case .green: return .green
-        case .orange: return .orange
-        case .purple: return .purple
-        case .teal: return .teal
-        case .pink: return .pink
-        case .indigo: return .indigo
-        }
-    }
-
-    private func toggleSection(_ section: String) {
-        if expandedSections.contains(section) {
-            expandedSections.remove(section)
         } else {
-            expandedSections.insert(section)
+            state = StudentDetailState(
+                repository: dependencies.studentDetailRepository,
+                member: member,
+                router: router
+            )
         }
+        loadedAuthority = authority
+        await state?.load(studentID: studentID)
     }
 
-    @MainActor
-    private func loadMeetings() async {
-        do {
-            let allMeetings = try await meetingService.fetchMeetings()
-            studentMeetings = allMeetings.filter { meeting in
-                meeting.relatedStudentIds.contains(studentId)
-            }
-            .sorted { $0.startTime < $1.startTime }
-        } catch {
-            print("Failed to load meetings: \(error)")
-            studentMeetings = []
-        }
-    }
+    private struct Authority: Hashable {
+        let userID: String
+        let districtID: String
+        let membershipVersion: Int
 
-    private func hasSurveyResults(for student: Student) -> Bool {
-        return student.surveyResults?.isEmpty == false
-    }
-
-    private func retakeSurvey() {
-        Task {
-            do {
-                guard let student = stateModel.student, let studentId = student.id else { return }
-
-                // Clear survey-generated interests from edge collection
-                // This preserves manually added interests (source != .survey)
-                try await StudentInterestService.shared.clearSurveyInterests(studentId: studentId)
-
-                // Archive the old survey response in Firestore
-                try await SurveyService.shared.archiveLatestSurvey(studentId: studentId)
-
-                print("[StudentDetail] Survey data cleared, preserving manual interests")
-
-                // Now show the survey
-                await MainActor.run {
-                    showingSurvey = true
-                }
-
-                // Refresh interests after clearing
-                await loadStudentInterests()
-            } catch {
-                print("[StudentDetail] Error clearing survey data: \(error.localizedDescription)")
-                // Show survey anyway
-                await MainActor.run {
-                    showingSurvey = true
-                }
-            }
-        }
-    }
-
-    // MARK: - Student Interest Loading (Phase 2)
-
-    /// Load student interests from edge collection and resolve them via library
-    @MainActor
-    private func loadStudentInterests() async {
-        isLoadingInterests = true
-
-        do {
-            // Fetch student interest edges
-            studentInterestEdges = try await studentInterestService.getStudentInterests(studentId: studentId)
-
-            // Resolve interest IDs to full Interest objects.
-            // Primary: look up in Firestore global library.
-            // Fallback: match against PredefinedInterestsData so survey-saved interests
-            //           (which use stable hash IDs) resolve even if the library isn't seeded.
-            var interests: [Interest] = []
-            for edge in studentInterestEdges {
-                if let firestoreInterest = try await interestLibraryService.fetchInterest(id: edge.interestId) {
-                    interests.append(firestoreInterest)
-                } else if let predefined = PredefinedInterestsData.allPredefinedInterests.first(where: { $0.id == edge.interestId }) {
-                    interests.append(predefined)
-                    print("[StudentDetailView] Resolved interest \(edge.interestId) from PredefinedInterestsData")
-                } else {
-                    print("[StudentDetailView] Could not resolve interest ID: \(edge.interestId)")
-                }
-            }
-
-            resolvedInterests = interests
-            print("[StudentDetailView] Loaded \(resolvedInterests.count) interests for student ID: \(studentId)")
-        } catch {
-            print("[StudentDetailView] Error loading student interests: \(error.localizedDescription)")
-            resolvedInterests = []
-        }
-
-        isLoadingInterests = false
-    }
-
-    /// Get the affinity level for a specific interest
-    private func getInterestLevel(for interestId: String) -> Int {
-        studentInterestEdges.first { $0.interestId == interestId }?.level ?? 0
-    }
-
-    private func loadSavedCareers() async {
-        isLoadingSavedCareers = true
-        defer { isLoadingSavedCareers = false }
-        do {
-            savedCareers = try await careerService.fetchSavedCareers(for: studentId)
-        } catch {
-            print("Failed to load saved careers: \(error)")
-        }
-    }
-
-    // MARK: - Student Mode
-
-    private func enableStudentMode(student: Student) {
-        print("[StudentDetail] 🎓 Button tapped - Enabling student mode for: \(student.name)")
-
-        // Use Task to avoid "modifying state during view update" warning
-        Task { @MainActor in
-            studentModeSession.startStudentMode(for: student)
-            print("[StudentDetail] 🎓 Active student after start: \(studentModeSession.activeStudent?.name ?? "nil")")
+        init(_ member: MembershipContext) {
+            userID = member.userID
+            districtID = member.districtID
+            membershipVersion = member.version
         }
     }
 }
 
-// MARK: - Student Interest Badge (Phase 2)
+private struct StudentOperationalHubContent: View {
+    @Bindable var state: StudentDetailState
+    @Binding var selectedDestination: StudentHubDestination
 
-/// Badge showing interest with affinity level indicator
-private struct StudentInterestBadge: View {
-    let interest: Interest
-    let level: Int
+    let edit: () -> Void
+    let archive: () -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            // Interest name
-            Text(interest.name)
-                .font(.tmiCaption)
-                .fontWeight(.medium)
+        ZStack {
+            TMIColors.background.ignoresSafeArea()
 
-            // Affinity level stars
-            if level > 0 {
-                HStack(spacing: 2) {
-                    ForEach(1...level, id: \.self) { _ in
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 8))
-                            .foregroundColor(.yellow)
+            phaseContent
+        }
+        .accessibilityIdentifier("studentDetail.screen")
+        .refreshable {
+            await state.refresh()
+        }
+    }
+
+    @ViewBuilder
+    private var phaseContent: some View {
+        switch state.phase {
+        case .idle, .loading:
+            ProgressView("Loading student…")
+                .tint(TMIColors.teal)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier("studentDetail.loading")
+
+        case .permissionDenied:
+            VStack(spacing: TMISpacing.md) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(TMIColors.textSecondary)
+                    .accessibilityHidden(true)
+                Text("Student Access Changed")
+                    .font(.title2.bold())
+                    .foregroundStyle(TMIColors.textPrimary)
+                    .accessibilityIdentifier("studentDetail.permissionDenied")
+                Text(
+                    "Your current staff membership no longer allows access to this student."
+                )
+                .font(.body)
+                .foregroundStyle(TMIColors.textSecondary)
+                .multilineTextAlignment(.center)
+            }
+            .padding(TMISpacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+        case .failed(let message) where state.header == nil:
+            ContentUnavailableView {
+                Label("Student Unavailable", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(message)
+            } actions: {
+                Button("Try Again") {
+                    Task { @MainActor in
+                        await state.refresh()
                     }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(TMIColors.teal)
+            }
+            .accessibilityIdentifier("studentDetail.failed")
+
+        case .loaded, .refreshing, .offline, .failed:
+            loadedContent
+        }
+    }
+
+    private var loadedContent: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: TMISpacing.lg) {
+                statusBanner
+
+                if let header = state.header {
+                    StudentHeaderView(
+                        header: header,
+                        isOffline: state.phase == .offline,
+                        isMutating: state.isMutating,
+                        onEdit: state.menuActions.contains(.edit) ? edit : nil,
+                        onArchive: state.menuActions.contains(.archive)
+                            ? archive
+                            : nil
+                    )
+                }
+
+                destinationPicker
+                selectedContent
+            }
+            .frame(maxWidth: 980, alignment: .leading)
+            .padding(TMISpacing.lg)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private var statusBanner: some View {
+        switch state.phase {
+        case .refreshing:
+            StudentDetailStatusBanner(
+                title: "Refreshing student details",
+                systemImage: "arrow.clockwise",
+                foreground: TMIColors.infoText,
+                background: TMIColors.infoSurface,
+                showsProgress: true
+            )
+        case .offline:
+            StudentDetailStatusBanner(
+                title: "Offline — showing the last confirmed student details",
+                systemImage: "wifi.slash",
+                foreground: TMIColors.infoText,
+                background: TMIColors.infoSurface
+            )
+            .accessibilityIdentifier("studentDetail.offline")
+        case .failed(let message):
+            StudentDetailStatusBanner(
+                title: message,
+                systemImage: "exclamationmark.triangle",
+                foreground: TMIColors.errorText,
+                background: TMIColors.errorSurface
+            )
+            .accessibilityIdentifier("studentDetail.partialFailure")
+        default:
+            EmptyView()
+        }
+
+        if let mutationError = state.mutationError {
+            StudentDetailStatusBanner(
+                title: mutationMessage(for: mutationError),
+                systemImage: "exclamationmark.triangle",
+                foreground: TMIColors.errorText,
+                background: TMIColors.errorSurface
+            )
+            .accessibilityIdentifier("studentDetail.mutationError")
+        }
+    }
+
+    private var destinationPicker: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: TMISpacing.sm) {
+                ForEach(StudentHubDestination.allCases) { destination in
+                    Button {
+                        selectedDestination = destination
+                    } label: {
+                        Label(destination.title, systemImage: destination.systemImage)
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, TMISpacing.md)
+                            .frame(minHeight: 44)
+                            .foregroundStyle(
+                                selectedDestination == destination
+                                    ? TMIColors.tealForeground
+                                    : TMIColors.textPrimary
+                            )
+                            .background(
+                                selectedDestination == destination
+                                    ? TMIColors.teal
+                                    : TMIColors.surface
+                            )
+                            .clipShape(Capsule())
+                            .overlay {
+                                Capsule()
+                                    .stroke(
+                                        selectedDestination == destination
+                                            ? TMIColors.teal
+                                            : TMIColors.interactiveBorder,
+                                        lineWidth: 1
+                                    )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(
+                        selectedDestination == destination ? .isSelected : []
+                    )
+                    .accessibilityIdentifier(
+                        "studentDetail.destination.\(destination.id)"
+                    )
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(interest.primaryCategory?.color.opacity(0.2) ?? Color.tmiPrimary.opacity(0.2))
-        )
-        .overlay(
-            Capsule()
-                .stroke(interest.primaryCategory?.color ?? .tmiPrimary, lineWidth: 1)
-        )
+        .scrollIndicators(.hidden)
+        .accessibilityLabel("Student detail sections")
+    }
+
+    @ViewBuilder
+    private var selectedContent: some View {
+        switch selectedDestination {
+        case .overview:
+            StudentOverviewSection(
+                header: state.header,
+                currentSections: state.currentSections
+            )
+        case .domain(let domain):
+            if domain == .meetingsAndNotes {
+                StudentTimelineView(
+                    privateNotes: state.privateNotes,
+                    studentReflections: state.studentReflections
+                )
+            }
+            StudentDomainSection(
+                domain: domain,
+                current: state.currentSections.first { $0.domain == domain },
+                history: state.historySections.first { $0.domain == domain }
+            )
+        }
+    }
+
+    private func mutationMessage(for error: StudentRepositoryError) -> String {
+        switch error {
+        case .onlineRequired, .unavailable:
+            "This action requires a connection. No confirmed student data was changed."
+        case .versionConflict:
+            "The student changed on the server. Refresh before trying again."
+        case .permissionDenied, .staleMembership:
+            "Your current staff access does not allow this action."
+        case .duplicate:
+            "A possible duplicate requires review."
+        default:
+            "The action was not confirmed. Try again."
+        }
     }
 }
 
-#Preview {
-    NavigationStack {
-        StudentDetailView(studentId: Student.sampleStudent.id ?? "preview-student-id")
+private enum StudentHubDestination: Hashable, Identifiable, CaseIterable {
+    case overview
+    case domain(StudentDetailDomain)
+
+    static let allCases: [StudentHubDestination] = [
+        .overview,
+        .domain(.interests),
+        .domain(.surveysAndForms),
+        .domain(.careers),
+        .domain(.resources),
+        .domain(.plans),
+        .domain(.meetingsAndNotes),
+        .domain(.progress),
+    ]
+
+    var id: String {
+        switch self {
+        case .overview: "overview"
+        case .domain(let domain): domain.rawValue
+        }
     }
-    .environment(ScheduleMeetingCoordinator())
-    .environment(AppRouter())
+
+    var title: String {
+        switch self {
+        case .overview: "Overview"
+        case .domain(let domain): domain.title
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .overview: "rectangle.grid.2x2"
+        case .domain(let domain): domain.systemImage
+        }
+    }
+}
+
+private struct StudentOverviewSection: View {
+    let header: StudentHeaderProjection?
+    let currentSections: [StudentDetailSectionProjection]
+
+    var body: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 260), spacing: TMISpacing.md)],
+            spacing: TMISpacing.md
+        ) {
+            TMICard(style: .outlined, accentColor: TMIColors.teal) {
+                VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                    Label("Next step", systemImage: "arrow.forward.circle")
+                        .font(.headline)
+                        .foregroundStyle(TMIColors.aubergine)
+                    Text(
+                        "Review the verified profile and assigned team. Discovery activities become available in the next release."
+                    )
+                    .font(.body)
+                    .foregroundStyle(TMIColors.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            TMICard(style: .outlined, accentColor: TMIColors.aubergine) {
+                VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                    Label("Plan status", systemImage: "checklist")
+                        .font(.headline)
+                        .foregroundStyle(TMIColors.aubergine)
+                    Text(planStatus)
+                        .font(.body)
+                        .foregroundStyle(TMIColors.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            ForEach(currentSections) { section in
+                TMICard(style: .outlined) {
+                    HStack(alignment: .top, spacing: TMISpacing.md) {
+                        Image(systemName: section.domain.systemImage)
+                            .font(.title2)
+                            .foregroundStyle(TMIColors.teal)
+                            .frame(width: 32)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: TMISpacing.xs) {
+                            Text(section.domain.title)
+                                .font(.headline)
+                                .foregroundStyle(TMIColors.textPrimary)
+                            Text(sectionSummary(section))
+                                .font(.subheadline)
+                                .foregroundStyle(TMIColors.textSecondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .accessibilityIdentifier(
+                    "studentDetail.overview.\(section.domain.rawValue)"
+                )
+            }
+        }
+        .accessibilityIdentifier("studentDetail.overview")
+    }
+
+    private var planStatus: String {
+        guard let activePlanStatus = header?.activePlanStatus else {
+            return "Plan status becomes available with the verified plan workflow."
+        }
+        return switch activePlanStatus {
+        case .active(let count):
+            "\(count) active \(count == 1 ? "plan" : "plans")"
+        case .none:
+            "No active plan is recorded."
+        case .unavailable:
+            "Plan status becomes available with the verified plan workflow."
+        }
+    }
+
+    private func sectionSummary(
+        _ section: StudentDetailSectionProjection
+    ) -> String {
+        if section.itemIDs.isEmpty {
+            return "Planned for Release \(section.domain.nextAvailableRelease)."
+        }
+        return "\(section.itemIDs.count) confirmed \(section.itemIDs.count == 1 ? "record" : "records")"
+    }
+}
+
+private struct StudentDomainSection: View {
+    let domain: StudentDetailDomain
+    let current: StudentDetailSectionProjection?
+    let history: StudentDetailSectionProjection?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            Text(domain.title)
+                .font(.title2.bold())
+                .foregroundStyle(TMIColors.textPrimary)
+
+            StudentDomainCollectionCard(
+                title: "Current",
+                projection: current,
+                identifier: "studentDetail.\(domain.rawValue).current"
+            )
+            StudentDomainCollectionCard(
+                title: "History",
+                projection: history,
+                identifier: "studentDetail.\(domain.rawValue).history"
+            )
+        }
+        .accessibilityIdentifier("studentDetail.domain.\(domain.rawValue)")
+    }
+}
+
+private struct StudentDomainCollectionCard: View {
+    let title: String
+    let projection: StudentDetailSectionProjection?
+    let identifier: String
+
+    var body: some View {
+        TMICard(style: .outlined) {
+            VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(TMIColors.aubergine)
+
+                if let projection, !projection.itemIDs.isEmpty {
+                    Label(
+                        "\(projection.itemIDs.count) confirmed \(projection.itemIDs.count == 1 ? "record" : "records")",
+                        systemImage: "checkmark.seal"
+                    )
+                    .foregroundStyle(TMIColors.teal)
+                } else if let emptyState = projection?.emptyState {
+                    ContentUnavailableView(
+                        emptyState.title,
+                        systemImage: projection?.domain.systemImage ?? "tray",
+                        description: Text(emptyState.detail)
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "Section unavailable",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text("Refresh the student record and try again.")
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+private struct StudentDetailStatusBanner: View {
+    let title: String
+    let systemImage: String
+    let foreground: Color
+    let background: Color
+    var showsProgress = false
+
+    var body: some View {
+        HStack(spacing: TMISpacing.sm) {
+            if showsProgress {
+                ProgressView()
+                    .tint(foreground)
+            } else {
+                Image(systemName: systemImage)
+                    .accessibilityHidden(true)
+            }
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .foregroundStyle(foreground)
+        .padding(TMISpacing.md)
+        .background(background)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+    }
 }

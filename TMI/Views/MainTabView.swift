@@ -318,27 +318,11 @@ struct MainTabView: View {
     private func routeDestination(_ route: AppRoute) -> some View {
         switch route {
         case .student(let studentID):
-            if let record = router.activeStudentRecord,
-               record.id == studentID {
-                CanonicalStudentRoutePlaceholder(record: record)
-            } else {
-                StudentDetailView(studentId: studentID)
-            }
+            StudentDetailView(studentID: studentID)
         case .editStudent(let studentID):
             if let record = router.activeStudentRecord,
                record.id == studentID {
-                ContentUnavailableView(
-                    "Edit From the Roster",
-                    systemImage: "person.crop.circle.badge.checkmark",
-                    description: Text(
-                        "Return to Students and choose Edit from \(record.displayName)’s action menu."
-                    )
-                )
-            } else if let student = router.activeStudent,
-               student.id == studentID {
-                StudentProfileView(existingStudent: student) {
-                    router.pop()
-                }
+                CanonicalStudentEditRoute(record: record)
             } else {
                 ContentUnavailableView(
                     "Student Unavailable",
@@ -364,21 +348,102 @@ struct MainTabView: View {
     }
 }
 
-private struct CanonicalStudentRoutePlaceholder: View {
-    let record: StudentRecord
+private struct CanonicalStudentEditRoute: View {
+    @Environment(\.appDependencies) private var dependencies
+    @Environment(\.authStateModel) private var authStateModel
+    @Environment(AppRouter.self) private var router
+
+    @State private var record: StudentRecord
+    @State private var isSubmitting = false
+    @State private var mutationError: StudentRepositoryError?
+
+    init(record: StudentRecord) {
+        _record = State(initialValue: record)
+    }
 
     var body: some View {
-        ContentUnavailableView {
-            Label(record.displayName, systemImage: "person.crop.circle")
-        } description: {
-            Text(
-                "Grade \(record.grade) • \(record.schoolID)\n"
-                    + "The student operational hub is the next blueprint milestone."
+        if let member = authStateModel.currentMembership {
+            StudentEditorView(
+                mode: .edit(record),
+                member: member,
+                isSubmitting: isSubmitting,
+                duplicateCandidateIDs: duplicateCandidateIDs,
+                submissionError: errorMessage
+            ) { draft in
+                await self.save(draft, member: member)
+            }
+        } else {
+            ContentUnavailableView(
+                "Student Access Unavailable",
+                systemImage: "lock.fill",
+                description: Text(
+                    "A verified staff membership is required to edit this student."
+                )
             )
         }
-        .foregroundStyle(TMIColors.textPrimary)
-        .navigationTitle(record.displayName)
-        .accessibilityIdentifier("studentHub.placeholder")
+    }
+
+    private var duplicateCandidateIDs: [String] {
+        guard case .duplicate(let candidateIDs) = mutationError else {
+            return []
+        }
+        return candidateIDs
+    }
+
+    private var errorMessage: String? {
+        guard let mutationError else { return nil }
+        return switch mutationError {
+        case .duplicate:
+            "A possible duplicate needs review before this update can be saved."
+        case .versionConflict:
+            "This record changed on the server. Return to the student and refresh before editing."
+        case .onlineRequired, .unavailable:
+            "This update requires a connection. No confirmed student data was changed."
+        case .permissionDenied, .staleMembership:
+            "Your current staff access does not allow this update."
+        default:
+            "The update was not confirmed. Review the fields and try again."
+        }
+    }
+
+    @MainActor
+    private func save(
+        _ draft: StudentDraft,
+        member: MembershipContext
+    ) async -> StudentEditorView.SaveOutcome {
+        guard !isSubmitting else { return .failed }
+
+        isSubmitting = true
+        mutationError = nil
+        defer { isSubmitting = false }
+
+        do {
+            let confirmed = try await dependencies.studentDetailRepository.update(
+                id: record.id,
+                draft: draft,
+                expectedVersion: record.metadata.recordVersion,
+                operationID: UUID(),
+                member: member
+            )
+            guard confirmed.id == record.id,
+                  confirmed.districtID == member.districtID,
+                  confirmed.metadata.recordVersion > record.metadata.recordVersion,
+                  router.setActiveStudent(confirmed) else {
+                mutationError = .invalidResponse
+                return .failed
+            }
+            record = confirmed
+            return .confirmed
+        } catch let error as StudentRepositoryError {
+            mutationError = error
+            if case .duplicate = error {
+                return .duplicate
+            }
+            return .failed
+        } catch {
+            mutationError = .invalidResponse
+            return .failed
+        }
     }
 }
 

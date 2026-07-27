@@ -336,19 +336,19 @@ git commit -m "feat: deliver secure student roster"
 - Create: `TMI/Features/Students/StudentTimelineView.swift`
 - Create: `TMITests/Features/Students/StudentDetailStateTests.swift`
 
-- [ ] **Step 1: Write failing projection tests**
+- [x] **Step 1: Write failing projection tests**
 
 Test header projection, permission-backed menu actions, separate private notes/student reflections queries, purposeful current/history empty sections derived from empty canonical collections, and active-student router context.
 
-- [ ] **Step 2: Implement the focused hub**
+- [x] **Step 2: Implement the focused hub**
 
 Create tabs/sections for overview, interests, surveys/forms, careers, resources, plans, meetings/notes, and progress. In Release 1, unbuilt domains show purposeful empty states describing the next available release action, not dead buttons or fabricated records. Header shows identity, grade, school, assigned team, active-plan status, last interaction, Student Mode availability (disabled until Release 2), edit, archive, and delete when permitted.
 
-- [ ] **Step 3: Split the legacy file**
+- [x] **Step 3: Split the legacy file**
 
 Move header, timeline, and each domain section to its own file as the section becomes active. Remove superseded nested types from the 1,257-line legacy view and keep no duplicate route.
 
-- [ ] **Step 4: Run detail/accessibility tests and commit**
+- [x] **Step 4: Run detail/accessibility tests and commit**
 
 ```bash
 git add TMI/Views/Students/StudentDetailView.swift TMI/Features/Students TMITests/Features/Students/StudentDetailStateTests.swift

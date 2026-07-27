@@ -41,6 +41,10 @@ struct UITestingLaunchConfigurationTests {
             ("roster-create-saving", .rosterCreateSaving),
             ("roster-archived", .rosterArchived),
             ("roster-create-duplicate", .rosterCreateDuplicate),
+            ("student-detail-populated", .studentDetailPopulated),
+            ("student-detail-release1", .studentDetailRelease1),
+            ("student-detail-offline", .studentDetailOffline),
+            ("student-detail-permission-denied", .studentDetailPermissionDenied),
         ]
 
         for (rawValue, expected) in fixtures {
