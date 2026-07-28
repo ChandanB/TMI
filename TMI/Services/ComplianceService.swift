@@ -98,45 +98,8 @@ final class ComplianceService {
     
     /// Get consent summary for a student
     func getConsentSummary(studentId: String) async throws -> ConsentSummary {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "ComplianceService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
-        }
-        
-        let collection = db.collection("users").document(uid).collection("students").document(studentId).collection("consents")
-        let snapshot = try await collection.getDocuments()
-        
-        let consents = snapshot.documents.compactMap { doc -> StudentConsent? in
-            let data = doc.data()
-            guard !data.isEmpty else { return nil }
-            
-            guard let consentTypeRaw = data["consentType"] as? String,
-                  let consentType = StudentConsent.ConsentType(rawValue: consentTypeRaw),
-                  let granted = data["granted"] as? Bool else {
-                return nil
-            }
-            
-            let grantedBy = data["grantedBy"] as? String
-            let grantedByName = data["grantedByName"] as? String
-            let grantedAtTimestamp = data["grantedAt"] as? Timestamp
-            let revokedAtTimestamp = data["revokedAt"] as? Timestamp
-            let expiresAtTimestamp = data["expiresAt"] as? Timestamp
-            let notes = data["notes"] as? String
-            
-            return StudentConsent(
-                id: doc.documentID,
-                studentId: studentId,
-                consentType: consentType,
-                granted: granted,
-                grantedBy: grantedBy,
-                grantedByName: grantedByName,
-                grantedAt: grantedAtTimestamp?.dateValue(),
-                revokedAt: revokedAtTimestamp?.dateValue(),
-                expiresAt: expiresAtTimestamp?.dateValue(),
-                notes: notes
-            )
-        }
-        
-        return ConsentSummary(studentId: studentId, consents: consents)
+        _ = studentId
+        throw ComplianceServiceError.studentConsentMigrationPending
     }
     
     /// Grant consent for a student
@@ -147,45 +110,19 @@ final class ComplianceService {
         grantedByName: String,
         expirationDays: Int?
     ) async throws {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "ComplianceService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
-        }
-        
-        let expiresAt = expirationDays.map { Date().addingTimeInterval(TimeInterval($0 * 86400)) }
-        
-        let consent = StudentConsent(
-            studentId: studentId,
-            consentType: consentType,
-            granted: true,
-            grantedBy: grantedBy,
-            grantedByName: grantedByName,
-            grantedAt: Date(),
-            revokedAt: nil,
-            expiresAt: expiresAt,
-            notes: nil
-        )
-        
-        let collection = db.collection("users").document(uid).collection("students").document(studentId).collection("consents")
-        try await collection.document(consentType.rawValue).setData(consent.toFirestoreData())
-        
-        print("[ComplianceService] Granted consent \(consentType.rawValue) for student \(studentId)")
+        _ = studentId
+        _ = consentType
+        _ = grantedBy
+        _ = grantedByName
+        _ = expirationDays
+        throw ComplianceServiceError.studentConsentMigrationPending
     }
     
     /// Revoke consent for a student
     func revokeConsent(studentId: String, consentType: StudentConsent.ConsentType) async throws {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "ComplianceService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
-        }
-        
-        let collection = db.collection("users").document(uid).collection("students").document(studentId).collection("consents")
-        let docRef = collection.document(consentType.rawValue)
-        
-        try await docRef.updateData([
-            "granted": false,
-            "revokedAt": Timestamp(date: Date())
-        ])
-        
-        print("[ComplianceService] Revoked consent \(consentType.rawValue) for student \(studentId)")
+        _ = studentId
+        _ = consentType
+        throw ComplianceServiceError.studentConsentMigrationPending
     }
     
     // MARK: - Private Helpers
@@ -231,6 +168,14 @@ final class ComplianceService {
             categories: categories,
             summary: data["summary"] as? String
         )
+    }
+}
+
+enum ComplianceServiceError: LocalizedError {
+    case studentConsentMigrationPending
+
+    var errorDescription: String? {
+        "Student consent records will be available after their canonical data migration."
     }
 }
 

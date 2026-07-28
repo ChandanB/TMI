@@ -12,9 +12,7 @@ struct AddInterestToStudentView: View {
     let onStudentUpdated: (Student) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.interestsStateModel) var interestsStateModel
 
-    @State private var studentService = StudentService()
     @State private var searchText = ""
     @State private var selectedCategory: InterestCategory?
     @State private var isAdding = false
@@ -62,88 +60,27 @@ struct AddInterestToStudentView: View {
             TMIBackgroundView(variant: .base)
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // Header
-                headerSection
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-                    .padding(.bottom, 12)
+            VStack(spacing: 20) {
+                Image(systemName: "heart.circle.fill")
+                    .font(.system(size: 54))
+                    .foregroundStyle(Color.tmiTextTertiary)
 
-                // Search bar
-                TMITextField(
-                    icon: "magnifyingglass",
-                    placeholder: "Search interests...",
-                    text: $searchText
-                )
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
+                Text("Interest Updates Are Unavailable")
+                    .font(.title2.bold())
+                    .foregroundStyle(Color.tmiTextPrimary)
 
-                // Category filter
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        CategoryFilterChip(
-                            title: "All",
-                            isSelected: selectedCategory == nil,
-                            action: { selectedCategory = nil }
-                        )
+                Text("Adding interests for \(student.name) will be available after Discovery is enabled.")
+                    .font(.body)
+                    .foregroundStyle(Color.tmiTextSecondary)
+                    .multilineTextAlignment(.center)
 
-                        ForEach(InterestCategory.allCases, id: \.self) { category in
-                            CategoryFilterChip(
-                                title: category.rawValue,
-                                icon: category.iconName,
-                                isSelected: selectedCategory == category,
-                                action: { selectedCategory = category }
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                }
-
-                // Results count
-                HStack {
-                    Text("\(availableInterests.count) available interests")
-                        .font(.caption)
-                        .foregroundColor(Color.tmiTextSecondary)
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 8)
-
-                // Survey-based interests section (if any)
-                if !surveyBasedInterests.isEmpty {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            surveyInterestsSection
-
-                            Divider()
-                                .background(Color.white.opacity(0.3))
-                                .padding(.horizontal, 20)
-
-                            addMoreInterestsSection
-                        }
-                        .padding(.bottom, 100)
-                    }
-                } else {
-                    // Interests list (no survey results)
-                    if availableInterests.isEmpty {
-                        emptyStateView
-                    } else {
-                        interestsList
-                    }
-                }
+                Button("Done", action: dismiss.callAsFunction)
+                    .buttonStyle(.borderedProminent)
             }
+            .padding(32)
         }
         .navigationTitle("Add Interests")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await loadInterests()
-        }
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(errorMessage)
-        }
     }
 
     // MARK: - Data Loading
@@ -324,31 +261,9 @@ struct AddInterestToStudentView: View {
     // MARK: - Actions
 
     private func addInterest(_ interest: Interest) {
-        guard !isAdding else { return }
-
-        isAdding = true
-
-        Task {
-            do {
-                // Use new deduplication method from StudentService
-                let savedStudent = try await studentService.addInterests([interest], to: student)
-
-                // Add to global interests collection
-                await interestsStateModel.addInterest(interest)
-
-                // Update parent view and dismiss
-                await MainActor.run {
-                    onStudentUpdated(savedStudent)
-                    dismiss()
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Failed to add interest: \(error.localizedDescription)"
-                    showError = true
-                    isAdding = false
-                }
-            }
-        }
+        _ = interest
+        errorMessage = "Interest updates are unavailable until Discovery is enabled."
+        showError = true
     }
 }
 

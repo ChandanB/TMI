@@ -15,7 +15,6 @@ final class StudentInterestSynchronizer {
 
     // MARK: - Dependencies
     private let planService = TMIPlanService.shared
-    private let studentService = StudentService()
     private let studentInterestService = StudentInterestService.shared
     private let interestLibraryService = InterestLibraryService.shared
 

@@ -291,15 +291,15 @@ struct InterestDetailView: View {
     
     private var emptyStudentsContent: some View {
         VStack(spacing: 12) {
-            Image(systemName: "person.2.slash")
+            Image(systemName: "person.crop.circle.badge.clock")
                 .font(.system(size: 32))
                 .foregroundColor(Color.tmiTextTertiary)
             
-            Text("No Associated Students")
+            Text("Student Associations Unavailable")
                 .font(.headline)
                 .foregroundColor(Color.tmiTextPrimary)
             
-            Text("No students have expressed this interest yet. Connect students or add this interest to student profiles.")
+            Text("Student associations will be available after Discovery is enabled.")
                 .font(.caption)
                 .foregroundColor(Color.tmiTextSecondary)
                 .multilineTextAlignment(.center)
@@ -559,8 +559,7 @@ struct InterestDetailView: View {
     // MARK: - Computed Properties
     
     private var studentCount: String {
-        guard let data = associatedData else { return "—" }
-        return "\(data.associatedStudents.count)"
+        "—"
     }
     
     private var averageEngagement: String {
@@ -576,21 +575,7 @@ struct InterestDetailView: View {
     }
     
     private var popularityTrend: String {
-        guard let data = associatedData else { return "—" }
-
-        let studentCount = data.associatedStudents.count
-
-        // Determine trend based on student count thresholds
-        switch studentCount {
-        case 0...2:
-            return "→ Emerging"
-        case 3...5:
-            return "→ Stable"
-        case 6...10:
-            return "↗ Growing"
-        default:
-            return "↗↗ Trending"
-        }
+        "—"
     }
 
     private var successRate: String {
@@ -607,38 +592,7 @@ struct InterestDetailView: View {
     }
 
     private var bestSeason: String {
-        guard let data = associatedData else { return "—" }
-
-        // Analyze when this interest was most popular based on creation dates
-        let calendar = Calendar.current
-        let seasonCounts = data.associatedStudents.reduce(into: [String: Int]()) { counts, student in
-            // Use the student's last interaction date or current date as proxy
-            let date = student.lastInteractionDate ?? Date()
-            let month = calendar.component(.month, from: date)
-
-            let season: String
-            switch month {
-            case 12, 1, 2:
-                season = "Winter"
-            case 3, 4, 5:
-                season = "Spring"
-            case 6, 7, 8:
-                season = "Summer"
-            case 9, 10, 11:
-                season = "Fall"
-            default:
-                season = "Year-round"
-            }
-
-            counts[season, default: 0] += 1
-        }
-
-        // Find the season with the most students
-        if let mostPopularSeason = seasonCounts.max(by: { $0.value < $1.value })?.key {
-            return mostPopularSeason
-        }
-
-        return "Year-round"
+        "—"
     }
     
     // MARK: - Data Loading
@@ -871,73 +825,24 @@ struct ConnectStudentSheet: View {
     let interest: Interest
     let onConnect: (Student) -> Void
 
-    @Environment(\.dismiss) var dismiss
-    @State private var studentService = StudentService()
-    @State private var students: [Student] = []
-    @State private var filteredStudents: [Student] = []
-    @State private var isLoading = false
-    @State private var searchText = ""
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView("Loading students...")
-                } else if filteredStudents.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "person.2.slash")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary)
+            VStack(spacing: 16) {
+                Image(systemName: "person.crop.circle.badge.clock")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.secondary)
 
-                        Text(searchText.isEmpty ? "No students available" : "No students found")
-                            .font(.headline)
+                Text("Student Connections Are Unavailable")
+                    .font(.headline)
 
-                        Text(searchText.isEmpty ?
-                            "All students already have this interest" :
-                            "Try a different search term")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding()
-                } else {
-                    List(filteredStudents) { student in
-                        Button(action: {
-                            onConnect(student)
-                            dismiss()
-                        }) {
-                            HStack {
-                                // Avatar
-                                ZStack {
-                                    Circle()
-                                        .fill(student.avatarColor.color)
-                                        .frame(width: 40, height: 40)
-
-                                    Text(student.initials)
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(Color.tmiTextPrimary)
-                                }
-
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(student.name)
-                                        .font(.body)
-                                        .foregroundColor(.primary)
-
-                                    Text("Grade \(student.grade)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                Spacer()
-
-                                Image(systemName: "plus.circle.fill")
-                                    .foregroundColor(.tmiPrimary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .searchable(text: $searchText, prompt: "Search students")
-                }
+                Text("Connecting students to \(interest.name) will be available after Discovery is enabled.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
+            .padding()
             .navigationTitle("Connect Student")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -947,85 +852,6 @@ struct ConnectStudentSheet: View {
                     }
                 }
             }
-            .task {
-                await loadStudents()
-            }
-            .onChange(of: searchText) { _, _ in
-                filterStudents()
-            }
-        }
-    }
-
-    @MainActor
-    private func loadStudents() async {
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            // Load all students
-            students = try await studentService.fetchStudents()
-
-            // Filter out students who already have this interest
-            guard let interestId = interest.id else {
-                filteredStudents = students
-                return
-            }
-
-            // Check each student asynchronously
-            var studentsWithoutInterest: [Student] = []
-            for student in students {
-                guard student.id != nil else { continue }
-
-                do {
-                    let hasInterest = try await student.hasInterest(interestId: interestId)
-                    if !hasInterest {
-                        studentsWithoutInterest.append(student)
-                    }
-                } catch {
-                    // If we can't check, include the student to be safe
-                    studentsWithoutInterest.append(student)
-                }
-            }
-
-            filteredStudents = studentsWithoutInterest
-        } catch {
-            print("[ConnectStudentSheet] Failed to load students: \(error)")
-            students = []
-            filteredStudents = []
-        }
-    }
-
-    @MainActor
-    private func filterStudents() {
-        // Start with all students (not filtered students, since we need to re-apply search)
-        Task {
-            guard let interestId = interest.id else {
-                filteredStudents = students
-                return
-            }
-
-            // Check each student asynchronously and apply search filter
-            var studentsWithoutInterest: [Student] = []
-            for student in students {
-                // Apply search filter first
-                if !searchText.isEmpty && !student.name.localizedCaseInsensitiveContains(searchText) {
-                    continue
-                }
-
-                guard student.id != nil else { continue }
-
-                do {
-                    let hasInterest = try await student.hasInterest(interestId: interestId)
-                    if !hasInterest {
-                        studentsWithoutInterest.append(student)
-                    }
-                } catch {
-                    // If we can't check, include the student to be safe
-                    studentsWithoutInterest.append(student)
-                }
-            }
-
-            filteredStudents = studentsWithoutInterest
         }
     }
 }

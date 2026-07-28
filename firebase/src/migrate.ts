@@ -17,6 +17,11 @@ export interface MigrationStore {
     path: string,
     data: Readonly<Record<string, unknown>>,
   ): Promise<"created" | "exists">;
+  compareAndReplace(
+    path: string,
+    expected: Readonly<Record<string, unknown>>,
+    replacement: Readonly<Record<string, unknown>>,
+  ): Promise<"replaced" | "already-applied" | "missing" | "conflict">;
 }
 
 export interface MigrationApplyResult {
@@ -45,6 +50,26 @@ export class ForwardOnlyMigrationError extends Error {
   }
 }
 
+export class CanonicalVerificationError extends Error {
+  constructor(path: string) {
+    super(
+      `Canonical verification failed because ${path} is missing. ` +
+        "Already-canonical fixture records are verify-only and are never created.",
+    );
+    this.name = "CanonicalVerificationError";
+  }
+}
+
+export class MigrationReferenceError extends Error {
+  constructor(detail: string) {
+    super(
+      `Migration assignment reference preflight failed: ${detail}. ` +
+        "No migration writes were applied.",
+    );
+    this.name = "MigrationReferenceError";
+  }
+}
+
 export class MemoryMigrationStore implements MigrationStore {
   readonly #documents = new Map<string, Readonly<Record<string, unknown>>>();
 
@@ -68,6 +93,25 @@ export class MemoryMigrationStore implements MigrationStore {
     }
     this.#documents.set(path, cloneRecord(data));
     return "created";
+  }
+
+  async compareAndReplace(
+    path: string,
+    expected: Readonly<Record<string, unknown>>,
+    replacement: Readonly<Record<string, unknown>>,
+  ): Promise<"replaced" | "already-applied" | "missing" | "conflict"> {
+    const existing = this.#documents.get(path);
+    if (existing === undefined) {
+      return "missing";
+    }
+    if (recordsEqual(existing, replacement)) {
+      return "already-applied";
+    }
+    if (!recordsEqual(existing, expected)) {
+      return "conflict";
+    }
+    this.#documents.set(path, cloneRecord(replacement));
+    return "replaced";
   }
 
   async replaceForTesting(
@@ -106,27 +150,96 @@ export class FirestoreMigrationStore implements MigrationStore {
       throw error;
     }
   }
+
+  async compareAndReplace(
+    path: string,
+    expected: Readonly<Record<string, unknown>>,
+    replacement: Readonly<Record<string, unknown>>,
+  ): Promise<"replaced" | "already-applied" | "missing" | "conflict"> {
+    const reference = this.firestore.doc(path);
+    return this.firestore.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(reference);
+      if (!snapshot.exists) {
+        return "missing";
+      }
+      const existing = snapshot.data() ?? {};
+      if (recordsEqual(existing, replacement)) {
+        return "already-applied";
+      }
+      if (!recordsEqual(existing, expected)) {
+        return "conflict";
+      }
+      transaction.set(reference, replacement);
+      return "replaced";
+    });
+  }
 }
 
 export async function applyMigrationPlan(
   plan: MigrationPlan,
   store: MigrationStore,
 ): Promise<MigrationApplyResult> {
+  assertUniqueDestinations(plan);
   const pending: MigrationWrite[] = [];
+  const pendingUpgrades: Array<{
+    readonly write: MigrationWrite;
+    readonly predecessorData: Readonly<Record<string, unknown>>;
+  }> = [];
   let alreadyApplied = 0;
 
   for (const write of plan.writes) {
     const existing = await store.read(write.manifest.destinationPath);
+    const verifiesCanonicalSource =
+      write.manifest.sourcePath === write.manifest.destinationPath;
+    if (verifiesCanonicalSource) {
+      if (existing === null) {
+        throw new CanonicalVerificationError(
+          write.manifest.destinationPath,
+        );
+      }
+      if (!recordsEqual(existing, write.data)) {
+        throw new MigrationConflictError(write.manifest.destinationPath);
+      }
+      alreadyApplied += 1;
+      continue;
+    }
     if (existing === null) {
       pending.push(write);
     } else if (recordsEqual(existing, write.data)) {
       alreadyApplied += 1;
+    } else if (
+      write.predecessorData !== undefined &&
+      recordsEqual(existing, write.predecessorData)
+    ) {
+      pendingUpgrades.push({
+        write,
+        predecessorData: write.predecessorData,
+      });
     } else {
       throw new MigrationConflictError(write.manifest.destinationPath);
     }
   }
 
+  await assertAssignmentReferences(plan, store);
+
   let writesApplied = 0;
+  for (const { write, predecessorData } of pendingUpgrades) {
+    const result = await store.compareAndReplace(
+      write.manifest.destinationPath,
+      predecessorData,
+      write.data,
+    );
+    if (result === "replaced") {
+      writesApplied += 1;
+      continue;
+    }
+    if (result === "already-applied") {
+      alreadyApplied += 1;
+      continue;
+    }
+    throw new MigrationConflictError(write.manifest.destinationPath);
+  }
+
   for (const write of pending) {
     const result = await store.createIfAbsent(
       write.manifest.destinationPath,
@@ -150,6 +263,115 @@ export async function applyMigrationPlan(
     writesApplied,
     alreadyApplied,
   };
+}
+
+async function assertAssignmentReferences(
+  plan: MigrationPlan,
+  store: MigrationStore,
+): Promise<void> {
+  const plannedRecords = new Map(
+    plan.writes
+      .filter((write) => write.manifest.ownerResolution === "mapped")
+      .map((write) => [write.manifest.destinationPath, write.data]),
+  );
+  const recordAt = async (
+    path: string,
+  ): Promise<Readonly<Record<string, unknown>> | null> =>
+    plannedRecords.get(path) ?? store.read(path);
+
+  for (const [path, record] of plannedRecords) {
+    const segments = path.split("/");
+    if (
+      segments.length !== 4 ||
+      segments[0] !== "districts"
+    ) {
+      continue;
+    }
+    const districtID = segments[1] ?? "";
+    const collection = segments[2];
+    const recordID = segments[3] ?? "";
+
+    if (collection === "students") {
+      const assignedMemberIDs = requireIdentifierArray(
+        record.assignedMemberIDs,
+        `${path}.assignedMemberIDs`,
+      );
+      for (const memberID of assignedMemberIDs) {
+        const memberPath =
+          `districts/${districtID}/members/${memberID}`;
+        const member = await recordAt(memberPath);
+        if (member === null) {
+          throw new MigrationReferenceError(
+            `${path} references missing member ${memberPath}`,
+          );
+        }
+        const assignedStudentIDs = requireIdentifierArray(
+          member.assignedStudentIDs,
+          `${memberPath}.assignedStudentIDs`,
+        );
+        if (!assignedStudentIDs.includes(recordID)) {
+          throw new MigrationReferenceError(
+            `${memberPath} does not reference assigned student ${path}`,
+          );
+        }
+      }
+      continue;
+    }
+
+    if (collection === "members") {
+      const assignedStudentIDs = requireIdentifierArray(
+        record.assignedStudentIDs,
+        `${path}.assignedStudentIDs`,
+      );
+      for (const studentID of assignedStudentIDs) {
+        const studentPath =
+          `districts/${districtID}/students/${studentID}`;
+        const student = await recordAt(studentPath);
+        if (student === null) {
+          throw new MigrationReferenceError(
+            `${path} references missing student ${studentPath}`,
+          );
+        }
+        const assignedMemberIDs = requireIdentifierArray(
+          student.assignedMemberIDs,
+          `${studentPath}.assignedMemberIDs`,
+        );
+        if (!assignedMemberIDs.includes(recordID)) {
+          throw new MigrationReferenceError(
+            `${studentPath} does not reference assigned member ${path}`,
+          );
+        }
+      }
+    }
+  }
+}
+
+function requireIdentifierArray(
+  value: unknown,
+  field: string,
+): readonly string[] {
+  if (
+    !Array.isArray(value) ||
+    !value.every(
+      (item) => typeof item === "string" && item.length > 0,
+    )
+  ) {
+    throw new MigrationReferenceError(
+      `${field} is not a valid identifier array`,
+    );
+  }
+  return value;
+}
+
+function assertUniqueDestinations(plan: MigrationPlan): void {
+  const destinations = new Set<string>();
+  for (const write of plan.writes) {
+    const destination = write.manifest.destinationPath;
+    if (destinations.has(destination)) {
+      throw new MigrationConflictError(destination);
+    }
+    destinations.add(destination);
+  }
 }
 
 export function rollbackMigration(): never {

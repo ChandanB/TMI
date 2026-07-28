@@ -14,7 +14,6 @@ final class DistrictAnalyticsService {
     static let shared = DistrictAnalyticsService()
     
     private let db = Firestore.firestore()
-    private let studentService = StudentService()
     private let planService = TMIPlanService.shared
     
     private init() {}
@@ -108,140 +107,22 @@ final class DistrictAnalyticsService {
     
     /// Compute district metrics
     func computeMetrics(for districtId: String, filter: DistrictFilter) async throws -> DistrictMetrics {
-        print("[DistrictAnalyticsService] Computing metrics for district: \(districtId)")
-
-        let allStudents = try await studentService.fetchStudentsInDistrict(districtId)
-        let filteredStudents = applyStudentFilter(allStudents, filter: filter)
-        let studentIds = Set(filteredStudents.compactMap { $0.id })
-
-        let plans = try await planService.fetchPlansInDistrict(districtId)
-        let filteredPlans = plans.filter { plan in
-            guard !studentIds.isEmpty else { return true }
-            return plan.students.contains { student in
-                guard let id = student.id else { return false }
-                return studentIds.contains(id)
-            }
-        }
-
-        let completedPlans = filteredPlans.filter { $0.progress >= 1.0 }
-        let activePlans = filteredPlans.filter { $0.progress < 1.0 }
-
-        let averageEngagement = averageEngagementRate(for: filteredStudents)
-        let flaggedStudents = evaluateStudentAlerts(
-            students: filteredStudents,
-            plans: filteredPlans
-        )
-
-        let formCompletionRate = try await computeFormCompletionRate(
-            districtId: districtId,
-            schoolId: filter.schoolId
-        )
-
-        let schools = try await fetchSchoolsCount(districtId: districtId, students: allStudents)
-        let staffCount = try await fetchStaffCount(districtId: districtId)
-
-        let completionRate = filteredPlans.isEmpty
-            ? 0.0
-            : Double(completedPlans.count) / Double(filteredPlans.count)
-
-        let planIds = filteredPlans.compactMap { $0.id }
-        let evidenceMetrics = try await computeEvidenceMetrics(planIds: planIds)
-
-        return DistrictMetrics(
-            totalStudents: filteredStudents.count,
-            activePlansCount: activePlans.count,
-            completedPlansCount: completedPlans.count,
-            planCompletionRate: completionRate,
-            formCompletionRate: formCompletionRate,
-            avgEngagementRate: averageEngagement,
-            flaggedStudentsCount: flaggedStudents.count,
-            totalSchools: schools,
-            totalStaff: staffCount,
-            planEvidenceCount: evidenceMetrics.totalEntries,
-            incidentCount: evidenceMetrics.incidentCount,
-            thoughtLogCount: evidenceMetrics.thoughtLogCount,
-            ratingCount: evidenceMetrics.ratingCount,
-            averageRating: evidenceMetrics.averageRating,
-            checklistCompletions: evidenceMetrics.checklistCompletions,
-            streakCompletions: evidenceMetrics.streakCompletions
-        )
+        _ = districtId
+        _ = filter
+        throw DistrictAnalyticsError.serverMetricsUnavailable
     }
     
     /// Compute school-level metrics
     func computeSchoolMetrics(for districtId: String) async throws -> [SchoolMetrics] {
-        print("[DistrictAnalyticsService] Computing school metrics for district: \(districtId)")
-
-        let students = try await studentService.fetchStudentsInDistrict(districtId)
-        let plans = try await planService.fetchPlansInDistrict(districtId)
-        let schools = try await DistrictService.shared.fetchSchools(for: districtId)
-        let schoolNameMap: [String: String] = Dictionary(uniqueKeysWithValues: schools.compactMap { school in
-            let key = school.id ?? school.schoolCode
-            return (key, school.name)
-        })
-
-        let studentsBySchool = Dictionary(grouping: students) { $0.schoolId ?? "unknown" }
-        let studentSchoolLookup: [String: String] = Dictionary(uniqueKeysWithValues: students.compactMap { student in
-            guard let id = student.id else { return nil }
-            return (id, student.schoolId ?? "unknown")
-        })
-
-        var plansBySchool: [String: [TMIPlan]] = [:]
-        for plan in plans {
-            let targetSchoolId: String
-            if let student = plan.students.first,
-               let studentId = student.id,
-               let schoolId = studentSchoolLookup[studentId] {
-                targetSchoolId = schoolId
-            } else {
-                targetSchoolId = "unknown"
-            }
-            plansBySchool[targetSchoolId, default: []].append(plan)
-        }
-
-        let assignments = try await fetchFormAssignments(districtId: districtId)
-        let assignmentsBySchool = Dictionary(grouping: assignments) { $0.schoolId ?? "unknown" }
-
-        var metrics: [SchoolMetrics] = []
-
-        for (schoolId, schoolStudents) in studentsBySchool {
-            let schoolPlans = plansBySchool[schoolId] ?? []
-            let completedPlans = schoolPlans.filter { $0.progress >= 1.0 }
-            let activePlans = schoolPlans.filter { $0.progress < 1.0 }
-
-            let engagementRate = averageEngagementRate(for: schoolStudents)
-            let alerts = evaluateStudentAlerts(students: schoolStudents, plans: schoolPlans)
-
-            let schoolAssignments = assignmentsBySchool[schoolId] ?? []
-            let completionRate = computeFormCompletionRate(assignments: schoolAssignments)
-
-            let schoolName = schoolNameMap[schoolId] ?? "School \(schoolId)"
-
-            metrics.append(
-                SchoolMetrics(
-                    schoolId: schoolId,
-                    schoolName: schoolName,
-                    studentCount: schoolStudents.count,
-                    activePlansCount: activePlans.count,
-                    completedPlansCount: completedPlans.count,
-                    engagementRate: engagementRate,
-                    formCompletionRate: completionRate,
-                    flaggedStudentsCount: alerts.count
-                )
-            )
-        }
-
-        return metrics.sorted { $0.schoolName < $1.schoolName }
+        _ = districtId
+        throw DistrictAnalyticsError.serverMetricsUnavailable
     }
     
     /// Fetch students needing attention
     func fetchStudentsNeedingAttention(for districtId: String, limit: Int) async throws -> [StudentNeedAlert] {
-        print("[DistrictAnalyticsService] Fetching students needing attention for district: \(districtId)")
-
-        let students = try await studentService.fetchStudentsInDistrict(districtId)
-        let plans = try await planService.fetchPlansInDistrict(districtId)
-
-        let alerts = evaluateStudentAlerts(students: students, plans: plans)
-        return Array(alerts.prefix(limit))
+        _ = districtId
+        _ = limit
+        throw DistrictAnalyticsError.serverMetricsUnavailable
     }
     
     /// Generate insights from metrics
@@ -568,6 +449,7 @@ enum ReportFormat: String, CaseIterable {
 enum DistrictAnalyticsError: LocalizedError {
     case fetchFailed(String)
     case exportNotImplemented
+    case serverMetricsUnavailable
     
     var errorDescription: String? {
         switch self {
@@ -575,6 +457,8 @@ enum DistrictAnalyticsError: LocalizedError {
             return "Failed to fetch analytics: \(message)"
         case .exportNotImplemented:
             return "Export functionality is not yet implemented"
+        case .serverMetricsUnavailable:
+            return "District metrics will be available after the server-owned analytics release."
         }
     }
 }

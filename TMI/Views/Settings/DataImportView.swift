@@ -10,6 +10,25 @@ import UniformTypeIdentifiers
 import FirebaseAuth
 import FirebaseFirestore
 
+nonisolated enum DataImportPayloadPolicy {
+    enum PolicyError: LocalizedError, Equatable {
+        case studentRecordsUnsupported
+
+        var errorDescription: String? {
+            switch self {
+            case .studentRecordsUnsupported:
+                return "Student records are institution-owned and cannot be imported from this screen."
+            }
+        }
+    }
+
+    static func validate(_ payload: [String: Any]) throws {
+        guard payload["students"] == nil else {
+            throw PolicyError.studentRecordsUnsupported
+        }
+    }
+}
+
 struct DataImportView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedFile: URL?
@@ -21,7 +40,6 @@ struct DataImportView: View {
     @State private var importResults: ImportResults?
     
     struct ImportResults {
-        let studentsImported: Int
         let plansImported: Int
         let interestsImported: Int
         let hobbiesImported: Int
@@ -199,7 +217,7 @@ struct DataImportView: View {
                     
                     FormatSupportRow(
                         format: "CSV",
-                        description: "Spreadsheet data (students, interests, etc.)",
+                        description: "Spreadsheet data for supported personal content",
                         icon: "tablecells.fill",
                         supported: true
                     )
@@ -265,9 +283,6 @@ struct DataImportView: View {
                         .background(Color.white.opacity(0.1))
                     
                     VStack(spacing: 8) {
-                        if results.studentsImported > 0 {
-                            ImportResultRow(icon: "person.3.fill", label: "Students", count: results.studentsImported)
-                        }
                         if results.plansImported > 0 {
                             ImportResultRow(icon: "brain.head.profile", label: "TMI Plans", count: results.plansImported)
                         }
@@ -386,12 +401,13 @@ struct DataImportView: View {
             }
             
             importProgress = 0.3
+
+            try DataImportPayloadPolicy.validate(jsonData)
             
             let db = Firestore.firestore()
             let userDoc = db.collection("users").document(user.uid)
             
             var results = ImportResults(
-                studentsImported: 0,
                 plansImported: 0,
                 interestsImported: 0,
                 hobbiesImported: 0,
@@ -400,13 +416,17 @@ struct DataImportView: View {
             )
             
             // Import each data type
-            let dataTypes = ["students", "tmiPlans", "interests", "hobbies", "resources", "forms"]
-            let progressIncrement = 0.7 / Double(dataTypes.count)
+            let importTargets: [(key: String, collection: CollectionReference)] = [
+                ("tmiPlans", userDoc.collection("tmiPlans")),
+                ("interests", userDoc.collection("interests")),
+                ("hobbies", userDoc.collection("hobbies")),
+                ("resources", userDoc.collection("resources")),
+                ("forms", userDoc.collection("forms")),
+            ]
+            let progressIncrement = 0.7 / Double(importTargets.count)
             
-            for dataType in dataTypes {
-                if let items = jsonData[dataType] as? [[String: Any]] {
-                    let collection = userDoc.collection(dataType)
-                    
+            for target in importTargets {
+                if let items = jsonData[target.key] as? [[String: Any]] {
                     for item in items {
                         // Remove existing ID to create new document
                         var importItem = item
@@ -416,16 +436,15 @@ struct DataImportView: View {
                         importItem["importedAt"] = FieldValue.serverTimestamp()
                         importItem["importedFrom"] = file.lastPathComponent
                         
-                        try await collection.addDocument(data: importItem)
+                        try await target.collection.addDocument(data: importItem)
                         
                         // Update results
-                        switch dataType {
-                        case "students": results = ImportResults(studentsImported: results.studentsImported + 1, plansImported: results.plansImported, interestsImported: results.interestsImported, hobbiesImported: results.hobbiesImported, resourcesImported: results.resourcesImported, formsImported: results.formsImported)
-                        case "tmiPlans": results = ImportResults(studentsImported: results.studentsImported, plansImported: results.plansImported + 1, interestsImported: results.interestsImported, hobbiesImported: results.hobbiesImported, resourcesImported: results.resourcesImported, formsImported: results.formsImported)
-                        case "interests": results = ImportResults(studentsImported: results.studentsImported, plansImported: results.plansImported, interestsImported: results.interestsImported + 1, hobbiesImported: results.hobbiesImported, resourcesImported: results.resourcesImported, formsImported: results.formsImported)
-                        case "hobbies": results = ImportResults(studentsImported: results.studentsImported, plansImported: results.plansImported, interestsImported: results.interestsImported, hobbiesImported: results.hobbiesImported + 1, resourcesImported: results.resourcesImported, formsImported: results.formsImported)
-                        case "resources": results = ImportResults(studentsImported: results.studentsImported, plansImported: results.plansImported, interestsImported: results.interestsImported, hobbiesImported: results.hobbiesImported, resourcesImported: results.resourcesImported + 1, formsImported: results.formsImported)
-                        case "forms": results = ImportResults(studentsImported: results.studentsImported, plansImported: results.plansImported, interestsImported: results.interestsImported, hobbiesImported: results.hobbiesImported, resourcesImported: results.resourcesImported, formsImported: results.formsImported + 1)
+                        switch target.key {
+                        case "tmiPlans": results = ImportResults(plansImported: results.plansImported + 1, interestsImported: results.interestsImported, hobbiesImported: results.hobbiesImported, resourcesImported: results.resourcesImported, formsImported: results.formsImported)
+                        case "interests": results = ImportResults(plansImported: results.plansImported, interestsImported: results.interestsImported + 1, hobbiesImported: results.hobbiesImported, resourcesImported: results.resourcesImported, formsImported: results.formsImported)
+                        case "hobbies": results = ImportResults(plansImported: results.plansImported, interestsImported: results.interestsImported, hobbiesImported: results.hobbiesImported + 1, resourcesImported: results.resourcesImported, formsImported: results.formsImported)
+                        case "resources": results = ImportResults(plansImported: results.plansImported, interestsImported: results.interestsImported, hobbiesImported: results.hobbiesImported, resourcesImported: results.resourcesImported + 1, formsImported: results.formsImported)
+                        case "forms": results = ImportResults(plansImported: results.plansImported, interestsImported: results.interestsImported, hobbiesImported: results.hobbiesImported, resourcesImported: results.resourcesImported, formsImported: results.formsImported + 1)
                         default: break
                         }
                     }

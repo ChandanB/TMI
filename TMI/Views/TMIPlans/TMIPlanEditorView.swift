@@ -53,9 +53,6 @@ struct TMIPlanEditorView: View {
     // MARK: - Students state
 
     @State private var selectedStudents: [Student] = []
-    @State private var availableStudents: [Student] = []
-    @State private var isLoadingStudents: Bool = false
-    @State private var showStudentPicker: Bool = false
 
     // MARK: - Linked data state (section components)
 
@@ -87,7 +84,6 @@ struct TMIPlanEditorView: View {
     // MARK: - Services
 
     private let planService = TMIPlanService.shared
-    private let studentService = StudentService.shared
 
     // MARK: - Validation
 
@@ -274,16 +270,9 @@ struct TMIPlanEditorView: View {
                 Button("Cancel") { dismiss() }
             }
         }
-        .sheet(isPresented: $showStudentPicker) {
-            studentPickerSheet
-                .tmiSheetStyle()
-        }
         .sheet(isPresented: $showAddGoal) {
             addGoalSheet
                 .tmiSheetStyle()
-        }
-        .task {
-            await loadAvailableStudents()
         }
         .onAppear {
             guard !didPopulate else { return }
@@ -439,17 +428,6 @@ struct TMIPlanEditorView: View {
                                 .foregroundStyle(Color.tmiTextSecondary)
                         }
 
-                        Spacer()
-
-                        Button {
-                            selectedStudents.removeAll { $0.id == student.id }
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .foregroundStyle(Color.tmiError)
-                                .font(.system(size: 20))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Remove \(student.name)")
                     }
                     .padding(TMISpacing.sm)
                     .background(Color.tmiBackground)
@@ -457,12 +435,12 @@ struct TMIPlanEditorView: View {
                 }
             }
 
-            TMIButton(
-                text: "Add Student",
-                icon: "person.badge.plus",
-                style: .secondary,
-                action: { showStudentPicker = true }
+            Label(
+                "Student associations are read-only until canonical plan linking arrives in Release 3.",
+                systemImage: "lock.fill"
             )
+            .font(.tmiCaption)
+            .foregroundStyle(Color.tmiTextSecondary)
         }
     }
 
@@ -714,65 +692,6 @@ struct TMIPlanEditorView: View {
         }
     }
 
-    // MARK: - Student Picker Sheet
-
-    private var studentPickerSheet: some View {
-        NavigationStack {
-            Group {
-                if isLoadingStudents {
-                    ProgressView("Loading students…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if availableStudents.isEmpty {
-                    ContentUnavailableView(
-                        "No Students Found",
-                        systemImage: "person.slash",
-                        description: Text("Add students to your roster first.")
-                    )
-                } else {
-                    List(availableStudents) { student in
-                        let isAlreadySelected = selectedStudents.contains { $0.id == student.id }
-                        Button {
-                            if isAlreadySelected {
-                                selectedStudents.removeAll { $0.id == student.id }
-                            } else {
-                                selectedStudents.append(student)
-                            }
-                        } label: {
-                            HStack {
-                                TMIAvatar(initials: student.initials, color: .tmiPrimary, size: 36)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(student.name)
-                                        .font(.tmiLabelLarge)
-                                        .foregroundStyle(Color.tmiTextPrimary)
-                                    Text("Grade \(student.grade)")
-                                        .font(.tmiCaption)
-                                        .foregroundStyle(Color.tmiTextSecondary)
-                                }
-
-                                Spacer()
-
-                                if isAlreadySelected {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(Color.tmiPrimary)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .navigationTitle("Select Students")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { showStudentPicker = false }
-                        .fontWeight(.semibold)
-                }
-            }
-        }
-    }
-
     // MARK: - Add Goal Sheet
 
     private var addGoalSheet: some View {
@@ -835,21 +754,6 @@ struct TMIPlanEditorView: View {
                 .font(.tmiCaption)
                 .foregroundStyle(Color.tmiTextSecondary)
             field()
-        }
-    }
-
-    // MARK: - Data Loading
-
-    @MainActor
-    private func loadAvailableStudents() async {
-        isLoadingStudents = true
-        defer { isLoadingStudents = false }
-
-        do {
-            availableStudents = try await studentService.fetchStudents()
-        } catch {
-            print("[TMIPlanEditorView] Error loading students: \(error.localizedDescription)")
-            availableStudents = []
         }
     }
 

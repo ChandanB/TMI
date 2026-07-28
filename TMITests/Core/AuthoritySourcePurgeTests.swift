@@ -92,7 +92,6 @@ struct AuthoritySourcePurgeTests {
     func servicesDoNotFetchProfileAuthority() throws {
         let root = repositoryRoot
         let files = [
-            "TMI/Services/StudentService.swift",
             "TMI/Services/TMIPlanService.swift",
             "TMI/Services/FormAssignmentService.swift",
             "TMI/Services/AuditLogService.swift",

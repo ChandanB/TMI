@@ -6,20 +6,13 @@
 //
 
 import SwiftUI
-import FirebaseFirestore
-import FirebaseAuth
 
 struct CareerPathDetailView: View {
     let career: CareerPath
     let studentId: String? // Optional, as we might just be browsing
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.authStateModel) private var authStateModel
     @State private var selectedLevel: SkillLevel = .beginner
-    @State private var isCreatingPlan = false
-    @State private var showingPlanCreated = false
-    @State private var showingError = false
-    @State private var errorMessage = ""
 
     var body: some View {
         ZStack {
@@ -188,140 +181,30 @@ struct CareerPathDetailView: View {
     }
 
     private var actionButton: some View {
-        Button(action: {
-            Task {
-                await createPlanFromCareer()
+        HStack(alignment: .top, spacing: TMISpacing.md) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundColor(.tmiSecondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Plan creation arrives in Release 3")
+                    .font(.tmiBody.bold())
+                    .foregroundColor(.tmiTextPrimary)
+
+                Text("You can explore this career now. Linking it to a canonical student plan will be available in the plan release.")
+                    .font(.tmiCaption)
+                    .foregroundColor(.tmiTextSecondary)
             }
-        }) {
-            HStack {
-                if isCreatingPlan {
-                    ProgressView()
-                        .tint(.white)
-                } else {
-                    Image(systemName: "sparkles")
-                    Text("Create My Plan")
-                        .fontWeight(.semibold)
-                }
-            }
-            .font(.tmiBody)
-            .foregroundColor(Color.tmiTextPrimary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, TMISpacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: TMIRadius.md)
-                    .fill(Color(hex: career.color))
-            )
         }
-        .buttonStyle(.plain)
-        .disabled(isCreatingPlan)
-        .alert("Plan Created!", isPresented: $showingPlanCreated) {
-            Button("Done", role: .cancel) {
-                dismiss()
-            }
-        } message: {
-            Text("Your TMI Plan for \(career.title) has been created successfully! Go to the TMI Plans tab to view and edit your new plan.")
+        .padding(TMISpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.tmiSurface)
+        .clipShape(RoundedRectangle(cornerRadius: TMIRadius.md))
+        .overlay {
+            RoundedRectangle(cornerRadius: TMIRadius.md)
+                .stroke(Color.tmiSecondary.opacity(0.35), lineWidth: 1)
         }
-        .alert("Error Creating Plan", isPresented: $showingError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(errorMessage)
-        }
-    }
-
-    // MARK: - Plan Creation
-
-    @MainActor
-    private func createPlanFromCareer() async {
-        guard let studentId = studentId else { return }
-        isCreatingPlan = true
-        defer { isCreatingPlan = false }
-
-        do {
-            guard let userId = Auth.auth().currentUser?.uid else {
-                errorMessage = "You must be signed in to create a plan"
-                showingError = true
-                print("[CareerPlan] No authenticated user")
-                return
-            }
-
-            guard let membership = authStateModel.currentMembership,
-                  membership.userID == userId else {
-                errorMessage = "We couldn’t verify your organization access."
-                showingError = true
-                return
-            }
-
-            let db = Firestore.firestore()
-
-            // Try to fetch the student
-            print("[CareerPlan] Attempting to fetch student with ID: \(studentId)")
-            var students: [Student] = []
-
-            let studentDoc = try await db.collection("users")
-                .document(userId)
-                .collection("students")
-                .document(studentId)
-                .getDocument()
-
-            if let student = try? studentDoc.decodedModel(
-                as: Student.self,
-                assigningDocumentIDTo: \.id
-            ) {
-                students = [student]
-                print("[CareerPlan] Found student: \(student.name)")
-            } else {
-                print("[CareerPlan] ⚠️ Student not found, creating plan without student")
-            }
-
-            // Create TMI Plan from career with Phase 1 fields
-            let now = Date()
-            let newPlan = TMIPlan(
-                title: "\(career.title) Career Plan",
-                description: "Career exploration plan for \(career.title)",
-                students: students,
-                model: career.pathway?.tmiModules.first ?? .chaseYourSpace,
-                interests: [],
-                startDate: now,
-                endDate: nil,
-                creationDate: now,
-                lastUpdated: now,
-                goals: createGoalsFromCareer(),
-                progress: 0.0,
-                notes: "",
-                strategies: createStrategiesFromCareer(),
-                createdBy: userId,
-                resources: [],
-                districtId: membership.districtID,
-                assignedCounselorId: userId // Creator is initially assigned
-            )
-
-            // Save via TMIPlanService (handles both user-scoped for backwards compatibility)
-            print("[CareerPlan] Saving plan via TMIPlanService...")
-            let savedPlan = try await TMIPlanService.shared.addPlan(newPlan)
-            
-            print("[CareerPlan] ✅ Successfully saved plan with ID: \(savedPlan.id ?? "unknown")")
-            
-            // Save student's career interest state
-            try await StudentCareerService.shared.addCareer(
-                studentId: studentId,
-                careerId: career.id.uuidString,
-                status: .exploring,
-                progress: 0.0,
-                isFavorite: true
-            )
-            print("[CareerPlan] ✅ Saved student career state for \(career.title)")
-
-            // Notify other views that a new plan was created
-            NotificationCenter.default.post(name: NSNotification.Name("TMIPlanCreated"), object: nil)
-
-            // Success feedback
-            showingPlanCreated = true
-
-        } catch {
-            errorMessage = "Failed to create plan: \(error.localizedDescription)"
-            showingError = true
-            print("[CareerPlan] ❌ Error creating plan: \(error)")
-        }
+        .accessibilityElement(children: .combine)
     }
 
     private func createGoalsFromCareer() -> [Goal] {

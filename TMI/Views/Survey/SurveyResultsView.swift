@@ -19,11 +19,9 @@ struct SurveyResultsView: View {
     @State private var analyzedClusters: [InterestCluster] = []
     @State private var topInterests: [String] = []
     @State private var careerMatches: [CareerMatchResult] = []
-    @State private var isSaving = false
+    @State private var isSaving = true
     @State private var saveError: String?
     @State private var showingCareerExploration = false
-    @State private var showingAddInterests = false
-    @State private var currentStudent: Student?
 
     var body: some View {
         ZStack {
@@ -32,9 +30,16 @@ struct SurveyResultsView: View {
 
             ScrollView {
                 VStack(spacing: TMISpacing.xl) {
-                    // Header
-                    celebrationHeader
-                        .padding(.top, TMISpacing.xl)
+                    if let saveError {
+                        surveyFailureHeader(saveError)
+                            .padding(.top, TMISpacing.xl)
+                    } else if isSaving {
+                        surveySavingHeader
+                            .padding(.top, TMISpacing.xl)
+                    } else {
+                        celebrationHeader
+                            .padding(.top, TMISpacing.xl)
+                    }
 
                     // Interest Clusters
                     if !analyzedClusters.isEmpty {
@@ -63,15 +68,6 @@ struct SurveyResultsView: View {
         .onAppear {
             analyzeSurveyResponses()
             saveSurveyToFirebase()
-            // Trigger confetti after slight delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                showConfetti = true
-                TMIHaptics.mediumImpact()
-            }
-            // Stop confetti after 3 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.3) {
-                showConfetti = false
-            }
         }
     }
 
@@ -92,7 +88,7 @@ struct SurveyResultsView: View {
             }
 
             // Title
-            Text("You did it!")
+            Text("Survey saved")
                 .font(.system(size: 32, weight: .bold))
                 .foregroundColor(.tmiTextPrimary)
 
@@ -107,6 +103,43 @@ struct SurveyResultsView: View {
                     .foregroundColor(.tmiTextSecondary)
             }
         }
+    }
+
+    private var surveySavingHeader: some View {
+        VStack(spacing: TMISpacing.lg) {
+            ProgressView()
+                .controlSize(.large)
+                .tint(.tmiSecondary)
+
+            Text("Saving survey")
+                .font(.system(size: 32, weight: .bold))
+                .foregroundColor(.tmiTextPrimary)
+
+            Text("Keep this screen open while your responses are saved.")
+                .font(.tmiBody)
+                .foregroundColor(.tmiTextSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, TMISpacing.screenPadding)
+    }
+
+    private func surveyFailureHeader(_ saveError: String) -> some View {
+        VStack(spacing: TMISpacing.lg) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(.orange)
+
+            Text("Survey not saved")
+                .font(.system(size: 32, weight: .bold))
+                .foregroundStyle(Color.tmiTextPrimary)
+
+            Text(saveError)
+                .font(.tmiBody)
+                .foregroundStyle(Color.tmiTextSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, TMISpacing.screenPadding)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Interest Clusters
@@ -258,40 +291,13 @@ struct SurveyResultsView: View {
                     }
                 }
 
-                // Add More Interests button
-                if let student = currentStudent {
-                    Button(action: {
-                        showingAddInterests = true
-                    }) {
-                        HStack {
-                            Image(systemName: "plus.circle.fill")
-                            Text("Add More Interests")
-                                .fontWeight(.semibold)
-                        }
-                        .font(.tmiBody)
-                        .foregroundColor(.tmiPrimary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, TMISpacing.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: TMIRadius.md)
-                                .fill(Color.tmiPrimary.opacity(0.1))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: TMIRadius.md)
-                                        .stroke(Color.tmiPrimary, lineWidth: 2)
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .sheet(isPresented: $showingAddInterests) {
-                        NavigationStack {
-                            AddInterestToStudentView(student: student) { updatedStudent in
-                                currentStudent = updatedStudent
-                                showingAddInterests = false
-                            }
-                        }
-                        .tmiSheetStyle()
-                    }
-                }
+                Label(
+                    "Adding more interests will be available when Student Mode is ready.",
+                    systemImage: "plus.circle.dashed"
+                )
+                .font(.tmiCaption)
+                .foregroundColor(.tmiTextSecondary)
+                .multilineTextAlignment(.center)
 
                 Button(action: {
                     // Call dismiss callback if provided, otherwise use environment dismiss
@@ -397,6 +403,8 @@ struct SurveyResultsView: View {
 
     private func saveSurveyToFirebase() {
         isSaving = true
+        saveError = nil
+        showConfetti = false
 
         Task {
             do {
@@ -436,14 +444,14 @@ struct SurveyResultsView: View {
                     dreamJob: extractDreamJob()
                 )
 
-                // Fetch the updated student to enable "Add More Interests" button
-                let studentService = StudentService()
-                let student = try await studentService.getStudent(by: studentId)
-
                 await MainActor.run {
                     careerMatches = matches
-                    currentStudent = student
                     isSaving = false
+                    showConfetti = true
+                    TMIHaptics.mediumImpact()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        self.showConfetti = false
+                    }
                 }
 
                 print("[DATA] Survey saved to both survey service and edge collection for student: \(studentId)")

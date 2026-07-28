@@ -30,8 +30,16 @@ export async function reconcileMigrationPlan(
 ): Promise<ReconciliationReport> {
   const mismatches: string[] = [];
   let foundCount = 0;
+  const destinationPaths = new Set<string>();
 
   for (const write of plan.writes) {
+    if (destinationPaths.has(write.manifest.destinationPath)) {
+      mismatches.push(
+        `duplicate destination: ${write.manifest.destinationPath}`,
+      );
+      continue;
+    }
+    destinationPaths.add(write.manifest.destinationPath);
     const actual = await store.read(write.manifest.destinationPath);
     if (actual === null) {
       mismatches.push(`missing destination: ${write.manifest.destinationPath}`);
@@ -49,6 +57,7 @@ export async function reconcileMigrationPlan(
   }
 
   await reconcilePlanReferences(plan, store, mismatches);
+  await reconcileStudentAssignments(plan, store, mismatches);
   mismatches.sort((left, right) => left.localeCompare(right));
   return {
     expectedCount: plan.writes.length,
@@ -65,11 +74,17 @@ function reconcileRequiredFields(
   mismatches: string[],
 ): void {
   const legacyID = write.manifest.sourcePath.split("/").at(-1);
+  const verifiesCanonicalSource =
+    write.manifest.sourcePath === write.manifest.destinationPath;
   const expectedFields: Readonly<Record<string, unknown>> = {
-    migrationId: plan.migrationId,
-    legacyPath: write.manifest.sourcePath,
-    legacyId: legacyID,
-    checksum: write.manifest.checksum,
+    ...(verifiesCanonicalSource
+      ? {}
+      : {
+          migrationId: plan.migrationId,
+          legacyPath: write.manifest.sourcePath,
+          legacyId: legacyID,
+          checksum: write.manifest.checksum,
+        }),
     schemaVersion: write.manifest.schemaVersion,
     createdAt: write.data.createdAt,
     createdBy: write.data.createdBy,
@@ -125,11 +140,16 @@ function reconcileTenantOwnership(
   }
   const segments = write.manifest.destinationPath.split("/");
   const districtID = segments[1];
+  const collection = segments[2];
+  const actualDistrictID =
+    collection === "members" ? actual.districtID : actual.districtId;
   if (
     segments.length !== 4 ||
     segments[0] !== "districts" ||
-    (segments[2] !== "students" && segments[2] !== "plans") ||
-    actual.districtId !== districtID
+    (collection !== "students" &&
+      collection !== "plans" &&
+      collection !== "members") ||
+    actualDistrictID !== districtID
   ) {
     mismatches.push(
       `tenant ownership mismatch: ${write.manifest.destinationPath}`,
@@ -169,6 +189,95 @@ async function reconcilePlanReferences(
       if ((await store.read(studentPath)) === null) {
         mismatches.push(
           `broken student reference (${studentID}): ${write.manifest.destinationPath}`,
+        );
+      }
+    }
+  }
+}
+
+async function reconcileStudentAssignments(
+  plan: MigrationPlan,
+  store: MigrationStore,
+  mismatches: string[],
+): Promise<void> {
+  for (const write of plan.writes) {
+    const segments = write.manifest.destinationPath.split("/");
+    if (
+      write.manifest.ownerResolution !== "mapped" ||
+      segments[2] !== "students"
+    ) {
+      continue;
+    }
+    const districtID = segments[1] ?? "";
+    const studentID = segments[3] ?? "";
+    const assignedMemberIDs = write.data.assignedMemberIDs;
+    if (
+      !Array.isArray(assignedMemberIDs) ||
+      !assignedMemberIDs.every((value) => typeof value === "string")
+    ) {
+      mismatches.push(
+        `malformed assigned members: ${write.manifest.destinationPath}`,
+      );
+      continue;
+    }
+    for (const memberID of assignedMemberIDs) {
+      const memberPath = `districts/${districtID}/members/${memberID}`;
+      const member = await store.read(memberPath);
+      if (member === null) {
+        mismatches.push(
+          `missing assigned member (${memberID}): ${write.manifest.destinationPath}`,
+        );
+        continue;
+      }
+      const assignedStudentIDs = member.assignedStudentIDs;
+      if (
+        !Array.isArray(assignedStudentIDs) ||
+        !assignedStudentIDs.includes(studentID)
+      ) {
+        mismatches.push(
+          `missing student back-reference (${studentID}): ${memberPath}`,
+        );
+      }
+    }
+  }
+
+  for (const write of plan.writes) {
+    const segments = write.manifest.destinationPath.split("/");
+    if (
+      write.manifest.ownerResolution !== "mapped" ||
+      segments[2] !== "members"
+    ) {
+      continue;
+    }
+    const districtID = segments[1] ?? "";
+    const memberID = segments[3] ?? "";
+    const assignedStudentIDs = write.data.assignedStudentIDs;
+    if (
+      !Array.isArray(assignedStudentIDs) ||
+      !assignedStudentIDs.every((value) => typeof value === "string")
+    ) {
+      mismatches.push(
+        `malformed assigned students: ${write.manifest.destinationPath}`,
+      );
+      continue;
+    }
+    for (const studentID of assignedStudentIDs) {
+      const studentPath =
+        `districts/${districtID}/students/${studentID}`;
+      const student = await store.read(studentPath);
+      if (student === null) {
+        mismatches.push(
+          `missing assigned student (${studentID}): ${write.manifest.destinationPath}`,
+        );
+        continue;
+      }
+      const assignedMemberIDs = student.assignedMemberIDs;
+      if (
+        !Array.isArray(assignedMemberIDs) ||
+        !assignedMemberIDs.includes(memberID)
+      ) {
+        mismatches.push(
+          `missing member back-reference (${memberID}): ${studentPath}`,
         );
       }
     }
@@ -239,6 +348,14 @@ async function runCLI(): Promise<void> {
     mode = "firestore";
   } else {
     const memoryStore = new MemoryMigrationStore();
+    for (const write of plan.writes) {
+      if (write.manifest.sourcePath === write.manifest.destinationPath) {
+        await memoryStore.replaceForTesting(
+          write.manifest.destinationPath,
+          write.data,
+        );
+      }
+    }
     await applyMigrationPlan(plan, memoryStore);
     store = memoryStore;
     mode = "fixture";

@@ -365,15 +365,15 @@ git commit -m "feat: establish student operational hub"
 - Remove after migration: `TMI/StateModels/AddStudentStateModel.swift`
 - Modify: all remaining student callers found by `rg`
 
-- [ ] **Step 1: Add roster migration fixtures**
+- [x] **Step 1: Add roster migration fixtures**
 
 Include user-scoped, top-level, already-canonical, duplicate-ID, missing-district, archived, and cross-reference cases. Expected canonical destination is always `districts/{districtId}/students/{studentId}`.
 
-- [ ] **Step 2: Run dry-run, apply twice, and reconcile**
+- [x] **Step 2: Run dry-run, apply twice, and reconcile**
 
 Expected: first apply writes declared records; second apply writes zero; unresolved owners quarantine; reconciliation is zero.
 
-- [ ] **Step 3: Freeze and remove legacy writers**
+- [x] **Step 3: Freeze and remove legacy writers**
 
 ```bash
 rg -n 'StudentService|users/.*/students|collection\("students"\)' TMI
@@ -381,7 +381,7 @@ rg -n 'StudentService|users/.*/students|collection\("students"\)' TMI
 
 Migrate every production caller to `StudentRepository`; then remove old service/state files. Keep the migration reader only in `TMI/Migration`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A TMI firebase

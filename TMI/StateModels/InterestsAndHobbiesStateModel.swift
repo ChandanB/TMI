@@ -18,8 +18,6 @@ import SwiftUI
 final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesData, IdentifiableError> {
     // MARK: - Dependencies
     private let interestLibraryService = InterestLibraryService.shared
-    private let studentInterestService = StudentInterestService.shared
-    private let studentService = StudentService()
     private let tmiPlanService = TMIPlanService.shared
 
     // MARK: - Fetch Guard
@@ -256,13 +254,10 @@ final class InterestsAndHobbiesStateModel: BaseStateModel<InterestsAndHobbiesDat
     @MainActor
     func fetchAssociatedData(for interest: Interest) async -> InterestAssociatedData {
         do {
-            async let studentsTask = studentService.fetchStudentsWithInterest(interest)
-            async let plansTask = tmiPlanService.fetchPlansWithInterest(interest)
-            
-            let (students, plans) = try await (studentsTask, plansTask)
-            
+            let plans = try await tmiPlanService.fetchPlansWithInterest(interest)
+
             return InterestAssociatedData(
-                associatedStudents: students,
+                associatedStudents: [],
                 connectedTMIPlans: plans,
                 engagementMetrics: nil
             )
@@ -353,32 +348,6 @@ struct InterestsAndHobbiesData: Equatable {
 }
 
 // InterestAssociatedData and HobbyAssociatedData are defined in InterestsAndHobbiesHelpers.swift
-
-// MARK: - Service Extensions
-
-extension StudentService {
-    func fetchStudentsWithInterest(_ interest: Interest) async throws -> [Student] {
-        guard let interestId = interest.id else { return [] }
-        
-        do {
-            // Use StudentInterestService to get IDs of students with this interest using Collection Group Query
-            let studentIds = try await StudentInterestService.shared.getStudentIdsWithInterest(interestId: interestId)
-            
-            guard !studentIds.isEmpty else { return [] }
-            
-            // Fetch students using these IDs
-            let allStudents = try await fetchStudents()
-            return allStudents.filter { student in
-                guard let sid = student.id else { return false }
-                return studentIds.contains(sid)
-            }
-        } catch {
-            print("Error fetching students with interest: \(error)")
-            return []
-        }
-    }
-    
-}
 
 extension TMIPlanService {
     func fetchPlansWithInterest(_ interest: Interest) async throws -> [TMIPlan] {

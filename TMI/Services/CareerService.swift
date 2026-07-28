@@ -292,55 +292,22 @@ final class CareerService: @unchecked Sendable {
 
     /// Save a career to a student's savedCareers subcollection
     func saveCareer(career: Career, for studentId: String) async throws {
-        guard let currentUser = Auth.auth().currentUser else {
-            throw CareerServiceError.userNotAuthenticated
-        }
-
-        let collection = firestore
-            .collection(FirestoreCollection.users.rawValue)
-            .document(currentUser.uid)
-            .collection("students")
-            .document(studentId)
-            .collection("savedCareers")
-
-        let docId = career.id ?? career.title
-        try await collection.document(docId).setModel(career)
+        _ = career
+        _ = studentId
+        throw CareerServiceError.featureUnavailable
     }
 
     /// Fetch careers saved for a specific student
     func fetchSavedCareers(for studentId: String) async throws -> [Career] {
-        guard let currentUser = Auth.auth().currentUser else {
-            throw CareerServiceError.userNotAuthenticated
-        }
-
-        let collection = firestore
-            .collection(FirestoreCollection.users.rawValue)
-            .document(currentUser.uid)
-            .collection("students")
-            .document(studentId)
-            .collection("savedCareers")
-
-        let snapshot = try await collection.getDocuments()
-        return try snapshot.documents.compactMap { document in
-            try document.data(as: Career.self)
-        }
+        _ = studentId
+        throw CareerServiceError.featureUnavailable
     }
 
     /// Remove a saved career from a student's savedCareers subcollection
     func removeSavedCareer(careerId: String, for studentId: String) async throws {
-        guard let currentUser = Auth.auth().currentUser else {
-            throw CareerServiceError.userNotAuthenticated
-        }
-
-        let document = firestore
-            .collection(FirestoreCollection.users.rawValue)
-            .document(currentUser.uid)
-            .collection("students")
-            .document(studentId)
-            .collection("savedCareers")
-            .document(careerId)
-
-        try await document.delete()
+        _ = careerId
+        _ = studentId
+        throw CareerServiceError.featureUnavailable
     }
 
     // MARK: - Firebase: Exploration Tracking
@@ -535,6 +502,7 @@ extension CareerService {
         case invalidCareerData
         case fetchFailed(String)
         case saveFailed(String)
+        case featureUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -548,6 +516,8 @@ extension CareerService {
                 return "Failed to fetch career data: \(message)"
             case .saveFailed(let message):
                 return "Failed to save career data: \(message)"
+            case .featureUnavailable:
+                return "Saved student careers will be available after the Release 2 data migration."
             }
         }
     }

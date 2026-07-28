@@ -13,7 +13,7 @@ import SwiftUI
 struct MVPEmptyStateCopyTests {
     @Test("MVP empty states guide users into the core workflow")
     func testMVPCopySupportsCoreWorkflow() {
-        #expect(MVPEmptyStateCopy.dashboardActivityTitle == "Start the core loop")
+        #expect(MVPEmptyStateCopy.dashboardActivityTitle == "Roster activity will appear here")
         #expect(MVPEmptyStateCopy.dashboardActivityMessage.localizedCaseInsensitiveContains("add a student"))
         #expect(MVPEmptyStateCopy.studentInterestsTitle == "Discover what motivates this student")
         #expect(MVPEmptyStateCopy.studentPlansTitle == "Turn interests into a support plan")

@@ -9,8 +9,6 @@
 import SwiftUI
 
 struct ConsentManagementView: View {
-    @Environment(\.authStateModel) private var authState
-
     @State private var students: [Student] = []
     @State private var consentSummaries: [String: ConsentSummary] = [:] // studentId -> ConsentSummary
     @State private var isLoading = false
@@ -18,8 +16,6 @@ struct ConsentManagementView: View {
     @State private var selectedFilter: ConsentFilter = .all
     @State private var selectedStudent: Student?
     @State private var showingConsentDetail = false
-
-    private let complianceService = ComplianceService.shared
 
     enum ConsentFilter: String, CaseIterable {
         case all = "All Students"
@@ -97,37 +93,10 @@ struct ConsentManagementView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Search bar
-            searchBar
-
-            // Filter chips
-            filterChips
-
-            // Statistics
-            statisticsSection
-
-            // Students list
-            if isLoading {
-                loadingView
-            } else if filteredStudents.isEmpty {
-                emptyView
-            } else {
-                studentsList
-            }
-        }
+        unavailableView
         .background(TMIBackgroundView(variant: .base).ignoresSafeArea())
         .navigationTitle("Consent Management")
         .navigationBarTitleDisplayMode(.large)
-        .task {
-            await loadData()
-        }
-        .sheet(isPresented: $showingConsentDetail) {
-            if let student = selectedStudent {
-                StudentConsentDetailView(student: student)
-                    .tmiSheetStyle()
-            }
-        }
     }
 
     // MARK: - Search Bar
@@ -288,39 +257,23 @@ struct ConsentManagementView: View {
         .padding(40)
     }
 
-    // MARK: - Actions
+    private var unavailableView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(Color.tmiTextTertiary)
 
-    @MainActor
-    private func loadData() async {
-        isLoading = true
-        defer { isLoading = false }
+            Text("Consent Management Is Unavailable")
+                .font(.title2.bold())
+                .foregroundStyle(Color.tmiTextPrimary)
 
-        // Load students
-        guard authState.currentUser?.userID != nil else {
-            print("[ConsentManagementView] ⚠️ No user ID")
-            return
+            Text("Consent management will be enabled after its district-scoped student records are ready.")
+                .font(.body)
+                .foregroundStyle(Color.tmiTextSecondary)
+                .multilineTextAlignment(.center)
         }
-
-        do {
-            // Fetch students from Firestore
-            students = try await StudentService.shared.fetchStudents()
-
-            // Fetch consent summaries for each student
-            for student in students {
-                guard let studentId = student.id else { continue }
-
-                do {
-                    let summary = try await complianceService.getConsentSummary(studentId: studentId)
-                    consentSummaries[studentId] = summary
-                } catch {
-                    print("[ConsentManagementView] ⚠️ Failed to load consent for \(student.name): \(error)")
-                }
-            }
-
-            print("[ConsentManagementView] ✅ Loaded \(students.count) students with consent data")
-        } catch {
-            print("[ConsentManagementView] ❌ Failed to load data: \(error)")
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(40)
     }
 }
 
@@ -811,12 +764,6 @@ private struct GrantConsentView: View {
             errorMessage = "Failed to grant consent: \(error.localizedDescription)"
         }
     }
-}
-
-// MARK: - Student Service Extension
-
-extension StudentService {
-    static let shared = StudentService()
 }
 
 // MARK: - Preview

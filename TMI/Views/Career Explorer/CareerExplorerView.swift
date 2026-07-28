@@ -2065,71 +2065,26 @@ struct StudentPickerSheet: View {
   @Binding var selectedStudent: Student?
   let onStudentSelected: (Student) -> Void
   @Environment(\.dismiss) private var dismiss
-  @State private var studentService = StudentService()
-  @State private var students: [Student] = []
-  @State private var isLoading = false
   
   var body: some View {
-    NavigationView {
+    NavigationStack {
       ZStack {
         TMIBackgroundView(variant: .base)
-        
-        if isLoading {
-          VStack {
-            ProgressView()
-              .scaleEffect(1.5)
-              .foregroundColor(Color.tmiTextPrimary)
-            Text("Loading Students...")
-              .foregroundColor(Color.tmiTextSecondary)
-              .padding(.top)
-          }
-        } else if students.isEmpty {
-          VStack(spacing: 20) {
-            Image(systemName: "person.3")
-              .font(.system(size: 50))
-              .foregroundColor(Color.tmiTextTertiary)
-            
-            Text("No Students Available")
-              .font(.title2)
-              .foregroundColor(Color.tmiTextPrimary)
-            
-            Text("Add students first to get personalized career recommendations")
-              .font(.body)
-              .foregroundColor(Color.tmiTextSecondary)
-              .multilineTextAlignment(.center)
-              .padding(.horizontal)
-          }
-        } else {
-          ScrollView {
-            LazyVStack(spacing: 12) {
-              ForEach(students) { student in
-                Button {
-                  onStudentSelected(student)
-                } label: {
-                  HStack {
-                    VStack(alignment: .leading) {
-                      Text(student.name)
-                        .font(.headline)
-                        .foregroundColor(Color.tmiTextPrimary)
-                      Text(student.grade)
-                        .font(.caption)
-                        .foregroundColor(Color.tmiTextSecondary)
-                    }
-                    Spacer()
-                    Image(systemName: "arrow.right.circle")
-                      .foregroundColor(.tmiSecondary)
-                  }
-                  .padding()
-                  .background(
-                    RoundedRectangle(cornerRadius: 12)
-                      .fill(Color.white.opacity(0.1))
-                  )
-                }
-                .buttonStyle(ScaleButtonStyle())
-              }
-            }
-            .padding()
-          }
+
+        VStack(spacing: 20) {
+          Image(systemName: "person.crop.circle.badge.clock")
+            .font(.system(size: 50))
+            .foregroundColor(Color.tmiTextTertiary)
+
+          Text("Student Recommendations Are Unavailable")
+            .font(.title2)
+            .foregroundColor(Color.tmiTextPrimary)
+
+          Text("Student-specific career recommendations will be available after Discovery is enabled.")
+            .font(.body)
+            .foregroundColor(Color.tmiTextSecondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
         }
       }
       .navigationTitle("Select Student")
@@ -2142,15 +2097,6 @@ struct StudentPickerSheet: View {
           .foregroundColor(Color.tmiTextPrimary)
         }
       }
-    }
-    .task {
-      isLoading = true
-      do {
-        students = try await studentService.fetchStudents()
-      } catch {
-        print("Failed to load students: \(error)")
-      }
-      isLoading = false
     }
   }
 }

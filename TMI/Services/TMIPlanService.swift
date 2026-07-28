@@ -18,11 +18,15 @@ class TMIPlanService {
     private let db = Firestore.firestore()
     private let authorizationSessions: any AuthorizationSessionProviding
     private let authorization = RBACService()
+    private let studentRepository: any StudentRepository
 
     init(
-        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared
+        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared,
+        studentRepository: (any StudentRepository)? = nil
     ) {
         self.authorizationSessions = authorizationSessions
+        self.studentRepository = studentRepository
+            ?? CanonicalStudentRepository.firebase()
     }
 
     /// Get the user-scoped TMI plans collection
@@ -1078,12 +1082,16 @@ class TMIPlanService {
             throw TMIPlanServiceError.authorizationDenied
         }
 
-        let studentService = StudentService(
-            authorizationSessions: authorizationSessions
-        )
+        let session = try authorizedSession()
         var canonicalStudents: [Student] = []
         for studentID in studentIDs {
-            guard let student = try await studentService.getStudent(by: studentID) else {
+            let record = try await studentRepository.student(
+                id: studentID,
+                member: session.membership
+            )
+            guard record.id == studentID,
+                  record.districtID == session.membership.districtID,
+                  let student = record.planStudentSnapshot() else {
                 throw TMIPlanServiceError.authorizationDenied
             }
             canonicalStudents.append(student)

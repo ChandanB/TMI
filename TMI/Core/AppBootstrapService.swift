@@ -81,10 +81,6 @@ final class AppBootstrapService {
             }
             
             group.addTask {
-                await self.primeStudentCache()
-            }
-
-            group.addTask {
                 await self.primePlanCache()
             }
 
@@ -169,20 +165,6 @@ final class AppBootstrapService {
     }
     
     // MARK: - Domain Caching
-    
-    private func primeStudentCache() async {
-        do {
-            let service = StudentService()
-            let students = try await service.fetchStudents()
-            
-            // Cache in the state model or local store
-            // The actual caching is handled by StudentListStateModel
-            print("[AppBootstrap] Primed student cache with \(students.count) students")
-        } catch {
-            bootstrapErrors["students"] = error
-            print("[AppBootstrap] Failed to prime student cache: \(error.localizedDescription)")
-        }
-    }
     
     private func primePlanCache() async {
         do {

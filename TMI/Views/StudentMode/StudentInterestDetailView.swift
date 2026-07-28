@@ -11,9 +11,7 @@ struct StudentInterestDetailView: View {
     let interest: Interest
     let currentStudent: Student
 
-    @State private var peersWithInterest: [Student] = []
-    @State private var isLoading = false
-    @Environment(\.dismiss) private var dismiss
+    private let peersWithInterest: [Student] = []
 
     var body: some View {
         ZStack {
@@ -28,7 +26,7 @@ struct StudentInterestDetailView: View {
                     // Classmates Section
                     if !peersWithInterest.isEmpty {
                         classmatesSection
-                    } else if !isLoading {
+                    } else {
                         emptyClassmatesSection
                     }
                 }
@@ -37,9 +35,6 @@ struct StudentInterestDetailView: View {
         }
         .navigationTitle(interest.name)
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await loadPeersWithInterest()
-        }
     }
 
     // MARK: - Interest Header
@@ -144,16 +139,16 @@ struct StudentInterestDetailView: View {
     private var emptyClassmatesSection: some View {
         TMICard(style: .default) {
             VStack(spacing: TMISpacing.md) {
-                Image(systemName: "person.crop.circle.badge.questionmark")
+                Image(systemName: "person.2.fill")
                     .font(.system(size: 50))
                     .foregroundColor(.tmiTextTertiary)
 
                 VStack(spacing: 8) {
-                    Text("You're the First!")
+                    Text("Classmate Connections Are Coming")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(Color.tmiTextPrimary)
 
-                    Text("None of your classmates have shared this interest yet. You're a pioneer!")
+                    Text("Your interest is saved. Classmate connections will appear when Student Mode is ready.")
                         .font(.system(size: 14))
                         .foregroundColor(.tmiTextSecondary)
                         .multilineTextAlignment(.center)
@@ -163,46 +158,6 @@ struct StudentInterestDetailView: View {
         }
     }
 
-    // MARK: - Helpers
-
-    // MARK: - Helpers
-
-    private func loadPeersWithInterest() async {
-        isLoading = true
-        defer { isLoading = false }
-        
-        guard let interestId = interest.id, let currentStudentId = currentStudent.id else {
-            print("Missing interest ID or student ID")
-            return
-        }
-
-        do {
-            // Fetch IDs of students who have this interest
-            let peerIds = try await StudentInterestService.shared.getStudentIdsWithInterest(interestId: interestId)
-            
-            // Filter out current student
-            let filteredIds = peerIds.filter { $0 != currentStudentId }
-            
-            guard !filteredIds.isEmpty else {
-                peersWithInterest = []
-                return
-            }
-            
-            // Fetch full student objects
-            // Optimized: Fetch all students once then filter locally (assuming dataset is small)
-            // Ideally: StudentService would support batch fetch by IDs
-            let allStudents = try await StudentService().fetchStudents()
-            peersWithInterest = allStudents.filter { student in
-                guard let sid = student.id else { return false }
-                return filteredIds.contains(sid)
-            }
-            
-        } catch {
-            print("Error loading peers: \(error)")
-            // Fallback to empty list
-            peersWithInterest = []
-        }
-    }
 }
 
 // MARK: - Peer Row

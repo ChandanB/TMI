@@ -321,96 +321,16 @@ final class SurveyService {
     for studentId: String,
     duration: TimeInterval
   ) async throws -> SurveyResponse {
-    guard let currentUser = Auth.auth().currentUser else {
-      throw SurveyServiceError.userNotAuthenticated
-    }
-
-    // Analyze responses to create interest clusters
-    let clusters = analyzeInterests(from: responses)
-    let topInterests = extractTopInterests(from: clusters)
-
-    // Convert clusters to actual Interest objects
-    let interests = convertClustersToInterests(clusters)
-
-    // Create survey response
-    let surveyResponse = SurveyResponse(
-      id: UUID(),
-      studentId: studentId,
-      responses: responses,
-      interestClusters: clusters,
-      topInterests: topInterests,
-      completedAt: Date(),
-      completionTime: duration
-    )
-
-    let userID = currentUser.uid
-    try await withTimeout(seconds: 10) { @MainActor @Sendable in
-      let docRef = self.firestore
-        .collection(FirestoreCollection.users.rawValue).document(userID)
-        .collection(FirestoreCollection.students.rawValue).document(studentId)
-        .collection("interestSurveys").document(surveyResponse.id.uuidString)
-
-      try await docRef.setData(surveyResponse.toFirestoreData())
-
-      let studentRef = self.firestore
-        .collection(FirestoreCollection.users.rawValue).document(userID)
-        .collection(FirestoreCollection.students.rawValue).document(studentId)
-
-      try await studentRef.updateData([
-        "latestSurveyId": surveyResponse.id.uuidString,
-        "lastSurveyDate": Timestamp(date: surveyResponse.completedAt),
-        "interestClusters": clusters.map { $0.toFirestoreData() },
-        "topInterests": topInterests
-      ])
-    }
-
-    print("[SurveyService] ✅ Survey saved with \(interests.count) interests for student: \(studentId)")
-
-    // Phase 0.2: Synchronize interests to StudentInterestService edge collection
-    // This ensures interests are stored in the proper location (/students/{id}/studentInterests/)
-    do {
-      // Build results map: [interestId: level]
-      let results = Dictionary(uniqueKeysWithValues: interests.map { interest in
-        // Calculate level (1-5) from interest weight or use default
-        let level = 5 // Surveys don't have levels yet, default to high affinity
-        return (interest.id ?? UUID().uuidString, level)
-      })
-
-      try await StudentInterestService.shared.saveSurveyResults(
-        studentId: studentId,
-        results: results
-      )
-      print("[SurveyService] ✅ Synchronized \(interests.count) interests to edge collection")
-    } catch {
-      print("[SurveyService] ⚠️ Failed to synchronize interests: \(error)")
-      // Don't throw - survey is still saved, just interests sync failed
-    }
-
-    return surveyResponse
+    _ = responses
+    _ = studentId
+    _ = duration
+    throw SurveyServiceError.studentSurveyPersistenceUnavailable
   }
 
   /// Fetch latest interest survey for student
   func fetchLatestStudentSurvey(for studentId: String) async throws -> SurveyResponse? {
-    guard let currentUser = Auth.auth().currentUser else {
-      throw SurveyServiceError.userNotAuthenticated
-    }
-
-    let userID = currentUser.uid
-    return try await withTimeout(seconds: 10) { @MainActor @Sendable in
-      let querySnapshot = try await self.firestore
-        .collection(FirestoreCollection.users.rawValue).document(userID)
-        .collection(FirestoreCollection.students.rawValue).document(studentId)
-        .collection("interestSurveys")
-        .order(by: "completedAt", descending: true)
-        .limit(to: 1)
-        .getDocuments()
-
-      guard let document = querySnapshot.documents.first else {
-        return nil
-      }
-
-      return try document.data(as: SurveyResponse.self)
-    }
+    _ = studentId
+    throw SurveyServiceError.studentSurveyPersistenceUnavailable
   }
 
   /// Get career matches for student based on latest survey
@@ -592,49 +512,8 @@ final class SurveyService {
 
   /// Archive the latest survey for a student (for retake functionality)
   func archiveLatestSurvey(studentId: String) async throws {
-    guard let currentUser = Auth.auth().currentUser else {
-      throw SurveyServiceError.userNotAuthenticated
-    }
-
-    print("[SurveyService] Archiving latest survey for student \(studentId)")
-
-    do {
-      // Get the student's latest survey
-      let surveyRef = firestore
-        .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
-        .collection(FirestoreCollection.students.rawValue).document(studentId)
-        .collection("interestSurveys")
-        .order(by: "completedAt", descending: true)
-        .limit(to: 1)
-
-      let snapshot = try await surveyRef.getDocuments()
-
-      guard let latestSurvey = snapshot.documents.first else {
-        print("[SurveyService] No survey found to archive")
-        return
-      }
-
-      // Mark as archived by updating status
-      try await latestSurvey.reference.updateData([
-        "archived": true,
-        "archivedAt": Timestamp(date: Date())
-      ])
-
-      // Clear the student's latestSurveyId field
-      let studentRef = firestore
-        .collection(FirestoreCollection.users.rawValue).document(currentUser.uid)
-        .collection(FirestoreCollection.students.rawValue).document(studentId)
-
-      try await studentRef.updateData([
-        "latestSurveyId": FieldValue.delete(),
-        "lastSurveyDate": FieldValue.delete()
-      ])
-
-      print("[SurveyService] Successfully archived survey \(latestSurvey.documentID)")
-    } catch {
-      print("[SurveyService] Error archiving survey: \(error.localizedDescription)")
-      throw SurveyServiceError.deleteFailed(error.localizedDescription)
-    }
+    _ = studentId
+    throw SurveyServiceError.studentSurveyPersistenceUnavailable
   }
 
   private func decodeSurvey(_ document: DocumentSnapshot) throws -> Survey {
@@ -664,6 +543,7 @@ extension SurveyService {
     case fetchFailed(String)
     case updateFailed(String)
     case deleteFailed(String)
+    case studentSurveyPersistenceUnavailable
 
     var errorDescription: String? {
       switch self {
@@ -683,6 +563,8 @@ extension SurveyService {
         return "Failed to update survey: \(message)"
       case .deleteFailed(let message):
         return "Failed to delete survey: \(message)"
+      case .studentSurveyPersistenceUnavailable:
+        return "Student survey saving is unavailable until canonical survey storage is released."
       }
     }
   }

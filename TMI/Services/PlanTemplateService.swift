@@ -16,11 +16,15 @@ final class PlanTemplateService {
     private let db = Firestore.firestore()
     private let authorizationSessions: any AuthorizationSessionProviding
     private let authorization = RBACService()
+    private let studentRepository: any StudentRepository
 
     init(
-        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared
+        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared,
+        studentRepository: (any StudentRepository)? = nil
     ) {
         self.authorizationSessions = authorizationSessions
+        self.studentRepository = studentRepository
+            ?? CanonicalStudentRepository.firebase()
     }
 
     // MARK: - Fetch Operations
@@ -217,11 +221,11 @@ final class PlanTemplateService {
         }
 
         let session = try authorizedSession()
-        let studentService = StudentService(
-            authorizationSessions: authorizationSessions
+        let canonicalStudent = try await studentRepository.student(
+            id: studentID,
+            member: session.membership
         )
-        guard let canonicalStudent = try await studentService.getStudent(by: studentID),
-              let studentScope = StudentAuthorizationScope(student: canonicalStudent) else {
+        guard let studentScope = StudentAuthorizationScope(record: canonicalStudent) else {
             throw PlanTemplateError.studentNotFound
         }
 
@@ -246,11 +250,15 @@ final class PlanTemplateService {
         let goals = template.goalsTemplate.map {
             Goal(description: $0.title, notes: $0.description)
         }
+        guard let trustedStudentSnapshot =
+            canonicalStudent.planStudentSnapshot() else {
+            throw PlanTemplateError.studentNotFound
+        }
         let plan = TMIPlan(
             id: planID,
-            title: "\(template.title) - \(canonicalStudent.name)",
+            title: "\(template.title) - \(canonicalStudent.displayName)",
             description: template.description,
-            students: [canonicalStudent],
+            students: [trustedStudentSnapshot],
             model: template.model,
             interests: [],
             startDate: startDate,

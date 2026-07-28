@@ -1,0 +1,194 @@
+{
+  "migrationId": "release1-roster-v1",
+  "migrationTimestamp": "2026-07-20T12:00:00.000Z",
+  "schemaVersion": 1,
+  "ownership": {
+    "users/teacher-1": "district-a",
+    "students/student-top": "district-b",
+    "plans/plan-top": "district-b",
+    "students/student-duplicate": "district-a",
+    "students/student-conflict": "district-a",
+    "students/student-archived": "district-a",
+    "districts/district-a/schools/school-a": "district-a",
+    "districts/district-b/schools/school-b": "district-b"
+  },
+  "documents": [
+    {
+      "path": "users/teacher-1/students/student-user",
+      "data": {
+        "name": "User Scoped Student",
+        "districtId": "district-a",
+        "schoolId": "school-a",
+        "grade": "7"
+      }
+    },
+    {
+      "path": "users/teacher-1/tmiPlans/plan-user",
+      "data": {
+        "name": "User Scoped Plan",
+        "districtId": "district-a",
+        "schoolId": "school-a",
+        "schoolIDs": [
+          "school-a"
+        ],
+        "studentIDs": [
+          "student-user"
+        ],
+        "status": "draft"
+      }
+    },
+    {
+      "path": "students/student-top",
+      "data": {
+        "name": "Top Level Student",
+        "districtId": "district-b",
+        "schoolId": "school-b",
+        "grade": "9"
+      }
+    },
+    {
+      "path": "plans/plan-top",
+      "data": {
+        "name": "Top Level Plan",
+        "districtId": "district-b",
+        "schoolId": "school-b",
+        "schoolIDs": [
+          "school-b"
+        ],
+        "studentIDs": [
+          "student-top"
+        ],
+        "status": "submitted"
+      }
+    },
+    {
+      "path": "students/student-unresolved",
+      "data": {
+        "name": "Unresolved Student",
+        "districtId": "untrusted-legacy-value",
+        "schoolId": "school-unknown",
+        "grade": "8"
+      }
+    },
+    {
+      "path": "users/teacher-1/students/student-strict",
+      "data": {
+        "name": "  Ava   Stone  ",
+        "grade": " 7 ",
+        "school": "North School",
+        "schoolId": "school-a",
+        "studentID": " A-100 ",
+        "dateOfBirth": 1325376000,
+        "assignedCounselorId": "counselor-1",
+        "primaryTeacherId": "teacher-1",
+        "createdAt": 1704067200,
+        "createdBy": "teacher-1",
+        "updatedAt": 1704153600
+      }
+    },
+    {
+      "path": "districts/district-a/members/teacher-1",
+      "data": {
+        "districtID": "district-a",
+        "schoolIDs": [
+          "school-a"
+        ],
+        "role": "teacher",
+        "capabilities": [],
+        "assignedStudentIDs": [
+          "student-strict"
+        ],
+        "isActive": true,
+        "version": 1,
+        "schemaVersion": 1,
+        "recordVersion": 1,
+        "createdAt": "2026-07-01T12:00:00.000Z",
+        "createdBy": "migration-operator",
+        "updatedAt": "2026-07-15T12:00:00.000Z",
+        "updatedBy": "migration-operator"
+      }
+    },
+    {
+      "path": "districts/district-a/members/counselor-1",
+      "data": {
+        "districtID": "district-a",
+        "schoolIDs": [
+          "school-a"
+        ],
+        "role": "counselor",
+        "capabilities": [],
+        "assignedStudentIDs": [
+          "student-strict"
+        ],
+        "isActive": true,
+        "version": 1,
+        "schemaVersion": 1,
+        "recordVersion": 1,
+        "createdAt": "2026-07-01T12:00:00.000Z",
+        "createdBy": "migration-operator",
+        "updatedAt": "2026-07-15T12:00:00.000Z",
+        "updatedBy": "migration-operator"
+      }
+    },
+    {
+      "path": "districts/district-a/students/student-duplicate",
+      "data": {
+        "districtId": "district-a",
+        "schoolId": "school-a",
+        "displayName": "Canonical Student",
+        "normalizedDisplayName": "canonical student",
+        "grade": "8",
+        "studentIdentifier": "CAN-200",
+        "normalizedStudentIdentifier": "can-200",
+        "dateOfBirth": "2012-03-04T00:00:00.000Z",
+        "assignedMemberIDs": [],
+        "isArchived": false,
+        "schemaVersion": 1,
+        "recordVersion": 3,
+        "createdAt": "2026-07-01T12:00:00.000Z",
+        "createdBy": "teacher-1",
+        "updatedAt": "2026-07-15T12:00:00.000Z",
+        "updatedBy": "teacher-1"
+      }
+    },
+    {
+      "path": "students/student-duplicate",
+      "data": {
+        "name": "Stale Duplicate Copy",
+        "districtId": "district-a",
+        "schoolId": "school-a",
+        "grade": "8",
+        "studentID": "CAN-200"
+      }
+    },
+    {
+      "path": "students/student-release1-unresolved",
+      "data": {
+        "name": "Release 1 Unresolved Student",
+        "schoolId": "school-unknown",
+        "grade": "6"
+      }
+    },
+    {
+      "path": "students/student-conflict",
+      "data": {
+        "name": "Conflicting District Student",
+        "districtId": "district-b",
+        "schoolId": "school-a",
+        "grade": "10"
+      }
+    },
+    {
+      "path": "students/student-archived",
+      "data": {
+        "name": "Archived Student",
+        "districtId": "district-a",
+        "schoolId": "school-a",
+        "grade": "12",
+        "assignedMemberIDs": [],
+        "isArchived": true,
+        "recordVersion": 4
+      }
+    }
+  ]
+}

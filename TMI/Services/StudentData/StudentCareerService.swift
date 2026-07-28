@@ -28,6 +28,7 @@ final class StudentCareerService {
         case userNotAuthenticated
         case invalidStudentId
         case invalidCareerId
+        case featureUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -43,14 +44,17 @@ final class StudentCareerService {
                 return "Invalid student ID"
             case .invalidCareerId:
                 return "Invalid career ID"
+            case .featureUnavailable:
+                return "Student careers will be available after the Release 2 data migration."
             }
         }
     }
 
     // MARK: - Collection Access
 
-    private func studentCareersCollection(for studentId: String) -> CollectionReference {
-        db.collection("students").document(studentId).collection("careerState")
+    private func studentCareersCollection(for studentId: String) throws -> CollectionReference {
+        _ = studentId
+        throw StudentCareerError.featureUnavailable
     }
 
     // MARK: - Fetch Operations

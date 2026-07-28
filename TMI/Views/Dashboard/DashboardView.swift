@@ -17,9 +17,9 @@ import AppKit
 #endif
 
 nonisolated enum MVPEmptyStateCopy {
-  static let dashboardActivityTitle = "Start the core loop"
-  static let dashboardActivityMessage = "Add a student, capture interests, and create the first TMI plan to start showing activity here."
-  static let dashboardActivityAction = "Add Student"
+  static let dashboardActivityTitle = "Roster activity will appear here"
+  static let dashboardActivityMessage = "Add a student to begin your secure district roster."
+  static let dashboardActivityAction = "Open Students"
 
   static let studentInterestsTitle = "Discover what motivates this student"
   static let studentInterestsMessage = "Run the interest survey or add a few interests so you can build a plan from real student signals."
@@ -130,8 +130,7 @@ extension EnvironmentValues {
 @Observable
 final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError> {
   // MARK: - Dependencies
-  private let studentService = StudentService()
-  private let tmiPlanService = TMIPlanService.shared
+  private let studentRepository: any StudentRepository = CanonicalStudentRepository.firebase()
 
   // MARK: - Cancellables
   private var cancellables = Set<AnyCancellable>()
@@ -162,60 +161,36 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     updateState(.loading)
 
     do {
-      // Fetch live data from services
-      async let studentsTask = studentService.fetchStudents()
-      async let plansTask = tmiPlanService.fetchPlans()
+      guard let membership else {
+        throw StudentRepositoryError.permissionDenied
+      }
+
+      // Release 1 roster counts come only from the canonical district repository.
+      let students = try await fetchCanonicalStudents(member: membership)
+      // Canonical plans arrive in Release 3. Release 1 must not make roster
+      // availability depend on the denied legacy user-scoped plan store.
+      let plans: [TMIPlan] = []
       
-      let (students, plans) = try await (studentsTask, plansTask)
-      
-      // Calculate real metrics
       let totalStudents = students.count
       let activeTMIPlans = plans.count
-      let surveysCompleted = students.filter { !($0.surveyResults?.isEmpty ?? true) }.count
-      // Calculate total interests identified asynchronously
-      
-      // Use ThrowingTaskGroup for parallel fetching of interest counts
-      let interestsIdentified: Int = try await withThrowingTaskGroup(of: Int.self) { group in
-          for student in students {
-              group.addTask {
-                  try await student.getInterestCount()
-              }
-          }
-
-          var total = 0
-          for try await count in group {
-              total += count
-          }
-          return total
-      }
-      
-      // Calculate plans aligned (students with plans vs total students)
       let studentsWithPlans = Set(plans.flatMap { $0.students.compactMap { $0.id } }).count
-      let plansAligned = studentsWithPlans
-      
-      // Generate engagement data and recent activities
-      let engagementData = generateEngagementData(from: students)
-      let recentActivities = generateRecentActivities(from: students, plans: plans)
-      
-      // Generate role-specific data if role is provided
-      let roleData = membership.map {
-        generateRoleSpecificData(role: $0.role, students: students, plans: plans)
-      }
-      
-      // Generate next best action based on role and data
-      let nextAction = Self.prioritizedNextBestAction(
+      let recentActivities = generateRecentActivities(from: [], plans: plans)
+      let roleData = canonicalRoleData(
         membership: membership,
         students: students,
         plans: plans
       )
+      let nextAction = Self.approvalAction(
+        for: plans.filter { $0.approvalStatus == .pendingApproval }
+      )
 
       let dashboardData = DashboardData(
-        engagementData: engagementData,
+        engagementData: [],
         totalStudents: totalStudents,
         activeTMIPlans: activeTMIPlans,
-        interestsIdentified: interestsIdentified,
-        surveysCompleted: surveysCompleted,
-        plansAligned: plansAligned,
+        interestsIdentified: 0,
+        surveysCompleted: 0,
+        plansAligned: studentsWithPlans,
         recentActivities: recentActivities,
         nextBestAction: nextAction,
         roleData: roleData
@@ -228,6 +203,64 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       print("[DashboardStateModel] Error fetching dashboard data: \(error)")
       handleError(error, userFriendlyMessage: "Failed to load dashboard data")
     }
+  }
+
+  private func fetchCanonicalStudents(
+    member: MembershipContext
+  ) async throws -> [StudentRecord] {
+    let schoolScopes: [String?]
+    if member.role == .districtAdministrator {
+      schoolScopes = [nil]
+    } else {
+      guard !member.schoolIDs.isEmpty else {
+        throw StudentRepositoryError.schoolFilterRequired
+      }
+      schoolScopes = member.schoolIDs.sorted().map(Optional.some)
+    }
+
+    var recordsByID: [String: StudentRecord] = [:]
+    for schoolID in schoolScopes {
+      var request = StudentPageRequest(
+        schoolID: schoolID,
+        status: .active
+      )
+      repeat {
+        let page = try await studentRepository.page(request, member: member)
+        for record in page.records {
+          recordsByID[record.id] = record
+        }
+        request.cursor = page.nextCursor
+      } while request.cursor != nil
+    }
+    return recordsByID.values.sorted {
+      $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+    }
+  }
+
+  private func canonicalRoleData(
+    membership: MembershipContext,
+    students: [StudentRecord],
+    plans: [TMIPlan]
+  ) -> RoleSpecificData {
+    var result = RoleSpecificData(role: membership.role)
+    switch membership.role {
+    case .counselor, .socialWorker:
+      result.caseloadCount = students.count
+      result.pendingApprovals = plans.filter {
+        $0.approvalStatus == .pendingApproval
+      }.count
+      result.caseloadStudentIds = students.map(\.id)
+    case .teacher:
+      result.classroomStudentCount = students.count
+      result.classroomPlansActive = plans.filter {
+        $0.approvalStatus == .approved
+      }.count
+      result.classroomStudentIds = students.map(\.id)
+    case .schoolAdministrator, .districtAdministrator:
+      result.schoolWideStudents = students.count
+      result.schoolWidePlans = plans.count
+    }
+    return result
   }
   
   // MARK: - Role-Specific Data Generation
@@ -613,11 +646,9 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
 struct DashboardView: View {
     @Environment(\.dashboardStateModel) var stateModel
     @Environment(\.authStateModel) private var authStateModel
-    @State private var studentStateModel = StudentListStateModel()
     @State private var districtViewModel = DistrictDashboardViewModel()
     @State private var selectedTimeFrame: TimeFrame = .week
     @State private var showingAllActivities = false
-    @State private var showingAddStudent = false
     @State private var navigateToStudents = false
     @State private var navigateToPlans = false
     @State private var navigateToSurveys = false
@@ -653,30 +684,15 @@ struct DashboardView: View {
         }
         .task {
             await stateModel.fetchWithMembership(authStateModel.currentMembership)
-            await studentStateModel.fetch()
             if isDistrictAdminRole {
                 await loadDistrictData()
             }
         }
         .refreshable {
             await stateModel.fetchWithMembership(authStateModel.currentMembership)
-            await studentStateModel.fetch()
             if isDistrictAdminRole {
                 await loadDistrictData()
             }
-        }
-        .sheet(isPresented: $showingAddStudent) {
-            NavigationStack {
-                StudentProfileView(onComplete: {
-                    showingAddStudent = false
-                    // Refresh dashboard and student data
-                    Task {
-                        await studentStateModel.fetch()
-                        await stateModel.refresh()
-                    }
-                })
-            }
-            .tmiSheetStyle()
         }
         .navigationDestination(isPresented: $navigateToStudents) {
             StudentListView()
@@ -707,7 +723,11 @@ struct DashboardView: View {
             title: "Unable to Load",
             message: error.message,
             action: {
-                Task { await stateModel.fetch() }
+                Task {
+                    await stateModel.fetchWithMembership(
+                        authStateModel.currentMembership
+                    )
+                }
             },
             actionLabel: "Try Again"
         )
@@ -718,57 +738,19 @@ struct DashboardView: View {
     @ViewBuilder
     private func dashboardContent(_ data: DashboardData) -> some View {
         ScrollView {
-            HStack(alignment: .top, spacing: TMISpacing.lg) {
-                // Left column
-                VStack(spacing: TMISpacing.lg) {
-                    recentActivitySection(data)
-                        .tmiCard()
-                                        
-                    StudentStatusWidget()
-                        .tmiCard()
-
-                    if !data.engagementData.isEmpty {
-                        DashboardEngagementChart(data: data.engagementData)
-                            .tmiCard()
-                    }
-
-                    if let readyToGrowCount = studentsNeedingAttention(data), readyToGrowCount > 0 {
-                        StudentsReadyToGrowCard(count: readyToGrowCount) {
-                            navigateToStudents = true
-                        }
-                        .tmiCard()
-                    }
-                    
-                    if let roleData = data.roleData {
-                        roleSpecificSection(roleData)
-                            .tmiCard()
-                    }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: TMISpacing.lg) {
+                    dashboardLeftColumn(data)
+                        .frame(minWidth: 320, maxWidth: .infinity)
+                    dashboardRightColumn(data)
+                        .frame(minWidth: 320, maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
 
-                // Right column
                 VStack(spacing: TMISpacing.lg) {
-                    QuickActionsGrid(data: data)
-                        .tmiCard()
-                    
-                    
-                    DashboardStatsView(
-                        data: data,
-                        onNavigateToStudents: { navigateToStudents = true },
-                        onNavigateToPlans: { navigateToPlans = true }
-                    )
-                    .tmiCard()
+                    dashboardLeftColumn(data)
+                    dashboardRightColumn(data)
                 }
-                .frame(maxWidth: .infinity)
             }
-            
-            DashboardHeaderView(
-                data: data,
-                attentionCount: studentsNeedingAttention(data) ?? 0,
-                onNavigateToStudents: { navigateToStudents = true },
-                onNavigateToPlans: { navigateToPlans = true }
-            )
-            .frame(maxWidth: .infinity)
             
             Color.clear.frame(height: 120)
         }
@@ -781,6 +763,28 @@ struct DashboardView: View {
                 allActivitiesView(data)
             }
             .tmiSheetStyle()
+        }
+    }
+
+    private func dashboardLeftColumn(_ data: DashboardData) -> some View {
+        VStack(spacing: TMISpacing.lg) {
+            recentActivitySection(data)
+                .tmiCard()
+
+            if !data.engagementData.isEmpty {
+                DashboardEngagementChart(data: data.engagementData)
+                    .tmiCard()
+            }
+        }
+    }
+
+    private func dashboardRightColumn(_ data: DashboardData) -> some View {
+        VStack(spacing: TMISpacing.lg) {
+            QuickActionsGrid(data: data)
+                .tmiCard()
+
+            releaseOneStatusCard(data)
+                .tmiCard()
         }
     }
 
@@ -810,7 +814,7 @@ struct DashboardView: View {
             Divider()
 
             if data.recentActivities.isEmpty {
-                emptyActivityState
+                emptyActivityState(data)
             } else {
                 VStack(spacing: 0) {
                     ForEach(data.recentActivities.prefix(3)) { activity in
@@ -858,26 +862,33 @@ struct DashboardView: View {
         .padding(.vertical, TMISpacing.sm)
     }
 
-    private var emptyActivityState: some View {
+    private func emptyActivityState(_ data: DashboardData) -> some View {
         VStack(spacing: TMISpacing.sm) {
-            Text("👋")
-                .font(.system(size: 36))
+            Image(systemName: data.totalStudents == 0 ? "person.crop.circle.badge.plus" : "clock.arrow.circlepath")
+                .font(.system(size: 36, weight: .medium))
+                .foregroundColor(.tmiPrimary)
 
-            Text("Welcome! Let's get started")
+            Text(MVPEmptyStateCopy.dashboardActivityTitle)
                 .font(.tmiBody)
                 .fontWeight(.semibold)
                 .foregroundColor(.tmiTextPrimary)
 
-            Text(MVPEmptyStateCopy.dashboardActivityMessage)
+            Text(
+                data.totalStudents == 0
+                    ? MVPEmptyStateCopy.dashboardActivityMessage
+                    : "Recent roster and plan activity will appear here as canonical events are recorded."
+            )
                 .font(.tmiCaption)
                 .foregroundColor(.tmiTextSecondary)
                 .multilineTextAlignment(.center)
 
             TMIButton(
-                text: MVPEmptyStateCopy.dashboardActivityAction,
-                icon: "person.badge.plus",
+                text: data.totalStudents == 0
+                    ? MVPEmptyStateCopy.dashboardActivityAction
+                    : "View Roster",
+                icon: "person.3.fill",
                 style: .primary,
-                action: { showingAddStudent = true }
+                action: { navigateToStudents = true }
             )
             .padding(.top, TMISpacing.sm)
         }
@@ -937,77 +948,23 @@ struct DashboardView: View {
 
 
 
-    // Helper function to calculate students needing attention
-    private func studentsNeedingAttention(_ data: DashboardData) -> Int? {
-        // Count students with engagement < 0.4 (needs support level)
-        let needsSupport = studentStateModel.students.filter { $0.engagementScore < 0.4 }.count
-        return needsSupport > 0 ? needsSupport : nil
-    }
-    
-    // MARK: - Role-Specific Section
-    
-    @ViewBuilder
-    private func roleSpecificSection(_ roleData: RoleSpecificData) -> some View {
+    private func releaseOneStatusCard(_ data: DashboardData) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
-            HStack {
-                HStack(spacing: TMISpacing.sm) {
-                    Image(systemName: "building.columns")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(Color.tmiPrimary)
-                        .frame(width: 32, height: 32)
-                    Text(roleData.role == .teacher ? "Classroom Summary" : roleData.role.displayName + " Overview")
-                        .font(.tmiTitle3.bold())
-                        .foregroundColor(.tmiTextPrimary)
-                }
-                Spacer()
-            }
+            Label("Release 1 workspace", systemImage: "checkmark.shield")
+                .font(.tmiTitle3.bold())
+                .foregroundColor(.tmiPrimary)
 
-            Divider()
+            Text("\(data.totalStudents) active students · \(data.activeTMIPlans) visible plans")
+                .font(.tmiBody)
+                .foregroundColor(.tmiTextPrimary)
 
-            switch roleData.role {
-            case .counselor, .socialWorker:
-                counselorSummaryCard(roleData)
-            case .teacher:
-                teacherActionSummaryCard(roleData)
-            case .schoolAdministrator, .districtAdministrator:
-                adminSummaryCard(roleData)
-            }
+            Text("Engagement, survey, interest, and support-alert metrics appear only after their canonical data releases. No placeholder scores are shown.")
+                .font(.tmiCaption)
+                .foregroundColor(.tmiTextSecondary)
         }
-        .tmiCard()
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
-    private func counselorSummaryCard(_ data: RoleSpecificData) -> some View {
-        VStack(spacing: 0) {
-            RoleSummaryRow(icon: "person.2.fill", value: "\(data.caseloadCount)", label: "Caseload", color: .tmiPrimary)
-            TMIDivider()
-            RoleSummaryRow(icon: "clock.badge.exclamationmark.fill", value: "\(data.pendingApprovals)", label: "Pending", color: data.pendingApprovals > 0 ? .orange : .gray)
-            TMIDivider()
-            RoleSummaryRow(icon: "calendar.badge.clock", value: "\(data.upcomingMeetings)", label: "Meetings", color: .blue)
-            TMIDivider()
-            RoleSummaryRow(icon: "exclamationmark.triangle.fill", value: "\(data.criticalAlerts)", label: "Alerts", color: data.criticalAlerts > 0 ? .red : .green)
-        }
-    }
-
-    private func teacherActionSummaryCard(_ data: RoleSpecificData) -> some View {
-        VStack(spacing: 0) {
-            RoleSummaryRow(icon: "heart.text.square.fill", value: "\(data.classroomSurveysPending)", label: "Survey Follow-up", color: data.classroomSurveysPending > 0 ? .orange : .green)
-            TMIDivider()
-            RoleSummaryRow(icon: "doc.text.fill", value: "\(data.classroomPlanGapCount)", label: "Plans To Start", color: .blue)
-            TMIDivider()
-            RoleSummaryRow(icon: "studentdesk", value: "\(data.classroomStudentCount)", label: "Students in View", color: .tmiPrimary)
-        }
-    }
-
-    private func adminSummaryCard(_ data: RoleSpecificData) -> some View {
-        VStack(spacing: 0) {
-            RoleSummaryRow(icon: "building.2.fill", value: "\(data.schoolWideStudents)", label: "Students", color: .tmiPrimary)
-            TMIDivider()
-            RoleSummaryRow(icon: "doc.text.fill", value: "\(data.schoolWidePlans)", label: "Plans", color: .blue)
-            TMIDivider()
-            RoleSummaryRow(icon: "person.3.fill", value: "\(data.staffCount)", label: "Staff", color: .purple)
-        }
-    }
-
     // MARK: - District Data Loading
 
     private func loadDistrictData() async {

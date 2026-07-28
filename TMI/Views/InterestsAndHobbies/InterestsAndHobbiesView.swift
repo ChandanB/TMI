@@ -24,9 +24,6 @@ struct InterestsAndHobbiesView: View {
     @State private var contentAppeared = false
     @State private var fabAppeared = false
 
-    // Dynamic data
-    @State private var activeStudentCount = 0
-    
     // Context-aware mode
     private var isStudentContext: Bool {
         studentContext.hasActiveStudent
@@ -36,8 +33,6 @@ struct InterestsAndHobbiesView: View {
         studentContext.cachedStudent
     }
 
-    private let studentService = StudentService()
-    
     var body: some View {
         ZStack {
             // Unified background
@@ -71,7 +66,6 @@ struct InterestsAndHobbiesView: View {
         }
         .task {
             await stateModel.fetch()
-            await loadActiveStudentCount()
             
             // If we have a student context, use prefetched interests
             if isStudentContext && !studentContext.prefetchedInterests.isEmpty {
@@ -80,7 +74,6 @@ struct InterestsAndHobbiesView: View {
         }
         .refreshable {
             await stateModel.refresh()
-            await loadActiveStudentCount()
         }
         .onAppear {
             animateViewEntrance()
@@ -308,7 +301,7 @@ struct InterestsAndHobbiesView: View {
 
             StatsCard(
                 icon: "person.2.fill",
-                value: "\(activeStudentCount)",
+                value: "—",
                 label: "Students",
                 color: segmentColor,
                 index: 2
@@ -499,16 +492,6 @@ struct InterestsAndHobbiesView: View {
         }
     }
 
-    @MainActor
-    private func loadActiveStudentCount() async {
-        do {
-            let students = try await studentService.fetchStudents()
-            activeStudentCount = students.count
-        } catch {
-            print("[InterestsAndHobbiesView] Failed to load student count: \(error)")
-            activeStudentCount = 0
-        }
-    }
 }
 
 // MARK: - Add Item Sheet

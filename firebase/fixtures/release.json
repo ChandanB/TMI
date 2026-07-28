@@ -5,7 +5,9 @@
   "ownership": {
     "users/teacher-1": "district-a",
     "students/student-top": "district-b",
-    "plans/plan-top": "district-b"
+    "plans/plan-top": "district-b",
+    "districts/district-a/schools/school-a": "district-a",
+    "districts/district-b/schools/school-b": "district-b"
   },
   "documents": [
     {

@@ -16,11 +16,16 @@ class FormAssignmentService {
   private let db = Firestore.firestore()
   private let authorizationSessions: any AuthorizationSessionProviding
   private let authorization = RBACService()
+  private let studentRepository: any StudentRepository
 
+  @MainActor
   init(
-    authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared
+    authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared,
+    studentRepository: (any StudentRepository)? = nil
   ) {
     self.authorizationSessions = authorizationSessions
+    self.studentRepository = studentRepository
+      ?? CanonicalStudentRepository.firebase()
   }
 
   // MARK: - CRUD Operations
@@ -66,11 +71,11 @@ class FormAssignmentService {
       throw FormAssignmentError.authorizationDenied
     }
 
-    let studentService = StudentService(
-      authorizationSessions: authorizationSessions
+    let canonicalStudent = try await studentRepository.student(
+      id: student.studentID,
+      member: session.membership
     )
-    guard let canonicalStudent = try await studentService.getStudent(by: student.studentID),
-          StudentAuthorizationScope(student: canonicalStudent) == student else {
+    guard StudentAuthorizationScope(record: canonicalStudent) == student else {
       throw FormAssignmentError.authorizationDenied
     }
 
@@ -256,7 +261,7 @@ class FormAssignmentService {
   private struct AssignmentAccess {
     let session: AuthenticatedSession
     let scope: FormAssignmentAuthorizationScope
-    let students: [Student]
+    let students: [StudentRecord]
   }
 
   private func authorizedSession() throws -> AuthenticatedSession {
@@ -322,7 +327,7 @@ class FormAssignmentService {
     }
 
     let studentScopes = try students.map { student in
-      guard let scope = StudentAuthorizationScope(student: student),
+      guard let scope = StudentAuthorizationScope(record: student),
             scope.districtID == member.districtID else {
         throw FormAssignmentError.authorizationDenied
       }
@@ -352,52 +357,96 @@ class FormAssignmentService {
   private func canonicalStudents(
     for cohort: AssignmentCohort,
     member: MembershipContext
-  ) async throws -> [Student] {
-    let studentService = StudentService(
-      authorizationSessions: authorizationSessions
-    )
-    let visibleStudents = try await studentService.fetchStudents()
-
+  ) async throws -> [StudentRecord] {
     switch cohort {
     case .allStudents:
-      return visibleStudents
+      return try await pageStudents(
+        request: StudentPageRequest(status: .active),
+        member: member
+      )
     case .school(let schoolID, _):
       guard member.role == .districtAdministrator
               || member.schoolIDs.contains(schoolID) else {
         throw FormAssignmentError.authorizationDenied
       }
-      return visibleStudents.filter { $0.schoolId == schoolID }
+      return try await pageStudents(
+        request: StudentPageRequest(schoolID: schoolID, status: .active),
+        member: member
+      )
     case .grade(let grade):
-      return visibleStudents.filter { $0.grade == grade }
+      return try await pageStudents(
+        request: StudentPageRequest(grade: grade, status: .active),
+        member: member
+      )
     case .specificStudents(let studentIDs, _),
          .customClass(_, let studentIDs):
       let requested = Set(studentIDs)
-      let matches = visibleStudents.filter {
-        guard let id = $0.id else { return false }
-        return requested.contains(id)
+      var matches: [StudentRecord] = []
+      for studentID in requested.sorted() {
+        do {
+          matches.append(
+            try await studentRepository.student(id: studentID, member: member)
+          )
+        } catch {
+          throw FormAssignmentError.authorizationDenied
+        }
       }
-      guard Set(matches.compactMap(\.id)) == requested else {
+      guard Set(matches.map(\.id)) == requested else {
         throw FormAssignmentError.authorizationDenied
       }
       return matches
     }
   }
 
+  private func pageStudents(
+    request: StudentPageRequest,
+    member: MembershipContext
+  ) async throws -> [StudentRecord] {
+    let schoolScopes: [String?]
+    if request.schoolID != nil || member.role == .districtAdministrator {
+      schoolScopes = [request.schoolID]
+    } else {
+      guard !member.schoolIDs.isEmpty else {
+        throw StudentRepositoryError.schoolFilterRequired
+      }
+      schoolScopes = member.schoolIDs.sorted().map(Optional.some)
+    }
+
+    var recordsByID: [String: StudentRecord] = [:]
+    for schoolID in schoolScopes {
+      var scopedRequest = request
+      scopedRequest.schoolID = schoolID
+      scopedRequest.cursor = nil
+      repeat {
+        let page = try await studentRepository.page(
+          scopedRequest,
+          member: member
+        )
+        for record in page.records {
+          recordsByID[record.id] = record
+        }
+        scopedRequest.cursor = page.nextCursor
+      } while scopedRequest.cursor != nil
+    }
+    return recordsByID.values.sorted {
+      $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+    }
+  }
+
   private func cohort(
     _ cohort: AssignmentCohort,
-    contains student: Student
+    contains student: StudentRecord
   ) -> Bool {
     switch cohort {
     case .allStudents:
       return true
     case .school(let schoolID, _):
-      return student.schoolId == schoolID
+      return student.schoolID == schoolID
     case .grade(let grade):
       return student.grade == grade
     case .specificStudents(let studentIDs, _),
          .customClass(_, let studentIDs):
-      guard let studentID = student.id else { return false }
-      return studentIDs.contains(studentID)
+      return studentIDs.contains(student.id)
     }
   }
 

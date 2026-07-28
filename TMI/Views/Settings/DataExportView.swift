@@ -8,25 +8,29 @@
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
+import UniformTypeIdentifiers
 
 struct DataExportView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedFormats: Set<ExportFormat> = [.json]
-    @State private var selectedDataTypes: Set<DataType> = [.students, .tmiPlans, .interests, .hobbies]
+    @State private var selectedDataTypes: Set<DataType> = [.tmiPlans, .interests, .hobbies]
     @State private var isExporting = false
     @State private var exportComplete = false
+    @State private var exportDocument: TMIExportDocument?
+    @State private var exportContentType: UTType = .json
+    @State private var exportFilename = "TMI_Export"
+    @State private var isPresentingExporter = false
+    @State private var exportErrorMessage: String?
     
     enum ExportFormat: String, CaseIterable, Identifiable {
         case json = "JSON"
         case csv = "CSV"
-        case pdf = "PDF"
         
         var id: String { rawValue }
         var description: String {
             switch self {
             case .json: return "Machine-readable format, ideal for importing into other TMI systems"
             case .csv: return "Spreadsheet format, ideal for data analysis in Excel or Google Sheets"
-            case .pdf: return "Human-readable format, ideal for sharing with colleagues or administrators"
             }
         }
         
@@ -34,7 +38,6 @@ struct DataExportView: View {
             switch self {
             case .json: return "doc.text.fill"
             case .csv: return "tablecells.fill"
-            case .pdf: return "doc.richtext.fill"
             }
         }
         
@@ -42,13 +45,18 @@ struct DataExportView: View {
             switch self {
             case .json: return "json"
             case .csv: return "csv"
-            case .pdf: return "pdf"
+            }
+        }
+
+        var contentType: UTType {
+            switch self {
+            case .json: .json
+            case .csv: .commaSeparatedText
             }
         }
     }
     
     enum DataType: String, CaseIterable, Identifiable {
-        case students = "Students"
         case tmiPlans = "TMI Plans"
         case interests = "Interests"
         case hobbies = "Hobbies"
@@ -58,7 +66,6 @@ struct DataExportView: View {
         var id: String { rawValue }
         var description: String {
             switch self {
-            case .students: return "Student profiles, demographics, and academic information"
             case .tmiPlans: return "All TMI intervention plans and progress tracking"
             case .interests: return "Student interests database and categorizations"
             case .hobbies: return "Student hobbies database and educational activities"
@@ -69,7 +76,6 @@ struct DataExportView: View {
         
         var icon: String {
             switch self {
-            case .students: return "person.3.fill"
             case .tmiPlans: return "brain.head.profile"
             case .interests: return "star.fill"
             case .hobbies: return "gamecontroller.fill"
@@ -114,6 +120,31 @@ struct DataExportView: View {
                     .foregroundColor(Color.tmiTextPrimary)
                 }
             }
+            .fileExporter(
+                isPresented: $isPresentingExporter,
+                document: exportDocument,
+                contentType: exportContentType,
+                defaultFilename: exportFilename
+            ) { result in
+                isExporting = false
+                switch result {
+                case .success:
+                    exportComplete = true
+                case .failure(let error):
+                    exportErrorMessage = error.localizedDescription
+                }
+            }
+            .alert(
+                "Export Failed",
+                isPresented: Binding(
+                    get: { exportErrorMessage != nil },
+                    set: { if !$0 { exportErrorMessage = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(exportErrorMessage ?? "Please try again.")
+            }
         }
     }
     
@@ -149,11 +180,7 @@ struct DataExportView: View {
                             format: format,
                             isSelected: selectedFormats.contains(format)
                         ) {
-                            if selectedFormats.contains(format) {
-                                selectedFormats.remove(format)
-                            } else {
-                                selectedFormats.insert(format)
-                            }
+                            selectedFormats = [format]
                         }
                     }
                 }
@@ -224,7 +251,7 @@ struct DataExportView: View {
             )
             
             if !selectedFormats.isEmpty && !selectedDataTypes.isEmpty {
-                Text("This will export \(selectedDataTypes.count) data types in \(selectedFormats.count) format\(selectedFormats.count == 1 ? "" : "s")")
+                Text("This will export \(selectedDataTypes.count) data types as \(selectedFormats.first?.rawValue ?? "a file")")
                     .font(.caption)
                     .foregroundColor(Color.tmiTextSecondary)
                     .multilineTextAlignment(.center)
@@ -253,10 +280,6 @@ struct DataExportView: View {
             // Export selected data types
             for dataType in selectedDataTypes {
                 switch dataType {
-                case .students:
-                    let studentsSnapshot = try await userDoc.collection("students").getDocuments()
-                    exportData["students"] = studentsSnapshot.documents.map { $0.data() }
-                    
                 case .tmiPlans:
                     let plansSnapshot = try await userDoc.collection("tmiPlans").getDocuments()
                     exportData["tmiPlans"] = plansSnapshot.documents.map { $0.data() }
@@ -279,26 +302,34 @@ struct DataExportView: View {
                 }
             }
             
-            // Create files for selected formats
-            for format in selectedFormats {
-                try await createExportFile(data: exportData, format: format)
+            guard let format = selectedFormats.first else {
+                isExporting = false
+                return
             }
-            
-            isExporting = false
-            exportComplete = true
-            
-            // Auto-dismiss after success
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            dismiss()
+            let normalizedExportData = try jsonSafeDictionary(exportData)
+            guard JSONSerialization.isValidJSONObject(normalizedExportData) else {
+                throw ExportSerializationError.invalidJSONObject
+            }
+            let prepared = try makeExportFile(
+                data: normalizedExportData,
+                format: format
+            )
+            exportDocument = TMIExportDocument(data: prepared.data)
+            exportContentType = format.contentType
+            exportFilename = prepared.filename
+            exportComplete = false
+            isPresentingExporter = true
             
         } catch {
-            print("Export error: \(error)")
             isExporting = false
-            // Could show error alert here
+            exportErrorMessage = error.localizedDescription
         }
     }
     
-    private func createExportFile(data: [String: Any], format: ExportFormat) async throws {
+    private func makeExportFile(
+        data: [String: Any],
+        format: ExportFormat
+    ) throws -> (data: Data, filename: String) {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
         let timestamp = dateFormatter.string(from: Date())
@@ -307,26 +338,15 @@ struct DataExportView: View {
         switch format {
         case .json:
             let jsonData = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
-            try await saveToDocuments(data: jsonData, filename: filename)
+            return (jsonData, filename)
             
         case .csv:
             let csvContent = convertToCSV(data: data)
-            let csvData = csvContent.data(using: .utf8)!
-            try await saveToDocuments(data: csvData, filename: filename)
-            
-        case .pdf:
-            // PDF generation would require more complex implementation
-            // For now, create a simple text-based PDF
-            let textContent = formatForPDF(data: data)
-            let pdfData = textContent.data(using: .utf8)!
-            try await saveToDocuments(data: pdfData, filename: filename.replacingOccurrences(of: ".pdf", with: ".txt"))
+            guard let csvData = csvContent.data(using: .utf8) else {
+                throw CocoaError(.fileWriteInapplicableStringEncoding)
+            }
+            return (csvData, filename)
         }
-    }
-    
-    private func saveToDocuments(data: Data, filename: String) async throws {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsPath.appendingPathComponent(filename)
-        try data.write(to: fileURL)
     }
     
     private func convertToCSV(data: [String: Any]) -> String {
@@ -347,20 +367,74 @@ struct DataExportView: View {
         
         return csv
     }
-    
-    private func formatForPDF(data: [String: Any]) -> String {
-        var content = "TMI Data Export\n"
-        content += "Generated: \(Date())\n\n"
-        
-        for (key, value) in data {
-            content += "\(key.uppercased()):\n"
-            if let array = value as? [[String: Any]] {
-                content += "Total items: \(array.count)\n"
-            }
-            content += "\n"
+
+    private func jsonSafeDictionary(
+        _ dictionary: [String: Any]
+    ) throws -> [String: Any] {
+        try dictionary.mapValues(jsonSafeValue)
+    }
+
+    private func jsonSafeValue(_ value: Any) throws -> Any {
+        switch value {
+        case let value as Date:
+            return ISO8601DateFormatter().string(from: value)
+        case let value as Timestamp:
+            return ISO8601DateFormatter().string(from: value.dateValue())
+        case let value as GeoPoint:
+            return [
+                "latitude": value.latitude,
+                "longitude": value.longitude,
+            ]
+        case let value as DocumentReference:
+            return ["path": value.path]
+        case let value as Data:
+            return ["base64": value.base64EncodedString()]
+        case let value as URL:
+            return value.absoluteString
+        case let value as [String: Any]:
+            return try jsonSafeDictionary(value)
+        case let value as [Any]:
+            return try value.map(jsonSafeValue)
+        case is NSNull, is String, is NSNumber:
+            return value
+        default:
+            throw ExportSerializationError.unsupportedValue(
+                String(reflecting: type(of: value))
+            )
         }
-        
-        return content
+    }
+    
+}
+
+enum ExportSerializationError: LocalizedError {
+    case invalidJSONObject
+    case unsupportedValue(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidJSONObject:
+            return "The selected records could not be converted to a safe export."
+        case .unsupportedValue(let type):
+            return "The export contains an unsupported value type: \(type)."
+        }
+    }
+}
+
+struct TMIExportDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.data] }
+
+    let data: Data
+
+    init(data: Data = Data()) {
+        self.data = data
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        data = configuration.file.regularFileContents ?? Data()
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
     }
 }
 
