@@ -484,7 +484,7 @@ struct TMITextField: View {
     @Binding var text: String
     var isSecure: Bool = false
     var keyboardType: UIKeyboardType = .default
-    var capitalization: TextInputAutocapitalization? = nil
+    var capitalization: TMITextInputAutocapitalization? = nil
     var onSubmit: (() -> Void)? = nil
     var focus: Binding<Bool>? = nil
 
@@ -518,7 +518,7 @@ struct TMITextField: View {
             .font(.system(size: 17 * dynamicTypeSize.tmiFontScale))
             .foregroundColor(Color.tmiTextPrimary)
             .autocorrectionDisabled()
-            .textInputAutocapitalization(effectiveCapitalization)
+            .tmiTextInputAutocapitalization(effectiveCapitalization)
             .textContentType(isSecure ? .password : nil)
             .keyboardType(keyboardType)
             .submitLabel(isSecure ? .done : .next)
@@ -558,7 +558,7 @@ struct TMITextField: View {
         )
     }
 
-    private var effectiveCapitalization: TextInputAutocapitalization? {
+    private var effectiveCapitalization: TMITextInputAutocapitalization? {
         if let capitalization {
             return capitalization
         }

@@ -28,12 +28,17 @@ struct TMIComponentAccessibilityTests {
 
         #expect(
             components.contains(
-                "var capitalization: TextInputAutocapitalization?"
+                "var capitalization: TMITextInputAutocapitalization?"
             )
         )
         #expect(
             components.contains(
-                ".textInputAutocapitalization(effectiveCapitalization)"
+                "private var effectiveCapitalization: TMITextInputAutocapitalization?"
+            )
+        )
+        #expect(
+            components.contains(
+                ".tmiTextInputAutocapitalization(effectiveCapitalization)"
             )
         )
         #expect(setup.contains("capitalization: .words"))

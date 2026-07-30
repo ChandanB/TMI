@@ -1,5 +1,35 @@
 import SwiftUI
 
+enum TMITextInputAutocapitalization {
+    case never
+    case sentences
+    case words
+    case characters
+}
+
+extension View {
+    @ViewBuilder
+    func tmiTextInputAutocapitalization(
+        _ autocapitalization: TMITextInputAutocapitalization?
+    ) -> some View {
+#if canImport(UIKit)
+        if let autocapitalization {
+            let nativeValue: TextInputAutocapitalization = switch autocapitalization {
+            case .never: .never
+            case .sentences: .sentences
+            case .words: .words
+            case .characters: .characters
+            }
+            textInputAutocapitalization(nativeValue)
+        } else {
+            self
+        }
+#else
+        self
+#endif
+    }
+}
+
 #if canImport(AppKit) && !canImport(UIKit)
 import AppKit
 
@@ -156,22 +186,18 @@ extension View {
         sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
     }
 
-    func textInputAutocapitalization(_ autocapitalization: TMITextInputAutocapitalization) -> some View {
+    func textInputAutocapitalization(
+        _ autocapitalization: TMITextInputAutocapitalization
+    ) -> some View {
         self
     }
+
 }
 
 enum TMINavigationBarTitleDisplayMode {
     case automatic
     case inline
     case large
-}
-
-enum TMITextInputAutocapitalization {
-    case never
-    case sentences
-    case words
-    case characters
 }
 
 extension ToolbarItemPlacement {
