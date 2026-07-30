@@ -17,7 +17,7 @@ The implementation is verified except for the macOS UI permission gate described
 ```bash
 xcodebuild test -quiet -project TMI.xcodeproj -scheme TMI \
   -destination 'platform=iOS Simulator,id=30138155-B4F2-4628-850A-BEFE4A6FC2AA' \
-  -resultBundlePath /tmp/TMI-AuthRepair-Partial-Focused-2.xcresult \
+  -resultBundlePath /tmp/TMI-AuthRepair-Final-Focused.xcresult \
   -only-testing:TMITests/MembershipRepositoryTests \
   -only-testing:TMITests/AuthStateModelMembershipTests \
   CODE_SIGNING_ALLOWED=NO
