@@ -454,6 +454,8 @@ struct TMIButton: View {
         }
         .buttonStyle(.plain)
         .disabled(isLoading || isDisabled)
+        .accessibilityLabel(text)
+        .accessibilityValue(isLoading ? "In progress" : "")
         .onHover { hovering in
             isHovered = hovering
         }
@@ -482,6 +484,7 @@ struct TMITextField: View {
     @Binding var text: String
     var isSecure: Bool = false
     var keyboardType: UIKeyboardType = .default
+    var capitalization: TextInputAutocapitalization? = nil
     var onSubmit: (() -> Void)? = nil
     var focus: Binding<Bool>? = nil
 
@@ -515,7 +518,7 @@ struct TMITextField: View {
             .font(.system(size: 17 * dynamicTypeSize.tmiFontScale))
             .foregroundColor(Color.tmiTextPrimary)
             .autocorrectionDisabled()
-            .textInputAutocapitalization(.never)
+            .textInputAutocapitalization(effectiveCapitalization)
             .textContentType(isSecure ? .password : nil)
             .keyboardType(keyboardType)
             .submitLabel(isSecure ? .done : .next)
@@ -553,6 +556,13 @@ struct TMITextField: View {
                 )
                 .animation(.easeInOut(duration: 0.2), value: isFocused)
         )
+    }
+
+    private var effectiveCapitalization: TextInputAutocapitalization? {
+        if let capitalization {
+            return capitalization
+        }
+        return isSecure || keyboardType == .emailAddress ? .never : nil
     }
 }
 

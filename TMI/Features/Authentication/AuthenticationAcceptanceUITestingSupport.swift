@@ -406,6 +406,7 @@ struct AuthenticationAvailabilityUITestingContent: View {
     @State private var authStateModel: AuthStateModel
     @State private var appRouter = AppRouter()
     @State private var studentContext = StudentContextStateModel()
+    @State private var hasStartedFixture = false
 
     private let dependencies: AppDependencies
     private let identityProvider: AuthenticationAcceptanceUITestingIdentityProvider
@@ -448,6 +449,9 @@ struct AuthenticationAvailabilityUITestingContent: View {
         _authStateModel = State(
             initialValue: AuthStateModel(
                 authentication: authentication,
+                signOutOperation: {
+                    identityProvider.signOut()
+                },
                 identityProvider: identityProvider,
                 profileProvider: profileProvider,
                 membershipProvider: membershipProvider,
@@ -458,14 +462,16 @@ struct AuthenticationAvailabilityUITestingContent: View {
 
     var body: some View {
         NavigationStack {
-            if authStateModel.isLoggedIn {
+            if !hasStartedFixture {
+                ProgressView("Checking organization access")
+            } else if authStateModel.isLoggedIn {
                 StudentListView()
             } else if authStateModel.requiresStaffAccessSetup {
                 StaffAccessSetupView()
             } else if authStateModel.canRetryAuthorization {
                 AuthenticationRecoveryView()
             } else {
-                ProgressView("Checking organization access")
+                AuthenticationView()
             }
         }
         .environment(\.appDependencies, dependencies)
@@ -482,6 +488,12 @@ struct AuthenticationAvailabilityUITestingContent: View {
             identityProvider.authenticate(
                 userID: AuthenticationAcceptanceFixture.invitationUserID
             )
+            while !authStateModel.canRetryAuthorization
+                && !authStateModel.requiresStaffAccessSetup
+                && !authStateModel.isLoggedIn {
+                await Task.yield()
+            }
+            hasStartedFixture = true
         }
     }
 }

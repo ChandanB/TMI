@@ -37,7 +37,8 @@ struct StaffAccessSetupView: View {
                         TMITextField(
                             icon: "person.fill",
                             placeholder: "Full name",
-                            text: $displayName
+                            text: $displayName,
+                            capitalization: .words
                         )
                         .textContentType(.name)
                         .accessibilityLabel("Full name")

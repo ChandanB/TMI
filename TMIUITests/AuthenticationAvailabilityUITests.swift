@@ -6,7 +6,7 @@ final class AuthenticationAvailabilityUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testRecoveryOffersHittableRetryAndSignOutWithVisibleRetryOutcome() {
+    func testRecoveryRetryHasVisibleOutcome() {
         let app = launch(fixture: "authentication-recovery")
 
         XCTAssertTrue(
@@ -15,9 +15,7 @@ final class AuthenticationAvailabilityUITests: XCTestCase {
         )
 
         let retry = app.buttons["authentication.recovery.retry"]
-        let signOut = app.buttons["authentication.recovery.signOut"]
         XCTAssertTrue(retry.isHittable)
-        XCTAssertTrue(signOut.isHittable)
 
         retry.tap()
 
@@ -25,6 +23,24 @@ final class AuthenticationAvailabilityUITests: XCTestCase {
             element("authentication.accessSetup.screen", in: app)
                 .waitForExistence(timeout: 10),
             "Retry must have a deterministic, visible recovery outcome."
+        )
+    }
+
+    func testRecoverySignOutReturnsToSignIn() {
+        let app = launch(fixture: "authentication-recovery")
+
+        XCTAssertTrue(
+            element("authentication.recovery.screen", in: app)
+                .waitForExistence(timeout: 10)
+        )
+        let signOut = app.buttons["authentication.recovery.signOut"]
+        XCTAssertTrue(signOut.isHittable)
+        signOut.tap()
+
+        XCTAssertTrue(
+            element("authentication.signIn.screen", in: app)
+                .waitForExistence(timeout: 10),
+            "Signing out of recovery must return to the sign-in screen."
         )
     }
 
