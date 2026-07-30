@@ -12,7 +12,6 @@ struct AuthenticationView: View {
   @State private var showingForgotPassword = false
   @State private var isRefreshingVerification = false
   @State private var verificationMessage: String?
-  @Environment(\.dismiss) private var dismiss
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @FocusState private var focusedField: Field?
   @State private var appearAnimation = false
@@ -91,9 +90,10 @@ struct AuthenticationView: View {
                   keyboardType: .emailAddress,
                   onSubmit: {
                     focusedField = .password
-                  }
+                  },
+                  focus: focusBinding(for: .email)
                 )
-                .focused($focusedField, equals: .email)
+                .accessibilityIdentifier("authentication.signIn.email")
                 .offset(x: animateEmail ? 0 : -30)
                 .opacity(animateEmail ? 1.0 : 0)
                 .animation(
@@ -113,9 +113,10 @@ struct AuthenticationView: View {
                   isSecure: true,
                   onSubmit: {
                     authenticate()
-                  }
+                  },
+                  focus: focusBinding(for: .password)
                 )
-                .focused($focusedField, equals: .password)
+                .accessibilityIdentifier("authentication.signIn.password")
                 .offset(x: animatePassword ? 0 : -30)
                 .opacity(animatePassword ? 1.0 : 0)
                 .animation(
@@ -252,11 +253,6 @@ struct AuthenticationView: View {
       } message: {
         Text("Enter your email address and we'll send you a link to reset your password.")
       }
-      .onChange(of: stateModel.isLoggedIn) { _, isAuthenticated in
-        if isAuthenticated {
-          dismiss()
-        }
-      }
       .errorBoundary()
       .onAppear {
         // Trigger animations
@@ -283,6 +279,19 @@ struct AuthenticationView: View {
     Task {
       await stateModel.signIn()
     }
+  }
+
+  private func focusBinding(for field: Field) -> Binding<Bool> {
+    Binding(
+      get: { focusedField == field },
+      set: { isFocused in
+        if isFocused {
+          focusedField = field
+        } else if focusedField == field {
+          focusedField = nil
+        }
+      }
+    )
   }
 
   private var emailVerificationStatus: some View {

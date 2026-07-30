@@ -72,7 +72,7 @@ struct SimplifiedRegistrationView: View {
     @FocusState private var focusedField: Field?
 
     enum Field: Hashable {
-        case displayName, email, invitationCode, password, confirmPassword
+        case displayName, email, invitationCode
     }
 
     var body: some View {
@@ -125,35 +125,38 @@ struct SimplifiedRegistrationView: View {
                                     icon: "person.fill",
                                     placeholder: "Full Name",
                                     text: $displayName,
-                                    onSubmit: { focusedField = .email }
+                                    onSubmit: { focusedField = .email },
+                                    focus: focusBinding(for: .displayName)
                                 )
-                                .focused($focusedField, equals: .displayName)
+                                .accessibilityIdentifier("authentication.registration.name")
 
                                 TMITextField(
                                     icon: "envelope.fill",
                                     placeholder: "Email",
                                     text: $email,
                                     keyboardType: .emailAddress,
-                                    onSubmit: { focusedField = .invitationCode }
+                                    onSubmit: { focusedField = .invitationCode },
+                                    focus: focusBinding(for: .email)
                                 )
-                                .focused($focusedField, equals: .email)
+                                .accessibilityIdentifier("authentication.registration.email")
 
                                 TMITextField(
                                     icon: "building.2.crop.circle",
                                     placeholder: "Staff Invitation Code",
                                     text: $invitationCode,
-                                    onSubmit: { focusedField = .password }
+                                    onSubmit: { focusedField = nil },
+                                    focus: focusBinding(for: .invitationCode)
                                 )
-                                .focused($focusedField, equals: .invitationCode)
+                                .accessibilityIdentifier("authentication.registration.invitation")
 
                                 TMITextField(
                                     icon: "lock.fill",
                                     placeholder: "Password (min 8 characters)",
                                     text: $password,
                                     isSecure: true,
-                                    onSubmit: { focusedField = .confirmPassword }
+                                    onSubmit: { focusedField = nil }
                                 )
-                                .focused($focusedField, equals: .password)
+                                .accessibilityIdentifier("authentication.registration.password")
 
                                 TMITextField(
                                     icon: "lock.shield.fill",
@@ -162,7 +165,9 @@ struct SimplifiedRegistrationView: View {
                                     isSecure: true,
                                     onSubmit: { register() }
                                 )
-                                .focused($focusedField, equals: .confirmPassword)
+                                .accessibilityIdentifier(
+                                    "authentication.registration.confirmPassword"
+                                )
 
                                 if let errorMessage = errorMessage {
                                     Text(errorMessage)
@@ -180,6 +185,7 @@ struct SimplifiedRegistrationView: View {
                                     action: register
                                 )
                                 .disabled(isRegistering)
+                                .accessibilityIdentifier("authentication.registration.submit")
                                 .padding(.top, 8)
                             }
                         }
@@ -203,6 +209,7 @@ struct SimplifiedRegistrationView: View {
                 }
             }
         }
+        .accessibilityIdentifier("authentication.registration.screen")
     }
 
     private func register() {
@@ -275,6 +282,19 @@ struct SimplifiedRegistrationView: View {
                 )
             }
         }
+    }
+
+    private func focusBinding(for field: Field) -> Binding<Bool> {
+        Binding(
+            get: { focusedField == field },
+            set: { isFocused in
+                if isFocused {
+                    focusedField = field
+                } else if focusedField == field {
+                    focusedField = nil
+                }
+            }
+        )
     }
 
     private func isValidEmail(_ email: String) -> Bool {

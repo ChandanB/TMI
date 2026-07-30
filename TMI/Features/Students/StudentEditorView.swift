@@ -4,7 +4,7 @@ struct StudentEditorView: View {
     enum SaveOutcome {
         case confirmed
         case queued
-        case duplicate
+        case duplicate(candidateIDs: [String])
         case failed
     }
 
@@ -49,6 +49,8 @@ struct StudentEditorView: View {
     @State private var isAwaitingServer = false
     @State private var isLocallyQueued: Bool
     @State private var isLocallyDuplicate = false
+    @State private var localDuplicateCandidateIDs: [String] = []
+    @AccessibilityFocusState private var isDuplicateWarningFocused: Bool
 
     init(
         mode: Mode,
@@ -95,6 +97,11 @@ struct StudentEditorView: View {
         .formStyle(.grouped)
         .navigationTitle(mode.title)
         .accessibilityIdentifier("studentEditor.screen")
+        .safeAreaInset(edge: .bottom) {
+            if !visibleDuplicateCandidateIDs.isEmpty {
+                duplicateWarning
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button(queued ? "Done" : "Cancel", action: dismiss.callAsFunction)
@@ -203,7 +210,10 @@ struct StudentEditorView: View {
 
     @ViewBuilder
     private var feedbackSection: some View {
-        if !duplicateCandidateIDs.isEmpty || submissionError != nil || submissionInFlight || queued {
+        if !visibleDuplicateCandidateIDs.isEmpty
+            || submissionError != nil
+            || submissionInFlight
+            || queued {
             Section("Save status") {
                 if submissionInFlight {
                     LabeledContent {
@@ -212,17 +222,6 @@ struct StudentEditorView: View {
                         Text("Waiting for server confirmation")
                     }
                     .accessibilityIdentifier("studentEditor.submitting")
-                }
-
-                if !duplicateCandidateIDs.isEmpty {
-                    Label(
-                        "\(duplicateCandidateIDs.count) possible duplicate record"
-                            + (duplicateCandidateIDs.count == 1 ? "" : "s")
-                            + " found. Cancel and search the roster by name or identifier before saving.",
-                        systemImage: "person.2.badge.gearshape"
-                    )
-                    .foregroundStyle(TMIColors.warningText)
-                    .accessibilityIdentifier("studentEditor.duplicates")
                 }
 
                 if queued {
@@ -239,6 +238,28 @@ struct StudentEditorView: View {
                 }
             }
         }
+    }
+
+    private var duplicateWarning: some View {
+        Label(
+            duplicateWarningMessage,
+            systemImage: "person.2.badge.gearshape"
+        )
+        .font(.subheadline)
+        .foregroundStyle(TMIColors.warningText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(TMIColors.warningSurface)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(duplicateWarningMessage)
+        .accessibilityIdentifier("studentEditor.duplicates")
+        .accessibilityFocused($isDuplicateWarningFocused)
+    }
+
+    private var duplicateWarningMessage: String {
+        "\(visibleDuplicateCandidateIDs.count) possible duplicate record"
+            + (visibleDuplicateCandidateIDs.count == 1 ? "" : "s")
+            + " found. Cancel and search the roster by name or identifier before saving."
     }
 
     private var draft: StudentDraft {
@@ -293,7 +314,11 @@ struct StudentEditorView: View {
     }
 
     private var duplicateLocked: Bool {
-        isLocallyDuplicate || !duplicateCandidateIDs.isEmpty
+        isLocallyDuplicate || !visibleDuplicateCandidateIDs.isEmpty
+    }
+
+    private var visibleDuplicateCandidateIDs: [String] {
+        duplicateCandidateIDs.isEmpty ? localDuplicateCandidateIDs : duplicateCandidateIDs
     }
 
     private var canManageAssignments: Bool {
@@ -333,8 +358,15 @@ struct StudentEditorView: View {
                     "Student saved on this device for submission after reconnecting.",
                     priority: .high
                 )
-            case .duplicate:
+            case .duplicate(let candidateIDs):
                 self.isLocallyDuplicate = true
+                self.localDuplicateCandidateIDs = candidateIDs
+                AccessibilityManager.shared.announce(
+                    self.duplicateWarningMessage,
+                    priority: .high
+                )
+                await Task.yield()
+                self.isDuplicateWarningFocused = true
             case .failed:
                 break
             }

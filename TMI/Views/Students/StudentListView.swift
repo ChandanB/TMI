@@ -484,8 +484,8 @@ private struct StudentRosterContent: View {
                 if case .createQueued = state.mutationError(for: .create) {
                     return .queued
                 }
-                if case .duplicate = state.mutationError(for: .create) {
-                    return .duplicate
+                if case .duplicate(let candidateIDs) = state.mutationError(for: .create) {
+                    return .duplicate(candidateIDs: candidateIDs)
                 }
                 return .failed
             }
@@ -509,8 +509,8 @@ private struct StudentRosterContent: View {
                 if confirmed {
                     return .confirmed
                 }
-                if case .duplicate = state.mutationError(for: target) {
-                    return .duplicate
+                if case .duplicate(let candidateIDs) = state.mutationError(for: target) {
+                    return .duplicate(candidateIDs: candidateIDs)
                 }
                 return .failed
             }
@@ -974,6 +974,7 @@ private struct StudentRosterFilterView: View {
             Section("Roster scope") {
                 schoolControl
                 TextField("Grade", text: $grade)
+                    .onSubmit(submit)
                     .accessibilityIdentifier("studentRoster.filter.grade")
 
                 if canFilterByMember {

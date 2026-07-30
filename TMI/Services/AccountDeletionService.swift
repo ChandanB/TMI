@@ -88,6 +88,42 @@ protocol AccountDeletionBackend: AnyObject {
 }
 
 @MainActor
+protocol AccountDeletionLocalDataPurging: AnyObject {
+    func purge() async throws
+}
+
+@MainActor
+final class SecureAccountDeletionLocalDataPurger: AccountDeletionLocalDataPurging {
+    private let storage: SecureStorage
+    private let studentRosterCacheStorageKey: String
+    private let deniedStudentRosterAuthoritiesStorageKeyPrefix: String
+    private let pendingStudentCreateOutboxStorageKey: String
+
+    init(
+        storage: SecureStorage = .shared,
+        studentRosterCacheStorageKey: String = SecureStudentPageCache.defaultStorageKey,
+        deniedStudentRosterAuthoritiesStorageKeyPrefix: String =
+            "\(SecureStudentPageCache.defaultDeniedAuthoritiesStorageKey).",
+        pendingStudentCreateOutboxStorageKey: String =
+            SecureStorageStudentCreateOutboxStorage.defaultStorageKey
+    ) {
+        self.storage = storage
+        self.studentRosterCacheStorageKey = studentRosterCacheStorageKey
+        self.deniedStudentRosterAuthoritiesStorageKeyPrefix =
+            deniedStudentRosterAuthoritiesStorageKeyPrefix
+        self.pendingStudentCreateOutboxStorageKey = pendingStudentCreateOutboxStorageKey
+    }
+
+    func purge() async throws {
+        try storage.delete(for: studentRosterCacheStorageKey)
+        try storage.deleteAll(
+            withPrefix: deniedStudentRosterAuthoritiesStorageKeyPrefix
+        )
+        try storage.delete(for: pendingStudentCreateOutboxStorageKey)
+    }
+}
+
+@MainActor
 final class AccountDeletionService {
     private struct PendingOperation {
         let userID: String
@@ -96,21 +132,25 @@ final class AccountDeletionService {
 
     static let shared = AccountDeletionService(
         backend: FirebaseAccountDeletionBackend(),
-        policy: .production
+        policy: .production,
+        localDataPurger: SecureAccountDeletionLocalDataPurger()
     )
 
     private let backend: any AccountDeletionBackend
     private let policy: AccountDeletionPolicy
+    private let localDataPurger: any AccountDeletionLocalDataPurging
     private let makeOperationID: () -> String
     private var pendingOperation: PendingOperation?
 
     init(
         backend: any AccountDeletionBackend,
         policy: AccountDeletionPolicy,
+        localDataPurger: any AccountDeletionLocalDataPurging,
         operationID: @escaping () -> String = { UUID().uuidString.lowercased() }
     ) {
         self.backend = backend
         self.policy = policy
+        self.localDataPurger = localDataPurger
         self.makeOperationID = operationID
     }
 
@@ -142,6 +182,7 @@ final class AccountDeletionService {
         try await backend.reauthenticate(email: identity.email, password: password)
 
         do {
+            try await localDataPurger.purge()
             try await backend.deletePersonalAccount(
                 identity: identity,
                 operationID: operationID

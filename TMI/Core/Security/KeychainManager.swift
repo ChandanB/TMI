@@ -196,6 +196,16 @@ nonisolated final class KeychainManager: Sendable {
     func delete(for key: String) throws {
         try deleteSynchronously(for: key)
     }
+
+    /// Delete every item in this service whose account starts with `prefix`.
+    func deleteAll(withPrefix prefix: String) async throws {
+        try deleteAllSynchronously(withPrefix: prefix)
+    }
+
+    /// Legacy synchronous prefix-delete method for compatibility.
+    func deleteAll(withPrefix prefix: String) throws {
+        try deleteAllSynchronously(withPrefix: prefix)
+    }
     
     /// Clear all items for this service
     func clearAll() async throws {
@@ -619,6 +629,19 @@ nonisolated final class KeychainManager: Sendable {
         }
 
         logger.info("Successfully deleted keychain item for key '\(key)'")
+    }
+
+    private func deleteAllSynchronously(withPrefix prefix: String) throws {
+        guard !prefix.isEmpty else {
+            throw KeychainError.invalidData
+        }
+
+        let matchingKeys = try getAllKeysSynchronously().filter {
+            $0.hasPrefix(prefix)
+        }
+        for key in matchingKeys {
+            try deleteSynchronously(for: key)
+        }
     }
 
     private func clearAllSynchronously() throws {

@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 @testable import TMI
 
@@ -67,6 +68,7 @@ struct AccountDeletionServiceTests {
         let service = AccountDeletionService(
             backend: backend,
             policy: .production,
+            localDataPurger: FakeAccountDeletionLocalDataPurger(),
             operationID: { "delete-operation-1" }
         )
 
@@ -81,12 +83,169 @@ struct AccountDeletionServiceTests {
         #expect(backend.receivedIdentity?.userID == "user-1")
     }
 
+    @Test("Successful deletion makes encrypted student cache and pending creates unreadable")
+    func successfulDeletionPurgesEncryptedStudentData() async throws {
+        let serviceName = "com.tmi.tests.account-deletion-cache.\(UUID().uuidString)"
+        let keychain = KeychainManager(service: serviceName)
+        let storage = SecureStorage(
+            keychain: keychain,
+            encryptionKeyTag: "account-deletion-cache-key"
+        )
+        defer { try? keychain.deleteAll() }
+
+        let pageKey = StudentPageCacheKey(
+            districtID: "district-a",
+            userID: "user-1",
+            membershipVersion: 1,
+            search: nil,
+            schoolID: "school-a",
+            grade: nil,
+            assignedMemberID: nil,
+            status: .active,
+            sort: .alphabetical,
+            cursor: nil,
+            limit: 50
+        )
+        let cachedPage = StudentStorePage(
+            documents: [
+                FirebaseStudentSnapshot(
+                    documentID: "student-a",
+                    document: FirebaseStudentDocument(
+                        districtId: "district-a",
+                        schoolId: "school-a",
+                        displayName: "Ava Stone",
+                        grade: "7",
+                        studentIdentifier: "0012",
+                        dateOfBirth: nil,
+                        pronouns: nil,
+                        assignedMemberIDs: ["user-1"],
+                        isArchived: false,
+                        schemaVersion: 1,
+                        recordVersion: 1,
+                        createdAt: Date(timeIntervalSince1970: 10),
+                        createdBy: "user-1",
+                        updatedAt: Date(timeIntervalSince1970: 20),
+                        updatedBy: "user-1"
+                    )
+                ),
+            ],
+            nextCursor: nil
+        )
+        let writer = SecureStudentPageCache(storage: storage)
+        await writer.save(cachedPage, for: pageKey)
+        #expect(await writer.page(for: pageKey) == cachedPage)
+
+        let queuedCreate = PendingStudentCreate(
+            operationID: UUID(uuidString: "00000000-0000-0000-0000-000000000321")!,
+            districtID: "district-a",
+            userID: "user-1",
+            membershipVersion: 1,
+            draft: StudentDraft(
+                displayName: "Pending Student",
+                schoolID: "school-a",
+                grade: "7",
+                studentIdentifier: "0099",
+                dateOfBirth: nil,
+                pronouns: nil,
+                assignedMemberIDs: ["user-1"]
+            ),
+            enqueuedAt: Date(timeIntervalSince1970: 30)
+        )
+        let outboxStorage = SecureStorageStudentCreateOutboxStorage(
+            secureStorage: storage
+        )
+        let outboxWriter = SecureStudentCreateOutbox(storage: outboxStorage)
+        try await outboxWriter.enqueue(queuedCreate)
+        #expect(try await outboxWriter.pending() == [queuedCreate])
+
+        await writer.invalidate(
+            authority: StudentCacheAuthority(
+                districtID: "district-b",
+                userID: "user-1"
+            )
+        )
+        let deniedAuthorityStorageKeyPrefix =
+            "\(SecureStudentPageCache.defaultDeniedAuthoritiesStorageKey)."
+        #expect(
+            try keychainAccounts(forService: serviceName).contains {
+                $0.hasPrefix(deniedAuthorityStorageKeyPrefix)
+            }
+        )
+        #expect(await writer.page(for: pageKey) == cachedPage)
+
+        let backend = FakeAccountDeletionBackend()
+        let purger = SecureAccountDeletionLocalDataPurger(storage: storage)
+        let service = AccountDeletionService(
+            backend: backend,
+            policy: .production,
+            localDataPurger: purger,
+            operationID: { "delete-operation-cache-purge" }
+        )
+
+        try await service.deleteAccount(password: "correct horse")
+
+        let reader = SecureStudentPageCache(storage: storage)
+        let outboxReader = SecureStudentCreateOutbox(storage: outboxStorage)
+        #expect(await reader.page(for: pageKey) == nil)
+        #expect(try await outboxReader.pending().isEmpty)
+        #expect(
+            try !keychainAccounts(forService: serviceName).contains {
+                $0.hasPrefix(deniedAuthorityStorageKeyPrefix)
+            }
+        )
+
+        try await purger.purge()
+        #expect(await reader.page(for: pageKey) == nil)
+        #expect(try await outboxReader.pending().isEmpty)
+        #expect(
+            try !keychainAccounts(forService: serviceName).contains {
+                $0.hasPrefix(deniedAuthorityStorageKeyPrefix)
+            }
+        )
+    }
+
+    @Test("Local purge failure prevents backend deletion and remains retryable")
+    func localPurgeFailureStopsBackendDeletion() async throws {
+        let backend = FakeAccountDeletionBackend()
+        let purger = FakeAccountDeletionLocalDataPurger(failuresRemaining: 1)
+        let service = AccountDeletionService(
+            backend: backend,
+            policy: .production,
+            localDataPurger: purger,
+            operationID: { "delete-operation-local-purge" }
+        )
+
+        await #expect(throws: AccountDeletionError.cleanupFailed) {
+            try await service.deleteAccount(password: "correct horse")
+        }
+        #expect(purger.callCount == 1)
+        #expect(backend.calls == [
+            .currentIdentity,
+            .reauthenticate,
+        ])
+
+        try await service.deleteAccount(password: "correct horse")
+
+        #expect(purger.callCount == 2)
+        #expect(backend.calls == [
+            .currentIdentity,
+            .reauthenticate,
+            .currentIdentity,
+            .reauthenticate,
+            .deletePersonalAccount,
+        ])
+        #expect(backend.receivedOperationIDs == [
+            "delete-operation-local-purge",
+        ])
+    }
+
     @Test("Incorrect password never starts destructive cleanup")
     func incorrectPasswordStopsDeletion() async {
         let backend = FakeAccountDeletionBackend(failure: .reauthenticate)
         let service = AccountDeletionService(
             backend: backend,
             policy: .production,
+            localDataPurger: FakeAccountDeletionLocalDataPurger(),
             operationID: { "delete-operation-2" }
         )
 
@@ -102,6 +261,7 @@ struct AccountDeletionServiceTests {
         let service = AccountDeletionService(
             backend: backend,
             policy: .production,
+            localDataPurger: FakeAccountDeletionLocalDataPurger(),
             operationID: { "delete-operation-3" }
         )
 
@@ -118,6 +278,7 @@ struct AccountDeletionServiceTests {
         let service = AccountDeletionService(
             backend: backend,
             policy: .production,
+            localDataPurger: FakeAccountDeletionLocalDataPurger(),
             operationID: {
                 generatedOperationCount += 1
                 return "delete-operation-\(generatedOperationCount)"
@@ -146,6 +307,7 @@ struct AccountDeletionServiceTests {
         let service = AccountDeletionService(
             backend: backend,
             policy: invalidPolicy,
+            localDataPurger: FakeAccountDeletionLocalDataPurger(),
             operationID: { "delete-operation-4" }
         )
 
@@ -161,6 +323,7 @@ struct AccountDeletionServiceTests {
         let emptyPasswordService = AccountDeletionService(
             backend: emptyPasswordBackend,
             policy: .production,
+            localDataPurger: FakeAccountDeletionLocalDataPurger(),
             operationID: { "delete-operation-5" }
         )
         await #expect(throws: AccountDeletionError.incorrectPassword) {
@@ -172,6 +335,7 @@ struct AccountDeletionServiceTests {
         let emptyOperationService = AccountDeletionService(
             backend: emptyOperationBackend,
             policy: .production,
+            localDataPurger: FakeAccountDeletionLocalDataPurger(),
             operationID: { "" }
         )
         await #expect(throws: AccountDeletionError.invalidOperation) {
@@ -179,6 +343,29 @@ struct AccountDeletionServiceTests {
         }
         #expect(emptyOperationBackend.calls.isEmpty)
     }
+}
+
+private func keychainAccounts(forService service: String) throws -> [String] {
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: service,
+        kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+        kSecReturnAttributes as String: true,
+        kSecMatchLimit as String: kSecMatchLimitAll,
+    ]
+
+    var result: AnyObject?
+    let status = SecItemCopyMatching(query as CFDictionary, &result)
+    if status == errSecItemNotFound {
+        return []
+    }
+    guard status == errSecSuccess else {
+        throw KeychainError.bulkRetrieveFailed(status: status)
+    }
+    guard let items = result as? [[String: Any]] else {
+        throw KeychainError.invalidData
+    }
+    return items.compactMap { $0[kSecAttrAccount as String] as? String }
 }
 
 @Suite("Account Deletion UI Wiring")
@@ -275,5 +462,22 @@ private final class FakeAccountDeletionBackend: AccountDeletionBackend {
             hasFailedPersonalDeletion = true
             throw AccountDeletionError.cleanupFailed
         }
+    }
+}
+
+@MainActor
+private final class FakeAccountDeletionLocalDataPurger: AccountDeletionLocalDataPurging {
+    private(set) var callCount = 0
+    private var failuresRemaining: Int
+
+    init(failuresRemaining: Int = 0) {
+        self.failuresRemaining = failuresRemaining
+    }
+
+    func purge() async throws {
+        callCount += 1
+        guard failuresRemaining > 0 else { return }
+        failuresRemaining -= 1
+        throw AccountDeletionError.cleanupFailed
     }
 }

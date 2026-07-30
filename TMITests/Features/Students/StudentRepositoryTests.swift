@@ -400,6 +400,282 @@ struct StudentRepositoryTests {
         }
     }
 
+    @Test("A server permission denial evicts cached pages for that authority")
+    func permissionDeniedPageEvictsAuthorityCache() async throws {
+        let cache = StudentPageCacheSpy()
+        let request = StudentPageRequest(search: "Ava")
+        let member = membership()
+        let primingRepository = makeRepository(
+            store: StudentRecordStoreSpy(pageResults: [.success(StudentStorePage(
+                documents: [snapshot(id: "student-a")],
+                nextCursor: nil
+            ))]),
+            cache: cache
+        )
+        _ = try await primingRepository.page(request, member: member)
+
+        let deniedRepository = makeRepository(
+            store: StudentRecordStoreSpy(pageResults: [.failure(.permissionDenied)]),
+            cache: cache
+        )
+        await expectRepositoryError(.permissionDenied) {
+            _ = try await deniedRepository.page(request, member: member)
+        }
+
+        let offlineRepository = makeRepository(
+            store: StudentRecordStoreSpy(pageResults: [.failure(.transportUnavailable)]),
+            cache: cache
+        )
+        await expectRepositoryError(.unavailable) {
+            _ = try await offlineRepository.page(request, member: member)
+        }
+        #expect(cache.invalidatedAuthorities == [
+            StudentCacheAuthority(districtID: member.districtID, userID: member.userID),
+        ])
+    }
+
+    @Test("The encrypted page cache survives repository reconstruction")
+    func secureCachePersistsAcrossInstances() async throws {
+        let service = "com.tmi.tests.student-cache.\(UUID().uuidString)"
+        let keychain = KeychainManager(service: service)
+        let storage = SecureStorage(
+            keychain: keychain,
+            encryptionKeyTag: "student-cache-key"
+        )
+        let storageKey = "student-pages"
+        defer { try? keychain.deleteAll() }
+
+        let key = StudentPageCacheKey(
+            districtID: "district-a",
+            userID: "teacher-a",
+            membershipVersion: 3,
+            search: nil,
+            schoolID: "school-a",
+            grade: nil,
+            assignedMemberID: nil,
+            status: .active,
+            sort: .alphabetical,
+            cursor: nil,
+            limit: 50
+        )
+        let expected = StudentStorePage(
+            documents: [snapshot(id: "student-a")],
+            nextCursor: nil
+        )
+
+        let writer = SecureStudentPageCache(
+            storage: storage,
+            storageKey: storageKey
+        )
+        await writer.save(expected, for: key)
+
+        let reader = SecureStudentPageCache(
+            storage: storage,
+            storageKey: storageKey
+        )
+        #expect(await reader.page(for: key) == expected)
+    }
+
+    @Test("Encrypted cache invalidation denies stale pages after archive deletion fails")
+    func secureCacheInvalidationFailsClosedAcrossReconstruction() async throws {
+        let service = "com.tmi.tests.student-cache.\(UUID().uuidString)"
+        let keychain = KeychainManager(service: service)
+        let storage = SecureStorage(
+            keychain: keychain,
+            encryptionKeyTag: "student-cache-key"
+        )
+        let storageKey = "student-pages"
+        defer { try? keychain.deleteAll() }
+
+        let key = StudentPageCacheKey.fixture(userID: "teacher-a")
+        let page = StudentStorePage(
+            documents: [snapshot(id: "student-a")],
+            nextCursor: nil
+        )
+        let writer = SecureStudentPageCache(
+            storage: storage,
+            storageKey: storageKey
+        )
+        await writer.save(page, for: key)
+
+        let failingStorage = StudentPageCacheDeletionFailurePersistence(
+            storage: storage,
+            failingKey: storageKey
+        )
+        let invalidator = SecureStudentPageCache(
+            storage: failingStorage,
+            storageKey: storageKey
+        )
+        await invalidator.invalidate(
+            authority: StudentCacheAuthority(
+                districtID: key.districtID,
+                userID: key.userID
+            )
+        )
+
+        let reconstructed = SecureStudentPageCache(
+            storage: storage,
+            storageKey: storageKey
+        )
+        #expect(await reconstructed.page(for: key) == nil)
+    }
+
+    @Test("Encrypted cache invalidation denies stale pages after archive rewrite fails")
+    func secureCacheRewriteFailureFailsClosedAcrossReconstruction() async throws {
+        let service = "com.tmi.tests.student-cache.\(UUID().uuidString)"
+        let keychain = KeychainManager(service: service)
+        let storage = SecureStorage(
+            keychain: keychain,
+            encryptionKeyTag: "student-cache-key"
+        )
+        let storageKey = "student-pages"
+        defer { try? keychain.deleteAll() }
+
+        let deniedKey = StudentPageCacheKey.fixture(userID: "teacher-a")
+        let retainedKey = StudentPageCacheKey.fixture(userID: "teacher-b")
+        let page = StudentStorePage(
+            documents: [snapshot(id: "student-a")],
+            nextCursor: nil
+        )
+        let writer = SecureStudentPageCache(
+            storage: storage,
+            storageKey: storageKey
+        )
+        await writer.save(page, for: deniedKey)
+        await writer.save(page, for: retainedKey)
+
+        let invalidator = SecureStudentPageCache(
+            storage: StudentPageCacheRewriteFailurePersistence(
+                storage: storage,
+                failingKey: storageKey
+            ),
+            storageKey: storageKey
+        )
+        await invalidator.invalidate(
+            authority: StudentCacheAuthority(
+                districtID: deniedKey.districtID,
+                userID: deniedKey.userID
+            )
+        )
+
+        let reconstructed = SecureStudentPageCache(
+            storage: storage,
+            storageKey: storageKey
+        )
+        #expect(await reconstructed.page(for: deniedKey) == nil)
+        #expect(await reconstructed.page(for: retainedKey) == page)
+    }
+
+    @Test("Encrypted cache clears stale pages when tombstone writing and archive deletion fail")
+    func secureCacheTombstoneWriteFailureFallsBackToEmptyArchive() async throws {
+        let service = "com.tmi.tests.student-cache.\(UUID().uuidString)"
+        let keychain = KeychainManager(service: service)
+        let storage = SecureStorage(
+            keychain: keychain,
+            encryptionKeyTag: "student-cache-key"
+        )
+        let storageKey = "student-pages"
+        defer { try? keychain.deleteAll() }
+
+        let key = StudentPageCacheKey.fixture(userID: "teacher-a")
+        let page = StudentStorePage(
+            documents: [snapshot(id: "student-a")],
+            nextCursor: nil
+        )
+        let writer = SecureStudentPageCache(
+            storage: storage,
+            storageKey: storageKey
+        )
+        await writer.save(page, for: key)
+
+        let invalidator = SecureStudentPageCache(
+            storage: StudentPageCacheTombstoneWriteFailurePersistence(
+                storage: storage,
+                archiveKey: storageKey
+            ),
+            storageKey: storageKey
+        )
+        await invalidator.invalidate(
+            authority: StudentCacheAuthority(
+                districtID: key.districtID,
+                userID: key.userID
+            )
+        )
+
+        let reconstructed = SecureStudentPageCache(
+            storage: storage,
+            storageKey: storageKey
+        )
+        #expect(await reconstructed.page(for: key) == nil)
+    }
+
+    @Test("Encrypted cache denies pages when an authority tombstone cannot be read")
+    func secureCacheTombstoneReadFailureFailsClosed() async throws {
+        let service = "com.tmi.tests.student-cache.\(UUID().uuidString)"
+        let keychain = KeychainManager(service: service)
+        let storage = SecureStorage(
+            keychain: keychain,
+            encryptionKeyTag: "student-cache-key"
+        )
+        let storageKey = "student-pages"
+        defer { try? keychain.deleteAll() }
+
+        let key = StudentPageCacheKey.fixture(userID: "teacher-a")
+        let page = StudentStorePage(
+            documents: [snapshot(id: "student-a")],
+            nextCursor: nil
+        )
+        let writer = SecureStudentPageCache(
+            storage: storage,
+            storageKey: storageKey
+        )
+        await writer.save(page, for: key)
+
+        let failingReader = SecureStudentPageCache(
+            storage: StudentPageCacheTombstoneReadFailurePersistence(
+                storage: storage,
+                archiveKey: storageKey
+            ),
+            storageKey: storageKey
+        )
+
+        #expect(await failingReader.page(for: key) == nil)
+    }
+
+    @Test("Encrypted page-cache invalidation is scoped to one authority")
+    func secureCacheInvalidationPreservesOtherAuthorities() async throws {
+        let service = "com.tmi.tests.student-cache.\(UUID().uuidString)"
+        let keychain = KeychainManager(service: service)
+        let storage = SecureStorage(
+            keychain: keychain,
+            encryptionKeyTag: "student-cache-key"
+        )
+        defer { try? keychain.deleteAll() }
+
+        let cache = SecureStudentPageCache(
+            storage: storage,
+            storageKey: "student-pages"
+        )
+        let first = StudentPageCacheKey.fixture(userID: "teacher-a")
+        let second = StudentPageCacheKey.fixture(userID: "teacher-b")
+        let page = StudentStorePage(
+            documents: [snapshot(id: "student-a")],
+            nextCursor: nil
+        )
+        await cache.save(page, for: first)
+        await cache.save(page, for: second)
+
+        await cache.invalidate(
+            authority: StudentCacheAuthority(
+                districtID: first.districtID,
+                userID: first.userID
+            )
+        )
+
+        #expect(await cache.page(for: first) == nil)
+        #expect(await cache.page(for: second) == page)
+    }
+
     @Test("Cache keys bind tenant, user, membership version, filters, and cursor")
     func cacheKeyBindsAuthorityAndRequest() async throws {
         let cache = StudentPageCacheSpy()
@@ -537,6 +813,69 @@ struct StudentRepositoryTests {
         #expect(requests.count == 1)
         #expect(requests[0].previous.version == 1)
         #expect(requests[0].membership == refreshedMembership)
+    }
+
+    @Test("A confirmed create evicts cached pages even when membership version is unchanged")
+    func confirmedCreateEvictsAuthorityCache() async throws {
+        let cache = StudentPageCacheSpy()
+        let store = StudentRecordStoreSpy(
+            studentResults: [.success(snapshot(id: "student-new", recordVersion: 1))]
+        )
+        let backend = StudentMutationBackendSpy(
+            createResults: [.success(StudentMutationResult(
+                studentID: "student-new",
+                recordVersion: 1,
+                replayed: false,
+                membership: mutationMembership(
+                    assignedStudentIDs: ["student-a", "student-b", "student-new"],
+                    version: 1
+                )
+            ))]
+        )
+        let repository = makeRepository(store: store, backend: backend, cache: cache)
+        let member = membership(version: 1)
+
+        _ = try await repository.create(
+            studentDraft(),
+            operationID: UUID(),
+            member: member
+        )
+
+        #expect(cache.invalidatedAuthorities == [
+            StudentCacheAuthority(districtID: member.districtID, userID: member.userID),
+        ])
+    }
+
+    @Test("A successful create response evicts cached pages before authority refresh fails")
+    func successfulCreateResponseEvictsCacheBeforeRefreshFailure() async throws {
+        let cache = StudentPageCacheSpy()
+        let backend = StudentMutationBackendSpy(
+            createResults: [.success(StudentMutationResult(
+                studentID: "student-new",
+                recordVersion: 1,
+                replayed: false,
+                membership: mutationMembership(version: 2)
+            ))]
+        )
+        let authorityRefresher = StudentMutationAuthorityRefresherSpy(error: .unavailable)
+        let repository = makeRepository(
+            backend: backend,
+            cache: cache,
+            authorityRefresher: authorityRefresher
+        )
+        let member = membership(version: 1)
+
+        await expectRepositoryError(.unavailable) {
+            _ = try await repository.create(
+                studentDraft(),
+                operationID: UUID(),
+                member: member
+            )
+        }
+
+        #expect(cache.invalidatedAuthorities == [
+            StudentCacheAuthority(districtID: member.districtID, userID: member.userID),
+        ])
     }
 
     @Test("Create exposes duplicate candidates as a typed repository error")
@@ -680,6 +1019,45 @@ struct StudentRepositoryTests {
         #expect(await outbox.items.isEmpty)
         #expect(backend.createRequests.count == 1)
         #expect(store.studentRequests.count == 1)
+    }
+
+    @Test("A successful reconciled create evicts cached pages before authority refresh fails")
+    func successfulReconciledCreateEvictsCacheBeforeRefreshFailure() async throws {
+        let pending = PendingStudentCreate(
+            operationID: UUID(),
+            districtID: "district-a",
+            userID: "teacher-a",
+            membershipVersion: 1,
+            draft: studentDraft(),
+            enqueuedAt: Date(timeIntervalSince1970: 10)
+        )
+        let cache = StudentPageCacheSpy()
+        let outbox = StudentCreateOutboxSpy(items: [pending])
+        let backend = StudentMutationBackendSpy(
+            createResults: [.success(StudentMutationResult(
+                studentID: "student-new",
+                recordVersion: 1,
+                replayed: false,
+                membership: mutationMembership(version: 2)
+            ))]
+        )
+        let authorityRefresher = StudentMutationAuthorityRefresherSpy(error: .unavailable)
+        let repository = makeRepository(
+            backend: backend,
+            cache: cache,
+            outbox: outbox,
+            authorityRefresher: authorityRefresher
+        )
+        let member = membership(version: 1)
+
+        await expectRepositoryError(.unavailable) {
+            _ = try await repository.reconcilePendingCreates(member: member)
+        }
+
+        #expect(cache.invalidatedAuthorities == [
+            StudentCacheAuthority(districtID: member.districtID, userID: member.userID),
+        ])
+        #expect(outbox.items == [pending])
     }
 
     @Test("Foreign outbox entries do not block the current authority and remain preserved")
@@ -1040,6 +1418,81 @@ struct StudentRepositoryTests {
         #expect((await store.studentRequests).count == 2)
     }
 
+    @Test("A confirmed update evicts cached pages even when membership version is unchanged")
+    func confirmedUpdateEvictsAuthorityCache() async throws {
+        let cache = StudentPageCacheSpy()
+        let store = StudentRecordStoreSpy(
+            studentResults: [
+                .success(snapshot(id: "student-a", recordVersion: 3)),
+                .success(snapshot(id: "student-a", displayName: "Ava Updated", recordVersion: 4)),
+            ]
+        )
+        let backend = StudentMutationBackendSpy(
+            updateResults: [.success(StudentMutationResult(
+                studentID: "student-a",
+                recordVersion: 4,
+                replayed: false,
+                membership: mutationMembership(version: 1)
+            ))]
+        )
+        let repository = makeRepository(
+            store: store,
+            backend: backend,
+            cache: cache
+        )
+        let member = membership(version: 1)
+
+        _ = try await repository.update(
+            id: "student-a",
+            draft: studentDraft(displayName: "Ava Updated"),
+            expectedVersion: 3,
+            operationID: UUID(),
+            member: member
+        )
+
+        #expect(cache.invalidatedAuthorities == [
+            StudentCacheAuthority(districtID: member.districtID, userID: member.userID),
+        ])
+    }
+
+    @Test("A successful update response evicts cached pages before authority refresh fails")
+    func successfulUpdateResponseEvictsCacheBeforeRefreshFailure() async throws {
+        let cache = StudentPageCacheSpy()
+        let store = StudentRecordStoreSpy(
+            studentResults: [.success(snapshot(id: "student-a", recordVersion: 3))]
+        )
+        let backend = StudentMutationBackendSpy(
+            updateResults: [.success(StudentMutationResult(
+                studentID: "student-a",
+                recordVersion: 4,
+                replayed: false,
+                membership: mutationMembership(version: 2)
+            ))]
+        )
+        let authorityRefresher = StudentMutationAuthorityRefresherSpy(error: .unavailable)
+        let repository = makeRepository(
+            store: store,
+            backend: backend,
+            cache: cache,
+            authorityRefresher: authorityRefresher
+        )
+        let member = membership(version: 1)
+
+        await expectRepositoryError(.unavailable) {
+            _ = try await repository.update(
+                id: "student-a",
+                draft: studentDraft(displayName: "Ava Updated"),
+                expectedVersion: 3,
+                operationID: UUID(),
+                member: member
+            )
+        }
+
+        #expect(cache.invalidatedAuthorities == [
+            StudentCacheAuthority(districtID: member.districtID, userID: member.userID),
+        ])
+    }
+
     @Test("Archive is online-required and transport failure is never queued")
     func archiveIsOnlineRequired() async throws {
         let store = StudentRecordStoreSpy(studentResults: [.success(snapshot(id: "student-a", recordVersion: 3))])
@@ -1086,6 +1539,76 @@ struct StudentRepositoryTests {
         #expect(requests[0].base.expectedRecordVersion == 3)
         #expect(requests[0].base.idempotencyKey == operationID.uuidString.lowercased())
         #expect(requests[0].base.reasonCode == .staffRosterArchive)
+    }
+
+    @Test("A confirmed archive evicts cached pages even when membership version is unchanged")
+    func confirmedArchiveEvictsAuthorityCache() async throws {
+        let cache = StudentPageCacheSpy()
+        let store = StudentRecordStoreSpy(
+            studentResults: [.success(snapshot(id: "student-a", recordVersion: 3))]
+        )
+        let backend = StudentMutationBackendSpy(
+            archiveResults: [.success(StudentMutationResult(
+                studentID: "student-a",
+                recordVersion: 4,
+                replayed: false,
+                membership: mutationMembership(version: 1)
+            ))]
+        )
+        let repository = makeRepository(
+            store: store,
+            backend: backend,
+            cache: cache
+        )
+        let member = membership(version: 1)
+
+        try await repository.archive(
+            id: "student-a",
+            expectedVersion: 3,
+            operationID: UUID(),
+            member: member
+        )
+
+        #expect(cache.invalidatedAuthorities == [
+            StudentCacheAuthority(districtID: member.districtID, userID: member.userID),
+        ])
+    }
+
+    @Test("A successful archive response evicts cached pages before authority refresh fails")
+    func successfulArchiveResponseEvictsCacheBeforeRefreshFailure() async throws {
+        let cache = StudentPageCacheSpy()
+        let store = StudentRecordStoreSpy(
+            studentResults: [.success(snapshot(id: "student-a", recordVersion: 3))]
+        )
+        let backend = StudentMutationBackendSpy(
+            archiveResults: [.success(StudentMutationResult(
+                studentID: "student-a",
+                recordVersion: 4,
+                replayed: false,
+                membership: mutationMembership(version: 2)
+            ))]
+        )
+        let authorityRefresher = StudentMutationAuthorityRefresherSpy(error: .unavailable)
+        let repository = makeRepository(
+            store: store,
+            backend: backend,
+            cache: cache,
+            authorityRefresher: authorityRefresher
+        )
+        let member = membership(version: 1)
+
+        await expectRepositoryError(.unavailable) {
+            try await repository.archive(
+                id: "student-a",
+                expectedVersion: 3,
+                operationID: UUID(),
+                member: member
+            )
+        }
+
+        #expect(cache.invalidatedAuthorities == [
+            StudentCacheAuthority(districtID: member.districtID, userID: member.userID),
+        ])
     }
 
     @Test("Archive preserves an unavailable authority-refresh error")
@@ -1474,6 +1997,119 @@ private final class StudentPageCacheSpy: StudentPageCache, @unchecked Sendable {
                 key.districtID != authority.districtID || key.userID != authority.userID
             }
         }
+    }
+}
+
+private extension StudentPageCacheKey {
+    static func fixture(userID: String) -> StudentPageCacheKey {
+        StudentPageCacheKey(
+            districtID: "district-a",
+            userID: userID,
+            membershipVersion: 1,
+            search: nil,
+            schoolID: "school-a",
+            grade: nil,
+            assignedMemberID: nil,
+            status: .active,
+            sort: .alphabetical,
+            cursor: nil,
+            limit: 50
+        )
+    }
+}
+
+private nonisolated struct StudentPageCacheDeletionFailurePersistence: StudentPageCachePersistence {
+    let storage: SecureStorage
+    let failingKey: String
+
+    func persist<T: Codable & Sendable>(_ object: T, for key: String) async throws {
+        try await storage.store(object, for: key)
+    }
+
+    func restore<T: Codable & Sendable>(
+        _ type: T.Type,
+        for key: String
+    ) async throws -> T {
+        try await storage.retrieve(type, for: key)
+    }
+
+    func remove(for key: String) throws {
+        guard key != failingKey else {
+            throw SecureStorageError.deletionFailed
+        }
+        try storage.delete(for: key)
+    }
+}
+
+private nonisolated struct StudentPageCacheTombstoneReadFailurePersistence: StudentPageCachePersistence {
+    let storage: SecureStorage
+    let archiveKey: String
+
+    func persist<T: Codable & Sendable>(_ object: T, for key: String) async throws {
+        try await storage.store(object, for: key)
+    }
+
+    func restore<T: Codable & Sendable>(
+        _ type: T.Type,
+        for key: String
+    ) async throws -> T {
+        guard key == archiveKey else {
+            throw SecureStorageError.retrievalFailed
+        }
+        return try await storage.retrieve(type, for: key)
+    }
+
+    func remove(for key: String) throws {
+        try storage.delete(for: key)
+    }
+}
+
+private nonisolated struct StudentPageCacheRewriteFailurePersistence: StudentPageCachePersistence {
+    let storage: SecureStorage
+    let failingKey: String
+
+    func persist<T: Codable & Sendable>(_ object: T, for key: String) async throws {
+        guard key != failingKey else {
+            throw SecureStorageError.storageFailed
+        }
+        try await storage.store(object, for: key)
+    }
+
+    func restore<T: Codable & Sendable>(
+        _ type: T.Type,
+        for key: String
+    ) async throws -> T {
+        try await storage.retrieve(type, for: key)
+    }
+
+    func remove(for key: String) throws {
+        try storage.delete(for: key)
+    }
+}
+
+private nonisolated struct StudentPageCacheTombstoneWriteFailurePersistence: StudentPageCachePersistence {
+    let storage: SecureStorage
+    let archiveKey: String
+
+    func persist<T: Codable & Sendable>(_ object: T, for key: String) async throws {
+        guard !key.hasPrefix("\(archiveKey).denied-authorities.") else {
+            throw SecureStorageError.storageFailed
+        }
+        try await storage.store(object, for: key)
+    }
+
+    func restore<T: Codable & Sendable>(
+        _ type: T.Type,
+        for key: String
+    ) async throws -> T {
+        try await storage.retrieve(type, for: key)
+    }
+
+    func remove(for key: String) throws {
+        guard key != archiveKey else {
+            throw SecureStorageError.deletionFailed
+        }
+        try storage.delete(for: key)
     }
 }
 

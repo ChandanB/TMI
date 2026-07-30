@@ -113,6 +113,28 @@ final class SecureStorageTests: XCTestCase {
         XCTAssertNoThrow(try secureStorage.delete(for: "nonExistentKey"))
     }
 
+    func testDeleteAllWithPrefixPreservesUnrelatedSecureData() async throws {
+        let service = "com.tmi.test.secure-prefix-delete.\(UUID().uuidString)"
+        let keychain = KeychainManager(service: service)
+        let storage = SecureStorage(
+            keychain: keychain,
+            encryptionKeyTag: "prefix-delete-master-key"
+        )
+        let prefix = "student-page-cache.v1.denied-authorities."
+        defer { try? keychain.deleteAll() }
+
+        try await storage.store(true, for: "\(prefix)authority-a")
+        try await storage.store(true, for: "\(prefix)authority-b")
+        try await storage.store("keep", for: "unrelated")
+
+        try storage.deleteAll(withPrefix: prefix)
+
+        XCTAssertFalse(storage.exists(for: "\(prefix)authority-a"))
+        XCTAssertFalse(storage.exists(for: "\(prefix)authority-b"))
+        XCTAssertTrue(storage.exists(for: "unrelated"))
+        XCTAssertNoThrow(try storage.deleteAll(withPrefix: prefix))
+    }
+
     func testClearAllData() async throws {
         let keys = ["key1", "key2", "key3"]
 

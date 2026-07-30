@@ -443,8 +443,8 @@ private struct CanonicalStudentEditRoute: View {
             return .confirmed
         } catch let error as StudentRepositoryError {
             mutationError = error
-            if case .duplicate = error {
-                return .duplicate
+            if case .duplicate(let candidateIDs) = error {
+                return .duplicate(candidateIDs: candidateIDs)
             }
             return .failed
         } catch {

@@ -143,7 +143,39 @@ final class KeychainManagerTests: XCTestCase {
         try await keychainManager.delete(for: "nonExistentKey")
         // Test passes if no error is thrown
     }
-    
+
+    func testDeleteAllWithPrefixIsServiceScopedAndIdempotent() async throws {
+        let prefix = "student-page-cache.v1.denied-authorities."
+        let otherService = KeychainManager(
+            service: "\(testService).other.\(UUID().uuidString)"
+        )
+        defer { try? otherService.deleteAll() }
+
+        try await keychainManager.store(testData, for: "\(prefix)authority-a")
+        try await keychainManager.store(testData, for: "\(prefix)authority-b")
+        try await keychainManager.store(testData, for: "unrelated")
+        try await otherService.store(testData, for: "\(prefix)authority-a")
+
+        try await keychainManager.deleteAll(withPrefix: prefix)
+
+        let firstMatchExists = await keychainManager.exists(
+            for: "\(prefix)authority-a"
+        )
+        let secondMatchExists = await keychainManager.exists(
+            for: "\(prefix)authority-b"
+        )
+        let unrelatedExists = await keychainManager.exists(for: "unrelated")
+        let otherServiceMatchExists = await otherService.exists(
+            for: "\(prefix)authority-a"
+        )
+        XCTAssertFalse(firstMatchExists)
+        XCTAssertFalse(secondMatchExists)
+        XCTAssertTrue(unrelatedExists)
+        XCTAssertTrue(otherServiceMatchExists)
+
+        try await keychainManager.deleteAll(withPrefix: prefix)
+    }
+
     func testClearAll() async throws {
         // Given
         let keys = ["key1", "key2", "key3"]

@@ -483,6 +483,7 @@ struct TMITextField: View {
     var isSecure: Bool = false
     var keyboardType: UIKeyboardType = .default
     var onSubmit: (() -> Void)? = nil
+    var focus: Binding<Bool>? = nil
 
     @FocusState private var isFocused: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -501,23 +502,40 @@ struct TMITextField: View {
                         text: $text,
                         prompt: Text(placeholder).foregroundColor(Color.tmiTextTertiary)
                     )
+                    .focused($isFocused)
                 } else {
                     TextField(
                         "",
                         text: $text,
                         prompt: Text(placeholder).foregroundColor(Color.tmiTextTertiary)
                     )
+                    .focused($isFocused)
                 }
             }
-            .focused($isFocused)
             .font(.system(size: 17 * dynamicTypeSize.tmiFontScale))
             .foregroundColor(Color.tmiTextPrimary)
             .autocorrectionDisabled()
             .textInputAutocapitalization(.never)
+            .textContentType(isSecure ? .password : nil)
             .keyboardType(keyboardType)
             .submitLabel(isSecure ? .done : .next)
             .onSubmit {
                 onSubmit?()
+            }
+            .onChange(of: isFocused) { _, value in
+                if focus?.wrappedValue != value {
+                    focus?.wrappedValue = value
+                }
+            }
+            .onChange(of: focus?.wrappedValue ?? false) { _, value in
+                if isFocused != value {
+                    isFocused = value
+                }
+            }
+            .onAppear {
+                if focus?.wrappedValue == true {
+                    isFocused = true
+                }
             }
         }
         .padding(.vertical, 16)

@@ -96,6 +96,25 @@ nonisolated final class SecureStorage: Sendable {
             throw SecureStorageError.deletionFailed
         }
     }
+
+    /// Delete only secure data keys in this service that start with `prefix`.
+    func deleteAll(withPrefix prefix: String) throws {
+        logger.debug(
+            "Deleting secure data by prefix",
+            metadata: ["prefix": prefix]
+        )
+
+        do {
+            try keychain.deleteAll(withPrefix: prefix)
+            logger.info(
+                "Successfully deleted secure data by prefix",
+                metadata: ["prefix": prefix]
+            )
+        } catch {
+            logger.error("Failed to delete secure data by prefix", error: error)
+            throw SecureStorageError.deletionFailed
+        }
+    }
     
     /// Clear all secure data (use with caution)
     func clearAll() throws {

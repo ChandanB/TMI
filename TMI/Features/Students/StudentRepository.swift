@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 @preconcurrency import FirebaseAuth
 @preconcurrency import FirebaseFirestore
 @preconcurrency import FirebaseFunctions
@@ -146,7 +147,7 @@ nonisolated struct FirebaseStudentDocument: Codable, Sendable, Equatable {
     let updatedBy: String
 }
 
-nonisolated struct FirebaseStudentSnapshot: Sendable, Equatable {
+nonisolated struct FirebaseStudentSnapshot: Codable, Sendable, Equatable {
     let documentID: String
     let document: FirebaseStudentDocument
 
@@ -263,7 +264,7 @@ nonisolated struct StudentStoreRecordRequest: Sendable, Equatable {
     let source: StudentStoreReadSource
 }
 
-nonisolated struct StudentStorePage: Sendable, Equatable {
+nonisolated struct StudentStorePage: Codable, Sendable, Equatable {
     let documents: [FirebaseStudentSnapshot]
     let nextCursor: StudentPageCursor?
 }
@@ -609,7 +610,7 @@ nonisolated struct StudentCacheAuthority: Sendable, Hashable {
     let userID: String
 }
 
-nonisolated struct StudentPageCacheKey: Sendable, Hashable {
+nonisolated struct StudentPageCacheKey: Codable, Sendable, Hashable {
     let districtID: String
     let userID: String
     let membershipVersion: Int
@@ -644,6 +645,184 @@ actor InMemoryStudentPageCache: StudentPageCache {
         pages = pages.filter { key, _ in
             key.districtID != authority.districtID || key.userID != authority.userID
         }
+    }
+}
+
+nonisolated protocol StudentPageCachePersistence: Sendable {
+    func persist<T: Codable & Sendable>(_ object: T, for key: String) async throws
+    func restore<T: Codable & Sendable>(_ type: T.Type, for key: String) async throws -> T
+    func remove(for key: String) throws
+}
+
+nonisolated extension SecureStorage: StudentPageCachePersistence {
+    func persist<T: Codable & Sendable>(_ object: T, for key: String) async throws {
+        try await store(object, for: key)
+    }
+
+    func restore<T: Codable & Sendable>(_ type: T.Type, for key: String) async throws -> T {
+        try await retrieve(type, for: key)
+    }
+
+    func remove(for key: String) throws {
+        try delete(for: key)
+    }
+}
+
+/// Device-bound encrypted persistence for server-confirmed roster pages.
+///
+/// Keys include the trusted tenant, user, membership version, and complete
+/// query shape. Cached pages therefore cannot be reused after a role/version
+/// change or across authorities. The bounded archive avoids unbounded Keychain
+/// growth while allowing an offline relaunch to restore recent roster reads.
+actor SecureStudentPageCache: StudentPageCache {
+    private struct Entry: Codable, Sendable {
+        let key: StudentPageCacheKey
+        let page: StudentStorePage
+        let savedAt: Date
+    }
+
+    private struct Archive: Codable, Sendable {
+        var entries: [Entry]
+    }
+
+    nonisolated static let defaultStorageKey = "student-page-cache.v1"
+    nonisolated static let defaultDeniedAuthoritiesStorageKey =
+        "student-page-cache.v1.denied-authorities"
+
+    private let storage: any StudentPageCachePersistence
+    private let storageKey: String
+    private let deniedAuthorityStorageKeyPrefix: String
+    private let maximumEntryCount: Int
+    private var sessionDeniedFingerprints: Set<String> = []
+
+    init(
+        storage: any StudentPageCachePersistence = SecureStorage.shared,
+        storageKey: String = SecureStudentPageCache.defaultStorageKey,
+        maximumEntryCount: Int = 16
+    ) {
+        self.storage = storage
+        self.storageKey = storageKey
+        self.deniedAuthorityStorageKeyPrefix = "\(storageKey).denied-authorities"
+        self.maximumEntryCount = max(1, maximumEntryCount)
+    }
+
+    func page(for key: StudentPageCacheKey) async -> StudentStorePage? {
+        let fingerprint = Self.authorityFingerprint(
+            districtID: key.districtID,
+            userID: key.userID
+        )
+        let isPersistentlyDenied = await isAuthorityDenied(fingerprint: fingerprint)
+        guard !sessionDeniedFingerprints.contains(fingerprint),
+              !isPersistentlyDenied else {
+            return nil
+        }
+        return await loadArchive().entries.first(where: { $0.key == key })?.page
+    }
+
+    func save(_ page: StudentStorePage, for key: StudentPageCacheKey) async {
+        var archive = await loadArchive()
+        archive.entries.removeAll { $0.key == key }
+        archive.entries.append(Entry(key: key, page: page, savedAt: .now))
+        archive.entries = Array(
+            archive.entries
+                .sorted { $0.savedAt > $1.savedAt }
+                .prefix(maximumEntryCount)
+        )
+        guard await persistArchive(archive) else { return }
+
+        let fingerprint = Self.authorityFingerprint(
+            districtID: key.districtID,
+            userID: key.userID
+        )
+        do {
+            try storage.remove(for: deniedAuthorityStorageKey(fingerprint: fingerprint))
+        } catch {
+            return
+        }
+        sessionDeniedFingerprints.remove(fingerprint)
+    }
+
+    func invalidate(authority: StudentCacheAuthority) async {
+        let fingerprint = Self.authorityFingerprint(
+            districtID: authority.districtID,
+            userID: authority.userID
+        )
+        sessionDeniedFingerprints.insert(fingerprint)
+
+        do {
+            try await storage.persist(
+                true,
+                for: deniedAuthorityStorageKey(fingerprint: fingerprint)
+            )
+        } catch {
+            await removeArchiveAfterTombstoneFailure()
+            return
+        }
+
+        var archive = await loadArchive()
+        archive.entries.removeAll {
+            $0.key.districtID == authority.districtID
+                && $0.key.userID == authority.userID
+        }
+        _ = await persistArchive(archive)
+    }
+
+    private func loadArchive() async -> Archive {
+        do {
+            return try await storage.restore(Archive.self, for: storageKey)
+        } catch {
+            return Archive(entries: [])
+        }
+    }
+
+    private func isAuthorityDenied(fingerprint: String) async -> Bool {
+        do {
+            return try await storage.restore(
+                Bool.self,
+                for: deniedAuthorityStorageKey(fingerprint: fingerprint)
+            )
+        } catch SecureStorageError.dataNotFound {
+            return false
+        } catch {
+            return true
+        }
+    }
+
+    private func persistArchive(_ archive: Archive) async -> Bool {
+        do {
+            if archive.entries.isEmpty {
+                try storage.remove(for: storageKey)
+            } else {
+                try await storage.persist(archive, for: storageKey)
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func removeArchiveAfterTombstoneFailure() async {
+        do {
+            try storage.remove(for: storageKey)
+        } catch {
+            try? await storage.persist(Archive(entries: []), for: storageKey)
+        }
+    }
+
+    private func deniedAuthorityStorageKey(fingerprint: String) -> String {
+        "\(deniedAuthorityStorageKeyPrefix).\(fingerprint)"
+    }
+
+    private static func authorityFingerprint(
+        districtID: String,
+        userID: String
+    ) -> String {
+        let input = [
+            "tmi.student-page-cache.authority.v1",
+            "\(districtID.utf8.count):\(districtID)",
+            "\(userID.utf8.count):\(userID)",
+        ].joined(separator: "|")
+        return Data(SHA256.hash(data: Data(input.utf8))).base64EncodedString()
     }
 }
 
@@ -774,7 +953,7 @@ nonisolated protocol StudentCreateOutboxStorage: Sendable {
 }
 
 nonisolated struct SecureStorageStudentCreateOutboxStorage: StudentCreateOutboxStorage {
-    private static let storageKey = "students.pending-creates"
+    nonisolated static let defaultStorageKey = "students.pending-creates"
     private let secureStorage: SecureStorage
 
     init(secureStorage: SecureStorage = .shared) {
@@ -782,20 +961,20 @@ nonisolated struct SecureStorageStudentCreateOutboxStorage: StudentCreateOutboxS
     }
 
     func load() async throws -> [PendingStudentCreate] {
-        guard secureStorage.exists(for: Self.storageKey) else { return [] }
+        guard secureStorage.exists(for: Self.defaultStorageKey) else { return [] }
         return try await secureStorage.retrieve(
             [PendingStudentCreate].self,
-            for: Self.storageKey
+            for: Self.defaultStorageKey
         )
     }
 
     func save(_ items: [PendingStudentCreate]) async throws {
         if items.isEmpty {
-            guard secureStorage.exists(for: Self.storageKey) else { return }
-            try secureStorage.delete(for: Self.storageKey)
+            guard secureStorage.exists(for: Self.defaultStorageKey) else { return }
+            try secureStorage.delete(for: Self.defaultStorageKey)
             return
         }
-        try await secureStorage.store(items, for: Self.storageKey)
+        try await secureStorage.store(items, for: Self.defaultStorageKey)
     }
 }
 
@@ -1258,6 +1437,7 @@ actor CanonicalStudentRepository: StudentRepository {
             storedPage = cachedPage
             source = .cache
         } catch StudentRecordStoreError.permissionDenied {
+            await invalidateCachedPages(for: member)
             throw StudentRepositoryError.permissionDenied
         } catch {
             throw StudentRepositoryError.invalidResponse
@@ -1334,6 +1514,7 @@ actor CanonicalStudentRepository: StudentRepository {
             throw mapMutationError(error)
         }
 
+        await invalidateCachedPages(for: member)
         let refreshedMember = try await refreshedMember(
             from: result.membership,
             previous: member
@@ -1441,6 +1622,7 @@ actor CanonicalStudentRepository: StudentRepository {
                 }
             }
 
+            await invalidateCachedPages(for: currentMember)
             let refreshed = try await refreshedMember(
                 from: result.membership,
                 previous: currentMember
@@ -1551,6 +1733,7 @@ actor CanonicalStudentRepository: StudentRepository {
         } catch {
             throw mapMutationError(error)
         }
+        await invalidateCachedPages(for: member)
         guard result.studentID == id else {
             throw StudentRepositoryError.invalidResponse
         }
@@ -1601,6 +1784,7 @@ actor CanonicalStudentRepository: StudentRepository {
         } catch {
             throw mapMutationError(error)
         }
+        await invalidateCachedPages(for: member)
         guard result.studentID == id,
               result.recordVersion > expectedVersion else {
             throw StudentRepositoryError.invalidResponse
@@ -1636,6 +1820,13 @@ actor CanonicalStudentRepository: StudentRepository {
             }
         }
         latestVersionByAuthority[authority] = member.version
+    }
+
+    private func invalidateCachedPages(for member: MembershipContext) async {
+        await cache.invalidate(authority: StudentCacheAuthority(
+            districtID: member.districtID,
+            userID: member.userID
+        ))
     }
 
     private func refreshedMember(
@@ -1958,6 +2149,7 @@ extension CanonicalStudentRepository {
         CanonicalStudentRepository(
             store: FirebaseStudentRecordStore(firestore: firestore),
             mutationBackend: FirebaseStudentTrustedMutationBackend(functions: functions),
+            cache: SecureStudentPageCache(),
             outbox: SecureStudentCreateOutbox(),
             authorityRefresher: FirebaseStudentMutationAuthorityRefresher(
                 auth: auth,

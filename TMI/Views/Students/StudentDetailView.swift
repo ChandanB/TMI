@@ -70,8 +70,8 @@ struct StudentDetailView: View {
                         if succeeded {
                             return .confirmed
                         }
-                        if case .duplicate = state.mutationError {
-                            return .duplicate
+                        if case .duplicate(let candidateIDs) = state.mutationError {
+                            return .duplicate(candidateIDs: candidateIDs)
                         }
                         return .failed
                     }

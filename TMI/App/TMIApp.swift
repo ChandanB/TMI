@@ -134,6 +134,8 @@ struct TMIApp: App {
         switch uiTestingConfiguration.fixture {
         case .signedOut:
             signedOutUITestingContent
+        case .authenticationAcceptance:
+            AuthenticationAcceptanceUITestingContent()
         case .rosterPopulated,
              .rosterEmpty,
              .rosterOffline,
@@ -141,7 +143,11 @@ struct TMIApp: App {
              .rosterCreateQueued,
              .rosterCreateSaving,
              .rosterArchived,
-             .rosterCreateDuplicate:
+             .rosterCreateDuplicate,
+             .rosterCreateConfirmed,
+             .rosterWorkflow,
+             .rosterCachePrime,
+             .rosterCacheOffline:
             if let fixture = uiTestingConfiguration.fixture {
                 rosterUITestingContent(fixture: fixture)
             }

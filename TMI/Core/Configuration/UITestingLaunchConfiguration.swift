@@ -2,6 +2,7 @@
 nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
     nonisolated enum Fixture: String, Sendable, Equatable {
         case signedOut = "signed-out"
+        case authenticationAcceptance = "authentication-acceptance"
         case rosterPopulated = "roster-populated"
         case rosterEmpty = "roster-empty"
         case rosterOffline = "roster-offline"
@@ -10,6 +11,10 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
         case rosterCreateSaving = "roster-create-saving"
         case rosterArchived = "roster-archived"
         case rosterCreateDuplicate = "roster-create-duplicate"
+        case rosterCreateConfirmed = "roster-create-confirmed"
+        case rosterWorkflow = "roster-workflow"
+        case rosterCachePrime = "roster-cache-prime"
+        case rosterCacheOffline = "roster-cache-offline"
         case studentDetailPopulated = "student-detail-populated"
         case studentDetailRelease1 = "student-detail-release1"
         case studentDetailOffline = "student-detail-offline"
