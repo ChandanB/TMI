@@ -249,7 +249,11 @@ final class AuthenticationRepository: AuthenticationProviding {
             request: pendingRegistration.request,
             identity: identity
         )
-        try await pendingRegistrationStore.clear()
+        do {
+            try await pendingRegistrationStore.clear()
+        } catch {
+            try? await pendingRegistrationStore.save(pendingRegistration)
+        }
         return AuthSession(identity: identity, membership: membership)
     }
 

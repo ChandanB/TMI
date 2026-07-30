@@ -167,6 +167,44 @@ struct AuthSessionTests {
         #expect(backend.deleteCurrentUserCallCount == 1)
     }
 
+    @Test("Cleanup failure after provisioning keeps the identity and retries safely")
+    func cleanupFailureAfterProvisioningIsRetryable() async throws {
+        let backend = AuthenticationBackendSpy()
+        let provisioner = InvitationProvisionerStub(
+            result: .success(membership())
+        )
+        let pendingStore = FailOnceClearingPendingRegistrationStore()
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: provisioner,
+            pendingRegistrationStore: pendingStore
+        )
+
+        var returnedSession: AuthSession?
+        var registrationError: Error?
+        do {
+            returnedSession = try await repository.register(
+                registrationRequest(invitationCode: "invite-a")
+            )
+        } catch {
+            registrationError = error
+        }
+
+        #expect(registrationError == nil)
+        #expect(returnedSession?.access == .authorized)
+        #expect(backend.deleteCurrentUserCallCount == 0)
+        #expect(provisioner.provisionCallCount == 1)
+        #expect(await pendingStore.pendingRegistration() != nil)
+
+        let retriedSession = try await repository.refresh()
+
+        #expect(retriedSession.access == .authorized)
+        #expect(backend.deleteCurrentUserCallCount == 0)
+        #expect(provisioner.provisionCallCount == 2)
+        #expect(await pendingStore.pendingRegistration() == nil)
+    }
+
     @Test("Invitation provisioning waits for verified email and resumes on refresh")
     func invitationProvisioningWaitsForVerification() async throws {
         let backend = AuthenticationBackendSpy()
@@ -428,6 +466,29 @@ private struct SessionLoaderStub: AuthenticationSessionLoading {
     }
 }
 
+private actor FailOnceClearingPendingRegistrationStore:
+    PendingStaffRegistrationStoring {
+    private var registration: PendingStaffRegistration?
+    private var shouldFailNextClear = true
+
+    func save(_ registration: PendingStaffRegistration) {
+        self.registration = registration
+    }
+
+    func pendingRegistration() -> PendingStaffRegistration? {
+        registration
+    }
+
+    func clear() throws {
+        if shouldFailNextClear {
+            shouldFailNextClear = false
+            registration = nil
+            throw AuthenticationTestError.pendingRegistrationCleanupFailed
+        }
+        registration = nil
+    }
+}
+
 @MainActor
 private final class InvitationProvisionerStub: StaffInvitationProvisioning {
     let result: Result<MembershipContext, Error>
@@ -449,4 +510,5 @@ private final class InvitationProvisionerStub: StaffInvitationProvisioning {
 private enum AuthenticationTestError: Error {
     case tokenRefreshFailed
     case provisioningFailed
+    case pendingRegistrationCleanupFailed
 }
