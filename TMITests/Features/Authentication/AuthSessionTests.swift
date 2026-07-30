@@ -153,8 +153,9 @@ struct AuthSessionTests {
             acceptableUsePolicyVersion: "2026-07-20"
         )
 
-        let session = try await repository.completeStaffOnboarding(request)
+        let result: Void = try await repository.completeStaffOnboarding(request)
 
+        _ = result
         #expect(backend.currentIdentityCallCount == 1)
         #expect(provisioner.provisionCallCount == 1)
         #expect(
@@ -166,8 +167,7 @@ struct AuthSessionTests {
                     acceptableUsePolicyVersion: "2026-07-20"
                 )
         )
-        #expect(session.membership?.districtID == "trusted-district")
-        #expect(session.access(requiringEmailVerification: false) == .authorized)
+        #expect(provisioner.lastProvisionedMembership == trustedMembership)
     }
 
     @Test("A token refresh failure never returns a partial session")
@@ -542,6 +542,7 @@ private final class InvitationProvisionerStub: StaffInvitationProvisioning {
     let result: Result<MembershipContext, Error>
     private(set) var provisionCallCount = 0
     private(set) var lastRequest: StaffInvitationAcceptanceRequest?
+    private(set) var lastProvisionedMembership: MembershipContext?
 
     init(result: Result<MembershipContext, Error>) {
         self.result = result
@@ -553,7 +554,9 @@ private final class InvitationProvisionerStub: StaffInvitationProvisioning {
     ) async throws -> MembershipContext {
         provisionCallCount += 1
         lastRequest = request
-        return try result.get()
+        let membership = try result.get()
+        lastProvisionedMembership = membership
+        return membership
     }
 }
 

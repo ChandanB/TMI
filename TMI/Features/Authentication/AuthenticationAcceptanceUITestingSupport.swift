@@ -93,7 +93,7 @@ private final class AuthenticationAcceptanceUITestingRepository: AuthenticationP
 
     func completeStaffOnboarding(
         _ request: StaffOnboardingRequest
-    ) async throws -> AuthSession {
+    ) async throws {
         throw AuthenticationAcceptanceUITestingError.invalidInvitation
     }
 

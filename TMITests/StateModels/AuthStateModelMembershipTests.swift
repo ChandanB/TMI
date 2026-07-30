@@ -145,6 +145,84 @@ struct AuthStateModelMembershipTests {
         #expect(model.currentMembership?.districtID == "trusted-district")
     }
 
+    @Test("A successful staff setup completion cannot mutate state after sign-out")
+    func successfulStaffSetupCompletionIsIgnoredAfterSignOut() async {
+        let identity = AuthenticatedIdentity(userID: "user-a", isEmailVerified: false)
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: [:]
+        )
+        let authentication = DelayedAuthenticationProvider()
+        let profileProvider = RecordingUserProfileProvider(profiles: [:])
+        let model = AuthStateModel(
+            authentication: authentication,
+            signOutOperation: { identityProvider.currentIdentity = nil },
+            identityProvider: identityProvider,
+            profileProvider: profileProvider,
+            membershipProvider: ImmediateMembershipProvider(memberships: [:]),
+            automaticallyStart: false
+        )
+        await model.fetch()
+        let setupTask = Task { @MainActor in
+            await model.completeStaffAccessSetup(
+                displayName: "Morgan Lee",
+                invitationCode: "invite-a"
+            )
+        }
+        #expect(await eventually { authentication.hasPendingRequest })
+
+        #expect(model.signOut())
+        authentication.resumeSuccessfully()
+        await setupTask.value
+
+        #expect(model.currentAuthState == .unauthenticated)
+        #expect(model.requiresStaffAccessSetup == false)
+        #expect(await profileProvider.requestedUserIDs == ["user-a"])
+    }
+
+    @Test("A failed staff setup completion cannot surface an error after sign-out")
+    func failedStaffSetupCompletionIsIgnoredAfterSignOut() async {
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: AuthenticatedIdentity(userID: "user-a", isEmailVerified: false),
+            claims: [:]
+        )
+        let authentication = DelayedAuthenticationProvider()
+        let model = AuthStateModel(
+            authentication: authentication,
+            signOutOperation: { identityProvider.currentIdentity = nil },
+            identityProvider: identityProvider,
+            profileProvider: FakeUserProfileProvider(profiles: [:]),
+            membershipProvider: ImmediateMembershipProvider(memberships: [:]),
+            automaticallyStart: false
+        )
+        await model.fetch()
+        let setupTask = Task { @MainActor in
+            await model.completeStaffAccessSetup(
+                displayName: "Morgan Lee",
+                invitationCode: "invite-a"
+            )
+        }
+        #expect(await eventually { authentication.hasPendingRequest })
+
+        #expect(model.signOut())
+        authentication.resumeWithFailure()
+        await setupTask.value
+
+        let currentAuthenticationError: AuthenticationError? = model.currentError
+        #expect(model.currentAuthState == .unauthenticated)
+        #expect(currentAuthenticationError == nil)
+    }
+
+    @Test("A successful user A setup completion cannot refetch or mutate user B")
+    func successfulPriorUserSetupCannotMutateReplacementIdentity() async {
+        await verifyPriorUserSetupDoesNotMutateReplacement(completion: .success)
+    }
+
+    @Test("A failed user A setup completion cannot force setup state onto user B")
+    func failedPriorUserSetupCannotMutateReplacementIdentity() async {
+        await verifyPriorUserSetupDoesNotMutateReplacement(completion: .failure)
+    }
+
     @Test("Unverified identity cannot publish a trusted staff session")
     func unverifiedIdentityCannotPublishSession() async {
         let identity = AuthenticatedIdentity(
@@ -753,6 +831,60 @@ struct AuthStateModelMembershipTests {
         )
     }
 
+    private func verifyPriorUserSetupDoesNotMutateReplacement(
+        completion: DelayedAuthenticationProvider.Completion
+    ) async {
+        let identityA = AuthenticatedIdentity(userID: "user-a", isEmailVerified: false)
+        let identityB = AuthenticatedIdentity(userID: "user-b", isEmailVerified: false)
+        let profileB = makeUser(id: "user-b")
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identityA,
+            claims: ["user-b": trustedClaim(userID: "user-b", version: 1)]
+        )
+        let authentication = DelayedAuthenticationProvider()
+        let profileProvider = RecordingUserProfileProvider(
+            profiles: ["user-b": profileB]
+        )
+        let membershipB = makeMembership(userID: "user-b")
+        let model = AuthStateModel(
+            authentication: authentication,
+            identityProvider: identityProvider,
+            profileProvider: profileProvider,
+            membershipProvider: ImmediateMembershipProvider(
+                memberships: ["user-b": membershipB]
+            ),
+            automaticallyStart: false
+        )
+        await model.fetch()
+        let setupTask = Task { @MainActor in
+            await model.completeStaffAccessSetup(
+                displayName: "Morgan Lee",
+                invitationCode: "invite-a"
+            )
+        }
+        #expect(await eventually { authentication.hasPendingRequest })
+
+        identityProvider.emit(identityB)
+        #expect(await eventually { model.currentMembership?.userID == "user-b" })
+        switch completion {
+        case .success:
+            authentication.resumeSuccessfully()
+        case .failure:
+            authentication.resumeWithFailure()
+        }
+        await setupTask.value
+
+        #expect(model.currentMembership?.userID == "user-b")
+        #expect(model.currentAuthState == .authenticated(
+            AuthenticatedSession(
+                profile: profileB,
+                claim: trustedClaim(userID: "user-b", version: 1),
+                membership: membershipB
+            )
+        ))
+        #expect(await profileProvider.requestedUserIDs == ["user-a", "user-b"])
+    }
+
     private func trustedClaim(
         userID: String,
         districtID: String = "trusted-district",
@@ -882,6 +1014,20 @@ private actor FakeUserProfileProvider: UserProfileProviding {
 
     func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
         profiles[identity.userID]
+    }
+}
+
+private actor RecordingUserProfileProvider: UserProfileProviding {
+    private let profiles: [String: TMIUser]
+    private(set) var requestedUserIDs: [String] = []
+
+    init(profiles: [String: TMIUser]) {
+        self.profiles = profiles
+    }
+
+    func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
+        requestedUserIDs.append(identity.userID)
+        return profiles[identity.userID]
     }
 }
 
@@ -1037,10 +1183,53 @@ private final class AuthenticationProviderSpy: AuthenticationProviding {
 
     func completeStaffOnboarding(
         _ request: StaffOnboardingRequest
-    ) async throws -> AuthSession {
+    ) async throws {
         completeStaffOnboardingCallCount += 1
         lastOnboardingRequest = request
-        return .signedOut
+    }
+
+    func sendPasswordReset(email: String) async throws {}
+    func sendVerification() async throws {}
+    func refresh() async throws -> AuthSession { .signedOut }
+    func reauthenticate(password: String) async throws {}
+    func signOut() async throws {}
+}
+
+@MainActor
+private final class DelayedAuthenticationProvider: AuthenticationProviding {
+    enum Completion {
+        case success
+        case failure
+    }
+
+    private var continuation: CheckedContinuation<Void, any Error>?
+
+    var hasPendingRequest: Bool {
+        continuation != nil
+    }
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        .signedOut
+    }
+
+    func register(_ request: StaffRegistrationRequest) async throws -> AuthSession {
+        .signedOut
+    }
+
+    func completeStaffOnboarding(_ request: StaffOnboardingRequest) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func resumeSuccessfully() {
+        continuation?.resume()
+        continuation = nil
+    }
+
+    func resumeWithFailure() {
+        continuation?.resume(throwing: AuthMembershipTestError.unavailable)
+        continuation = nil
     }
 
     func sendPasswordReset(email: String) async throws {}

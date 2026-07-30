@@ -84,7 +84,7 @@ nonisolated struct PendingStaffRegistration: Codable, Sendable, Equatable {
 protocol AuthenticationProviding: Sendable {
     func signIn(email: String, password: String) async throws -> AuthSession
     func register(_ request: StaffRegistrationRequest) async throws -> AuthSession
-    func completeStaffOnboarding(_ request: StaffOnboardingRequest) async throws -> AuthSession
+    func completeStaffOnboarding(_ request: StaffOnboardingRequest) async throws
     func sendPasswordReset(email: String) async throws
     func sendVerification() async throws
     func refresh() async throws -> AuthSession
@@ -222,20 +222,19 @@ final class AuthenticationRepository: AuthenticationProviding {
 
     func completeStaffOnboarding(
         _ request: StaffOnboardingRequest
-    ) async throws -> AuthSession {
+    ) async throws {
         let request = request.invitationAcceptanceRequest
         guard !request.displayName.isEmpty, !request.invitationCode.isEmpty else {
             throw AuthenticationRepositoryError.invitationRequired
         }
         let identity = try await backend.currentIdentity()
         guard !requiresEmailVerification || identity.isEmailVerified else {
-            return AuthSession(identity: identity, membership: nil)
+            return
         }
-        let membership = try await invitationProvisioner.provision(
+        _ = try await invitationProvisioner.provision(
             request: request,
             identity: identity
         )
-        return AuthSession(identity: identity, membership: membership)
     }
 
     func sendPasswordReset(email: String) async throws {

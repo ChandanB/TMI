@@ -568,7 +568,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   private let auditService: any AuditEventRecording
   private let signInOperation: @MainActor (String, String) async throws -> Void
   private let staffOnboardingOperation:
-    @MainActor (StaffOnboardingRequest) async throws -> AuthSession
+    @MainActor (StaffOnboardingRequest) async throws -> Void
   private let signOutOperation: @MainActor () throws -> Void
   private let resetPasswordOperation: @MainActor (String) async throws -> Void
   private let identityProvider: any AuthenticationIdentityProviding
@@ -588,6 +588,10 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   private var authorizationGeneration: UInt64 = 0
   @ObservationIgnored
   private var authorizationSessionUpdateTask: Task<Void, Never>?
+  @ObservationIgnored
+  private var staffAccessSetupTask: Task<Void, Never>?
+  @ObservationIgnored
+  private var staffAccessSetupGeneration: UInt64 = 0
 
   // MARK: - Current User State
   private(set) var authenticatedSession: AuthenticatedSession?
@@ -779,7 +783,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
       guard let authentication else {
         throw UnconfiguredAuthenticationDependencyError.unavailable
       }
-      return try await authentication.completeStaffOnboarding(request)
+      try await authentication.completeStaffOnboarding(request)
     }
     self.resetPasswordOperation = { email in
       if let authentication {
@@ -823,9 +827,11 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   }
 
   isolated deinit {
+    staffAccessSetupGeneration &+= 1
     authorizationTask?.cancel()
     authorizationDeadlineTask?.cancel()
     authorizationSessionUpdateTask?.cancel()
+    staffAccessSetupTask?.cancel()
     authStateListenerHandle?.remove()
   }
 
@@ -868,6 +874,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
         return
       }
 
+      self.invalidateStaffAccessSetup()
       if let identity {
         self.startAuthorization(for: identity)
       } else {
@@ -1096,6 +1103,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
   @MainActor
   private func transitionToUnauthenticated(logLogout: Bool) {
+    invalidateStaffAccessSetup()
     invalidateAuthorization()
     clearPublishedSession()
     pendingAuthenticatedSession = nil
@@ -1153,29 +1161,73 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
       return
     }
 
+    guard let identityID = identityProvider.currentIdentity?.userID else {
+      return
+    }
+
+    invalidateStaffAccessSetup()
+    let generation = staffAccessSetupGeneration
     isCompletingStaffAccessSetup = true
     currentError = nil
-    defer { isCompletingStaffAccessSetup = false }
+    let request = StaffOnboardingRequest(
+      displayName: displayName,
+      invitationCode: invitationCode,
+      privacyPolicyVersion: StaffPolicyVersions.privacyPolicyVersion,
+      acceptableUsePolicyVersion:
+        StaffPolicyVersions.acceptableUsePolicyVersion
+    )
 
-    do {
-      _ = try await staffOnboardingOperation(
-        StaffOnboardingRequest(
-          displayName: displayName,
-          invitationCode: invitationCode,
-          privacyPolicyVersion: StaffPolicyVersions.privacyPolicyVersion,
-          acceptableUsePolicyVersion:
-            StaffPolicyVersions.acceptableUsePolicyVersion
+    let task = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+      do {
+        try await self.staffOnboardingOperation(request)
+        guard self.isCurrentStaffAccessSetup(
+          identityID: identityID,
+          generation: generation
+        ) else {
+          return
+        }
+        self.staffAccessSetupTask = nil
+        await self.fetch()
+      } catch {
+        guard self.isCurrentStaffAccessSetup(
+          identityID: identityID,
+          generation: generation
+        ) else {
+          return
+        }
+        self.staffAccessSetupTask = nil
+        self.isCompletingStaffAccessSetup = false
+        self.currentError = AuthenticationError(
+          type: .institutionVerificationFailed,
+          message: Self.staffAccessSetupErrorMessage,
+          traumaInformedMessage: Self.staffAccessSetupErrorMessage
         )
-      )
-      await fetch()
-    } catch {
-      currentError = AuthenticationError(
-        type: .institutionVerificationFailed,
-        message: Self.staffAccessSetupErrorMessage,
-        traumaInformedMessage: Self.staffAccessSetupErrorMessage
-      )
-      updateState(.loaded(.registering(.institutionVerification)))
+        self.updateState(.loaded(.registering(.institutionVerification)))
+      }
     }
+    staffAccessSetupTask = task
+    await task.value
+  }
+
+  @MainActor
+  private func invalidateStaffAccessSetup() {
+    staffAccessSetupGeneration &+= 1
+    staffAccessSetupTask?.cancel()
+    staffAccessSetupTask = nil
+    isCompletingStaffAccessSetup = false
+  }
+
+  @MainActor
+  private func isCurrentStaffAccessSetup(
+    identityID: String,
+    generation: UInt64
+  ) -> Bool {
+    !Task.isCancelled
+      && staffAccessSetupGeneration == generation
+      && identityProvider.currentIdentity?.userID == identityID
   }
 
   @MainActor
@@ -1303,6 +1355,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   func signOut() -> Bool {
     let previousState = state
 
+    invalidateStaffAccessSetup()
     do {
       try signOutOperation()
       invalidateAuthorization()
