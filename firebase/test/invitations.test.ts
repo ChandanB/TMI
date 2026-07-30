@@ -603,6 +603,50 @@ describe("staff invitation provisioning", () => {
     expect(claimsWrites).toHaveLength(1);
   });
 
+  it("refuses claim retry after the canonical profile identity changes", async () => {
+    for (const mutation of [
+      { userID: "other-user" },
+      { email: "other@example.test" },
+    ]) {
+      await provisionUntilClaimWriteFails();
+      await firestore.doc(`users/${userID}/private/profile`).update(mutation);
+      claimsError = undefined;
+
+      await expectHttpsError(makeHandler()(callableRequest()), "data-loss");
+      expect(claimsWrites).toEqual([]);
+    }
+  });
+
+  it("refuses claim retry after preferences gain authority or malformed versions", async () => {
+    for (const mutation of [
+      { districtID },
+      { schemaVersion: 2 },
+      { recordVersion: 2 },
+    ]) {
+      await provisionUntilClaimWriteFails();
+      await firestore.doc(`users/${userID}/preferences/settings`).update(mutation);
+      claimsError = undefined;
+
+      await expectHttpsError(makeHandler()(callableRequest()), "data-loss");
+      expect(claimsWrites).toEqual([]);
+    }
+  });
+
+  it("refuses claim retry after acknowledgement schema or record versions change", async () => {
+    for (const acknowledgement of ["privacyPolicy", "acceptableUsePolicy"]) {
+      for (const mutation of [{ schemaVersion: 2 }, { recordVersion: 2 }]) {
+        await provisionUntilClaimWriteFails();
+        await firestore.doc(
+          `districts/${districtID}/members/${userID}/acknowledgements/${acknowledgement}`,
+        ).update(mutation);
+        claimsError = undefined;
+
+        await expectHttpsError(makeHandler()(callableRequest()), "data-loss");
+        expect(claimsWrites).toEqual([]);
+      }
+    }
+  });
+
   it("refuses claim repair when the canonical membership or audit was altered", async () => {
     const handler = makeHandler();
     await handler(callableRequest());
@@ -717,6 +761,21 @@ describe("staff invitation provisioning", () => {
       .get();
     expect(invitation.data()?.isActive).toBe(true);
     expect(invitation.data()?.consumedByUserID).toBeUndefined();
+  }
+
+  async function provisionUntilClaimWriteFails(): Promise<void> {
+    await testEnv.clearFirestore();
+    await seedInvitation({});
+    authUser = {
+      userID,
+      email: "  Staff-1@Example.Test  ",
+      emailVerified: true,
+      disabled: false,
+      customClaims: {},
+    };
+    claimsWrites = [];
+    claimsError = new Error("synthetic claims outage");
+    await expectHttpsError(makeHandler()(callableRequest()), "unavailable");
   }
 });
 

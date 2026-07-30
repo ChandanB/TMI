@@ -184,6 +184,7 @@ export const createProvisionStaffMembershipHandler = (
           transaction,
           invitation,
           userID,
+          normalizedEmail,
           authUser.customClaims,
         );
       }
@@ -657,6 +658,7 @@ const readIdempotentMembership = async (
   transaction: FirebaseFirestore.Transaction,
   invitation: TrustedInvitation,
   userID: string,
+  normalizedEmail: string,
   trustedClaims: Readonly<Record<string, unknown>>,
 ): Promise<ProvisionStaffMembershipResult> => {
   const paths = onboardingPaths(invitation.districtID, userID);
@@ -676,6 +678,8 @@ const readIdempotentMembership = async (
     transaction.get(firestore.doc(paths.audit)),
   ]);
   const membership = membershipSnapshot.data();
+  const profile = profileSnapshot.data();
+  const preferences = preferencesSnapshot.data();
   const privacy = privacySnapshot.data();
   const acceptableUse = acceptableUseSnapshot.data();
   const audit = auditSnapshot.data();
@@ -701,25 +705,31 @@ const readIdempotentMembership = async (
     membership.version < 1 ||
     membership.recordVersion !== 1 ||
     !profileSnapshot.exists ||
+    !isCompatibleProfile(profile, userID, normalizedEmail) ||
     !preferencesSnapshot.exists ||
-    privacy?.documentID !== "privacyPolicy" ||
-    privacy.version !== requiredPolicyVersions.privacyPolicy ||
-    privacy.operationID !== `staff-provision-${userID}` ||
-    acceptableUse?.documentID !== "acceptableUsePolicy" ||
-    acceptableUse.version !== requiredPolicyVersions.acceptableUsePolicy ||
-    acceptableUse.operationID !== `staff-provision-${userID}` ||
-    audit?.schemaVersion !== 1 ||
-    audit.recordVersion !== 1 ||
-    audit.action !== "staff.membership.provision" ||
-    audit.actorUserID !== userID ||
-    audit.districtID !== invitation.districtID ||
-    audit.targetPath !== paths.membership ||
-    audit.reasonCode !== "staff-invitation-accepted" ||
-    audit.requestHash !== expectedAuditHash ||
-    audit.details?.role !== invitation.role ||
-    !equalStringArrays(audit.details?.schoolIDs, invitation.schoolIDs) ||
-    !equalStringArrays(audit.details?.capabilities, invitation.capabilities) ||
-    audit.result?.recordVersion !== 1
+    !isCompatiblePreferences(preferences) ||
+    !privacySnapshot.exists ||
+    !isCompatibleAcknowledgement(
+      privacy,
+      "privacyPolicy",
+      requiredPolicyVersions.privacyPolicy,
+      userID,
+    ) ||
+    !acceptableUseSnapshot.exists ||
+    !isCompatibleAcknowledgement(
+      acceptableUse,
+      "acceptableUsePolicy",
+      requiredPolicyVersions.acceptableUsePolicy,
+      userID,
+    ) ||
+    !auditSnapshot.exists ||
+    !isCompatibleAudit(
+      audit,
+      invitation,
+      paths.membership,
+      userID,
+      expectedAuditHash,
+    )
   ) {
     throw new HttpsError(
       "data-loss",

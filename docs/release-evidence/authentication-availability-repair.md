@@ -16,28 +16,24 @@ The implementation is verified except for the macOS UI permission gate described
 
 ```bash
 xcodebuild test -quiet -project TMI.xcodeproj -scheme TMI \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' \
-  -derivedDataPath '/tmp/TMI-AuthRepair-Full macOS DD' \
-  -resultBundlePath /tmp/TMI-AuthRepair-Focused.xcresult \
-  -only-testing:TMITests/AuthSessionTests \
-  -only-testing:TMITests/FirebaseStaffInvitationProvisionerTests \
+  -destination 'platform=iOS Simulator,id=30138155-B4F2-4628-850A-BEFE4A6FC2AA' \
+  -resultBundlePath /tmp/TMI-AuthRepair-Partial-Focused-2.xcresult \
+  -only-testing:TMITests/MembershipRepositoryTests \
   -only-testing:TMITests/AuthStateModelMembershipTests \
-  -only-testing:TMITests/SignOutCallSiteTests \
-  -only-testing:TMITests/TMIComponentAccessibilityTests \
-  -only-testing:TMITests/UITestingLaunchConfigurationTests
+  CODE_SIGNING_ALLOWED=NO
 ```
 
-Final-review focused rerun of `MembershipRepositoryTests` and `AuthStateModelMembershipTests`: `Passed`, 0 failed. The focused authentication total is now 68 logical tests with 71 passed executions based on the prior accepted bundle plus four new logical regressions.
+Final-review focused rerun explicitly included both suites: `Passed`, 35 passed, 0 skipped, 0 failed. No aggregate count is inferred by adding this rerun to the earlier result bundle.
 
 - `AuthSessionTests`: 19
 - `FirebaseStaffInvitationProvisionerTests`: 4
-- `AuthStateModelMembershipTests`: 27
-- `MembershipRepositoryTests`: 2 new claim-presence regressions (the suite also retains its prior coverage)
+- `AuthStateModelMembershipTests`: 2 new partial-state regressions.
+- `MembershipRepositoryTests`: 2 new claim-presence regressions.
 - `SignOutCallSiteTests`: 6
 - `TMIComponentAccessibilityTests`: 6 executions (3 logical tests)
 - `UITestingLaunchConfigurationTests`: 7
 
-Result bundle: `/tmp/TMI-AuthRepair-Focused.xcresult`
+Result bundle: `/tmp/TMI-AuthRepair-Partial-Focused-2.xcresult`
 
 The adapter additionally has UIKit behavioral coverage for all four mappings: `never`, `sentences`, `words`, and `characters`. The mapping test was first observed failing to compile because `TMITextInputAutocapitalization` had no `uiKitValue`; the GREEN component bundle reports 3 logical tests and 6 passed executions at `/tmp/TMI-AuthRepair-Capitalization-Green-3.xcresult`.
 
@@ -48,7 +44,7 @@ cd firebase
 npm test
 ```
 
-Result: 8 test files passed, 96 tests passed, 0 failed. The invitation suite now includes 25 tests, including six partial-state reconciliation regressions. No dependency audit fix was run.
+Result after replay-hardening review: 8 test files passed, 99 tests passed, 0 failed. The invitation suite now includes 28 tests, including partial-state reconciliation and post-transaction claim-retry mutation regressions. No dependency audit fix was run.
 
 The local Java runtime emitted the known deprecated `sun.misc.Unsafe` warning, and Firebase Admin emitted metadata lookup warnings without live credentials. The `demo-tmi` emulator suite completed successfully.
 
