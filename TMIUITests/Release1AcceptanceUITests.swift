@@ -82,6 +82,10 @@ final class Release1AcceptanceUITests: XCTestCase {
         app.secureTextFields["authentication.registration.confirmPassword"]
             .typeText("\n")
 
+        XCTAssertFalse(
+            app.staticTexts["Verify Your Email"].exists,
+            "Trusted invitation provisioning must not introduce an email refresh gate."
+        )
         XCTAssertTrue(
             element("studentRoster.empty", in: app)
                 .waitForExistence(timeout: 10),

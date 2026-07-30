@@ -15,6 +15,22 @@ struct UITestingLaunchConfigurationTests {
         #expect(configuration.contentSize == nil)
     }
 
+    @Test("Explicit UI testing arguments select authentication availability fixtures")
+    func explicitArgumentsSelectAuthenticationAvailabilityFixtures() {
+        let fixtures: [(String, UITestingLaunchConfiguration.Fixture)] = [
+            ("authentication-recovery", .authenticationRecovery),
+            ("authentication-access-setup", .authenticationAccessSetup),
+        ]
+
+        for (rawValue, expected) in fixtures {
+            let configuration = UITestingLaunchConfiguration(
+                arguments: ["TMI", "-uiTesting", "-fixture", rawValue]
+            )
+
+            #expect(configuration.fixture == expected)
+        }
+    }
+
     @Test("Explicit UI testing arguments select the largest accessibility text size")
     func explicitArgumentsSelectLargestAccessibilityTextSize() {
         let configuration = UITestingLaunchConfiguration(

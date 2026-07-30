@@ -149,6 +149,78 @@ private enum AuthenticationAcceptanceUITestingError: Error {
     case invalidInvitation
 }
 
+@MainActor
+private final class AuthenticationAvailabilityProfileProvider: UserProfileProviding {
+    enum InitialMode {
+        case recovery
+        case accessSetup
+    }
+
+    private let initialMode: InitialMode
+    private var recoveryAttempt = 0
+    var isProvisioned = false
+
+    init(initialMode: InitialMode) {
+        self.initialMode = initialMode
+    }
+
+    func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
+        if isProvisioned {
+            return TMIUser(
+                id: identity.userID,
+                userID: identity.userID,
+                displayName: AuthenticationAcceptanceFixture.invitationName,
+                email: AuthenticationAcceptanceFixture.invitationEmail,
+                isEmailVerified: true,
+                requestedRole: .teacher,
+                createdAt: .distantPast
+            )
+        }
+
+        switch initialMode {
+        case .recovery:
+            recoveryAttempt += 1
+            if recoveryAttempt == 1 {
+                throw AuthenticationAcceptanceUITestingError.invalidIdentity
+            }
+            return nil
+        case .accessSetup:
+            return nil
+        }
+    }
+}
+
+@MainActor
+private final class AuthenticationAvailabilityRepository: AuthenticationProviding {
+    private let profileProvider: AuthenticationAvailabilityProfileProvider
+
+    init(profileProvider: AuthenticationAvailabilityProfileProvider) {
+        self.profileProvider = profileProvider
+    }
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        throw AuthenticationAcceptanceUITestingError.invalidCredentials
+    }
+
+    func register(_ request: StaffRegistrationRequest) async throws -> AuthSession {
+        throw AuthenticationAcceptanceUITestingError.invalidInvitation
+    }
+
+    func completeStaffOnboarding(_ request: StaffOnboardingRequest) async throws {
+        guard request.displayName == AuthenticationAcceptanceFixture.invitationName,
+              request.invitationCode == AuthenticationAcceptanceFixture.invitationCode else {
+            throw AuthenticationAcceptanceUITestingError.invalidInvitation
+        }
+        profileProvider.isProvisioned = true
+    }
+
+    func sendPasswordReset(email: String) async throws { }
+    func sendVerification() async throws { }
+    func refresh() async throws -> AuthSession { .signedOut }
+    func reauthenticate(password: String) async throws { }
+    func signOut() async throws { }
+}
+
 private actor AuthenticationAcceptanceUITestingStudentRepository: StudentRepository {
     func page(
         _ request: StudentPageRequest,
@@ -321,6 +393,96 @@ struct AuthenticationAcceptanceUITestingContent: View {
         .environment(appRouter)
         .tint(TMIColors.teal)
         .preferredColorScheme(.light)
+    }
+}
+
+@MainActor
+struct AuthenticationAvailabilityUITestingContent: View {
+    enum Mode {
+        case recovery
+        case accessSetup
+    }
+
+    @State private var authStateModel: AuthStateModel
+    @State private var appRouter = AppRouter()
+    @State private var studentContext = StudentContextStateModel()
+
+    private let dependencies: AppDependencies
+    private let identityProvider: AuthenticationAcceptanceUITestingIdentityProvider
+
+    init(mode: Mode) {
+        let identityProvider = AuthenticationAcceptanceUITestingIdentityProvider()
+        let initialMode: AuthenticationAvailabilityProfileProvider.InitialMode
+        switch mode {
+        case .recovery:
+            initialMode = .recovery
+        case .accessSetup:
+            initialMode = .accessSetup
+        }
+        let profileProvider = AuthenticationAvailabilityProfileProvider(
+            initialMode: initialMode
+        )
+        let authentication = AuthenticationAvailabilityRepository(
+            profileProvider: profileProvider
+        )
+        let membershipProvider = InMemoryMembershipProvider(
+            memberships: [
+                AuthenticationAcceptanceFixture.membership(
+                    userID: AuthenticationAcceptanceFixture.invitationUserID
+                )
+            ]
+        )
+        let students = AuthenticationAcceptanceUITestingStudentRepository()
+        let dependencies = AppDependencies(
+            runtime: .preview,
+            flags: .production,
+            membership: membershipProvider,
+            authentication: authentication,
+            studentRepository: students,
+            studentDetailRepository: Release1StudentDetailRepository(students: students),
+            logger: TMILogger(category: "UITesting")
+        )
+
+        self.dependencies = dependencies
+        self.identityProvider = identityProvider
+        _authStateModel = State(
+            initialValue: AuthStateModel(
+                authentication: authentication,
+                identityProvider: identityProvider,
+                profileProvider: profileProvider,
+                membershipProvider: membershipProvider,
+                automaticallyStart: false
+            )
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            if authStateModel.isLoggedIn {
+                StudentListView()
+            } else if authStateModel.requiresStaffAccessSetup {
+                StaffAccessSetupView()
+            } else if authStateModel.canRetryAuthorization {
+                AuthenticationRecoveryView()
+            } else {
+                ProgressView("Checking organization access")
+            }
+        }
+        .environment(\.appDependencies, dependencies)
+        .environment(\.authStateModel, authStateModel)
+        .environment(\.studentContext, studentContext)
+        .environment(appRouter)
+        .tint(TMIColors.teal)
+        .preferredColorScheme(.light)
+        .task {
+            guard identityProvider.currentIdentity == nil else {
+                return
+            }
+            await authStateModel.fetch()
+            identityProvider.authenticate(
+                userID: AuthenticationAcceptanceFixture.invitationUserID
+            )
+        }
     }
 }
 #endif

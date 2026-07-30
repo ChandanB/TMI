@@ -268,7 +268,7 @@ struct SimplifiedRegistrationView: View {
                 confirmPassword = ""
                 invitationCode = ""
 
-                // The Auth listener presents email verification or authorized access.
+                // Trusted invitation provisioning authorizes access immediately.
                 await authStateModel.fetch()
 
                 isRegistering = false

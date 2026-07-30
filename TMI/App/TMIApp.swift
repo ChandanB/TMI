@@ -138,6 +138,10 @@ struct TMIApp: App {
             signedOutUITestingContent
         case .authenticationAcceptance:
             AuthenticationAcceptanceUITestingContent()
+        case .authenticationRecovery:
+            AuthenticationAvailabilityUITestingContent(mode: .recovery)
+        case .authenticationAccessSetup:
+            AuthenticationAvailabilityUITestingContent(mode: .accessSetup)
         case .rosterPopulated,
              .rosterEmpty,
              .rosterOffline,

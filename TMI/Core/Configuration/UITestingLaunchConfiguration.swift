@@ -3,6 +3,8 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
     nonisolated enum Fixture: String, Sendable, Equatable {
         case signedOut = "signed-out"
         case authenticationAcceptance = "authentication-acceptance"
+        case authenticationRecovery = "authentication-recovery"
+        case authenticationAccessSetup = "authentication-access-setup"
         case rosterPopulated = "roster-populated"
         case rosterEmpty = "roster-empty"
         case rosterOffline = "roster-offline"

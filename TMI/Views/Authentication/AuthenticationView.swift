@@ -75,7 +75,8 @@ struct AuthenticationView: View {
             // Login Card - Using unified TMICard
             TMICard(style: .elevated) {
               VStack(spacing: 24) {
-                if stateModel.requiresVerification {
+                if dependencies.flags.staffEmailVerificationRequired
+                    && stateModel.requiresVerification {
                   emailVerificationStatus
                 }
 
