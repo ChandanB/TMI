@@ -500,7 +500,7 @@ const isCompatibleMembership = (
   membership: DocumentData | undefined,
   invitation: TrustedInvitation,
   userID: string,
-): boolean =>
+): membership is DocumentData =>
   membership?.schemaVersion === 1 &&
   membership.recordVersion === 1 &&
   membership.userID === userID &&
@@ -694,16 +694,7 @@ const readIdempotentMembership = async (
   });
   if (
     !membershipSnapshot.exists ||
-    membership?.userID !== userID ||
-    membership.districtID !== invitation.districtID ||
-    membership.role !== invitation.role ||
-    !equalStringArrays(membership.schoolIDs, invitation.schoolIDs) ||
-    !equalStringArrays(membership.capabilities, invitation.capabilities) ||
-    parseIdentifierArray(membership.assignedStudentIDs, 10_000) === null ||
-    membership.isActive !== true ||
-    !Number.isSafeInteger(membership.version) ||
-    membership.version < 1 ||
-    membership.recordVersion !== 1 ||
+    !isCompatibleMembership(membership, invitation, userID) ||
     !profileSnapshot.exists ||
     !isCompatibleProfile(profile, userID, normalizedEmail) ||
     !preferencesSnapshot.exists ||

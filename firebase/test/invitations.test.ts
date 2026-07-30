@@ -617,6 +617,17 @@ describe("staff invitation provisioning", () => {
     }
   });
 
+  it("refuses claim retry after the membership schema changes", async () => {
+    await provisionUntilClaimWriteFails();
+    await firestore.doc(`districts/${districtID}/members/${userID}`).update({
+      schemaVersion: 2,
+    });
+    claimsError = undefined;
+
+    await expectHttpsError(makeHandler()(callableRequest()), "data-loss");
+    expect(claimsWrites).toEqual([]);
+  });
+
   it("refuses claim retry after preferences gain authority or malformed versions", async () => {
     for (const mutation of [
       { districtID },

@@ -44,7 +44,7 @@ cd firebase
 npm test
 ```
 
-Result after replay-hardening review: 8 test files passed, 99 tests passed, 0 failed. The invitation suite now includes 28 tests, including partial-state reconciliation and post-transaction claim-retry mutation regressions. No dependency audit fix was run.
+Result after replay-hardening review: 8 test files passed, 100 tests passed, 0 failed. The invitation suite now includes 29 tests, including partial-state reconciliation and post-transaction claim-retry mutation regressions for every canonical artifact, including membership schema integrity. No dependency audit fix was run.
 
 The local Java runtime emitted the known deprecated `sun.misc.Unsafe` warning, and Firebase Admin emitted metadata lookup warnings without live credentials. The `demo-tmi` emulator suite completed successfully.
 
