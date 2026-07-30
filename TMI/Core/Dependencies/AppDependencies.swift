@@ -19,22 +19,25 @@ nonisolated struct AppDependencies: Sendable {
 
     @MainActor
     static func production(firestore: Firestore) -> AppDependencies {
+        let flags = FeatureFlags.production
         let membership = MembershipRepository(
             store: FirebaseMembershipStore(firestore: firestore)
         )
         let authentication = AuthenticationRepository(
             backend: FirebaseAuthenticationBackend(),
             sessionLoader: FirebaseAuthenticationSessionLoader(
-                membershipProvider: membership
+                membershipProvider: membership,
+                requiresEmailVerification: flags.staffEmailVerificationRequired
             ),
             invitationProvisioner: FirebaseStaffInvitationProvisioner(),
-            pendingRegistrationStore: SecurePendingStaffRegistrationStore()
+            pendingRegistrationStore: SecurePendingStaffRegistrationStore(),
+            requiresEmailVerification: flags.staffEmailVerificationRequired
         )
         let students = CanonicalStudentRepository.firebase(firestore: firestore)
 
         return AppDependencies(
             runtime: .production,
-            flags: .production,
+            flags: flags,
             membership: membership,
             authentication: authentication,
             studentRepository: students,

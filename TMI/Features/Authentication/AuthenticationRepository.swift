@@ -114,18 +114,21 @@ final class AuthenticationRepository: AuthenticationProviding {
     private let sessionLoader: any AuthenticationSessionLoading
     private let invitationProvisioner: any StaffInvitationProvisioning
     private let pendingRegistrationStore: any PendingStaffRegistrationStoring
+    private let requiresEmailVerification: Bool
 
     init(
         backend: any AuthenticationBackend,
         sessionLoader: any AuthenticationSessionLoading,
         invitationProvisioner: any StaffInvitationProvisioning,
         pendingRegistrationStore: any PendingStaffRegistrationStoring =
-            InMemoryPendingStaffRegistrationStore()
+            InMemoryPendingStaffRegistrationStore(),
+        requiresEmailVerification: Bool = true
     ) {
         self.backend = backend
         self.sessionLoader = sessionLoader
         self.invitationProvisioner = invitationProvisioner
         self.pendingRegistrationStore = pendingRegistrationStore
+        self.requiresEmailVerification = requiresEmailVerification
     }
 
     func signIn(email: String, password: String) async throws -> AuthSession {
@@ -136,7 +139,7 @@ final class AuthenticationRepository: AuthenticationProviding {
             email: normalizedEmail,
             password: password
         )
-        if identity.isEmailVerified,
+        if (!requiresEmailVerification || identity.isEmailVerified),
            let pendingRegistration = try await pendingRegistrationStore
             .pendingRegistration(),
            pendingRegistration.identityID == identity.userID {
@@ -173,9 +176,11 @@ final class AuthenticationRepository: AuthenticationProviding {
 
         do {
             try await pendingRegistrationStore.save(pendingRegistration)
-            try await backend.sendVerification()
-            guard identity.isEmailVerified else {
-                return AuthSession(identity: identity, membership: nil)
+            if requiresEmailVerification {
+                try await backend.sendVerification()
+                guard identity.isEmailVerified else {
+                    return AuthSession(identity: identity, membership: nil)
+                }
             }
             return try await completePendingRegistration(
                 pendingRegistration,
@@ -202,7 +207,7 @@ final class AuthenticationRepository: AuthenticationProviding {
 
     func refresh() async throws -> AuthSession {
         let identity = try await backend.refreshIdentity()
-        guard identity.isEmailVerified else {
+        guard !requiresEmailVerification || identity.isEmailVerified else {
             return AuthSession(identity: identity, membership: nil)
         }
         if let pendingRegistration = try await pendingRegistrationStore
@@ -236,7 +241,7 @@ final class AuthenticationRepository: AuthenticationProviding {
         _ pendingRegistration: PendingStaffRegistration,
         identity: AuthIdentity
     ) async throws -> AuthSession {
-        guard identity.isEmailVerified,
+        guard (!requiresEmailVerification || identity.isEmailVerified),
               pendingRegistration.identityID == identity.userID else {
             return AuthSession(identity: identity, membership: nil)
         }
@@ -392,20 +397,23 @@ final class FirebaseAuthenticationBackend: AuthenticationBackend {
 final class FirebaseAuthenticationSessionLoader: AuthenticationSessionLoading {
     private let auth: Auth
     private let membershipProvider: any MembershipProviding
+    private let requiresEmailVerification: Bool
 
     init(
         auth: Auth = Auth.auth(),
-        membershipProvider: any MembershipProviding
+        membershipProvider: any MembershipProviding,
+        requiresEmailVerification: Bool = true
     ) {
         self.auth = auth
         self.membershipProvider = membershipProvider
+        self.requiresEmailVerification = requiresEmailVerification
     }
 
     func session(for identity: AuthIdentity) async throws -> AuthSession {
         guard let user = auth.currentUser, user.uid == identity.userID else {
             throw FirebaseAuthenticationError.identityMismatch
         }
-        guard identity.isEmailVerified else {
+        guard !requiresEmailVerification || identity.isEmailVerified else {
             return AuthSession(identity: identity, membership: nil)
         }
 

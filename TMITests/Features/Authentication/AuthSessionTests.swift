@@ -179,7 +179,8 @@ struct AuthSessionTests {
             backend: backend,
             sessionLoader: SessionLoaderStub(session: .signedOut),
             invitationProvisioner: provisioner,
-            pendingRegistrationStore: pendingStore
+            pendingRegistrationStore: pendingStore,
+            requiresEmailVerification: true
         )
 
         let pendingSession = try await repository.register(
@@ -196,6 +197,32 @@ struct AuthSessionTests {
 
         #expect(authorizedSession.access == .authorized)
         #expect(provisioner.provisionCallCount == 1)
+        #expect(await pendingStore.pendingRegistration() == nil)
+    }
+
+    @Test("Registration provisions unverified staff when verification is disabled")
+    func registrationProvisionsWhenVerificationIsDisabled() async throws {
+        let backend = AuthenticationBackendSpy()
+        backend.identityIsVerified = false
+        let provisioner = InvitationProvisionerStub(
+            result: .success(membership())
+        )
+        let pendingStore = InMemoryPendingStaffRegistrationStore()
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: provisioner,
+            pendingRegistrationStore: pendingStore,
+            requiresEmailVerification: false
+        )
+
+        let session = try await repository.register(
+            registrationRequest(invitationCode: "invite-a")
+        )
+
+        #expect(backend.sendVerificationCallCount == 0)
+        #expect(provisioner.provisionCallCount == 1)
+        #expect(session.access(requiringEmailVerification: false) == .authorized)
         #expect(await pendingStore.pendingRegistration() == nil)
     }
 
