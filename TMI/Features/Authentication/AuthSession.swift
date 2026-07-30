@@ -67,10 +67,14 @@ nonisolated struct AuthSession: Sendable, Equatable {
     }
 
     var access: AppAccessState {
+        access(requiringEmailVerification: true)
+    }
+
+    func access(requiringEmailVerification: Bool) -> AppAccessState {
         guard let identity else {
             return .signedOut
         }
-        guard identity.isEmailVerified else {
+        guard !requiringEmailVerification || identity.isEmailVerified else {
             return .emailVerificationRequired
         }
 

@@ -3,12 +3,28 @@ nonisolated struct FeatureFlags: Sendable, Equatable {
     let guardianAccounts: Bool
     let aiSuggestions: Bool
     let institutionalSSO: Bool
+    let staffEmailVerificationRequired: Bool
+
+    init(
+        independentStudentAccounts: Bool,
+        guardianAccounts: Bool,
+        aiSuggestions: Bool,
+        institutionalSSO: Bool,
+        staffEmailVerificationRequired: Bool
+    ) {
+        self.independentStudentAccounts = independentStudentAccounts
+        self.guardianAccounts = guardianAccounts
+        self.aiSuggestions = aiSuggestions
+        self.institutionalSSO = institutionalSSO
+        self.staffEmailVerificationRequired = staffEmailVerificationRequired
+    }
 
     static let production = FeatureFlags(
         independentStudentAccounts: false,
         guardianAccounts: false,
         aiSuggestions: false,
-        institutionalSSO: false
+        institutionalSSO: false,
+        staffEmailVerificationRequired: false
     )
 }
 

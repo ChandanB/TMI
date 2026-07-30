@@ -11,6 +11,7 @@ struct FeatureFlagsTests {
         #expect(flags.guardianAccounts == false)
         #expect(flags.aiSuggestions == false)
         #expect(flags.institutionalSSO == false)
+        #expect(flags.staffEmailVerificationRequired == false)
     }
 
     @Test("Production denies a missing trusted membership without bootstrap access")
@@ -41,7 +42,8 @@ struct FeatureFlagsTests {
             independentStudentAccounts: true,
             guardianAccounts: false,
             aiSuggestions: false,
-            institutionalSSO: false
+            institutionalSSO: false,
+            staffEmailVerificationRequired: false
         )
 
         let decision = flags.registrationAccountAccess(for: .student)
@@ -56,7 +58,8 @@ struct FeatureFlagsTests {
             independentStudentAccounts: false,
             guardianAccounts: true,
             aiSuggestions: false,
-            institutionalSSO: false
+            institutionalSSO: false,
+            staffEmailVerificationRequired: false
         )
 
         let decisions = [
@@ -85,13 +88,15 @@ struct FeatureFlagsTests {
             independentStudentAccounts: true,
             guardianAccounts: false,
             aiSuggestions: false,
-            institutionalSSO: false
+            institutionalSSO: false,
+            staffEmailVerificationRequired: false
         )
         let guardianFlags = FeatureFlags(
             independentStudentAccounts: false,
             guardianAccounts: true,
             aiSuggestions: false,
-            institutionalSSO: false
+            institutionalSSO: false,
+            staffEmailVerificationRequired: false
         )
 
         #expect(

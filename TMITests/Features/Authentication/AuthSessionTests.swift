@@ -25,6 +25,42 @@ struct AuthSessionTests {
         #expect(session.access == .emailVerificationRequired)
     }
 
+    @Test("Unverified active staff can enter when email verification is disabled")
+    func unverifiedActiveStaffCanEnterWhenVerificationIsDisabled() {
+        let session = AuthSession(
+            identity: AuthIdentity(
+                userID: "staff-1",
+                email: "staff@example.edu",
+                isEmailVerified: false
+            ),
+            membership: membership()
+        )
+
+        #expect(session.access(requiringEmailVerification: false) == .authorized)
+    }
+
+    @Test("Unverified active staff is blocked when email verification is required")
+    func unverifiedActiveStaffIsBlockedWhenVerificationIsRequired() {
+        let session = AuthSession(
+            identity: AuthIdentity(
+                userID: "staff-1",
+                email: "staff@example.edu",
+                isEmailVerified: false
+            ),
+            membership: membership()
+        )
+
+        #expect(
+            session.access(requiringEmailVerification: true)
+                == .emailVerificationRequired
+        )
+    }
+
+    @Test("Production temporarily disables staff email verification")
+    func productionDisablesStaffEmailVerification() {
+        #expect(FeatureFlags.production.staffEmailVerificationRequired == false)
+    }
+
     @Test("An active verified member can enter")
     func activeVerifiedMemberCanEnter() {
         let session = AuthSession(
@@ -235,7 +271,8 @@ struct AuthSessionTests {
                 independentStudentAccounts: false,
                 guardianAccounts: false,
                 aiSuggestions: false,
-                institutionalSSO: true
+                institutionalSSO: true,
+                staffEmailVerificationRequired: false
             ),
             provider: nil
         )
