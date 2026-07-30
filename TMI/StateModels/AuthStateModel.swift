@@ -573,11 +573,15 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   private let profileProvider: any UserProfileProviding
   private let membershipProvider: any MembershipProviding
   private let authorizationSessionStore: TrustedAuthorizationSessionStore
+  private let featureFlags: FeatureFlags
+  private let authorizationDeadline: Duration
 
   @ObservationIgnored
   private var authStateListenerHandle: AuthStateListenerHandle?
   @ObservationIgnored
   private var authorizationTask: Task<Void, Never>?
+  @ObservationIgnored
+  private var authorizationDeadlineTask: Task<Void, Never>?
   @ObservationIgnored
   private var authorizationGeneration: UInt64 = 0
   @ObservationIgnored
@@ -715,6 +719,14 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     authenticatedSession?.claim
   }
 
+  var canRetryAuthorization: Bool {
+    guard identityProvider.currentIdentity != nil,
+          case .loaded(.error(let error)) = state else {
+      return false
+    }
+    return error.type == .institutionVerificationFailed
+  }
+
   // MARK: - Initialization
   init(
     firebaseManager: FirebaseManager? = nil,
@@ -725,6 +737,8 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     profileProvider: (any UserProfileProviding)? = nil,
     membershipProvider: (any MembershipProviding)? = nil,
     authorizationSessionStore: TrustedAuthorizationSessionStore = TrustedAuthorizationSessionStore(),
+    featureFlags: FeatureFlags = .production,
+    authorizationDeadline: Duration = .seconds(10),
     automaticallyStart: Bool = true
   ) {
     let resolvedFirebaseManager = firebaseManager ?? (
@@ -768,6 +782,8 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
       MembershipRepository(store: FirebaseMembershipStore(firestore: $0.firestore))
     } ?? UnavailableAuthMembershipProvider()
     self.authorizationSessionStore = authorizationSessionStore
+    self.featureFlags = featureFlags
+    self.authorizationDeadline = authorizationDeadline
     let authorizationSessionUpdates = authorizationSessionStore.sessionUpdates()
     super.init()
 
@@ -789,6 +805,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
   isolated deinit {
     authorizationTask?.cancel()
+    authorizationDeadlineTask?.cancel()
     authorizationSessionUpdateTask?.cancel()
     authStateListenerHandle?.remove()
   }
@@ -865,6 +882,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     currentError = nil
     sessionID = sessionID ?? UUID().uuidString
     updateState(.loading)
+    startAuthorizationDeadline(for: identity, generation: generation)
 
     let task = Task { @MainActor [weak self] in
       guard let self else {
@@ -881,12 +899,12 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     _ identity: AuthenticatedIdentity,
     generation: UInt64
   ) async {
-    guard identity.isEmailVerified else {
+    guard !featureFlags.staffEmailVerificationRequired || identity.isEmailVerified else {
       guard isCurrentAuthorization(identity, generation: generation) else {
         return
       }
       updateState(.loaded(.verifying(.institutionalEmail)))
-      authorizationTask = nil
+      completeAuthorization(generation: generation)
       return
     }
 
@@ -896,7 +914,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
           return
         }
         updateState(.loaded(.registering(.basicInfo)))
-        authorizationTask = nil
+        completeAuthorization(generation: generation)
         return
       }
       guard profile.userID == identity.userID,
@@ -923,6 +941,8 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
         throw MembershipRepositoryError.malformed
       }
 
+      completeAuthorization(generation: generation)
+
       if profile.requiresParentalConsent && !profile.hasValidConsent {
         pendingAuthenticatedSession = session
         updateState(.loaded(.awaitingConsent(.coppa)))
@@ -930,17 +950,53 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
         publishAuthenticatedSession(session)
         await logAuditEvent(.login, result: .success)
       }
-
-      if authorizationGeneration == generation {
-        authorizationTask = nil
-      }
     } catch {
       guard isCurrentAuthorization(identity, generation: generation) else {
         return
       }
       failOrganizationAccessVerification()
-      authorizationTask = nil
+      completeAuthorization(generation: generation)
     }
+  }
+
+  @MainActor
+  private func startAuthorizationDeadline(
+    for identity: AuthenticatedIdentity,
+    generation: UInt64
+  ) {
+    authorizationDeadlineTask?.cancel()
+    authorizationDeadlineTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+
+      do {
+        try await Task.sleep(for: self.authorizationDeadline)
+      } catch {
+        return
+      }
+
+      guard self.authorizationGeneration == generation,
+            self.identityProvider.currentIdentity?.userID == identity.userID else {
+        return
+      }
+
+      self.authorizationGeneration &+= 1
+      self.authorizationTask?.cancel()
+      self.authorizationTask = nil
+      self.authorizationDeadlineTask = nil
+      self.failOrganizationAccessVerification()
+    }
+  }
+
+  @MainActor
+  private func completeAuthorization(generation: UInt64) {
+    guard authorizationGeneration == generation else {
+      return
+    }
+    authorizationDeadlineTask?.cancel()
+    authorizationDeadlineTask = nil
+    authorizationTask = nil
   }
 
   @MainActor
@@ -1046,10 +1102,23 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     authorizationGeneration &+= 1
     authorizationTask?.cancel()
     authorizationTask = nil
+    authorizationDeadlineTask?.cancel()
+    authorizationDeadlineTask = nil
   }
 
   static let organizationAccessErrorMessage =
     "We couldn’t verify your organization access. Check your connection and try again."
+
+  @MainActor
+  func retryAuthorization() async {
+    guard canRetryAuthorization,
+          let identity = identityProvider.currentIdentity else {
+      return
+    }
+
+    let task = startAuthorization(for: identity)
+    await task.value
+  }
 
   // MARK: - Form Field Methods
 

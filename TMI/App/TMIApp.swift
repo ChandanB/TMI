@@ -51,6 +51,7 @@ struct TMIApp: App {
             dependencies = .preview()
             authStateModel = AuthStateModel(
                 membershipProvider: dependencies.membership,
+                featureFlags: dependencies.flags,
                 automaticallyStart: false
             )
         } else {
@@ -65,7 +66,8 @@ struct TMIApp: App {
                 authentication: dependencies.authentication,
                 auditService: AuditService(),
                 membershipProvider: dependencies.membership,
-                authorizationSessionStore: .shared
+                authorizationSessionStore: .shared,
+                featureFlags: dependencies.flags
             )
         }
 
@@ -290,6 +292,8 @@ struct ContentView: View {
                 LoadingView()
             } else if authStateModel.isLoggedIn {
                 authenticatedContent
+            } else if authStateModel.canRetryAuthorization {
+                AuthenticationRecoveryView()
             } else {
                 AuthenticationView()
             }

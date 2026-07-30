@@ -56,6 +56,13 @@ struct AuthStateModelMembershipTests {
             profiles: ["user-1": makeUser(id: "user-1")],
             membershipProvider: ImmediateMembershipProvider(
                 memberships: ["user-1": makeMembership(userID: "user-1")]
+            ),
+            featureFlags: FeatureFlags(
+                independentStudentAccounts: false,
+                guardianAccounts: false,
+                aiSuggestions: true,
+                institutionalSSO: false,
+                staffEmailVerificationRequired: true
             )
         )
 
@@ -69,6 +76,96 @@ struct AuthStateModelMembershipTests {
             model.currentAuthState
                 == AuthenticationState.verifying(.institutionalEmail)
         )
+    }
+
+    @Test("A stalled persisted identity exits startup loading at the authorization deadline")
+    func stalledPersistedIdentityExitsStartupLoading() async {
+        let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: true)
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: ["user-1": trustedClaim(userID: "user-1", version: 1)]
+        )
+        let profileProvider = SequencedUserProfileProvider(
+            results: [.suspend]
+        )
+        let model = AuthStateModel(
+            identityProvider: identityProvider,
+            profileProvider: profileProvider,
+            membershipProvider: ImmediateMembershipProvider(
+                memberships: ["user-1": makeMembership(userID: "user-1")]
+            ),
+            authorizationDeadline: .milliseconds(10),
+            automaticallyStart: false
+        )
+
+        await model.fetch()
+
+        #expect(model.isCheckingAuth == false)
+        #expect(model.isLoggedIn == false)
+        #expect(model.canRetryAuthorization)
+        #expect(model.currentError?.type == .institutionVerificationFailed)
+    }
+
+    @Test("Retry starts a fresh authorization generation after a timeout")
+    func retryStartsFreshAuthorizationAfterTimeout() async {
+        let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: true)
+        let profile = makeUser(id: "user-1")
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: ["user-1": trustedClaim(userID: "user-1", version: 1)]
+        )
+        let profileProvider = SequencedUserProfileProvider(
+            results: [.suspend, .profile(profile)]
+        )
+        let model = AuthStateModel(
+            identityProvider: identityProvider,
+            profileProvider: profileProvider,
+            membershipProvider: ImmediateMembershipProvider(
+                memberships: ["user-1": makeMembership(userID: "user-1")]
+            ),
+            authorizationDeadline: .milliseconds(10),
+            automaticallyStart: false
+        )
+
+        await model.fetch()
+        await model.retryAuthorization()
+
+        #expect(await profileProvider.requestCount == 2)
+        #expect(model.isLoggedIn)
+        #expect(model.currentUser == profile)
+        #expect(model.canRetryAuthorization == false)
+    }
+
+    @Test("A slow audit event cannot revoke an authorized session")
+    func slowAuditCannotRevokeAuthorizedSession() async {
+        let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: true)
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: ["user-1": trustedClaim(userID: "user-1", version: 1)]
+        )
+        let auditRecorder = SuspendedAuditEventRecorder()
+        let model = AuthStateModel(
+            auditService: auditRecorder,
+            identityProvider: identityProvider,
+            profileProvider: FakeUserProfileProvider(
+                profiles: ["user-1": makeUser(id: "user-1")]
+            ),
+            membershipProvider: ImmediateMembershipProvider(
+                memberships: ["user-1": makeMembership(userID: "user-1")]
+            ),
+            authorizationDeadline: .milliseconds(10),
+            automaticallyStart: false
+        )
+        let fetchTask = Task { @MainActor in
+            await model.fetch()
+        }
+
+        #expect(await eventually { model.isLoggedIn })
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(model.isLoggedIn)
+
+        auditRecorder.resume()
+        await fetchTask.value
     }
 
     @Test("Editable profile authority cannot elevate the trusted membership")
@@ -537,7 +634,8 @@ struct AuthStateModelMembershipTests {
         signOutOperation: (@MainActor () throws -> Void)? = nil,
         auditService: any AuditEventRecording = NoOpAuditEventRecorder(),
         authorizationSessionStore: TrustedAuthorizationSessionStore =
-            TrustedAuthorizationSessionStore()
+            TrustedAuthorizationSessionStore(),
+        featureFlags: FeatureFlags = .production
     ) -> AuthStateModel {
         AuthStateModel(
             auditService: auditService,
@@ -546,6 +644,7 @@ struct AuthStateModelMembershipTests {
             profileProvider: FakeUserProfileProvider(profiles: profiles),
             membershipProvider: membershipProvider,
             authorizationSessionStore: authorizationSessionStore,
+            featureFlags: featureFlags,
             automaticallyStart: false
         )
     }
@@ -682,6 +781,37 @@ private actor FakeUserProfileProvider: UserProfileProviding {
     }
 }
 
+private actor SequencedUserProfileProvider: UserProfileProviding {
+    enum Result {
+        case suspend
+        case profile(TMIUser?)
+    }
+
+    private var results: [Result]
+    private(set) var requestCount = 0
+
+    init(results: [Result]) {
+        self.results = results
+    }
+
+    func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
+        requestCount += 1
+        let result = results.removeFirst()
+
+        switch result {
+        case .suspend:
+            do {
+                try await Task.sleep(for: .seconds(60))
+            } catch {
+                throw error
+            }
+            return nil
+        case .profile(let profile):
+            return profile
+        }
+    }
+}
+
 private actor ImmediateMembershipProvider: MembershipProviding {
     private let memberships: [String: MembershipContext]
     private let error: Error?
@@ -765,6 +895,22 @@ private final class RecordingAuditEventRecorder: AuditEventRecording {
 
     func logEvent(_ event: AuditEvent) async {
         events.append(event)
+    }
+}
+
+@MainActor
+private final class SuspendedAuditEventRecorder: AuditEventRecording {
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func logEvent(_ event: AuditEvent) async {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func resume() {
+        continuation?.resume()
+        continuation = nil
     }
 }
 
