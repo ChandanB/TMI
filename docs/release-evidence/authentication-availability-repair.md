@@ -9,6 +9,7 @@ The implementation is verified except for the macOS UI permission gate described
 - Repair source HEAD before release-gate evidence: `8084cb01393b682dc63d027649a9f657b6875428`
 - Baseline: `eb14a988b2928f46ffe4c14ce1417d5a4ae47e88`
 - Release-gate correction: the fresh macOS gate exposed native `TextInputAutocapitalization` use in a cross-platform component. A source-contract regression test was observed failing before a minimal `TMITextInputAutocapitalization` compatibility adapter was added. The correction and this evidence are recorded together in the evidence commit.
+- Durable RED reproduction: `docs/release-evidence/logs/authentication-availability-repair-macos-red.txt` records the exact detached `8084cb0` command, exit code 65, and compiler diagnostics.
 
 ## Focused authentication and accessibility gate
 
@@ -25,16 +26,18 @@ xcodebuild test -quiet -project TMI.xcodeproj -scheme TMI \
   -only-testing:TMITests/UITestingLaunchConfigurationTests
 ```
 
-Result: `Passed`, 63 passed, 0 skipped, 0 failed.
+Result: `Passed`, 64 logical tests with 67 passed executions, 0 skipped, 0 failed. Xcode reports the four argument rows of the capitalization mapping as one logical parameterized test and four passed executions.
 
 - `AuthSessionTests`: 19
 - `FirebaseStaffInvitationProvisionerTests`: 4
 - `AuthStateModelMembershipTests`: 25
 - `SignOutCallSiteTests`: 6
-- `TMIComponentAccessibilityTests`: 2
+- `TMIComponentAccessibilityTests`: 6 executions (3 logical tests)
 - `UITestingLaunchConfigurationTests`: 7
 
 Result bundle: `/tmp/TMI-AuthRepair-Focused.xcresult`
+
+The adapter additionally has UIKit behavioral coverage for all four mappings: `never`, `sentences`, `words`, and `characters`. The mapping test was first observed failing to compile because `TMITextInputAutocapitalization` had no `uiKitValue`; the GREEN component bundle reports 3 logical tests and 6 passed executions at `/tmp/TMI-AuthRepair-Capitalization-Green-3.xcresult`.
 
 ## Firebase gate
 

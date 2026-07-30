@@ -1,0 +1,26 @@
+Authentication availability repair macOS RED reproduction
+Date: July 30, 2026 (CDT)
+Detached revision: 8084cb01393b682dc63d027649a9f657b6875428
+Temporary worktree: /tmp/TMI-AuthRepair-8084-repro
+
+Command:
+xcodebuild test -quiet -project TMI.xcodeproj -scheme TMI \
+  -destination 'platform=macOS' \
+  -derivedDataPath '/tmp/TMI-AuthRepair-8084 Repro DD' \
+  -only-testing:TMITests
+
+Exit code: 65
+
+Key compiler diagnostics (verbatim):
+/tmp/TMI-AuthRepair-8084-repro/TMI/Views/Components/TMIComponentLibrary.swift:487:25: error: cannot find type 'TextInputAutocapitalization' in scope
+    var capitalization: TextInputAutocapitalization? = nil
+                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+/tmp/TMI-AuthRepair-8084-repro/TMI/Views/Components/TMIComponentLibrary.swift:561:42: error: cannot find type 'TextInputAutocapitalization' in scope
+    private var effectiveCapitalization: TextInputAutocapitalization? {
+                                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+Testing failed:
+	Cannot find type 'TextInputAutocapitalization' in scope
+	Cannot find type 'TextInputAutocapitalization' in scope
+	Testing cancelled because the build failed.
+
+** TEST FAILED **

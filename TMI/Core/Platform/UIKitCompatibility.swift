@@ -7,6 +7,19 @@ enum TMITextInputAutocapitalization {
     case characters
 }
 
+#if canImport(UIKit)
+extension TMITextInputAutocapitalization {
+    var uiKitValue: TextInputAutocapitalization {
+        switch self {
+        case .never: .never
+        case .sentences: .sentences
+        case .words: .words
+        case .characters: .characters
+        }
+    }
+}
+#endif
+
 extension View {
     @ViewBuilder
     func tmiTextInputAutocapitalization(
@@ -14,13 +27,7 @@ extension View {
     ) -> some View {
 #if canImport(UIKit)
         if let autocapitalization {
-            let nativeValue: TextInputAutocapitalization = switch autocapitalization {
-            case .never: .never
-            case .sentences: .sentences
-            case .words: .words
-            case .characters: .characters
-            }
-            textInputAutocapitalization(nativeValue)
+            textInputAutocapitalization(autocapitalization.uiKitValue)
         } else {
             self
         }

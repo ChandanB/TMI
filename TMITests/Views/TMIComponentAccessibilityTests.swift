@@ -1,5 +1,10 @@
 import Foundation
 import Testing
+@testable import TMI
+
+#if canImport(UIKit)
+import SwiftUI
+#endif
 
 @Suite("TMI component accessibility")
 struct TMIComponentAccessibilityTests {
@@ -43,6 +48,27 @@ struct TMIComponentAccessibilityTests {
         )
         #expect(setup.contains("capitalization: .words"))
     }
+
+#if canImport(UIKit)
+    @Test(
+        "Cross-platform capitalization maps to UIKit",
+        arguments: [
+            (TMITextInputAutocapitalization.never, TextInputAutocapitalization.never),
+            (.sentences, .sentences),
+            (.words, .words),
+            (.characters, .characters),
+        ]
+    )
+    @MainActor
+    func capitalizationMapsToUIKit(
+        value: TMITextInputAutocapitalization,
+        expected: TextInputAutocapitalization
+    ) {
+        #expect(
+            String(reflecting: value.uiKitValue) == String(reflecting: expected)
+        )
+    }
+#endif
 
     private func source(at relativePath: String) throws -> String {
         let url = URL(fileURLWithPath: #filePath)
