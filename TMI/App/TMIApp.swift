@@ -292,6 +292,8 @@ struct ContentView: View {
                 LoadingView()
             } else if authStateModel.isLoggedIn {
                 authenticatedContent
+            } else if authStateModel.requiresStaffAccessSetup {
+                StaffAccessSetupView()
             } else if authStateModel.canRetryAuthorization {
                 AuthenticationRecoveryView()
             } else {

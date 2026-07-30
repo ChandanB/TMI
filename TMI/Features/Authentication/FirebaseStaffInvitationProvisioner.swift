@@ -40,7 +40,7 @@ final class FirebaseStaffInvitationProvisioner: StaffInvitationProvisioning {
     }
 
     func provision(
-        request: StaffRegistrationRequest,
+        request: StaffInvitationAcceptanceRequest,
         identity: AuthIdentity
     ) async throws -> MembershipContext {
         let response: Any

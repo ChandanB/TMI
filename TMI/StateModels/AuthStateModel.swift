@@ -567,6 +567,8 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
   // MARK: - Dependencies
   private let auditService: any AuditEventRecording
   private let signInOperation: @MainActor (String, String) async throws -> Void
+  private let staffOnboardingOperation:
+    @MainActor (StaffOnboardingRequest) async throws -> AuthSession
   private let signOutOperation: @MainActor () throws -> Void
   private let resetPasswordOperation: @MainActor (String) async throws -> Void
   private let identityProvider: any AuthenticationIdentityProviding
@@ -643,6 +645,11 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     set { ui.set("currentError", value: newValue) }
   }
 
+  var isCompletingStaffAccessSetup: Bool {
+    get { ui.get("isCompletingStaffAccessSetup") ?? false }
+    set { ui.set("isCompletingStaffAccessSetup", value: newValue) }
+  }
+
   // MARK: - Computed Properties
   var isLoggedIn: Bool {
     if case .loaded(.authenticated) = state {
@@ -678,6 +685,12 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
       return true
     }
     return false
+  }
+
+  var requiresStaffAccessSetup: Bool {
+    currentAuthState == .registering(.institutionVerification)
+      && identityProvider.currentIdentity != nil
+      && authenticatedSession == nil
   }
 
   var awaitingConsent: Bool {
@@ -762,6 +775,12 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
       }
       try await resolvedFirebaseManager.signIn(withEmail: email, password: password)
     }
+    self.staffOnboardingOperation = { request in
+      guard let authentication else {
+        throw UnconfiguredAuthenticationDependencyError.unavailable
+      }
+      return try await authentication.completeStaffOnboarding(request)
+    }
     self.resetPasswordOperation = { email in
       if let authentication {
         try await authentication.sendPasswordReset(email: email)
@@ -833,6 +852,7 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     ui.set("showingForgotPassword", value: false)
     ui.set("focusedField", value: nil as AuthField?)
     ui.set("currentError", value: nil as AuthenticationError?)
+    ui.set("isCompletingStaffAccessSetup", value: false)
     sessionID = sessionID ?? UUID().uuidString
     updateState(.loading)
   }
@@ -913,7 +933,8 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
         guard isCurrentAuthorization(identity, generation: generation) else {
           return
         }
-        updateState(.loaded(.registering(.basicInfo)))
+        registrationStep = .institutionVerification
+        updateState(.loaded(.registering(.institutionVerification)))
         completeAuthorization(generation: generation)
         return
       }
@@ -1108,6 +1129,54 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
 
   static let organizationAccessErrorMessage =
     "We couldn’t verify your organization access. Check your connection and try again."
+  static let staffAccessSetupErrorMessage =
+    "We couldn’t verify this staff invitation. Check the details and try again."
+
+  @MainActor
+  func completeStaffAccessSetup(
+    displayName: String,
+    invitationCode: String
+  ) async {
+    let displayName = displayName
+      .split(whereSeparator: \.isWhitespace)
+      .joined(separator: " ")
+    let invitationCode = invitationCode
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard requiresStaffAccessSetup,
+          !displayName.isEmpty,
+          !invitationCode.isEmpty else {
+      currentError = AuthenticationError(
+        type: .institutionVerificationFailed,
+        message: Self.staffAccessSetupErrorMessage,
+        traumaInformedMessage: Self.staffAccessSetupErrorMessage
+      )
+      return
+    }
+
+    isCompletingStaffAccessSetup = true
+    currentError = nil
+    defer { isCompletingStaffAccessSetup = false }
+
+    do {
+      _ = try await staffOnboardingOperation(
+        StaffOnboardingRequest(
+          displayName: displayName,
+          invitationCode: invitationCode,
+          privacyPolicyVersion: StaffPolicyVersions.privacyPolicyVersion,
+          acceptableUsePolicyVersion:
+            StaffPolicyVersions.acceptableUsePolicyVersion
+        )
+      )
+      await fetch()
+    } catch {
+      currentError = AuthenticationError(
+        type: .institutionVerificationFailed,
+        message: Self.staffAccessSetupErrorMessage,
+        traumaInformedMessage: Self.staffAccessSetupErrorMessage
+      )
+      updateState(.loaded(.registering(.institutionVerification)))
+    }
+  }
 
   @MainActor
   func retryAuthorization() async {

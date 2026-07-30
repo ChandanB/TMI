@@ -132,6 +132,44 @@ struct AuthSessionTests {
         #expect(backend.createUserCallCount == 0)
     }
 
+    @Test("An existing authenticated identity accepts an invitation without client authority")
+    func existingIdentityCompletesStaffOnboarding() async throws {
+        let backend = AuthenticationBackendSpy()
+        backend.identityIsVerified = false
+        let trustedMembership = membership(districtID: "trusted-district")
+        let provisioner = InvitationProvisionerStub(
+            result: .success(trustedMembership)
+        )
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: provisioner,
+            requiresEmailVerification: false
+        )
+        let request = StaffOnboardingRequest(
+            displayName: "  Morgan   Lee  ",
+            invitationCode: "  opaque-invitation  ",
+            privacyPolicyVersion: "2026-07-20",
+            acceptableUsePolicyVersion: "2026-07-20"
+        )
+
+        let session = try await repository.completeStaffOnboarding(request)
+
+        #expect(backend.currentIdentityCallCount == 1)
+        #expect(provisioner.provisionCallCount == 1)
+        #expect(
+            provisioner.lastRequest
+                == StaffInvitationAcceptanceRequest(
+                    displayName: "Morgan Lee",
+                    invitationCode: "opaque-invitation",
+                    privacyPolicyVersion: "2026-07-20",
+                    acceptableUsePolicyVersion: "2026-07-20"
+                )
+        )
+        #expect(session.membership?.districtID == "trusted-district")
+        #expect(session.access(requiringEmailVerification: false) == .authorized)
+    }
+
     @Test("A token refresh failure never returns a partial session")
     func tokenRefreshFailureIsReported() async {
         let backend = AuthenticationBackendSpy()
@@ -415,6 +453,7 @@ struct AuthSessionTests {
 @MainActor
 private final class AuthenticationBackendSpy: AuthenticationBackend {
     var createUserCallCount = 0
+    var currentIdentityCallCount = 0
     var deleteCurrentUserCallCount = 0
     var sendVerificationCallCount = 0
     var refreshError: Error?
@@ -427,6 +466,15 @@ private final class AuthenticationBackendSpy: AuthenticationBackend {
     func createUser(email: String, password: String) async throws -> AuthIdentity {
         createUserCallCount += 1
         return identity
+    }
+
+    func currentIdentity() async throws -> AuthIdentity {
+        currentIdentityCallCount += 1
+        return AuthIdentity(
+            userID: "staff-1",
+            email: "staff@example.edu",
+            isEmailVerified: identityIsVerified
+        )
     }
 
     func deleteCurrentUser() async throws {
@@ -493,16 +541,18 @@ private actor FailOnceClearingPendingRegistrationStore:
 private final class InvitationProvisionerStub: StaffInvitationProvisioning {
     let result: Result<MembershipContext, Error>
     private(set) var provisionCallCount = 0
+    private(set) var lastRequest: StaffInvitationAcceptanceRequest?
 
     init(result: Result<MembershipContext, Error>) {
         self.result = result
     }
 
     func provision(
-        request: StaffRegistrationRequest,
+        request: StaffInvitationAcceptanceRequest,
         identity: AuthIdentity
     ) async throws -> MembershipContext {
         provisionCallCount += 1
+        lastRequest = request
         return try result.get()
     }
 }

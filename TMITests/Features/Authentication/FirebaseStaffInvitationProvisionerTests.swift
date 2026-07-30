@@ -87,12 +87,9 @@ struct FirebaseStaffInvitationProvisionerTests {
         }
     }
 
-    private var registrationRequest: StaffRegistrationRequest {
-        StaffRegistrationRequest(
+    private var registrationRequest: StaffInvitationAcceptanceRequest {
+        StaffInvitationAcceptanceRequest(
             displayName: "Morgan Lee",
-            email: "morgan@example.edu",
-            password: "Correct-Horse-9",
-            requestedRole: .teacher,
             invitationCode: "opaque-invitation",
             privacyPolicyVersion: "2026-07-20",
             acceptableUsePolicyVersion: "2026-07-20"

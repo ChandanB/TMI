@@ -91,6 +91,12 @@ private final class AuthenticationAcceptanceUITestingRepository: AuthenticationP
         )
     }
 
+    func completeStaffOnboarding(
+        _ request: StaffOnboardingRequest
+    ) async throws -> AuthSession {
+        throw AuthenticationAcceptanceUITestingError.invalidInvitation
+    }
+
     func sendPasswordReset(email: String) async throws { }
 
     func sendVerification() async throws { }

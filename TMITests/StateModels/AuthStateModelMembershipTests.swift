@@ -41,6 +41,110 @@ struct AuthStateModelMembershipTests {
         #expect(source.contains("FirestorePaths.privateProfile(userID: identity.userID)"))
     }
 
+    @Test("A missing canonical profile requires staff access setup without authorizing")
+    func missingCanonicalProfileRequiresStaffAccessSetup() async {
+        let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: false)
+        let model = AuthStateModel(
+            authentication: AuthenticationProviderSpy(),
+            identityProvider: FakeAuthenticationIdentityProvider(
+                identity: identity,
+                claims: [:]
+            ),
+            profileProvider: FakeUserProfileProvider(profiles: [:]),
+            membershipProvider: ImmediateMembershipProvider(memberships: [:]),
+            featureFlags: .production,
+            automaticallyStart: false
+        )
+
+        await model.fetch()
+
+        #expect(model.requiresStaffAccessSetup)
+        #expect(model.currentAuthState == .registering(.institutionVerification))
+        #expect(model.authenticatedSession == nil)
+        #expect(model.currentMembership == nil)
+        #expect(model.isLoggedIn == false)
+    }
+
+    @Test("Staff access setup validates required fields before provisioning")
+    func staffAccessSetupValidatesRequiredFields() async {
+        let authentication = AuthenticationProviderSpy()
+        let model = AuthStateModel(
+            authentication: authentication,
+            identityProvider: FakeAuthenticationIdentityProvider(
+                identity: AuthenticatedIdentity(
+                    userID: "user-1",
+                    isEmailVerified: false
+                ),
+                claims: [:]
+            ),
+            profileProvider: FakeUserProfileProvider(profiles: [:]),
+            membershipProvider: ImmediateMembershipProvider(memberships: [:]),
+            automaticallyStart: false
+        )
+
+        await model.fetch()
+        await model.completeStaffAccessSetup(
+            displayName: " ",
+            invitationCode: "invite-a"
+        )
+
+        #expect(authentication.completeStaffOnboardingCallCount == 0)
+        #expect(model.requiresStaffAccessSetup)
+        let currentAuthenticationError: AuthenticationError? = model.currentError
+        #expect(currentAuthenticationError != nil)
+    }
+
+    @Test("Staff access setup publishes only a freshly loaded canonical session")
+    func staffAccessSetupReloadsCanonicalSession() async {
+        let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: false)
+        let profile = makeUser(id: "user-1", role: .districtAdmin)
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: ["user-1": trustedClaim(userID: "user-1", version: 1)]
+        )
+        let profileProvider = SequencedUserProfileProvider(
+            results: [.profile(nil), .profile(profile)]
+        )
+        let authentication = AuthenticationProviderSpy()
+        let membership = makeMembership(
+            userID: "user-1",
+            districtID: "trusted-district",
+            role: .teacher
+        )
+        let model = AuthStateModel(
+            authentication: authentication,
+            identityProvider: identityProvider,
+            profileProvider: profileProvider,
+            membershipProvider: ImmediateMembershipProvider(
+                memberships: ["user-1": membership]
+            ),
+            automaticallyStart: false
+        )
+
+        await model.fetch()
+        await model.completeStaffAccessSetup(
+            displayName: "  Morgan Lee  ",
+            invitationCode: "  opaque-invitation  "
+        )
+
+        #expect(authentication.completeStaffOnboardingCallCount == 1)
+        #expect(
+            authentication.lastOnboardingRequest
+                == StaffOnboardingRequest(
+                    displayName: "Morgan Lee",
+                    invitationCode: "opaque-invitation",
+                    privacyPolicyVersion: StaffPolicyVersions.privacyPolicyVersion,
+                    acceptableUsePolicyVersion:
+                        StaffPolicyVersions.acceptableUsePolicyVersion
+                )
+        )
+        #expect(await profileProvider.requestCount == 2)
+        #expect(model.isLoggedIn)
+        #expect(model.currentUser?.requestedRole == .districtAdmin)
+        #expect(model.currentMembership?.role == .teacher)
+        #expect(model.currentMembership?.districtID == "trusted-district")
+    }
+
     @Test("Unverified identity cannot publish a trusted staff session")
     func unverifiedIdentityCannotPublishSession() async {
         let identity = AuthenticatedIdentity(
@@ -918,6 +1022,8 @@ private final class SuspendedAuditEventRecorder: AuditEventRecording {
 private final class AuthenticationProviderSpy: AuthenticationProviding {
     private(set) var signInCallCount = 0
     private(set) var lastEmail: String?
+    private(set) var completeStaffOnboardingCallCount = 0
+    private(set) var lastOnboardingRequest: StaffOnboardingRequest?
 
     func signIn(email: String, password: String) async throws -> AuthSession {
         signInCallCount += 1
@@ -927,6 +1033,14 @@ private final class AuthenticationProviderSpy: AuthenticationProviding {
 
     func register(_ request: StaffRegistrationRequest) async throws -> AuthSession {
         .signedOut
+    }
+
+    func completeStaffOnboarding(
+        _ request: StaffOnboardingRequest
+    ) async throws -> AuthSession {
+        completeStaffOnboardingCallCount += 1
+        lastOnboardingRequest = request
+        return .signedOut
     }
 
     func sendPasswordReset(email: String) async throws {}

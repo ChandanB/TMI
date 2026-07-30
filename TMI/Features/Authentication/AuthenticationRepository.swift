@@ -25,6 +25,32 @@ nonisolated struct StaffRegistrationRequest: Sendable, Equatable {
     }
 }
 
+nonisolated struct StaffOnboardingRequest: Sendable, Equatable {
+    let displayName: String
+    let invitationCode: String
+    let privacyPolicyVersion: String
+    let acceptableUsePolicyVersion: String
+
+    var invitationAcceptanceRequest: StaffInvitationAcceptanceRequest {
+        StaffInvitationAcceptanceRequest(
+            displayName: displayName
+                .split(whereSeparator: \.isWhitespace)
+                .joined(separator: " "),
+            invitationCode: invitationCode
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            privacyPolicyVersion: privacyPolicyVersion,
+            acceptableUsePolicyVersion: acceptableUsePolicyVersion
+        )
+    }
+}
+
+nonisolated struct StaffInvitationAcceptanceRequest: Sendable, Equatable {
+    let displayName: String
+    let invitationCode: String
+    let privacyPolicyVersion: String
+    let acceptableUsePolicyVersion: String
+}
+
 nonisolated struct PendingStaffRegistration: Codable, Sendable, Equatable {
     let identityID: String
     let displayName: String
@@ -44,12 +70,9 @@ nonisolated struct PendingStaffRegistration: Codable, Sendable, Equatable {
         acceptableUsePolicyVersion = request.acceptableUsePolicyVersion
     }
 
-    var request: StaffRegistrationRequest {
-        StaffRegistrationRequest(
+    var invitationAcceptanceRequest: StaffInvitationAcceptanceRequest {
+        StaffInvitationAcceptanceRequest(
             displayName: displayName,
-            email: email,
-            password: "",
-            requestedRole: requestedRole,
             invitationCode: invitationCode,
             privacyPolicyVersion: privacyPolicyVersion,
             acceptableUsePolicyVersion: acceptableUsePolicyVersion
@@ -61,6 +84,7 @@ nonisolated struct PendingStaffRegistration: Codable, Sendable, Equatable {
 protocol AuthenticationProviding: Sendable {
     func signIn(email: String, password: String) async throws -> AuthSession
     func register(_ request: StaffRegistrationRequest) async throws -> AuthSession
+    func completeStaffOnboarding(_ request: StaffOnboardingRequest) async throws -> AuthSession
     func sendPasswordReset(email: String) async throws
     func sendVerification() async throws
     func refresh() async throws -> AuthSession
@@ -70,6 +94,7 @@ protocol AuthenticationProviding: Sendable {
 
 @MainActor
 protocol AuthenticationBackend {
+    func currentIdentity() async throws -> AuthIdentity
     func signIn(email: String, password: String) async throws -> AuthIdentity
     func createUser(email: String, password: String) async throws -> AuthIdentity
     func deleteCurrentUser() async throws
@@ -88,7 +113,7 @@ protocol AuthenticationSessionLoading {
 @MainActor
 protocol StaffInvitationProvisioning {
     func provision(
-        request: StaffRegistrationRequest,
+        request: StaffInvitationAcceptanceRequest,
         identity: AuthIdentity
     ) async throws -> MembershipContext
 }
@@ -195,6 +220,24 @@ final class AuthenticationRepository: AuthenticationProviding {
         }
     }
 
+    func completeStaffOnboarding(
+        _ request: StaffOnboardingRequest
+    ) async throws -> AuthSession {
+        let request = request.invitationAcceptanceRequest
+        guard !request.displayName.isEmpty, !request.invitationCode.isEmpty else {
+            throw AuthenticationRepositoryError.invitationRequired
+        }
+        let identity = try await backend.currentIdentity()
+        guard !requiresEmailVerification || identity.isEmailVerified else {
+            return AuthSession(identity: identity, membership: nil)
+        }
+        let membership = try await invitationProvisioner.provision(
+            request: request,
+            identity: identity
+        )
+        return AuthSession(identity: identity, membership: membership)
+    }
+
     func sendPasswordReset(email: String) async throws {
         try await backend.sendPasswordReset(
             email: email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -246,7 +289,7 @@ final class AuthenticationRepository: AuthenticationProviding {
             return AuthSession(identity: identity, membership: nil)
         }
         let membership = try await invitationProvisioner.provision(
-            request: pendingRegistration.request,
+            request: pendingRegistration.invitationAcceptanceRequest,
             identity: identity
         )
         do {
@@ -325,6 +368,13 @@ final class FirebaseAuthenticationBackend: AuthenticationBackend {
 
     init(auth: Auth = Auth.auth()) {
         self.auth = auth
+    }
+
+    func currentIdentity() async throws -> AuthIdentity {
+        guard let user = auth.currentUser else {
+            throw FirebaseAuthenticationError.noAuthenticatedUser
+        }
+        return identity(for: user)
     }
 
     func signIn(email: String, password: String) async throws -> AuthIdentity {
