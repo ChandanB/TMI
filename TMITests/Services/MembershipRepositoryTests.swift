@@ -4,6 +4,23 @@ import Testing
 
 @Suite("Trusted Membership Repository")
 struct MembershipRepositoryTests {
+    @Test("Completely absent trusted claims are distinguished from malformed claims")
+    func absentTrustedClaimsAreMissing() {
+        #expect(throws: TrustedTenantClaimError.missing) {
+            try TrustedTenantClaim(userID: "user-1", tokenClaims: [:])
+        }
+    }
+
+    @Test("Partial trusted claims remain malformed")
+    func partialTrustedClaimsAreMalformed() {
+        #expect(throws: TrustedTenantClaimError.malformed) {
+            try TrustedTenantClaim(
+                userID: "user-1",
+                tokenClaims: [TrustedTenantClaim.districtIDClaimKey: "district-1"]
+            )
+        }
+    }
+
     @Test("Trusted claims use the frozen wire keys and accept staff only")
     func trustedClaimWireContract() throws {
         let claim = try TrustedTenantClaim(

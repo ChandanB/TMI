@@ -179,23 +179,14 @@ export const createProvisionStaffMembershipHandler = (
         if (invitation.consumedByUserID !== userID) {
           throw unusableInvitationError();
         }
-        requireCompatibleTrustedClaims(
-          authUser.customClaims,
-          invitation,
-          true,
-        );
         return readIdempotentMembership(
           dependencies.firestore,
           transaction,
           invitation,
           userID,
+          authUser.customClaims,
         );
       }
-      requireCompatibleTrustedClaims(
-        authUser.customClaims,
-        invitation,
-        false,
-      );
       if (
         !invitation.isActive ||
         invitation.expiresAt.toMillis() <= dependencies.now().getTime() ||
@@ -224,19 +215,85 @@ export const createProvisionStaffMembershipHandler = (
         transaction.get(references.acceptableUse),
         transaction.get(references.audit),
       ]);
-      if (existingSnapshots.some((snapshot) => snapshot.exists)) {
-        throw new HttpsError(
-          "already-exists",
-          "The account already has onboarding records.",
-        );
+      const [
+        membershipSnapshot,
+        profileSnapshot,
+        preferencesSnapshot,
+        privacySnapshot,
+        acceptableUseSnapshot,
+        auditSnapshot,
+      ] = existingSnapshots;
+      const existingMembership = membershipSnapshot.data();
+      const membershipVersion = existingMembership?.version ?? 1;
+      const assignedStudentIDs = existingMembership?.assignedStudentIDs ?? [];
+      if (
+        membershipSnapshot.exists &&
+        !isCompatibleMembership(existingMembership, invitation, userID)
+      ) {
+        throw incompatibleExistingRecordError();
+      }
+      requireCompatibleTrustedClaims(
+        authUser.customClaims,
+        invitation,
+        membershipVersion,
+      );
+      if (
+        profileSnapshot.exists &&
+        !isCompatibleProfile(profileSnapshot.data(), userID, normalizedEmail)
+      ) {
+        throw incompatibleExistingRecordError();
+      }
+      if (
+        preferencesSnapshot.exists &&
+        !isCompatiblePreferences(preferencesSnapshot.data())
+      ) {
+        throw incompatibleExistingRecordError();
+      }
+      const expectedAuditHash = hashAuditRequest({
+        userID,
+        districtID: invitation.districtID,
+        role: invitation.role,
+        schoolIDs: invitation.schoolIDs,
+        capabilities: invitation.capabilities,
+        privacyPolicyVersion: data.privacyPolicyVersion,
+        acceptableUsePolicyVersion: data.acceptableUsePolicyVersion,
+      });
+      if (
+        privacySnapshot.exists &&
+        !isCompatibleAcknowledgement(
+          privacySnapshot.data(),
+          "privacyPolicy",
+          data.privacyPolicyVersion,
+          userID,
+        )
+      ) {
+        throw incompatibleExistingRecordError();
+      }
+      if (
+        acceptableUseSnapshot.exists &&
+        !isCompatibleAcknowledgement(
+          acceptableUseSnapshot.data(),
+          "acceptableUsePolicy",
+          data.acceptableUsePolicyVersion,
+          userID,
+        )
+      ) {
+        throw incompatibleExistingRecordError();
+      }
+      if (
+        auditSnapshot.exists &&
+        !isCompatibleAudit(
+          auditSnapshot.data(),
+          invitation,
+          paths.membership,
+          userID,
+          expectedAuditHash,
+        )
+      ) {
+        throw incompatibleExistingRecordError();
       }
 
-      const membership = membershipResult(
-        invitation,
-        userID,
-        false,
-      );
-      transaction.create(references.membership, {
+      if (!membershipSnapshot.exists) transaction.create(references.membership, {
         schemaVersion: 1,
         recordVersion: 1,
         userID,
@@ -252,7 +309,7 @@ export const createProvisionStaffMembershipHandler = (
         updatedAt: timestamp,
         updatedBy: userID,
       });
-      transaction.create(references.profile, {
+      if (!profileSnapshot.exists) transaction.create(references.profile, {
         schemaVersion: 1,
         recordVersion: 1,
         userID,
@@ -262,14 +319,14 @@ export const createProvisionStaffMembershipHandler = (
         createdAt: timestamp,
         updatedAt: timestamp,
       });
-      transaction.create(references.preferences, {
+      if (!preferencesSnapshot.exists) transaction.create(references.preferences, {
         schemaVersion: 1,
         recordVersion: 1,
         onboardingComplete: false,
         createdAt: timestamp,
         updatedAt: timestamp,
       });
-      transaction.create(references.privacy, {
+      if (!privacySnapshot.exists) transaction.create(references.privacy, {
         schemaVersion: 1,
         recordVersion: 1,
         documentID: "privacyPolicy",
@@ -277,7 +334,7 @@ export const createProvisionStaffMembershipHandler = (
         acceptedAt: timestamp,
         operationID: `staff-provision-${userID}`,
       });
-      transaction.create(references.acceptableUse, {
+      if (!acceptableUseSnapshot.exists) transaction.create(references.acceptableUse, {
         schemaVersion: 1,
         recordVersion: 1,
         documentID: "acceptableUsePolicy",
@@ -285,7 +342,7 @@ export const createProvisionStaffMembershipHandler = (
         acceptedAt: timestamp,
         operationID: `staff-provision-${userID}`,
       });
-      transaction.create(references.audit, {
+      if (!auditSnapshot.exists) transaction.create(references.audit, {
         schemaVersion: 1,
         recordVersion: 1,
         action: "staff.membership.provision",
@@ -293,15 +350,7 @@ export const createProvisionStaffMembershipHandler = (
         districtID: invitation.districtID,
         targetPath: paths.membership,
         reasonCode: "staff-invitation-accepted",
-        requestHash: hashAuditRequest({
-          userID,
-          districtID: invitation.districtID,
-          role: invitation.role,
-          schoolIDs: invitation.schoolIDs,
-          capabilities: invitation.capabilities,
-          privacyPolicyVersion: data.privacyPolicyVersion,
-          acceptableUsePolicyVersion: data.acceptableUsePolicyVersion,
-        }),
+        requestHash: expectedAuditHash,
         details: {
           role: invitation.role,
           schoolIDs: [...invitation.schoolIDs],
@@ -316,7 +365,13 @@ export const createProvisionStaffMembershipHandler = (
         consumedByUserID: userID,
         consumedAt: timestamp,
       });
-      return membership;
+      return membershipResult(
+        invitation,
+        userID,
+        false,
+        membershipVersion,
+        assignedStudentIDs,
+      );
     },
   );
 
@@ -408,7 +463,7 @@ const normalizeEmail = (email: string): string =>
 const requireCompatibleTrustedClaims = (
   claims: Readonly<Record<string, unknown>>,
   invitation: TrustedInvitation,
-  allowMatchingClaims: boolean,
+  expectedMembershipVersion: number | true,
 ): void => {
   const districtID = claims.tmiDistrictID;
   const accessClass = claims.tmiAccessClass;
@@ -421,10 +476,10 @@ const requireCompatibleTrustedClaims = (
     return;
   }
   if (
-    allowMatchingClaims &&
     districtID === invitation.districtID &&
     accessClass === "staff" &&
-    membershipVersion === 1
+    claims.tmiMembershipVersion ===
+      (expectedMembershipVersion === true ? 1 : expectedMembershipVersion)
   ) {
     return;
   }
@@ -433,6 +488,86 @@ const requireCompatibleTrustedClaims = (
     "The account already has incompatible trusted authorization claims.",
   );
 };
+
+const incompatibleExistingRecordError = (): HttpsError =>
+  new HttpsError(
+    "permission-denied",
+    "Existing onboarding records are incompatible with this invitation.",
+  );
+
+const isCompatibleMembership = (
+  membership: DocumentData | undefined,
+  invitation: TrustedInvitation,
+  userID: string,
+): boolean =>
+  membership?.schemaVersion === 1 &&
+  membership.recordVersion === 1 &&
+  membership.userID === userID &&
+  membership.districtID === invitation.districtID &&
+  membership.role === invitation.role &&
+  equalStringArrays(membership.schoolIDs, invitation.schoolIDs) &&
+  equalStringArrays(membership.capabilities, invitation.capabilities) &&
+  parseIdentifierArray(membership.assignedStudentIDs, 10_000) !== null &&
+  membership.isActive === true &&
+  Number.isSafeInteger(membership.version) &&
+  membership.version > 0;
+
+const isCompatibleProfile = (
+  profile: DocumentData | undefined,
+  userID: string,
+  normalizedEmail: string,
+): boolean =>
+  profile?.schemaVersion === 1 &&
+  profile.recordVersion === 1 &&
+  profile.userID === userID &&
+  typeof profile.email === "string" &&
+  normalizeEmail(profile.email) === normalizedEmail;
+
+const preferenceAuthorityFields = new Set([
+  "userID", "districtID", "schoolIDs", "role", "capabilities",
+  "assignedStudentIDs", "isActive", "version", "tmiDistrictID",
+  "tmiAccessClass", "tmiMembershipVersion",
+]);
+
+const isCompatiblePreferences = (
+  preferences: DocumentData | undefined,
+): boolean =>
+  preferences?.schemaVersion === 1 &&
+  preferences.recordVersion === 1 &&
+  typeof preferences.onboardingComplete === "boolean" &&
+  !Object.keys(preferences).some((key) => preferenceAuthorityFields.has(key));
+
+const isCompatibleAcknowledgement = (
+  acknowledgement: DocumentData | undefined,
+  documentID: string,
+  version: string,
+  userID: string,
+): boolean =>
+  acknowledgement?.schemaVersion === 1 &&
+  acknowledgement.recordVersion === 1 &&
+  acknowledgement.documentID === documentID &&
+  acknowledgement.version === version &&
+  acknowledgement.operationID === `staff-provision-${userID}`;
+
+const isCompatibleAudit = (
+  audit: DocumentData | undefined,
+  invitation: TrustedInvitation,
+  membershipPath: string,
+  userID: string,
+  expectedHash: string,
+): boolean =>
+  audit?.schemaVersion === 1 &&
+  audit.recordVersion === 1 &&
+  audit.action === "staff.membership.provision" &&
+  audit.actorUserID === userID &&
+  audit.districtID === invitation.districtID &&
+  audit.targetPath === membershipPath &&
+  audit.reasonCode === "staff-invitation-accepted" &&
+  audit.requestHash === expectedHash &&
+  audit.details?.role === invitation.role &&
+  equalStringArrays(audit.details?.schoolIDs, invitation.schoolIDs) &&
+  equalStringArrays(audit.details?.capabilities, invitation.capabilities) &&
+  audit.result?.recordVersion === 1;
 
 const parseTrustedInvitation = (data: DocumentData): TrustedInvitation => {
   const schemaVersion = data.schemaVersion;
@@ -522,6 +657,7 @@ const readIdempotentMembership = async (
   transaction: FirebaseFirestore.Transaction,
   invitation: TrustedInvitation,
   userID: string,
+  trustedClaims: Readonly<Record<string, unknown>>,
 ): Promise<ProvisionStaffMembershipResult> => {
   const paths = onboardingPaths(invitation.districtID, userID);
   const [
@@ -559,9 +695,10 @@ const readIdempotentMembership = async (
     membership.role !== invitation.role ||
     !equalStringArrays(membership.schoolIDs, invitation.schoolIDs) ||
     !equalStringArrays(membership.capabilities, invitation.capabilities) ||
-    !equalStringArrays(membership.assignedStudentIDs, []) ||
+    parseIdentifierArray(membership.assignedStudentIDs, 10_000) === null ||
     membership.isActive !== true ||
-    membership.version !== 1 ||
+    !Number.isSafeInteger(membership.version) ||
+    membership.version < 1 ||
     membership.recordVersion !== 1 ||
     !profileSnapshot.exists ||
     !preferencesSnapshot.exists ||
@@ -589,7 +726,14 @@ const readIdempotentMembership = async (
       "The provisioned membership is missing or malformed.",
     );
   }
-  return membershipResult(invitation, userID, true);
+  requireCompatibleTrustedClaims(trustedClaims, invitation, membership.version);
+  return membershipResult(
+    invitation,
+    userID,
+    true,
+    membership.version,
+    membership.assignedStudentIDs,
+  );
 };
 
 const equalStringArrays = (
@@ -604,15 +748,17 @@ const membershipResult = (
   invitation: TrustedInvitation,
   userID: string,
   replayed: boolean,
+  version = 1,
+  assignedStudentIDs: readonly string[] = [],
 ): ProvisionStaffMembershipResult => ({
   userID,
   districtID: invitation.districtID,
   schoolIDs: [...invitation.schoolIDs],
   role: invitation.role,
   capabilities: [...invitation.capabilities],
-  assignedStudentIDs: [],
+  assignedStudentIDs: [...assignedStudentIDs],
   isActive: true,
-  version: 1,
+  version,
   replayed,
 });
 

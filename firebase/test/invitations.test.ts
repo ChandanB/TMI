@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { Timestamp as AdminTimestamp } from "firebase-admin/firestore";
 import {
   deleteField,
   doc,
@@ -390,11 +391,151 @@ describe("staff invitation provisioning", () => {
       });
     });
 
-    await expectHttpsError(makeHandler()(callableRequest()), "already-exists");
+    await expectHttpsError(makeHandler()(callableRequest()), "permission-denied");
 
     expect(claimsWrites).toEqual([]);
     expect((await firestore.doc(`districts/${districtID}/members/${userID}`).get()).exists)
       .toBe(false);
+    await expectInvitationToRemainActive();
+  });
+
+  it("repairs profile-only partial onboarding state", async () => {
+    await firestore.doc(`users/${userID}/private/profile`).set({
+      schemaVersion: 1,
+      recordVersion: 1,
+      userID,
+      displayName: "Existing Name",
+      email,
+      isEmailVerified: true,
+      createdAt: AdminTimestamp.fromDate(now),
+      updatedAt: AdminTimestamp.fromDate(now),
+    });
+
+    const result = await makeHandler()(callableRequest());
+
+    expect(result.replayed).toBe(false);
+    expect((await firestore.doc(`districts/${districtID}/members/${userID}`).get()).exists)
+      .toBe(true);
+    expect((await firestore.doc(`users/${userID}/private/profile`).get()).data()?.displayName)
+      .toBe("Existing Name");
+  });
+
+  it("repairs membership-only state without resetting assignment or version", async () => {
+    await firestore.doc(`districts/${districtID}/members/${userID}`).set({
+      schemaVersion: 1,
+      recordVersion: 1,
+      userID,
+      districtID,
+      schoolIDs: [schoolID],
+      role: "teacher",
+      capabilities: ["student.read.detail"],
+      assignedStudentIDs: ["student-existing"],
+      isActive: true,
+      version: 7,
+      createdAt: AdminTimestamp.fromDate(now),
+      createdBy: userID,
+      updatedAt: AdminTimestamp.fromDate(now),
+      updatedBy: userID,
+    });
+
+    const result = await makeHandler()(callableRequest());
+
+    expect(result).toMatchObject({
+      version: 7,
+      assignedStudentIDs: ["student-existing"],
+      replayed: false,
+    });
+    expect(claimsWrites[0]?.tmiMembershipVersion).toBe(7);
+  });
+
+  it("accepts only complete trusted claims matching a compatible partial membership", async () => {
+    await firestore.doc(`districts/${districtID}/members/${userID}`).set({
+      schemaVersion: 1,
+      recordVersion: 1,
+      userID,
+      districtID,
+      schoolIDs: [schoolID],
+      role: "teacher",
+      capabilities: ["student.read.detail"],
+      assignedStudentIDs: [],
+      isActive: true,
+      version: 7,
+    });
+    authUser = {
+      ...authUser,
+      customClaims: {
+        tmiDistrictID: districtID,
+        tmiAccessClass: "staff",
+        tmiMembershipVersion: 7,
+      },
+    };
+
+    await expect(makeHandler()(callableRequest())).resolves.toMatchObject({
+      version: 7,
+    });
+
+    await testEnv.clearFirestore();
+    await seedInvitation({});
+    authUser = {
+      ...authUser,
+      customClaims: { tmiDistrictID: districtID },
+    };
+    await expectHttpsError(makeHandler()(callableRequest()), "permission-denied");
+  });
+
+  it("fills missing non-authority records while preserving valid preferences", async () => {
+    await firestore.doc(`users/${userID}/preferences/settings`).set({
+      schemaVersion: 1,
+      recordVersion: 1,
+      onboardingComplete: true,
+      theme: "calm",
+    });
+
+    await makeHandler()(callableRequest());
+
+    expect((await firestore.doc(`users/${userID}/preferences/settings`).get()).data())
+      .toMatchObject({ onboardingComplete: true, theme: "calm" });
+    expect((await firestore.doc(
+      `districts/${districtID}/members/${userID}/acknowledgements/privacyPolicy`,
+    ).get()).exists).toBe(true);
+  });
+
+  it("denies conflicting pre-existing profile identity or email", async () => {
+    for (const profile of [
+      { userID: "other-user", email },
+      { userID, email: "other@example.test" },
+    ]) {
+      await firestore.doc(`users/${userID}/private/profile`).set({
+        schemaVersion: 1,
+        recordVersion: 1,
+        displayName: "Existing",
+        isEmailVerified: true,
+        createdAt: AdminTimestamp.fromDate(now),
+        updatedAt: AdminTimestamp.fromDate(now),
+        ...profile,
+      });
+
+      await expectHttpsError(makeHandler()(callableRequest()), "permission-denied");
+      await expectInvitationToRemainActive();
+      await firestore.doc(`users/${userID}/private/profile`).delete();
+    }
+  });
+
+  it("denies conflicting membership authority", async () => {
+    await firestore.doc(`districts/${districtID}/members/${userID}`).set({
+      schemaVersion: 1,
+      recordVersion: 1,
+      userID,
+      districtID,
+      schoolIDs: [schoolID],
+      role: "counselor",
+      capabilities: ["student.read.detail"],
+      assignedStudentIDs: [],
+      isActive: true,
+      version: 1,
+    });
+
+    await expectHttpsError(makeHandler()(callableRequest()), "permission-denied");
     await expectInvitationToRemainActive();
   });
 

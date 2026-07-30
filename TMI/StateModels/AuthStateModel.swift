@@ -950,12 +950,24 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
         throw UserProfileLoadingError.identityMismatch
       }
 
-      let claim = try await identityProvider.trustedClaim(for: identity)
+      let claim: TrustedTenantClaim
+      do {
+        claim = try await identityProvider.trustedClaim(for: identity)
+      } catch TrustedTenantClaimError.missing {
+        transitionToStaffAccessSetup(identity: identity, generation: generation)
+        return
+      }
       guard isCurrentAuthorization(identity, generation: generation) else {
         return
       }
 
-      let membership = try await membershipProvider.membership(for: claim)
+      let membership: MembershipContext
+      do {
+        membership = try await membershipProvider.membership(for: claim)
+      } catch MembershipRepositoryError.notFound {
+        transitionToStaffAccessSetup(identity: identity, generation: generation)
+        return
+      }
       guard isCurrentAuthorization(identity, generation: generation) else {
         return
       }
@@ -985,6 +997,19 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
       failOrganizationAccessVerification()
       completeAuthorization(generation: generation)
     }
+  }
+
+  @MainActor
+  private func transitionToStaffAccessSetup(
+    identity: AuthenticatedIdentity,
+    generation: UInt64
+  ) {
+    guard isCurrentAuthorization(identity, generation: generation) else {
+      return
+    }
+    registrationStep = .institutionVerification
+    updateState(.loaded(.registering(.institutionVerification)))
+    completeAuthorization(generation: generation)
   }
 
   @MainActor

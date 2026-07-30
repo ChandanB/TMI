@@ -65,6 +65,52 @@ struct AuthStateModelMembershipTests {
         #expect(model.isLoggedIn == false)
     }
 
+    @Test("A canonical profile with missing trusted claims requires staff access setup")
+    func profileWithMissingTrustedClaimsRequiresStaffAccessSetup() async {
+        let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: true)
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: [:]
+        )
+        identityProvider.claimError = TrustedTenantClaimError.missing
+        let model = makeModel(
+            identityProvider: identityProvider,
+            profiles: ["user-1": makeUser(id: "user-1")],
+            membershipProvider: ImmediateMembershipProvider(memberships: [:])
+        )
+
+        await model.fetch()
+
+        #expect(model.requiresStaffAccessSetup)
+        #expect(model.currentAuthState == .registering(.institutionVerification))
+        #expect(model.authenticatedSession == nil)
+        #expect(model.currentMembership == nil)
+    }
+
+    @Test("A canonical profile with a missing membership requires staff access setup")
+    func profileWithMissingMembershipRequiresStaffAccessSetup() async {
+        let identity = AuthenticatedIdentity(userID: "user-1", isEmailVerified: true)
+        let identityProvider = FakeAuthenticationIdentityProvider(
+            identity: identity,
+            claims: ["user-1": trustedClaim(userID: "user-1", version: 1)]
+        )
+        let model = makeModel(
+            identityProvider: identityProvider,
+            profiles: ["user-1": makeUser(id: "user-1")],
+            membershipProvider: ImmediateMembershipProvider(
+                memberships: [:],
+                error: MembershipRepositoryError.notFound
+            )
+        )
+
+        await model.fetch()
+
+        #expect(model.requiresStaffAccessSetup)
+        #expect(model.currentAuthState == .registering(.institutionVerification))
+        #expect(model.authenticatedSession == nil)
+        #expect(model.currentMembership == nil)
+    }
+
     @Test("Staff access setup validates required fields before provisioning")
     func staffAccessSetupValidatesRequiredFields() async {
         let authentication = AuthenticationProviderSpy()

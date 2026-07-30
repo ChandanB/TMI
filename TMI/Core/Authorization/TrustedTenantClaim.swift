@@ -32,6 +32,20 @@ nonisolated struct TrustedTenantClaim: Sendable, Equatable {
         guard TrustedIdentifier.isValid(userID) else {
             throw TrustedTenantClaimError.malformed
         }
+        let trustedKeys = [
+            Self.districtIDClaimKey,
+            Self.accessClassClaimKey,
+            Self.membershipVersionClaimKey,
+        ]
+        let presentTrustedKeyCount = trustedKeys.count {
+            tokenClaims[$0] != nil
+        }
+        guard presentTrustedKeyCount > 0 else {
+            throw TrustedTenantClaimError.missing
+        }
+        guard presentTrustedKeyCount == trustedKeys.count else {
+            throw TrustedTenantClaimError.malformed
+        }
         guard let districtID = tokenClaims[Self.districtIDClaimKey] as? String,
               TrustedIdentifier.isValid(districtID) else {
             throw TrustedTenantClaimError.malformed
@@ -77,6 +91,7 @@ nonisolated struct TrustedTenantClaim: Sendable, Equatable {
 }
 
 nonisolated enum TrustedTenantClaimError: Error, Equatable {
+    case missing
     case malformed
     case unsupportedAccessClass
 }

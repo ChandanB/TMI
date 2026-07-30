@@ -10,6 +10,7 @@ The implementation is verified except for the macOS UI permission gate described
 - Baseline: `eb14a988b2928f46ffe4c14ce1417d5a4ae47e88`
 - Release-gate correction: the fresh macOS gate exposed native `TextInputAutocapitalization` use in a cross-platform component. A source-contract regression test was observed failing before a minimal `TMITextInputAutocapitalization` compatibility adapter was added. The correction and this evidence are recorded together in the evidence commit.
 - Durable RED reproduction: `docs/release-evidence/logs/authentication-availability-repair-macos-red.txt` records the exact detached `8084cb0` command, exit code 65, and compiler diagnostics.
+- Final-review partial-state RED: six new invitation-reconciliation tests initially failed because the callable rejected every pre-existing onboarding document, and four client regressions initially lacked the missing-claim state and setup transitions.
 
 ## Focused authentication and accessibility gate
 
@@ -26,11 +27,12 @@ xcodebuild test -quiet -project TMI.xcodeproj -scheme TMI \
   -only-testing:TMITests/UITestingLaunchConfigurationTests
 ```
 
-Result: `Passed`, 64 logical tests with 67 passed executions, 0 skipped, 0 failed. Xcode reports the four argument rows of the capitalization mapping as one logical parameterized test and four passed executions.
+Final-review focused rerun of `MembershipRepositoryTests` and `AuthStateModelMembershipTests`: `Passed`, 0 failed. The focused authentication total is now 68 logical tests with 71 passed executions based on the prior accepted bundle plus four new logical regressions.
 
 - `AuthSessionTests`: 19
 - `FirebaseStaffInvitationProvisionerTests`: 4
-- `AuthStateModelMembershipTests`: 25
+- `AuthStateModelMembershipTests`: 27
+- `MembershipRepositoryTests`: 2 new claim-presence regressions (the suite also retains its prior coverage)
 - `SignOutCallSiteTests`: 6
 - `TMIComponentAccessibilityTests`: 6 executions (3 logical tests)
 - `UITestingLaunchConfigurationTests`: 7
@@ -46,7 +48,7 @@ cd firebase
 npm test
 ```
 
-Result: 8 test files passed, 90 tests passed, 0 failed. No dependency audit fix was run.
+Result: 8 test files passed, 96 tests passed, 0 failed. The invitation suite now includes 25 tests, including six partial-state reconciliation regressions. No dependency audit fix was run.
 
 The local Java runtime emitted the known deprecated `sun.misc.Unsafe` warning, and Firebase Admin emitted metadata lookup warnings without live credentials. The `demo-tmi` emulator suite completed successfully.
 
@@ -119,6 +121,9 @@ This is an environment blocker and remains an outstanding manual release gate. A
 - Staff setup sends only invitation code, display name, privacy-policy version, and acceptable-use-policy version. It sends no role, district, school, membership, or capability authority.
 - The callable rejects unexpected request fields and derives role, district, school assignments, and capabilities from the trusted server-side invitation.
 - Existing authenticated staff without a canonical profile can accept a real invitation and reload the canonical session without recreating the Auth identity.
+- A profile-present identity with all trusted claim keys absent, or a valid matching claim with no canonical membership, enters Access Setup Required. Partial/malformed claims, unavailable authorization, inactive membership, and version or identity mismatches remain denied or recoverable and never enter setup.
+- An active, email-bound, unconsumed invitation can reconcile compatible partial canonical state transactionally. Existing membership authority must exactly match the invitation and preserves its version and assigned students; compatible profiles and non-authority preferences are preserved; missing profile, membership, acknowledgements, preferences, and audit records are created without overwriting compatible records.
+- Existing trusted claims are accepted only when district, staff access class, and membership version exactly match the reconciled canonical membership. Partial or conflicting claims and incompatible profiles, memberships, acknowledgements, preferences, or audit records deny provisioning before invitation consumption.
 - Startup authorization has a bounded deadline, leaves loading with recoverable guidance, and retry starts a fresh authorization generation. Stale completions cannot mutate a signed-out or replacement identity.
 - Provisioning transport or ambiguous response failures preserve the authenticated identity and surface an idempotent retry; terminal invitation errors remain terminal.
 - Sign-out failures remain visible and retryable, including the post-account-deletion sign-out path.
