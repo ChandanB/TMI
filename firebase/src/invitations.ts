@@ -56,6 +56,7 @@ export interface ProvisioningAuthUser {
 export interface ProvisionStaffMembershipDependencies {
   readonly firestore: Firestore;
   readonly now: () => Date;
+  readonly requireVerifiedEmail: boolean;
   readonly getAuthUser: (userID: string) => Promise<ProvisioningAuthUser>;
   readonly setCustomUserClaims: (
     userID: string,
@@ -155,7 +156,11 @@ export const createProvisionStaffMembershipHandler = (
   const data = parseProvisionStaffMembershipRequest(request.data);
   const userID = requireOnboardingIdentity(request);
   const authUser = await dependencies.getAuthUser(userID);
-  const verifiedEmail = validateAuthUser(authUser, userID);
+  const normalizedEmail = validateAuthUser(
+    authUser,
+    userID,
+    dependencies.requireVerifiedEmail,
+  );
 
   const invitationReference = dependencies.firestore.doc(
     `staffInvitations/${hashInvitationCode(data.invitationCode)}`,
@@ -195,7 +200,7 @@ export const createProvisionStaffMembershipHandler = (
         !invitation.isActive ||
         invitation.expiresAt.toMillis() <= dependencies.now().getTime() ||
         invitation.recipientEmailHash !==
-          hashInvitationRecipientEmail(data.invitationCode, verifiedEmail)
+          hashInvitationRecipientEmail(data.invitationCode, normalizedEmail)
       ) {
         throw unusableInvitationError();
       }
@@ -252,8 +257,8 @@ export const createProvisionStaffMembershipHandler = (
         recordVersion: 1,
         userID,
         displayName: data.displayName,
-        email: verifiedEmail,
-        isEmailVerified: true,
+        email: normalizedEmail,
+        isEmailVerified: authUser.emailVerified,
         createdAt: timestamp,
         updatedAt: timestamp,
       });
@@ -335,6 +340,7 @@ export const createProductionProvisionStaffMembershipHandler = () =>
   createProvisionStaffMembershipHandler({
     firestore: getFirestore(),
     now: () => new Date(),
+    requireVerifiedEmail: false,
     getAuthUser: async (userID) => {
       const user = await getAuth().getUser(userID);
       return {
@@ -374,6 +380,7 @@ const requireOnboardingIdentity = (
 const validateAuthUser = (
   authUser: ProvisioningAuthUser,
   requestedUserID: string,
+  requireVerifiedEmail: boolean,
 ): string => {
   if (
     authUser.userID !== requestedUserID ||
@@ -386,7 +393,7 @@ const validateAuthUser = (
       "The authenticated account cannot accept an invitation.",
     );
   }
-  if (!authUser.emailVerified) {
+  if (requireVerifiedEmail && !authUser.emailVerified) {
     throw new HttpsError(
       "failed-precondition",
       "Verify the account email before accepting an invitation.",

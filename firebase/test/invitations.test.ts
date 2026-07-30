@@ -280,10 +280,36 @@ describe("staff invitation provisioning", () => {
   it("requires authoritative email verification before consuming an invitation", async () => {
     authUser = { ...authUser, emailVerified: false };
 
-    await expectHttpsError(makeHandler()(callableRequest()), "failed-precondition");
+    await expectHttpsError(
+      makeHandler(() => authUser, true)(callableRequest()),
+      "failed-precondition",
+    );
 
     expect(claimsWrites).toEqual([]);
     await expectInvitationToRemainActive();
+  });
+
+  it("allows an email-bound unverified account under the temporary policy", async () => {
+    authUser = { ...authUser, emailVerified: false };
+
+    const result = await makeHandler(
+      () => authUser,
+      false,
+    )(callableRequest());
+
+    expect(result.replayed).toBe(false);
+    expect(claimsWrites).toEqual([
+      {
+        tmiDistrictID: districtID,
+        tmiAccessClass: "staff",
+        tmiMembershipVersion: 1,
+      },
+    ]);
+    const profile = await firestore.doc(`users/${userID}/private/profile`).get();
+    expect(profile.data()).toMatchObject({
+      email,
+      isEmailVerified: false,
+    });
   });
 
   it("rejects missing, malformed, and authority-bearing request fields", async () => {
@@ -500,10 +526,12 @@ describe("staff invitation provisioning", () => {
 
   function makeHandler(
     authUserProvider: () => ProvisioningAuthUser = () => authUser,
+    requireVerifiedEmail = true,
   ) {
     return createProvisionStaffMembershipHandler({
       firestore,
       now: () => now,
+      requireVerifiedEmail,
       getAuthUser: async () => authUserProvider(),
       setCustomUserClaims: async (requestedUserID, claims) => {
         const membership = await firestore
