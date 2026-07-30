@@ -393,11 +393,11 @@ git commit -m "refactor: retire legacy student persistence"
 **Files:**
 - Create: `docs/release-evidence/release-1.md`
 
-- [ ] **Step 1: Run the universal gate and roster journey**
+- [x] **Step 1: Run the universal gate and roster journey**
 
 Automate sign-in, invitation onboarding, first-student empty action, create, duplicate warning, edit, page/filter/search, unauthorized denial, archive, and restoration from cached offline read. Expected: all pass on iPhone, iPad, and macOS.
 
-- [ ] **Step 2: Record evidence, commit, and tag**
+- [x] **Step 2: Record evidence, commit, and tag**
 
 ```bash
 git add docs/release-evidence/release-1.md
