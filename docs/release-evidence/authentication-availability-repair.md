@@ -6,7 +6,7 @@ The implementation is verified except for the macOS UI permission gate described
 
 - Verification date: July 30, 2026 (CDT)
 - Branch: `codex/authentication-availability-repair`
-- Repair source HEAD before release-gate evidence: `8084cb01393b682dc63d027649a9f657b6875428`
+- Final repair source HEAD: `f0bc76e`
 - Baseline: `eb14a988b2928f46ffe4c14ce1417d5a4ae47e88`
 - Release-gate correction: the fresh macOS gate exposed native `TextInputAutocapitalization` use in a cross-platform component. A source-contract regression test was observed failing before a minimal `TMITextInputAutocapitalization` compatibility adapter was added. The correction and this evidence are recorded together in the evidence commit.
 - Durable RED reproduction: `docs/release-evidence/logs/authentication-availability-repair-macos-red.txt` records the exact detached `8084cb0` command, exit code 65, and compiler diagnostics.
@@ -23,19 +23,11 @@ xcodebuild test -quiet -project TMI.xcodeproj -scheme TMI \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-Final-review focused rerun explicitly included both suites: `Passed`, 35 passed, 0 skipped, 0 failed. No aggregate count is inferred by adding this rerun to the earlier result bundle.
+Final-source rerun at `f0bc76e`: `Passed`, 35 passed, 0 skipped, 0 failed.
 
-- `AuthSessionTests`: 19
-- `FirebaseStaffInvitationProvisionerTests`: 4
-- `AuthStateModelMembershipTests`: 2 new partial-state regressions.
-- `MembershipRepositoryTests`: 2 new claim-presence regressions.
-- `SignOutCallSiteTests`: 6
-- `TMIComponentAccessibilityTests`: 6 executions (3 logical tests)
-- `UITestingLaunchConfigurationTests`: 7
+Result bundle: `/tmp/TMI-AuthRepair-Final-Focused.xcresult`
 
-Result bundle: `/tmp/TMI-AuthRepair-Partial-Focused-2.xcresult`
-
-The adapter additionally has UIKit behavioral coverage for all four mappings: `never`, `sentences`, `words`, and `characters`. The mapping test was first observed failing to compile because `TMITextInputAutocapitalization` had no `uiKitValue`; the GREEN component bundle reports 3 logical tests and 6 passed executions at `/tmp/TMI-AuthRepair-Capitalization-Green-3.xcresult`.
+Earlier focused bundles covered `AuthSessionTests`, `FirebaseStaffInvitationProvisionerTests`, `SignOutCallSiteTests`, `TMIComponentAccessibilityTests`, and `UITestingLaunchConfigurationTests` before the partial-state repair. The adapter additionally has UIKit behavioral coverage for all four mappings: `never`, `sentences`, `words`, and `characters`. The mapping test was first observed failing to compile because `TMITextInputAutocapitalization` had no `uiKitValue`; the GREEN component bundle reports 3 logical tests and 6 passed executions at `/tmp/TMI-AuthRepair-Capitalization-Green-3.xcresult`.
 
 ## Firebase gate
 
@@ -59,7 +51,7 @@ xcodebuild test -quiet -project TMI.xcodeproj -scheme TMI \
   -resultBundlePath /tmp/TMI-AuthRepair-Full-iOS.xcresult
 ```
 
-Result: `Passed`, 516 total, 513 passed, 3 expected hosted SecureStorage skips, 0 failed.
+Historical pre-partial-state result at `8084cb0`: `Passed`, 516 total, 513 passed, 3 expected hosted SecureStorage skips, 0 failed. The later Swift source changes are covered by the final-source focused gate above; this bundle is not represented as a full-suite run at `f0bc76e`.
 
 Result bundle: `/tmp/TMI-AuthRepair-Full-iOS.xcresult`
 
@@ -73,7 +65,7 @@ xcodebuild test -quiet -project TMI.xcodeproj -scheme TMI \
   -only-testing:TMITests
 ```
 
-Result: `Passed`, 487 total, 483 passed, 4 expected hosted Keychain or Local Authentication skips, 0 failed.
+Historical pre-partial-state result at `8084cb0`: `Passed`, 487 total, 483 passed, 4 expected hosted Keychain or Local Authentication skips, 0 failed. The later Swift source changes are covered by the final-source focused gate above; this bundle is not represented as a full-suite run at `f0bc76e`.
 
 Result bundle: `/tmp/TMI-AuthRepair-Full-macOS.xcresult`
 
@@ -99,7 +91,7 @@ Result: both commands exited 0.
 
 ## UI and accessibility evidence
 
-No application source changed between repair HEAD `8084cb0` and these accepted iPhone/iPad review bundles. The later release-gate correction only restores the platform-compatible implementation of the already-reviewed capitalization behavior.
+These iPhone/iPad review bundles validate the authentication recovery UI at repair HEAD `8084cb0`. Later changes added the cross-platform capitalization adapter and partial-state authorization routing; those changes are covered by their focused unit gates, not by these UI bundles. UI acceptance at final source remains conditional on rerunning these checks if release policy requires a single final-HEAD UI bundle.
 
 - iPhone 17 Pro, iOS 26.5: 13 passed, 0 skipped, 0 failed: 9 unit checks plus 4 UI checks. Bundle: `/tmp/TMI-AuthRepair-Review-iPhone.xcresult`
 - iPad Pro 13-inch (M5), iPadOS 26.5: 4 UI checks passed, 0 skipped, 0 failed. Bundle: `/tmp/TMI-AuthRepair-Review-iPad.xcresult`
