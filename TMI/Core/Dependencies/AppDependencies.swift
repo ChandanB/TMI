@@ -15,7 +15,28 @@ nonisolated struct AppDependencies: Sendable {
     let authentication: (any AuthenticationProviding)?
     let studentRepository: any StudentRepository
     let studentDetailRepository: any StudentDetailRepository
+    let studentModeRepository: StudentModeRepository?
     let logger: TMILogger
+
+    init(
+        runtime: Runtime,
+        flags: FeatureFlags,
+        membership: any MembershipProviding,
+        authentication: (any AuthenticationProviding)?,
+        studentRepository: any StudentRepository,
+        studentDetailRepository: any StudentDetailRepository,
+        studentModeRepository: StudentModeRepository? = nil,
+        logger: TMILogger
+    ) {
+        self.runtime = runtime
+        self.flags = flags
+        self.membership = membership
+        self.authentication = authentication
+        self.studentRepository = studentRepository
+        self.studentDetailRepository = studentDetailRepository
+        self.studentModeRepository = studentModeRepository
+        self.logger = logger
+    }
 
     @MainActor
     static func production(firestore: Firestore) -> AppDependencies {
@@ -42,6 +63,7 @@ nonisolated struct AppDependencies: Sendable {
             authentication: authentication,
             studentRepository: students,
             studentDetailRepository: Release1StudentDetailRepository(students: students),
+            studentModeRepository: .firebase(),
             logger: .production
         )
     }

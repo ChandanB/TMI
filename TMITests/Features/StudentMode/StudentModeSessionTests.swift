@@ -46,13 +46,19 @@ struct StudentModeSessionTests {
     @Test("Inactivity locks at exactly five minutes")
     func inactivityBoundary() throws {
         let session = StudentModeSession()
-        session.activate(try grant(expiresAt: start.addingTimeInterval(1_800)), at: start)
+        session.activate(
+            try grant(expiresAt: start.addingTimeInterval(1_800)),
+            profile: profile(),
+            at: start
+        )
 
         session.evaluate(at: start.addingTimeInterval(299.999))
         #expect(session.state.isActive)
 
         session.evaluate(at: start.addingTimeInterval(300))
         #expect(session.state == .locked(.inactivity))
+        #expect(session.isStudentModeContained)
+        #expect(session.studentProfile == profile())
     }
 
     @Test("Explicit activity moves the inactivity boundary")
@@ -101,6 +107,7 @@ struct StudentModeSessionTests {
         let session = StudentModeSession()
         session.activate(
             try grant(expiresAt: expiry),
+            profile: profile(),
             at: expiry.addingTimeInterval(-1)
         )
 
@@ -108,6 +115,8 @@ struct StudentModeSessionTests {
         #expect(session.state.isActive)
         session.evaluate(at: expiry)
         #expect(session.state.isExpired)
+        #expect(session.isStudentModeContained)
+        #expect(session.studentProfile == profile())
     }
 
     @Test("Revoking the scoped assignment locks immediately")
@@ -121,18 +130,120 @@ struct StudentModeSessionTests {
     }
 
     @Test("Secure exit clears all respondent state")
-    func secureExitReset() throws {
-        let session = StudentModeSession()
+    func secureExitReset() async throws {
+        let session = StudentModeSession(
+            authenticateStaff: { true },
+            securelyEndRespondentSession: { _ in }
+        )
         session.activate(try grant(expiresAt: start.addingTimeInterval(1_800)), at: start)
         session.recordFailedExitAttempt(at: start.addingTimeInterval(1))
         session.enterBackground(at: start.addingTimeInterval(2))
 
-        session.secureExit()
+        #expect(await session.exitStudentMode())
 
         #expect(session.state == .inactive)
         #expect(session.failedExitAttemptCount == 0)
         #expect(session.lastActivityAt == nil)
         #expect(session.backgroundedAt == nil)
+        #expect(!session.isStudentModeContained)
+        #expect(session.studentProfile == nil)
+    }
+
+    @Test("Only authenticated server-acknowledged exit releases containment")
+    func authenticatedSecureExitBoundary() async throws {
+        let exit = StudentModeSecureExitSpy()
+        let session = StudentModeSession(
+            authenticateStaff: { true },
+            securelyEndRespondentSession: { grant in
+                await exit.record(grant)
+            }
+        )
+        let grant = try grant(expiresAt: start.addingTimeInterval(1_800))
+        session.activate(grant, profile: profile(), at: start)
+        session.recordFailedExitAttempt(at: start.addingTimeInterval(1))
+
+        let succeeded = await session.exitStudentMode()
+
+        #expect(succeeded)
+        #expect(await exit.endedSessionID == grant.sessionID)
+        #expect(session.state == .inactive)
+        #expect(!session.isStudentModeContained)
+    }
+
+    @Test("Failed authenticated server exit stays in the contained shell")
+    func failedServerExitRetainsContainment() async throws {
+        let session = StudentModeSession(
+            authenticateStaff: { true },
+            securelyEndRespondentSession: { _ in
+                throw StudentModeRepositoryError.unavailable
+            }
+        )
+        session.activate(
+            try grant(expiresAt: start.addingTimeInterval(1_800)),
+            profile: profile(),
+            at: start
+        )
+
+        let succeeded = await session.exitStudentMode()
+
+        #expect(!succeeded)
+        #expect(session.isStudentModeContained)
+        #expect(session.studentProfile == profile())
+    }
+
+    @Test("Scene lifecycle forwards protected background boundaries")
+    func sceneLifecycleBoundary() throws {
+        let session = StudentModeSession()
+        session.activate(
+            try grant(expiresAt: start.addingTimeInterval(1_800)),
+            profile: profile(),
+            at: start
+        )
+
+        session.handleSceneTransition(
+            from: .active,
+            to: .background,
+            at: start.addingTimeInterval(10)
+        )
+        session.handleSceneTransition(
+            from: .background,
+            to: .inactive,
+            at: start.addingTimeInterval(39)
+        )
+        session.handleSceneTransition(
+            from: .inactive,
+            to: .active,
+            at: start.addingTimeInterval(40)
+        )
+
+        #expect(session.state == .locked(.backgroundProtection))
+        #expect(session.isStudentModeContained)
+    }
+
+    @Test("Root presentation never exposes the staff shell while locked or expired")
+    func rootPresentationBoundary() throws {
+        let expiry = start.addingTimeInterval(1_800)
+        let session = StudentModeSession()
+        session.activate(
+            try grant(expiresAt: expiry),
+            profile: profile(),
+            at: start
+        )
+        session.recordFailedExitAttempt(at: start.addingTimeInterval(1))
+        session.recordFailedExitAttempt(at: start.addingTimeInterval(2))
+        session.recordFailedExitAttempt(at: start.addingTimeInterval(3))
+        session.recordFailedExitAttempt(at: start.addingTimeInterval(4))
+        session.recordFailedExitAttempt(at: start.addingTimeInterval(5))
+        #expect(session.rootPresentation == .student(profile()))
+
+        let expiringSession = StudentModeSession()
+        expiringSession.activate(
+            try grant(expiresAt: expiry),
+            profile: profile(),
+            at: start
+        )
+        expiringSession.evaluate(at: expiry)
+        #expect(expiringSession.rootPresentation == .student(profile()))
     }
 
     private func grant(expiresAt: Date) throws -> StudentModeGrant {
@@ -144,7 +255,7 @@ struct StudentModeSessionTests {
                 assignmentIDs: ["assignment-a"],
                 allowedOperations: [.readAssignment, .writeDraft]
             ),
-            respondentToken: "respondent-token",
+            recordVersion: 1,
             issuedAt: start,
             expiresAt: expiresAt,
             staffIdentity: StudentModeStaffIdentity(
@@ -152,6 +263,15 @@ struct StudentModeSessionTests {
                 districtID: "district-a",
                 membershipVersion: 4
             )
+        )
+    }
+
+    private func profile() -> StudentModeProfile {
+        StudentModeProfile(
+            studentID: "student-a",
+            displayName: "Student",
+            grade: "7",
+            pronouns: nil
         )
     }
 }
@@ -163,6 +283,7 @@ struct StudentModeRepositoryTests {
     @Test("Issuance preserves staff identity and validates the trusted response scope")
     func issuePreservesIdentity() async throws {
         let transport = StudentModeTransportSpy()
+        let respondentAuth = StudentModeRespondentAuthSpy()
         let repository = StudentModeRepository(
             issueSession: { request in
                 await transport.recordIssue(request)
@@ -170,7 +291,14 @@ struct StudentModeRepositoryTests {
             },
             endSession: { request in
                 await transport.recordEnd(request)
-                return StudentModeEndResponse(sessionID: request.sessionID, ended: true)
+                return StudentModeEndResponse(
+                    sessionID: request.sessionID,
+                    ended: true,
+                    recordVersion: request.expectedRecordVersion + 1
+                )
+            },
+            signInRespondent: { token in
+                await respondentAuth.signIn(token: token)
             }
         )
         let identity = staffIdentity()
@@ -188,11 +316,19 @@ struct StudentModeRepositoryTests {
 
         #expect(grant.staffIdentity == identity)
         #expect(grant.scope == scope)
-        #expect(grant.respondentToken == "respondent-token")
+        #expect(grant.recordVersion == 1)
         let request = await transport.lastIssue
         #expect(request?.durationMinutes == 30)
-        #expect(request?.staffIdentity == identity)
-        #expect(request?.allowedOperations == nil)
+        #expect(request?.payload.keys.sorted() == [
+            "assignmentIDs",
+            "districtID",
+            "durationMinutes",
+            "expectedRecordVersion",
+            "idempotencyKey",
+            "reasonCode",
+            "studentID",
+        ])
+        #expect(await respondentAuth.signedInToken == "respondent-token")
     }
 
     @Test("Requested duration is capped before transport")
@@ -203,7 +339,13 @@ struct StudentModeRepositoryTests {
                 await transport.recordIssue(request)
                 return self.response(for: request)
             },
-            endSession: { _ in StudentModeEndResponse(sessionID: "unused", ended: true) }
+            endSession: {
+                StudentModeEndResponse(
+                    sessionID: $0.sessionID,
+                    ended: true,
+                    recordVersion: $0.expectedRecordVersion + 1
+                )
+            }
         )
 
         _ = try await repository.issueSession(
@@ -226,7 +368,13 @@ struct StudentModeRepositoryTests {
                 issueSession: { request in
                     mutation.apply(to: self.response(for: request))
                 },
-                endSession: { _ in StudentModeEndResponse(sessionID: "unused", ended: true) }
+                endSession: {
+                    StudentModeEndResponse(
+                        sessionID: $0.sessionID,
+                        ended: true,
+                        recordVersion: $0.expectedRecordVersion + 1
+                    )
+                }
             )
 
             await #expect(throws: StudentModeRepositoryError.invalidResponse) {
@@ -251,7 +399,7 @@ struct StudentModeRepositoryTests {
         )
         let identity = staffIdentity()
 
-        await #expect(throws: StudentModeRepositoryError.transportUnavailable) {
+        await #expect(throws: StudentModeRepositoryError.unavailable) {
             _ = try await repository.issueSession(
                 scope: try self.studentScope(),
                 requestedDurationMinutes: 30,
@@ -265,35 +413,90 @@ struct StudentModeRepositoryTests {
         #expect(identity == staffIdentity())
     }
 
+    @Test(
+        "Callable cancellation auth conflict validation and unavailable errors remain distinct",
+        arguments: [
+            (StudentModeCallableError.cancelled, StudentModeRepositoryError.cancelled),
+            (.unauthenticated, .authenticationRequired),
+            (.alreadyExists, .conflict),
+            (.invalidArgument, .validation),
+            (.unavailable, .unavailable),
+        ]
+    )
+    func typedErrorMapping(
+        callableError: StudentModeCallableError,
+        expected: StudentModeRepositoryError
+    ) async throws {
+        let repository = StudentModeRepository(
+            issueSession: { _ in throw callableError },
+            endSession: { _ in throw callableError }
+        )
+
+        await #expect(throws: expected) {
+            _ = try await repository.issueSession(
+                scope: try self.studentScope(),
+                requestedDurationMinutes: 30,
+                staffIdentity: self.staffIdentity(),
+                expectedStudentRecordVersion: 7,
+                idempotencyKey: "issue-a",
+                reasonCode: "educator-launch",
+                now: self.now
+            )
+        }
+    }
+
     @Test("Ending validates acknowledgement without changing staff authentication")
     func endSessionValidation() async throws {
         let identity = staffIdentity()
+        let respondentAuth = StudentModeRespondentAuthSpy()
         let repository = StudentModeRepository(
             issueSession: { _ in throw StudentModeTransportTestError.offline },
             endSession: { request in
-                #expect(request.staffIdentity == identity)
-                return StudentModeEndResponse(sessionID: request.sessionID, ended: true)
+                #expect(request.districtID == identity.districtID)
+                #expect(request.expectedRecordVersion == 3)
+                #expect(request.payload.keys.sorted() == [
+                    "disposition",
+                    "districtID",
+                    "expectedRecordVersion",
+                    "idempotencyKey",
+                    "reasonCode",
+                    "sessionID",
+                ])
+                return StudentModeEndResponse(
+                    sessionID: request.sessionID,
+                    ended: true,
+                    recordVersion: 4
+                )
+            },
+            signOutRespondent: {
+                await respondentAuth.signOut()
             }
         )
-
         try await repository.endSession(
             sessionID: "opaque-session-a",
             staffIdentity: identity,
+            expectedRecordVersion: 3,
             disposition: .ended,
             idempotencyKey: "end-a",
             reasonCode: "secure-exit"
         )
+        #expect(await respondentAuth.signOutCount == 1)
 
         let malformed = StudentModeRepository(
             issueSession: { _ in throw StudentModeTransportTestError.offline },
             endSession: { _ in
-                StudentModeEndResponse(sessionID: "different-session", ended: true)
+                StudentModeEndResponse(
+                    sessionID: "different-session",
+                    ended: true,
+                    recordVersion: 4
+                )
             }
         )
         await #expect(throws: StudentModeRepositoryError.invalidResponse) {
             try await malformed.endSession(
                 sessionID: "opaque-session-a",
                 staffIdentity: identity,
+                expectedRecordVersion: 3,
                 disposition: .ended,
                 idempotencyKey: "end-a",
                 reasonCode: "secure-exit"
@@ -327,7 +530,8 @@ struct StudentModeRepositoryTests {
             studentID: request.studentID,
             assignmentIDs: request.assignmentIDs,
             allowedOperations: [.readAssignment, .writeDraft],
-            respondentToken: "respondent-token",
+            customToken: "respondent-token",
+            recordVersion: 1,
             issuedAt: now,
             expiresAt: now.addingTimeInterval(
                 TimeInterval(request.durationMinutes * 60)
@@ -346,6 +550,27 @@ private actor StudentModeTransportSpy {
 
     func recordEnd(_ request: StudentModeEndRequest) {
         lastEnd = request
+    }
+}
+
+private actor StudentModeSecureExitSpy {
+    private(set) var endedSessionID: String?
+
+    func record(_ grant: StudentModeGrant) {
+        endedSessionID = grant.sessionID
+    }
+}
+
+private actor StudentModeRespondentAuthSpy {
+    private(set) var signedInToken: String?
+    private(set) var signOutCount = 0
+
+    func signIn(token: String) {
+        signedInToken = token
+    }
+
+    func signOut() {
+        signOutCount += 1
     }
 }
 
@@ -399,7 +624,8 @@ private extension StudentModeIssueResponse {
             studentID: studentID ?? self.studentID,
             assignmentIDs: assignmentIDs ?? self.assignmentIDs,
             allowedOperations: allowedOperations ?? self.allowedOperations,
-            respondentToken: respondentToken,
+            customToken: customToken,
+            recordVersion: recordVersion,
             issuedAt: issuedAt,
             expiresAt: expiresAt ?? self.expiresAt
         )

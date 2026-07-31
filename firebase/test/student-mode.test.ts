@@ -291,6 +291,30 @@ describe("Student Mode callable trust boundary", () => {
     }
   });
 
+  it("rejects cohort-only assignments without an exact student projection", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(
+          context.firestore(),
+          `districts/${districtID}/formAssignments/${assignmentID}`,
+        ),
+        {
+          districtId: districtID,
+          schoolId: "school-1",
+          templateId: "template-1",
+          assignmentType: "survey",
+          isActive: true,
+          cohort: { type: "allStudents" },
+        },
+      );
+    });
+
+    await expectHttpsError(
+      handlers().issueSession(callableRequest(issueRequest())),
+      "permission-denied",
+    );
+  });
+
   it("issues opaque least-privilege claims with default and capped duration", async () => {
     const first = await handlers().issueSession(
       callableRequest(issueRequest()),
@@ -321,14 +345,15 @@ describe("Student Mode callable trust boundary", () => {
       tmiSessionID: first.sessionID,
       tmiAssignmentIDs: [assignmentID],
     });
-    expect(issuedClaims[0]?.tmiAllowedOperations).toEqual(
-      expect.arrayContaining([
-        "readStudentSafeProfile",
-        "readAssignment",
-        "writeDraft",
-        "submitAssignment",
-        "requestHelp",
-      ]),
+    expect(issuedClaims[0]?.tmiAllowedOperations).toEqual([
+      "readStudentSafeProfile",
+      "readAssignment",
+      "writeDraft",
+      "submitAssignment",
+      "requestHelp",
+    ]);
+    expect(first.allowedOperations).toEqual(
+      issuedClaims[0]?.tmiAllowedOperations,
     );
     expect(issuedClaims[0]).not.toHaveProperty("tmiMembershipVersion");
 
@@ -544,6 +569,15 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
         setDoc(doc(db, `districts/${districtID}/tasks/task-1`), {
           createdBy: staffUserID,
         }),
+        setDoc(doc(db, `users/${respondentUserID}`), {
+          displayName: "Synthetic respondent",
+        }),
+        setDoc(doc(db, `users/${respondentUserID}/private/profile`), {
+          dateOfBirth: "private",
+        }),
+        setDoc(doc(db, `users/${respondentUserID}/preferences/settings`), {
+          notifications: true,
+        }),
         setDoc(
           doc(db, `districts/${districtID}/formAssignments/assignment-2`),
           { districtId: districtID, studentIDs: [studentID], isActive: true },
@@ -655,6 +689,97 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
     );
   });
 
+  it("allows the exact survey operation set and denies unrelated purposes", async () => {
+    const surveyOperations = [
+      "readStudentSafeProfile",
+      "readAssignment",
+      "writeDraft",
+      "submitAssignment",
+      "requestHelp",
+    ];
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(
+        doc(
+          context.firestore(),
+          `districts/${districtID}/studentModeSessions/${sessionID}`,
+        ),
+        { allowedOperations: surveyOperations },
+      );
+    });
+    const db = respondentContext({
+      tmiAllowedOperations: surveyOperations,
+    }).firestore();
+    await assertSucceeds(
+      getDoc(
+        doc(
+          db,
+          `districts/${districtID}/students/${studentID}/studentSafe/profile`,
+        ),
+      ),
+    );
+    await assertSucceeds(
+      getDoc(
+        doc(db, `districts/${districtID}/formAssignments/${assignmentID}`),
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(
+          db,
+          `districts/${districtID}/students/${studentID}/responses/survey-only`,
+        ),
+        {
+          districtID,
+          studentID,
+          respondentSessionID: sessionID,
+          assignmentID,
+          status: "draft",
+          answers: {},
+        },
+      ),
+    );
+    await assertFails(getDoc(doc(db, "catalogs/careers/items/career-1")));
+    await assertFails(
+      getDoc(doc(db, `districts/${districtID}/plans/plan-1/goals/goal-1`)),
+    );
+    await assertFails(
+      setDoc(
+        doc(
+          db,
+          `districts/${districtID}/students/${studentID}/interests/not-survey`,
+        ),
+        {
+          districtID,
+          studentID,
+          respondentSessionID: sessionID,
+          interestID: "career-tech",
+        },
+      ),
+    );
+  });
+
+  it("allows one draft submission transition and freezes submitted answers", async () => {
+    const db = respondentContext().firestore();
+    const response = doc(
+      db,
+      `districts/${districtID}/students/${studentID}/responses/immutable`,
+    );
+    await assertSucceeds(
+      setDoc(response, {
+        districtID,
+        studentID,
+        respondentSessionID: sessionID,
+        assignmentID,
+        status: "draft",
+        answers: { q1: "first" },
+      }),
+    );
+    await assertSucceeds(updateDoc(response, { answers: { q1: "revised" } }));
+    await assertSucceeds(updateDoc(response, { status: "submitted" }));
+    await assertFails(updateDoc(response, { answers: { q1: "mutated" } }));
+    await assertFails(updateDoc(response, { status: "draft" }));
+  });
+
   it("denies every staff-only read class and cross-scope read", async () => {
     const db = respondentContext().firestore();
     for (const path of [
@@ -670,6 +795,9 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
       `districts/${districtID}/formAssignments/assignment-2`,
       `districts/${districtID}/students/student-2/studentSafe/profile`,
       "districts/d2/students/student-1/studentSafe/profile",
+      `users/${respondentUserID}`,
+      `users/${respondentUserID}/private/profile`,
+      `users/${respondentUserID}/preferences/settings`,
     ]) {
       await assertFails(getDoc(doc(db, path)));
     }

@@ -133,6 +133,7 @@ class FormAssignmentService {
     newAssignment.assignedByName = session.profile.displayName
     newAssignment.districtId = session.membership.districtID
     newAssignment.schoolId = access.scope.schoolID
+    newAssignment.studentIDs = access.students.map(\.id)
     newAssignment.totalAssigned = access.students.count
 
     if let versionId {
@@ -177,6 +178,7 @@ class FormAssignmentService {
     updated.updatedAt = Date()
     updated.districtId = session.membership.districtID
     updated.schoolId = proposedAccess.scope.schoolID
+    updated.studentIDs = proposedAccess.students.map(\.id)
     updated.totalAssigned = proposedAccess.students.count
 
     let data = try Firestore.Encoder().encode(updated)

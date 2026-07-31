@@ -8,6 +8,7 @@ struct StudentHeaderView: View {
     let isMutating: Bool
     let onEdit: (() -> Void)?
     let onArchive: (() -> Void)?
+    let onLaunchStudentMode: (() -> Void)?
 
     @State private var showingArchiveConfirmation = false
 
@@ -16,13 +17,15 @@ struct StudentHeaderView: View {
         isOffline: Bool,
         isMutating: Bool,
         onEdit: (() -> Void)? = nil,
-        onArchive: (() -> Void)? = nil
+        onArchive: (() -> Void)? = nil,
+        onLaunchStudentMode: (() -> Void)? = nil
     ) {
         self.header = header
         self.isOffline = isOffline
         self.isMutating = isMutating
         self.onEdit = onEdit
         self.onArchive = onArchive
+        self.onLaunchStudentMode = onLaunchStudentMode
     }
 
     var body: some View {
@@ -182,7 +185,9 @@ struct StudentHeaderView: View {
     }
 
     private var studentModeControl: some View {
-        Button(action: {}) {
+        Button {
+            onLaunchStudentMode?()
+        } label: {
             HStack(spacing: TMISpacing.md) {
                 Image(systemName: "person.crop.circle.badge.clock")
                     .font(.title3)
@@ -190,11 +195,11 @@ struct StudentHeaderView: View {
                 VStack(alignment: .leading, spacing: TMISpacing.xxs) {
                     Text("Student Mode")
                         .font(.headline)
-                    Text("Available in Release 2")
+                    Text("One student and one assigned activity")
                         .font(.subheadline)
                 }
                 Spacer(minLength: 0)
-                Text("Unavailable")
+                Text("Launch")
                     .font(.caption.weight(.semibold))
             }
             .foregroundStyle(TMIColors.infoText)
@@ -210,11 +215,10 @@ struct StudentHeaderView: View {
             }
         }
         .buttonStyle(.plain)
-        .disabled(true)
-        .opacity(1)
+        .disabled(isOffline || isMutating || onLaunchStudentMode == nil)
         .accessibilityLabel("Student Mode")
         .accessibilityValue(studentModeAccessibilityValue)
-        .accessibilityHint("This control is not available in Release 1.")
+        .accessibilityHint("Opens the secure Student Mode activity picker.")
         .accessibilityIdentifier("studentDetail.studentMode")
     }
 
@@ -259,7 +263,7 @@ struct StudentHeaderView: View {
     private var studentModeAccessibilityValue: String {
         switch header.studentModeAvailability {
         case .availableInRelease2:
-            "Available in Release 2"
+            onLaunchStudentMode == nil ? "Unavailable" : "Available"
         }
     }
 

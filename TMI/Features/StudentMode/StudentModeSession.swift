@@ -15,6 +15,14 @@ nonisolated enum StudentModeOperation: String, Codable, CaseIterable, Sendable {
     case writeCheckIn
     case updateCareerState
     case requestHelp
+
+    static let surveyAssignment: Set<StudentModeOperation> = [
+        .readStudentSafeProfile,
+        .readAssignment,
+        .writeDraft,
+        .submitAssignment,
+        .requestHelp,
+    ]
 }
 
 nonisolated enum StudentModeSessionError: Error, Equatable {
@@ -62,10 +70,33 @@ nonisolated struct StudentModeStaffIdentity: Codable, Hashable, Sendable {
     let membershipVersion: Int
 }
 
+nonisolated struct StudentModeProfile: Codable, Hashable, Sendable {
+    let studentID: String
+    let displayName: String
+    let grade: String
+    let pronouns: String?
+
+    var firstName: String {
+        displayName.split(whereSeparator: \.isWhitespace).first.map(String.init)
+            ?? displayName
+    }
+
+    var initials: String {
+        let value = displayName
+            .split(whereSeparator: \.isWhitespace)
+            .prefix(2)
+            .compactMap(\.first)
+            .map(String.init)
+            .joined()
+            .uppercased()
+        return value.isEmpty ? "?" : value
+    }
+}
+
 nonisolated struct StudentModeGrant: Sendable, Equatable {
     let sessionID: String
     let scope: StudentModeScope
-    let respondentToken: String
+    let recordVersion: Int
     let issuedAt: Date
     let expiresAt: Date
     let staffIdentity: StudentModeStaffIdentity
@@ -96,9 +127,18 @@ nonisolated enum StudentModeState: Sendable, Equatable {
     }
 }
 
+nonisolated enum StudentModeRootPresentation: Sendable, Equatable {
+    case staff
+    case student(StudentModeProfile)
+}
+
 @Observable
 @MainActor
 final class StudentModeSession {
+    typealias AuthenticateStaff = @MainActor @Sendable () async -> Bool
+    typealias SecurelyEndRespondentSession =
+        @MainActor @Sendable (StudentModeGrant) async throws -> Void
+
     nonisolated static let defaultDurationMinutes = 30
     nonisolated static let maximumDurationMinutes = 60
     nonisolated static let inactivityInterval: TimeInterval = 5 * 60
@@ -109,10 +149,49 @@ final class StudentModeSession {
     private(set) var lastActivityAt: Date?
     private(set) var backgroundedAt: Date?
     private(set) var failedExitAttemptCount = 0
-    private(set) var activeStudent: Student?
+    private(set) var studentProfile: StudentModeProfile?
+    private(set) var currentGrant: StudentModeGrant?
+    private var authenticateStaffAction: AuthenticateStaff
+    private var securelyEndRespondentSession: SecurelyEndRespondentSession
 
     var isStudentModeActive: Bool {
         state.isActive
+    }
+
+    var isStudentModeContained: Bool {
+        state != .inactive && currentGrant != nil && studentProfile != nil
+    }
+
+    var rootPresentation: StudentModeRootPresentation {
+        if isStudentModeContained, let studentProfile {
+            return .student(studentProfile)
+        }
+        return .staff
+    }
+
+    init(
+        authenticateStaff: @escaping AuthenticateStaff = {
+            await StudentModeSession.authenticateDeviceOwner()
+        },
+        securelyEndRespondentSession: @escaping SecurelyEndRespondentSession = { _ in
+            throw StudentModeRepositoryError.unavailable
+        }
+    ) {
+        authenticateStaffAction = authenticateStaff
+        self.securelyEndRespondentSession = securelyEndRespondentSession
+    }
+
+    func configureSecureExit(repository: StudentModeRepository) {
+        securelyEndRespondentSession = { grant in
+            try await repository.endSession(
+                sessionID: grant.sessionID,
+                staffIdentity: grant.staffIdentity,
+                expectedRecordVersion: grant.recordVersion,
+                disposition: .ended,
+                idempotencyKey: UUID().uuidString,
+                reasonCode: "secure-exit"
+            )
+        }
     }
 
     nonisolated static func duration(
@@ -127,7 +206,7 @@ final class StudentModeSession {
 
     func activate(
         _ grant: StudentModeGrant,
-        student: Student? = nil,
+        profile: StudentModeProfile? = nil,
         at now: Date = Date()
     ) {
         guard grant.staffIdentity.districtID == grant.scope.districtID,
@@ -137,7 +216,13 @@ final class StudentModeSession {
             return
         }
         state = .active(grant)
-        activeStudent = student
+        currentGrant = grant
+        studentProfile = profile ?? StudentModeProfile(
+            studentID: grant.scope.studentID,
+            displayName: "Student",
+            grade: "",
+            pronouns: nil
+        )
         lastActivityAt = now
         backgroundedAt = nil
         failedExitAttemptCount = 0
@@ -195,30 +280,43 @@ final class StudentModeSession {
         lock(.assignmentRevoked)
     }
 
-    func secureExit() {
-        secureReset(to: .inactive)
-    }
-
     func hasSessionTimedOut() -> Bool {
         evaluate(at: Date())
         return !state.isActive
     }
 
     func exitStudentMode() async -> Bool {
-        guard state != .inactive else {
+        guard state != .inactive, let currentGrant else {
             return true
         }
-        let authenticated = await authenticateStaff()
-        if authenticated {
-            secureExit()
-        } else {
+        let authenticated = await authenticateStaffAction()
+        guard authenticated else {
             recordFailedExitAttempt()
+            return false
         }
-        return authenticated
+        do {
+            try await securelyEndRespondentSession(currentGrant)
+            secureReset(to: .inactive)
+            return true
+        } catch {
+            return false
+        }
     }
 
     func forceExitDueToTimeout() {
-        secureReset(to: .expired)
+        expire()
+    }
+
+    func handleSceneTransition(
+        from _: ScenePhase,
+        to newPhase: ScenePhase,
+        at now: Date = Date()
+    ) {
+        if newPhase == .background {
+            enterBackground(at: now)
+        } else if newPhase == .active, backgroundedAt != nil {
+            returnToForeground(at: now)
+        }
     }
 
     private func evaluateActiveGrant(at now: Date) -> StudentModeGrant? {
@@ -226,7 +324,7 @@ final class StudentModeSession {
             return nil
         }
         if now >= grant.expiresAt {
-            secureReset(to: .expired)
+            expire()
             return nil
         }
         if let lastActivityAt,
@@ -239,19 +337,28 @@ final class StudentModeSession {
 
     private func lock(_ reason: StudentModeLockReason) {
         state = .locked(reason)
-        activeStudent = nil
+        backgroundedAt = nil
+    }
+
+    private func expire() {
+        guard currentGrant != nil else {
+            secureReset(to: .inactive)
+            return
+        }
+        state = .expired
         backgroundedAt = nil
     }
 
     private func secureReset(to nextState: StudentModeState) {
         state = nextState
-        activeStudent = nil
+        currentGrant = nil
+        studentProfile = nil
         lastActivityAt = nil
         backgroundedAt = nil
         failedExitAttemptCount = 0
     }
 
-    private func authenticateStaff() async -> Bool {
+    private static func authenticateDeviceOwner() async -> Bool {
         let context = LAContext()
         var error: NSError?
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {

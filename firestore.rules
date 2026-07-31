@@ -5,6 +5,15 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isRespondent() {
+      return isAuthenticated()
+        && request.auth.token.get('tmiAccessClass', '') == 'respondent';
+    }
+
+    function isAuthenticatedNonRespondent() {
+      return isAuthenticated() && !isRespondent();
+    }
+
     function trustedDistrictID() {
       return isAuthenticated()
         ? request.auth.token.get('tmiDistrictID', '')
@@ -370,28 +379,31 @@ service cloud.firestore {
     }
 
     match /users/{userID} {
-      allow read: if isAuthenticated() && request.auth.uid == userID;
-      allow create: if isAuthenticated()
+      allow read: if isAuthenticatedNonRespondent()
+        && request.auth.uid == userID;
+      allow create: if isAuthenticatedNonRespondent()
         && request.auth.uid == userID
         && profileCreateKeysAreAllowed(request.resource.data);
-      allow update: if isAuthenticated()
+      allow update: if isAuthenticatedNonRespondent()
         && request.auth.uid == userID
         && profileUpdateKeysAreAllowed();
       allow delete: if false;
 
       match /private/profile {
-        allow read: if isAuthenticated() && request.auth.uid == userID;
-        allow create: if isAuthenticated()
+        allow read: if isAuthenticatedNonRespondent()
+          && request.auth.uid == userID;
+        allow create: if isAuthenticatedNonRespondent()
           && request.auth.uid == userID
           && profileCreateKeysAreAllowed(request.resource.data);
-        allow update: if isAuthenticated()
+        allow update: if isAuthenticatedNonRespondent()
           && request.auth.uid == userID
           && profileUpdateKeysAreAllowed();
         allow delete: if false;
       }
 
       match /preferences/settings {
-        allow read, create, update: if isAuthenticated() && request.auth.uid == userID;
+        allow read, create, update: if isAuthenticatedNonRespondent()
+          && request.auth.uid == userID;
         allow delete: if false;
       }
 
@@ -490,6 +502,7 @@ service cloud.firestore {
               == respondentAssignmentID(districtID)
             && resource.data.get('assignmentID', '')
               == respondentAssignmentID(districtID)
+            && resource.data.get('status', '') == 'draft'
             && request.resource.data.get('status', '')
               in ['draft', 'submitted'];
           allow delete: if false;

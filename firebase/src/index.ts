@@ -195,6 +195,14 @@ const studentModeOperationValues = [
 
 type StudentModeOperation = (typeof studentModeOperationValues)[number];
 
+const surveyStudentModeOperations = [
+  "readStudentSafeProfile",
+  "readAssignment",
+  "writeDraft",
+  "submitAssignment",
+  "requestHelp",
+] as const satisfies readonly StudentModeOperation[];
+
 const exportTypeValues = [
   "professionalPlan",
   "interventionSummary",
@@ -1865,10 +1873,8 @@ const assignmentContainsStudent = (
   studentID: string,
 ): boolean => {
   const projectedStudentIDs = assignment.studentIDs;
-  if (
-    Array.isArray(projectedStudentIDs) &&
-    !projectedStudentIDs.includes(studentID)
-  ) {
+  if (!Array.isArray(projectedStudentIDs) ||
+      !projectedStudentIDs.includes(studentID)) {
     return false;
   }
   const cohort = assignment.cohort;
@@ -1901,6 +1907,18 @@ const isStudentModeAssignmentType = (assignment: DocumentData): boolean =>
   assignment.assignmentType === undefined ||
   assignment.assignmentType === "survey" ||
   assignment.assignmentType === "form";
+
+const studentModeOperationsForAssignment = (
+  assignment: DocumentData,
+): readonly StudentModeOperation[] => {
+  if (!isStudentModeAssignmentType(assignment)) {
+    throw new HttpsError(
+      "permission-denied",
+      "The assignment type is not available in Student Mode.",
+    );
+  }
+  return surveyStudentModeOperations;
+};
 
 const studentSafeProfile = (
   student: DocumentData,
@@ -2092,6 +2110,8 @@ export const createStudentModeHandlers = (
               "The assignment is not active for the selected student.",
             );
           }
+          const allowedOperations =
+            studentModeOperationsForAssignment(assignment);
           if (sessionSnapshot.exists) {
             throw new HttpsError(
               "already-exists",
@@ -2112,7 +2132,7 @@ export const createStudentModeHandlers = (
             schoolId: schoolID,
             studentID: data.studentID,
             assignmentIDs: [assignmentID],
-            allowedOperations: [...studentModeOperationValues],
+            allowedOperations: [...allowedOperations],
             educatorUserID: identity.userID,
             respondentUserID,
             status: "active",
@@ -2148,10 +2168,19 @@ export const createStudentModeHandlers = (
     const issuedAt = session.get("issuedAt");
     const expiresAt = session.get("expiresAt");
     const respondentUserID = session.get("respondentUserID");
+    const storedAllowedOperations = session.get("allowedOperations");
     if (
       !(issuedAt instanceof Timestamp) ||
       !(expiresAt instanceof Timestamp) ||
-      typeof respondentUserID !== "string"
+      typeof respondentUserID !== "string" ||
+      !Array.isArray(storedAllowedOperations) ||
+      !storedAllowedOperations.every(
+        (operation): operation is StudentModeOperation =>
+          typeof operation === "string" &&
+          studentModeOperationValues.includes(
+            operation as StudentModeOperation,
+          ),
+      )
     ) {
       throw new HttpsError(
         "data-loss",
@@ -2173,7 +2202,7 @@ export const createStudentModeHandlers = (
       tmiStudentID: data.studentID,
       tmiSessionID: sessionID,
       tmiAssignmentIDs: [assignmentID],
-      tmiAllowedOperations: [...studentModeOperationValues],
+      tmiAllowedOperations: [...storedAllowedOperations],
     };
     if (Buffer.byteLength(JSON.stringify(tokenPayload), "utf8") > 900) {
       throw new HttpsError(
@@ -2191,7 +2220,7 @@ export const createStudentModeHandlers = (
       districtID: data.districtID,
       studentID: data.studentID,
       assignmentIDs: [assignmentID],
-      allowedOperations: [...studentModeOperationValues],
+      allowedOperations: [...storedAllowedOperations],
       customToken,
       issuedAt: issuedAt.toDate().toISOString(),
       expiresAt: expiresAt.toDate().toISOString(),

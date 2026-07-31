@@ -11,6 +11,7 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) private var authStateModel
     @Environment(\.studentContext) private var studentContext
@@ -31,18 +32,19 @@ struct MainTabView: View {
 
     var body: some View {
         Group {
-            if let activeStudent = studentModeSession.activeStudent {
+            switch studentModeSession.rootPresentation {
+            case .student(let studentProfile):
                 // Student Mode - Restricted Interface
-                StudentModeView(student: activeStudent)
+                StudentModeView(profile: studentProfile)
                     .environment(\.studentModeSession, studentModeSession)
                     .environment(\.studentAccessMode, .studentMode)
                     .onAppear {
                         dependencies.logger.info(
                             "student_mode_entered",
-                            metadata: ["studentID": activeStudent.id ?? "missing"]
+                            metadata: ["studentID": studentProfile.studentID]
                         )
                     }
-            } else {
+            case .staff:
                 // Staff Mode - Full Interface
                 staffTabView
                     .environment(\.studentModeSession, studentModeSession)
@@ -54,6 +56,9 @@ struct MainTabView: View {
             }
         }
         .task {
+            if let repository = dependencies.studentModeRepository {
+                studentModeSession.configureSecureExit(repository: repository)
+            }
             updateNavigationPolicy()
             restoreSelectedTab()
             try? router.resumePendingDeepLink()
@@ -76,6 +81,12 @@ struct MainTabView: View {
             // Persist only the non-sensitive tab. Record IDs are reloaded and
             // reauthorized after every scene or process reconstruction.
             restoredTab = tab.rawValue
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            studentModeSession.handleSceneTransition(
+                from: oldPhase,
+                to: newPhase
+            )
         }
     }
     

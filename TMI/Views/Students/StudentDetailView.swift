@@ -3,6 +3,7 @@ import SwiftUI
 struct StudentDetailView: View {
     @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) private var authStateModel
+    @Environment(\.studentModeSession) private var studentModeSession
     @Environment(AppRouter.self) private var router
 
     let studentID: String
@@ -11,6 +12,7 @@ struct StudentDetailView: View {
     @State private var loadedAuthority: Authority?
     @State private var selectedDestination: StudentHubDestination = .overview
     @State private var showingEditor = false
+    @State private var showingStudentModeLaunch = false
 
     private let memberOverride: MembershipContext?
 
@@ -36,6 +38,9 @@ struct StudentDetailView: View {
                         Task { @MainActor in
                             _ = await state.archive(operationID: UUID())
                         }
+                    },
+                    launchStudentMode: {
+                        showingStudentModeLaunch = true
                     }
                 )
             } else {
@@ -76,6 +81,20 @@ struct StudentDetailView: View {
                         return .failed
                     }
                 }
+                .tmiSheetStyle()
+            }
+        }
+        .sheet(isPresented: $showingStudentModeLaunch) {
+            if let state,
+               let student = state.student,
+               let member,
+               let repository = dependencies.studentModeRepository {
+                StudentModeLaunchView(
+                    student: student,
+                    member: member,
+                    repository: repository,
+                    session: studentModeSession
+                )
                 .tmiSheetStyle()
             }
         }
@@ -165,6 +184,7 @@ private struct StudentOperationalHubContent: View {
 
     let edit: () -> Void
     let archive: () -> Void
+    let launchStudentMode: () -> Void
 
     var body: some View {
         ZStack {
@@ -241,7 +261,8 @@ private struct StudentOperationalHubContent: View {
                         onEdit: state.menuActions.contains(.edit) ? edit : nil,
                         onArchive: state.menuActions.contains(.archive)
                             ? archive
-                            : nil
+                            : nil,
+                        onLaunchStudentMode: launchStudentMode
                     )
                 }
 

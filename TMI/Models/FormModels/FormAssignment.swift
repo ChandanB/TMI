@@ -16,6 +16,8 @@ struct FormAssignment: Codable, Identifiable, Sendable {
   var assignedBy: String // User ID of staff who assigned
   var assignedByName: String?
   var cohort: AssignmentCohort
+  /// Canonical target projection used by security rules and respondent sessions.
+  var studentIDs: [String]?
   var dueDate: Date?
   var createdAt: Date
   var updatedAt: Date?
@@ -40,6 +42,7 @@ struct FormAssignment: Codable, Identifiable, Sendable {
     assignedBy: String,
     assignedByName: String? = nil,
     cohort: AssignmentCohort,
+    studentIDs: [String]? = nil,
     dueDate: Date? = nil,
     createdAt: Date = Date(),
     updatedAt: Date? = nil,
@@ -59,6 +62,7 @@ struct FormAssignment: Codable, Identifiable, Sendable {
     self.assignedBy = assignedBy
     self.assignedByName = assignedByName
     self.cohort = cohort
+    self.studentIDs = studentIDs
     self.dueDate = dueDate
     self.createdAt = createdAt
     self.updatedAt = updatedAt
@@ -202,5 +206,4 @@ enum SubmissionStatus: String, Codable, CaseIterable, Sendable {
     }
   }
 }
-
 
