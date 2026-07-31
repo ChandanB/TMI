@@ -1,5 +1,12 @@
 # Universal Debug Registration Bypass Design
 
+> **Status: deferred after integration review.** The proposed client-only
+> provisioner does not create the canonical Firebase profile, tenant claim, and
+> membership reloaded by `AuthStateModel`, so its implementation was not merged
+> to `main`. A future bypass must provision canonical backend authority or
+> provide a complete Debug authorization stack; this document is not approved
+> for implementation as written.
+
 ## Goal
 
 Allow developers to register and recover a staff account in an ordinary Debug build without first creating a Firebase staff invitation.
