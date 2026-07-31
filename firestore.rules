@@ -66,6 +66,7 @@ service cloud.firestore {
     function hasActiveRespondentSession(districtID) {
       let claimAssignments = request.auth.token.get('tmiAssignmentIDs', []);
       let claimOperations = request.auth.token.get('tmiAllowedOperations', []);
+      let session = get(respondentSessionPath(districtID)).data;
       return isAuthenticated()
         && request.auth.token.get('tmiAccessClass', '') == 'respondent'
         && trustedDistrictID() == districtID
@@ -73,29 +74,26 @@ service cloud.firestore {
         && request.auth.token.get('tmiSessionID', '') != ''
         && claimAssignments.size() == 1
         && exists(respondentSessionPath(districtID))
-        && get(respondentSessionPath(districtID)).data.get('status', '') == 'active'
-        && get(respondentSessionPath(districtID)).data.get('expiresAt', request.time) > request.time
-        && get(respondentSessionPath(districtID)).data.get('districtID', '') == districtID
-        && get(respondentSessionPath(districtID)).data.get('studentID', '')
+        && session.get('status', '') == 'active'
+        && session.get('expiresAt', request.time) > request.time
+        && session.get('districtID', '') == districtID
+        && session.get('studentID', '')
           == request.auth.token.get('tmiStudentID', '')
-        && get(respondentSessionPath(districtID)).data.get('respondentUserID', '')
+        && session.get('respondentUserID', '')
           == request.auth.uid
-        && get(respondentSessionPath(districtID)).data.get('assignmentIDs', []).size()
+        && session.get('assignmentIDs', []).size()
           == claimAssignments.size()
-        && get(respondentSessionPath(districtID)).data.get('assignmentIDs', [])
-          .hasOnly(claimAssignments)
-        && get(respondentSessionPath(districtID)).data.get('allowedOperations', []).size()
+        && session.get('assignmentIDs', []).hasOnly(claimAssignments)
+        && session.get('allowedOperations', []).size()
           == claimOperations.size()
-        && get(respondentSessionPath(districtID)).data.get('allowedOperations', [])
-          .hasOnly(claimOperations);
+        && session.get('allowedOperations', []).hasOnly(claimOperations);
     }
 
     function respondentMay(districtID, studentID, operation) {
       return hasActiveRespondentSession(districtID)
+        && hasActiveRespondentAssignment(districtID)
         && request.auth.token.get('tmiStudentID', '') == studentID
-        && operation in get(
-          respondentSessionPath(districtID)
-        ).data.get('allowedOperations', []);
+        && operation in request.auth.token.get('tmiAllowedOperations', []);
     }
 
     function respondentAssignmentID(districtID) {
@@ -111,10 +109,11 @@ service cloud.firestore {
     }
 
     function hasActiveRespondentAssignment(districtID) {
-      return respondentAssignment(districtID).get('districtId', '') == districtID
-        && respondentAssignment(districtID).get('isActive', false) == true
+      let assignment = respondentAssignment(districtID);
+      return assignment.get('districtId', '') == districtID
+        && assignment.get('isActive', false) == true
         && request.auth.token.get('tmiStudentID', '')
-          in respondentAssignment(districtID).get('studentIDs', []);
+          in assignment.get('studentIDs', []);
     }
 
     function isScopedRespondentWrite(districtID, studentID, data) {
@@ -148,8 +147,7 @@ service cloud.firestore {
       planID,
       recordData
     ) {
-      return hasActiveRespondentSession(districtID)
-        && respondentMay(
+      return respondentMay(
           districtID,
           request.auth.token.get('tmiStudentID', ''),
           'readStudentVisiblePlan'
@@ -694,14 +692,17 @@ service cloud.firestore {
         }
 
         match /{collectionName}/{recordID} {
-          allow read: if collectionName in ['goals', 'actions', 'resources', 'forms']
-            && (
-              canReadPlan(
+          allow read: if (
+              collectionName in ['goals', 'actions', 'resources', 'forms']
+              && canReadPlan(
                 districtID,
                 planID,
                 planData(districtID, planID)
               )
-              || respondentMayReadPlanRecord(
+            )
+            || (
+              collectionName in ['goals', 'actions', 'resources']
+              && respondentMayReadPlanRecord(
                 districtID,
                 planID,
                 resource.data
@@ -764,8 +765,7 @@ service cloud.firestore {
             )
           )
           || (
-            hasActiveRespondentSession(districtID)
-            && respondentMay(
+            respondentMay(
               districtID,
               request.auth.token.get('tmiStudentID', ''),
               'readAssignment'

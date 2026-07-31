@@ -2123,7 +2123,6 @@ export const createStudentModeHandlers = (
           transaction.set(
             safeProfileReference,
             studentSafeProfile(student, data.districtID, data.studentID),
-            { merge: true },
           );
           return { recordVersion: 1 };
         },

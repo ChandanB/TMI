@@ -5,6 +5,15 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function isRespondent() {
+      return isAuthenticated()
+        && request.auth.token.get('tmiAccessClass', '') == 'respondent';
+    }
+
+    function isAuthenticatedNonRespondent() {
+      return isAuthenticated() && !isRespondent();
+    }
+
     function trustedDistrictID() {
       return isAuthenticated()
         ? request.auth.token.get('tmiDistrictID', '')
@@ -167,12 +176,14 @@ service firebase.storage {
     }
 
     match /users/{userID}/profile/{fileName} {
-      allow read: if isAuthenticated() && request.auth.uid == userID;
-      allow create, update: if isAuthenticated()
+      allow read: if isAuthenticatedNonRespondent()
+        && request.auth.uid == userID;
+      allow create, update: if isAuthenticatedNonRespondent()
         && request.auth.uid == userID
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if isAuthenticated() && request.auth.uid == userID;
+      allow delete: if isAuthenticatedNonRespondent()
+        && request.auth.uid == userID;
     }
 
     match /districts/{districtID}/students/{studentID}/files/{allPaths=**} {
@@ -204,7 +215,7 @@ service firebase.storage {
     }
 
     match /catalogs/{catalogName}/{allPaths=**} {
-      allow read: if isAuthenticated()
+      allow read: if isAuthenticatedNonRespondent()
         && catalogName in [
           'careers',
           'interests',

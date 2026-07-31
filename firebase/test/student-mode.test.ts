@@ -7,6 +7,7 @@ import {
 import type { CallableRequest } from "firebase-functions/v2/https";
 import {
   Timestamp,
+  deleteDoc,
   doc,
   getDoc,
   setDoc,
@@ -127,6 +128,20 @@ describe("Student Mode callable trust boundary", () => {
           isArchived: false,
           recordVersion: 1,
         }),
+        setDoc(
+          doc(
+            db,
+            `districts/${districtID}/students/${studentID}/studentSafe/profile`,
+          ),
+          {
+            schemaVersion: 0,
+            districtID,
+            studentID,
+            displayName: "Stale name",
+            dateOfBirth: "must-be-removed",
+            restrictedData: { note: "must-be-removed" },
+          },
+        ),
         setDoc(
           doc(db, `districts/${districtID}/formAssignments/${assignmentID}`),
           {
@@ -430,6 +445,7 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
 
   beforeEach(async () => {
     await testEnv.clearFirestore();
+    await testEnv.clearStorage();
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
       const activeSession = {
@@ -488,6 +504,10 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
           { studentVisible: true, title: "Visible goal" },
         ),
         setDoc(
+          doc(db, `districts/${districtID}/plans/plan-1/forms/form-1`),
+          { studentVisible: true, title: "Unassigned plan form" },
+        ),
+        setDoc(
           doc(
             db,
             `districts/${districtID}/students/${studentID}/resources/resource-1`,
@@ -534,6 +554,19 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
             `districts/${districtID}/students/student-2/studentSafe/profile`,
           ),
           { districtID, studentID: "student-2" },
+        ),
+        uploadBytes(
+          ref(
+            context.storage(),
+            `users/${respondentUserID}/profile/avatar.jpg`,
+          ),
+          new Uint8Array([1]),
+          { contentType: "image/jpeg" },
+        ),
+        uploadBytes(
+          ref(context.storage(), "catalogs/careers/career-1/image.png"),
+          new Uint8Array([2]),
+          { contentType: "image/png" },
         ),
       ]);
     });
@@ -630,6 +663,7 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
       `districts/${districtID}/students/${studentID}/restrictedRecords/restricted-1`,
       `districts/${districtID}/auditEvents/audit-1`,
       `districts/${districtID}/plans/plan-1/approvals/approval-1`,
+      `districts/${districtID}/plans/plan-1/forms/form-1`,
       `districts/${districtID}/members/${staffUserID}`,
       `districts/${districtID}/schools/school-1`,
       `districts/${districtID}/tasks/task-1`,
@@ -639,6 +673,53 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
     ]) {
       await assertFails(getDoc(doc(db, path)));
     }
+  });
+
+  it("requires the assignment to remain active for every respondent operation", async () => {
+    const readPaths = [
+      `districts/${districtID}/students/${studentID}/studentSafe/profile`,
+      "catalogs/careers/items/career-1",
+      `districts/${districtID}/plans/plan-1/goals/goal-1`,
+    ];
+    const writePath =
+      `districts/${districtID}/students/${studentID}/interests/post-lock-interest`;
+    const writeData = {
+      districtID,
+      studentID,
+      respondentSessionID: sessionID,
+      interestID: "career-tech",
+    };
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(
+        doc(
+          context.firestore(),
+          `districts/${districtID}/formAssignments/${assignmentID}`,
+        ),
+        { isActive: false },
+      );
+    });
+    for (const path of readPaths) {
+      await assertFails(getDoc(doc(respondentContext().firestore(), path)));
+    }
+    await assertFails(
+      setDoc(doc(respondentContext().firestore(), writePath), writeData),
+    );
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await deleteDoc(
+        doc(
+          context.firestore(),
+          `districts/${districtID}/formAssignments/${assignmentID}`,
+        ),
+      );
+    });
+    for (const path of readPaths) {
+      await assertFails(getDoc(doc(respondentContext().firestore(), path)));
+    }
+    await assertFails(
+      setDoc(doc(respondentContext().firestore(), writePath), writeData),
+    );
   });
 
   it("denies forbidden and cross-student writes", async () => {
@@ -738,13 +819,16 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
     );
   });
 
-  it("denies respondent access to all student storage", async () => {
+  it("denies respondent access everywhere in Storage", async () => {
     const storage = respondentContext().storage();
-    const file = ref(
-      storage,
+    for (const path of [
       `districts/${districtID}/students/${studentID}/files/file.txt`,
-    );
-    await assertFails(uploadBytes(file, new Uint8Array([1, 2, 3])));
-    await assertFails(getBytes(file));
+      `users/${respondentUserID}/profile/avatar.jpg`,
+      "catalogs/careers/career-1/image.png",
+    ]) {
+      const file = ref(storage, path);
+      await assertFails(uploadBytes(file, new Uint8Array([1, 2, 3])));
+      await assertFails(getBytes(file));
+    }
   });
 });
