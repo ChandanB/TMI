@@ -59,6 +59,106 @@ service cloud.firestore {
         && capability in membership(districtID).get('capabilities', []);
     }
 
+    function respondentSessionPath(districtID) {
+      return /databases/$(database)/documents/districts/$(districtID)/studentModeSessions/$(request.auth.token.get('tmiSessionID', ''));
+    }
+
+    function hasActiveRespondentSession(districtID) {
+      let claimAssignments = request.auth.token.get('tmiAssignmentIDs', []);
+      let claimOperations = request.auth.token.get('tmiAllowedOperations', []);
+      return isAuthenticated()
+        && request.auth.token.get('tmiAccessClass', '') == 'respondent'
+        && trustedDistrictID() == districtID
+        && request.auth.token.get('tmiStudentID', '') != ''
+        && request.auth.token.get('tmiSessionID', '') != ''
+        && claimAssignments.size() == 1
+        && exists(respondentSessionPath(districtID))
+        && get(respondentSessionPath(districtID)).data.get('status', '') == 'active'
+        && get(respondentSessionPath(districtID)).data.get('expiresAt', request.time) > request.time
+        && get(respondentSessionPath(districtID)).data.get('districtID', '') == districtID
+        && get(respondentSessionPath(districtID)).data.get('studentID', '')
+          == request.auth.token.get('tmiStudentID', '')
+        && get(respondentSessionPath(districtID)).data.get('respondentUserID', '')
+          == request.auth.uid
+        && get(respondentSessionPath(districtID)).data.get('assignmentIDs', []).size()
+          == claimAssignments.size()
+        && get(respondentSessionPath(districtID)).data.get('assignmentIDs', [])
+          .hasOnly(claimAssignments)
+        && get(respondentSessionPath(districtID)).data.get('allowedOperations', []).size()
+          == claimOperations.size()
+        && get(respondentSessionPath(districtID)).data.get('allowedOperations', [])
+          .hasOnly(claimOperations);
+    }
+
+    function respondentMay(districtID, studentID, operation) {
+      return hasActiveRespondentSession(districtID)
+        && request.auth.token.get('tmiStudentID', '') == studentID
+        && operation in get(
+          respondentSessionPath(districtID)
+        ).data.get('allowedOperations', []);
+    }
+
+    function respondentAssignmentID(districtID) {
+      return get(
+        respondentSessionPath(districtID)
+      ).data.get('assignmentIDs', [])[0];
+    }
+
+    function respondentAssignment(districtID) {
+      return get(
+        /databases/$(database)/documents/districts/$(districtID)/formAssignments/$(respondentAssignmentID(districtID))
+      ).data;
+    }
+
+    function hasActiveRespondentAssignment(districtID) {
+      return respondentAssignment(districtID).get('districtId', '') == districtID
+        && respondentAssignment(districtID).get('isActive', false) == true
+        && request.auth.token.get('tmiStudentID', '')
+          in respondentAssignment(districtID).get('studentIDs', []);
+    }
+
+    function isScopedRespondentWrite(districtID, studentID, data) {
+      return data.get('districtID', '') == districtID
+        && data.get('studentID', '') == studentID
+        && data.get('respondentSessionID', '')
+          == request.auth.token.get('tmiSessionID', '');
+    }
+
+    function respondentMayWriteRecord(districtID, studentID, operation) {
+      return respondentMay(districtID, studentID, operation)
+        && isScopedRespondentWrite(
+          districtID,
+          studentID,
+          request.resource.data
+        );
+    }
+
+    function respondentMayUpdateRecord(districtID, studentID, operation) {
+      return respondentMayWriteRecord(districtID, studentID, operation)
+        && isScopedRespondentWrite(districtID, studentID, resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'districtID',
+            'studentID',
+            'respondentSessionID'
+          ]);
+    }
+
+    function respondentMayReadPlanRecord(
+      districtID,
+      planID,
+      recordData
+    ) {
+      return hasActiveRespondentSession(districtID)
+        && respondentMay(
+          districtID,
+          request.auth.token.get('tmiStudentID', ''),
+          'readStudentVisiblePlan'
+        )
+        && request.auth.token.get('tmiStudentID', '')
+          in planData(districtID, planID).get('studentIDs', [])
+        && recordData.get('studentVisible', false) == true;
+    }
+
     function belongsToSchool(districtID, schoolID) {
       return hasActiveMembership(districtID)
         && schoolID in membership(districtID).get('schoolIDs', []);
@@ -343,6 +443,15 @@ service cloud.firestore {
         allow list: if canListStudent(districtID, resource.data);
         allow create, update, delete: if false;
 
+        match /studentSafe/profile {
+          allow get: if respondentMay(
+            districtID,
+            studentID,
+            'readStudentSafeProfile'
+          );
+          allow list, write: if false;
+        }
+
         match /restrictedRecords/{recordID} {
           allow read: if canReadRestrictedStudentRecord(districtID, studentID);
           allow create, update: if canWriteRestrictedStudentRecord(districtID, studentID);
@@ -361,8 +470,31 @@ service cloud.firestore {
             studentID,
             studentData(districtID, studentID)
           );
-          allow create: if canCollaborateOnStudent(districtID, studentID);
-          allow update, delete: if false;
+          allow create: if canCollaborateOnStudent(districtID, studentID)
+            || (
+              respondentMayWriteRecord(
+                districtID,
+                studentID,
+                'writeDraft'
+              )
+              && request.resource.data.get('assignmentID', '')
+                == respondentAssignmentID(districtID)
+              && request.resource.data.get('status', '') == 'draft'
+            );
+          allow update: if respondentMayUpdateRecord(
+              districtID,
+              studentID,
+              request.resource.data.get('status', '') == 'submitted'
+                ? 'submitAssignment'
+                : 'writeDraft'
+            )
+            && request.resource.data.get('assignmentID', '')
+              == respondentAssignmentID(districtID)
+            && resource.data.get('assignmentID', '')
+              == respondentAssignmentID(districtID)
+            && request.resource.data.get('status', '')
+              in ['draft', 'submitted'];
+          allow delete: if false;
         }
 
         match /progress/{entryID} {
@@ -375,11 +507,124 @@ service cloud.firestore {
           allow update, delete: if false;
         }
 
+        match /interests/{interestID} {
+          allow read: if canReadStudent(
+              districtID,
+              studentID,
+              studentData(districtID, studentID)
+            );
+          allow create: if canCollaborateOnStudent(districtID, studentID)
+            || respondentMayWriteRecord(
+              districtID,
+              studentID,
+              'updateInterests'
+            );
+          allow update: if canCollaborateOnStudent(districtID, studentID)
+            || respondentMayUpdateRecord(
+              districtID,
+              studentID,
+              'updateInterests'
+            );
+          allow delete: if false;
+        }
+
+        match /careers/{careerID} {
+          allow read: if canReadStudent(
+              districtID,
+              studentID,
+              studentData(districtID, studentID)
+            );
+          allow create: if respondentMayWriteRecord(
+            districtID,
+            studentID,
+            'updateCareerState'
+          );
+          allow update: if respondentMayUpdateRecord(
+            districtID,
+            studentID,
+            'updateCareerState'
+          );
+          allow delete: if false;
+        }
+
+        match /resources/{resourceID} {
+          allow read: if (
+              canReadStudent(
+                districtID,
+                studentID,
+                studentData(districtID, studentID)
+              )
+              || respondentMay(
+                districtID,
+                studentID,
+                'readStudentVisiblePlan'
+              )
+            )
+            && (
+              hasActiveMembership(districtID)
+              || resource.data.get('studentVisible', false) == true
+            );
+          allow create, update: if canCollaborateOnStudent(
+            districtID,
+            studentID
+          );
+          allow delete: if false;
+        }
+
+        match /reflections/{reflectionID} {
+          allow read: if canReadStudent(
+            districtID,
+            studentID,
+            studentData(districtID, studentID)
+          );
+          allow create: if respondentMayWriteRecord(
+            districtID,
+            studentID,
+            'writeReflection'
+          );
+          allow update: if respondentMayUpdateRecord(
+            districtID,
+            studentID,
+            'writeReflection'
+          );
+          allow delete: if false;
+        }
+
+        match /checkIns/{checkInID} {
+          allow read: if canReadStudent(
+            districtID,
+            studentID,
+            studentData(districtID, studentID)
+          );
+          allow create: if respondentMayWriteRecord(
+            districtID,
+            studentID,
+            'writeCheckIn'
+          );
+          allow update: if respondentMayUpdateRecord(
+            districtID,
+            studentID,
+            'writeCheckIn'
+          );
+          allow delete: if false;
+        }
+
+        match /helpRequests/{requestID} {
+          allow read: if canReadStudent(
+            districtID,
+            studentID,
+            studentData(districtID, studentID)
+          );
+          allow create: if respondentMayWriteRecord(
+            districtID,
+            studentID,
+            'requestHelp'
+          );
+          allow update, delete: if false;
+        }
+
         match /{collectionName}/{recordID} {
           allow read: if collectionName in [
-              'interests',
-              'careers',
-              'resources',
               'surveys',
               'notes'
             ]
@@ -389,9 +634,6 @@ service cloud.firestore {
               studentData(districtID, studentID)
             );
           allow create, update: if collectionName in [
-              'interests',
-              'careers',
-              'resources',
               'surveys',
               'notes'
             ]
@@ -453,10 +695,17 @@ service cloud.firestore {
 
         match /{collectionName}/{recordID} {
           allow read: if collectionName in ['goals', 'actions', 'resources', 'forms']
-            && canReadPlan(
-              districtID,
-              planID,
-              planData(districtID, planID)
+            && (
+              canReadPlan(
+                districtID,
+                planID,
+                planData(districtID, planID)
+              )
+              || respondentMayReadPlanRecord(
+                districtID,
+                planID,
+                resource.data
+              )
             );
           allow create, update: if collectionName in [
               'goals',
@@ -506,11 +755,24 @@ service cloud.firestore {
       }
 
       match /formTemplates/{templateID} {
-        allow read: if hasActiveMembership(districtID)
-          && (
-            resource.data.get('schoolId', null) == null
-            || role(districtID) == 'districtAdministrator'
-            || belongsToSchool(districtID, resource.data.get('schoolId', ''))
+        allow read: if (
+            hasActiveMembership(districtID)
+            && (
+              resource.data.get('schoolId', null) == null
+              || role(districtID) == 'districtAdministrator'
+              || belongsToSchool(districtID, resource.data.get('schoolId', ''))
+            )
+          )
+          || (
+            hasActiveRespondentSession(districtID)
+            && respondentMay(
+              districtID,
+              request.auth.token.get('tmiStudentID', ''),
+              'readAssignment'
+            )
+            && hasActiveRespondentAssignment(districtID)
+            && respondentAssignment(districtID).get('templateId', '')
+              == templateID
           );
         allow create: if hasActiveMembership(districtID)
           && request.resource.data.get('districtId', districtID) == districtID
@@ -533,13 +795,27 @@ service cloud.firestore {
       }
 
       match /formAssignments/{assignmentID} {
-        allow read: if hasActiveMembership(districtID)
-          && (
-            resource.data.get('assignedBy', '') == request.auth.uid
-            || resource.data.get('studentIDs', []).hasOnly(
-              membership(districtID).get('assignedStudentIDs', [])
+        allow read: if (
+            hasActiveMembership(districtID)
+            && (
+              resource.data.get('assignedBy', '') == request.auth.uid
+              || resource.data.get('studentIDs', []).hasOnly(
+                membership(districtID).get('assignedStudentIDs', [])
+              )
+              || role(districtID) in ['schoolAdministrator', 'districtAdministrator']
             )
-            || role(districtID) in ['schoolAdministrator', 'districtAdministrator']
+          )
+          || (
+            respondentMay(
+              districtID,
+              request.auth.token.get('tmiStudentID', ''),
+              'readAssignment'
+            )
+            && assignmentID == respondentAssignmentID(districtID)
+            && resource.data.get('isActive', false) == true
+            && resource.data.get('districtId', '') == districtID
+            && request.auth.token.get('tmiStudentID', '')
+              in resource.data.get('studentIDs', [])
           );
         allow create: if hasActiveMembership(districtID)
           && request.resource.data.get('assignedBy', '') == request.auth.uid
@@ -619,14 +895,26 @@ service cloud.firestore {
     }
 
     match /catalogs/{catalogName}/items/{itemID} {
-      allow read: if isAuthenticated()
-        && catalogName in [
-          'careers',
-          'interests',
-          'globalResources',
-          'tmiModels',
-          'surveyDefinitions'
-        ];
+      allow read: if (
+          isAuthenticated()
+          && request.auth.token.get('tmiAccessClass', '') != 'respondent'
+          && catalogName in [
+            'careers',
+            'interests',
+            'globalResources',
+            'tmiModels',
+            'surveyDefinitions'
+          ]
+        )
+        || (
+          catalogName == 'careers'
+          && resource.data.get('isApproved', false) == true
+          && respondentMay(
+            trustedDistrictID(),
+            request.auth.token.get('tmiStudentID', ''),
+            'readCareerCatalog'
+          )
+        );
       allow write: if false;
     }
 

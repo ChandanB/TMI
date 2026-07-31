@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import {
@@ -19,17 +19,21 @@ import {
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import {
   assertRecordVersion,
+  assertDistrict,
   canManageSchool,
   canReadStudentDetail,
   capabilityValues,
   executePrivilegedOperation,
   parseBaseRequest,
+  parseTrustedCallableIdentity,
   rejectUnexpectedFields,
   requireBoolean,
   requireEnum,
   requireIdentifier,
   requireIdentifierArray,
   requireInteger,
+  requireCapability,
+  requireTrustedMembership,
   requireRecord,
   requireString,
   staffRoleValues,
@@ -156,8 +160,40 @@ export interface IssueStudentModeSessionRequest
   extends PrivilegedBaseRequest {
   readonly studentID: string;
   readonly assignmentIDs: readonly string[];
-  readonly durationMinutes: number;
+  readonly durationMinutes?: number;
 }
+
+export interface EndStudentModeSessionRequest
+  extends PrivilegedBaseRequest {
+  readonly sessionID: string;
+  readonly disposition: "ended" | "revoked";
+}
+
+export interface StudentModeRespondentClaims
+  extends Record<string, unknown> {
+  readonly tmiDistrictID: string;
+  readonly tmiAccessClass: "respondent";
+  readonly tmiStudentID: string;
+  readonly tmiSessionID: string;
+  readonly tmiAssignmentIDs: readonly [string];
+  readonly tmiAllowedOperations: readonly StudentModeOperation[];
+}
+
+const studentModeOperationValues = [
+  "readStudentSafeProfile",
+  "readAssignment",
+  "readCareerCatalog",
+  "readStudentVisiblePlan",
+  "writeDraft",
+  "submitAssignment",
+  "updateInterests",
+  "writeReflection",
+  "writeCheckIn",
+  "updateCareerState",
+  "requestHelp",
+] as const;
+
+type StudentModeOperation = (typeof studentModeOperationValues)[number];
 
 const exportTypeValues = [
   "professionalPlan",
@@ -448,13 +484,36 @@ const parseIssueStudentModeSessionRequest = (
     assignmentIDs: requireIdentifierArray(
       data.assignmentIDs,
       "assignmentIDs",
-      { allowEmpty: false, maximumCount: 100 },
+      { allowEmpty: false, maximumCount: 1 },
     ),
-    durationMinutes: requireInteger(
-      data.durationMinutes,
-      "durationMinutes",
-      1,
+    durationMinutes: Math.min(
+      data.durationMinutes === undefined
+        ? 30
+        : requireInteger(
+            data.durationMinutes,
+            "durationMinutes",
+            1,
+          ),
       60,
+    ),
+  };
+};
+
+const parseEndStudentModeSessionRequest = (
+  value: unknown,
+): EndStudentModeSessionRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(
+    data,
+    withBaseFields("sessionID", "disposition"),
+  );
+  return {
+    ...parseBaseRequest(data),
+    sessionID: requireIdentifier(data.sessionID, "sessionID"),
+    disposition: requireEnum(
+      data.disposition,
+      "disposition",
+      ["ended", "revoked"] as const,
     ),
   };
 };
@@ -1792,108 +1851,433 @@ const transitionPlanHandler = async (
   });
 };
 
-const issueStudentModeSessionHandler = async (
-  request: CallableRequest<IssueStudentModeSessionRequest>,
-): Promise<
-  PrivilegedOperationResult & {
-    readonly customToken: string;
-    readonly expiresAt: string;
+interface StudentModeDependencies {
+  readonly firestore: Firestore;
+  readonly createCustomToken: (
+    userID: string,
+    claims: StudentModeRespondentClaims,
+  ) => Promise<string>;
+}
+
+const assignmentContainsStudent = (
+  assignment: DocumentData,
+  student: DocumentData,
+  studentID: string,
+): boolean => {
+  const projectedStudentIDs = assignment.studentIDs;
+  if (
+    Array.isArray(projectedStudentIDs) &&
+    !projectedStudentIDs.includes(studentID)
+  ) {
+    return false;
   }
-> => {
-  const data = parseIssueStudentModeSessionRequest(request.data);
-  const firestore = getFirestore();
-  const sessionPath = `districts/${data.districtID}/studentModeSessions/${data.idempotencyKey}`;
-  const result = await executePrivilegedOperation(
-    firestore,
-    request,
-    data,
-    {
-      action: "studentMode.session.issue",
-      targetPath: () => sessionPath,
-      requiredCapability: null,
-      auditDetails: (input) => ({
-        studentID: input.studentID,
-        assignmentIDs: [...input.assignmentIDs],
-        durationMinutes: input.durationMinutes,
-      }),
-      mutate: async ({ transaction, membership, identity }) => {
-        const studentReference = firestore.doc(
-          `districts/${data.districtID}/students/${data.studentID}`,
-        );
-        const sessionReference = firestore.doc(sessionPath);
-        const [studentSnapshot, sessionSnapshot] = await Promise.all([
-          transaction.get(studentReference),
-          transaction.get(sessionReference),
-        ]);
-        const student = requireExistingData(studentSnapshot, "Student");
-        assertRecordVersion(
-          student.recordVersion,
-          data.expectedRecordVersion,
-        );
-        const schoolID = requireSchoolID(student, "Student");
-        if (!canReadStudentDetail(membership, data.studentID, schoolID)) {
-          throw new HttpsError(
-            "permission-denied",
-            "Student Mode can only be issued for an authorized student.",
-          );
-        }
-        if (sessionSnapshot.exists) {
-          throw new HttpsError(
-            "already-exists",
-            "The Student Mode session already exists.",
-          );
-        }
-        const issuedAt = Timestamp.now();
-        const expiresAt = Timestamp.fromMillis(
-          issuedAt.toMillis() + data.durationMinutes * 60_000,
-        );
-        transaction.create(sessionReference, {
-          schemaVersion: 1,
-          recordVersion: 1,
-          districtID: data.districtID,
-          schoolId: schoolID,
-          studentID: data.studentID,
-          assignmentIDs: [...data.assignmentIDs],
-          educatorUserID: identity.userID,
-          status: "active",
-          issuedAt,
-          expiresAt,
-          lastActivityAt: issuedAt,
-        });
-        return { recordVersion: 1 };
-      },
-    },
-  );
-  const session = await firestore.doc(sessionPath).get();
-  const expiresAt = session.get("expiresAt");
-  if (!(expiresAt instanceof Timestamp)) {
+  const cohort = assignment.cohort;
+  if (typeof cohort !== "object" || cohort === null || Array.isArray(cohort)) {
+    return (
+      Array.isArray(projectedStudentIDs) &&
+      projectedStudentIDs.includes(studentID)
+    );
+  }
+  const cohortData = cohort as Record<string, unknown>;
+  switch (cohortData.type) {
+    case "allStudents":
+      return true;
+    case "school":
+      return cohortData.schoolId === student.schoolId;
+    case "grade":
+      return cohortData.grade === student.grade;
+    case "specificStudents":
+    case "customClass":
+      return (
+        Array.isArray(cohortData.studentIds) &&
+        cohortData.studentIds.includes(studentID)
+      );
+    default:
+      return false;
+  }
+};
+
+const isStudentModeAssignmentType = (assignment: DocumentData): boolean =>
+  assignment.assignmentType === undefined ||
+  assignment.assignmentType === "survey" ||
+  assignment.assignmentType === "form";
+
+const studentSafeProfile = (
+  student: DocumentData,
+  districtID: string,
+  studentID: string,
+): Readonly<Record<string, unknown>> => ({
+  schemaVersion: 1,
+  districtID,
+  studentID,
+  ...(typeof student.displayName === "string"
+    ? { displayName: student.displayName }
+    : {}),
+  ...(typeof student.grade === "string" ? { grade: student.grade } : {}),
+  ...(typeof student.pronouns === "string"
+    ? { pronouns: student.pronouns }
+    : {}),
+});
+
+const sessionIDFromAuditTarget = (
+  targetPath: unknown,
+  districtID: string,
+): string => {
+  const prefix = `districts/${districtID}/studentModeSessions/`;
+  if (
+    typeof targetPath !== "string" ||
+    !targetPath.startsWith(prefix)
+  ) {
     throw new HttpsError(
       "data-loss",
-      "The Student Mode session expiry is missing.",
+      "The Student Mode audit target is malformed.",
     );
   }
-  const tokenPayload = {
-    tmiDistrictID: data.districtID,
-    tmiAccessClass: "studentMode",
-    tmiMembershipVersion: 1,
-    tmiStudentID: data.studentID,
-    tmiSessionID: data.idempotencyKey,
-  };
-  if (Buffer.byteLength(JSON.stringify(tokenPayload), "utf8") > 900) {
-    throw new HttpsError(
-      "invalid-argument",
-      "The Student Mode identifiers are too large for a secure token.",
-    );
-  }
-  const sessionUserID = `studentMode_${createHash("sha256")
-    .update(`${data.districtID}:${data.idempotencyKey}`)
-    .digest("hex")}`;
-  const customToken = await getAuth().createCustomToken(
-    sessionUserID,
-    tokenPayload,
+  return requireIdentifier(
+    targetPath.slice(prefix.length),
+    "audit sessionID",
   );
-  return { ...result, customToken, expiresAt: expiresAt.toDate().toISOString() };
 };
+
+export const createStudentModeHandlers = (
+  dependencies: StudentModeDependencies,
+) => ({
+  issueSession: async (
+    request: CallableRequest<IssueStudentModeSessionRequest>,
+  ): Promise<
+    PrivilegedOperationResult & {
+      readonly sessionID: string;
+      readonly districtID: string;
+      readonly studentID: string;
+      readonly assignmentIDs: readonly [string];
+      readonly allowedOperations: readonly StudentModeOperation[];
+      readonly customToken: string;
+      readonly issuedAt: string;
+      readonly expiresAt: string;
+    }
+  > => {
+    const data = parseIssueStudentModeSessionRequest(request.data);
+    const assignmentID = data.assignmentIDs[0];
+    if (assignmentID === undefined || data.durationMinutes === undefined) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Exactly one assignment and a valid duration are required.",
+      );
+    }
+    const durationMinutes = data.durationMinutes;
+    const callerIdentity = parseTrustedCallableIdentity(request);
+    assertDistrict(callerIdentity, data.districtID);
+    await dependencies.firestore.runTransaction(async (transaction) => {
+      const membership = await requireTrustedMembership(
+        dependencies.firestore,
+        transaction,
+        callerIdentity,
+      );
+      requireCapability(membership, "student.read.detail");
+      const [studentSnapshot, assignmentSnapshot] = await Promise.all([
+        transaction.get(
+          dependencies.firestore.doc(
+            `districts/${data.districtID}/students/${data.studentID}`,
+          ),
+        ),
+        transaction.get(
+          dependencies.firestore.doc(
+            `districts/${data.districtID}/formAssignments/${assignmentID}`,
+          ),
+        ),
+      ]);
+      const student = requireExistingData(studentSnapshot, "Student");
+      assertRecordVersion(
+        student.recordVersion,
+        data.expectedRecordVersion,
+      );
+      const schoolID = requireSchoolID(student, "Student");
+      if (
+        student.districtId !== data.districtID ||
+        student.isArchived === true ||
+        !membership.assignedStudentIDs.has(data.studentID) ||
+        !membership.schoolIDs.has(schoolID) ||
+        !canReadStudentDetail(membership, data.studentID, schoolID)
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "Student Mode requires a directly assigned active student.",
+        );
+      }
+      const assignment = requireExistingData(
+        assignmentSnapshot,
+        "Assignment",
+      );
+      if (
+        assignment.districtId !== data.districtID ||
+        assignment.isActive !== true ||
+        !isStudentModeAssignmentType(assignment) ||
+        !assignmentContainsStudent(assignment, student, data.studentID)
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "The assignment is not active for the selected student.",
+        );
+      }
+    });
+    const candidateSessionID = `sm_${randomUUID().replaceAll("-", "")}`;
+    const candidateSessionPath =
+      `districts/${data.districtID}/studentModeSessions/${candidateSessionID}`;
+    const result = await executePrivilegedOperation(
+      dependencies.firestore,
+      request,
+      data,
+      {
+        action: "studentMode.session.issue",
+        targetPath: () => candidateSessionPath,
+        requiredCapability: "student.read.detail",
+        auditDetails: () => ({
+          studentID: data.studentID,
+          assignmentIDs: [assignmentID],
+          durationMinutes,
+        }),
+        mutate: async ({ transaction, membership, identity }) => {
+          const studentReference = dependencies.firestore.doc(
+            `districts/${data.districtID}/students/${data.studentID}`,
+          );
+          const assignmentReference = dependencies.firestore.doc(
+            `districts/${data.districtID}/formAssignments/${assignmentID}`,
+          );
+          const sessionReference = dependencies.firestore.doc(
+            candidateSessionPath,
+          );
+          const safeProfileReference = dependencies.firestore.doc(
+            `districts/${data.districtID}/students/${data.studentID}/studentSafe/profile`,
+          );
+          const [studentSnapshot, assignmentSnapshot, sessionSnapshot] =
+            await Promise.all([
+              transaction.get(studentReference),
+              transaction.get(assignmentReference),
+              transaction.get(sessionReference),
+            ]);
+          const student = requireExistingData(studentSnapshot, "Student");
+          assertRecordVersion(
+            student.recordVersion,
+            data.expectedRecordVersion,
+          );
+          const schoolID = requireSchoolID(student, "Student");
+          if (
+            student.districtId !== data.districtID ||
+            student.isArchived === true ||
+            !membership.assignedStudentIDs.has(data.studentID) ||
+            !membership.schoolIDs.has(schoolID) ||
+            !canReadStudentDetail(
+              membership,
+              data.studentID,
+              schoolID,
+            )
+          ) {
+            throw new HttpsError(
+              "permission-denied",
+              "Student Mode requires a directly assigned active student.",
+            );
+          }
+          const assignment = requireExistingData(
+            assignmentSnapshot,
+            "Assignment",
+          );
+          if (
+            assignment.districtId !== data.districtID ||
+            assignment.isActive !== true ||
+            !isStudentModeAssignmentType(assignment) ||
+            !assignmentContainsStudent(assignment, student, data.studentID)
+          ) {
+            throw new HttpsError(
+              "permission-denied",
+              "The assignment is not active for the selected student.",
+            );
+          }
+          if (sessionSnapshot.exists) {
+            throw new HttpsError(
+              "already-exists",
+              "The generated Student Mode session already exists.",
+            );
+          }
+          const issuedAt = Timestamp.now();
+          const expiresAt = Timestamp.fromMillis(
+            issuedAt.toMillis() + durationMinutes * 60_000,
+          );
+          const respondentUserID = `studentMode_${createHash("sha256")
+            .update(candidateSessionID)
+            .digest("hex")}`;
+          transaction.create(sessionReference, {
+            schemaVersion: 1,
+            recordVersion: 1,
+            districtID: data.districtID,
+            schoolId: schoolID,
+            studentID: data.studentID,
+            assignmentIDs: [assignmentID],
+            allowedOperations: [...studentModeOperationValues],
+            educatorUserID: identity.userID,
+            respondentUserID,
+            status: "active",
+            issuedAt,
+            expiresAt,
+            lastActivityAt: issuedAt,
+          });
+          transaction.set(
+            safeProfileReference,
+            studentSafeProfile(student, data.districtID, data.studentID),
+            { merge: true },
+          );
+          return { recordVersion: 1 };
+        },
+      },
+    );
+    let sessionID = candidateSessionID;
+    if (result.replayed) {
+      const audit = await dependencies.firestore
+        .doc(
+          `districts/${data.districtID}/auditEvents/${data.idempotencyKey}`,
+        )
+        .get();
+      sessionID = sessionIDFromAuditTarget(
+        audit.get("targetPath"),
+        data.districtID,
+      );
+    }
+    const session = await dependencies.firestore
+      .doc(
+        `districts/${data.districtID}/studentModeSessions/${sessionID}`,
+      )
+      .get();
+    const issuedAt = session.get("issuedAt");
+    const expiresAt = session.get("expiresAt");
+    const respondentUserID = session.get("respondentUserID");
+    if (
+      !(issuedAt instanceof Timestamp) ||
+      !(expiresAt instanceof Timestamp) ||
+      typeof respondentUserID !== "string"
+    ) {
+      throw new HttpsError(
+        "data-loss",
+        "The Student Mode session credential state is missing.",
+      );
+    }
+    if (
+      session.get("status") !== "active" ||
+      expiresAt.toMillis() <= Date.now()
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "The Student Mode session is no longer active.",
+      );
+    }
+    const tokenPayload: StudentModeRespondentClaims = {
+      tmiDistrictID: data.districtID,
+      tmiAccessClass: "respondent",
+      tmiStudentID: data.studentID,
+      tmiSessionID: sessionID,
+      tmiAssignmentIDs: [assignmentID],
+      tmiAllowedOperations: [...studentModeOperationValues],
+    };
+    if (Buffer.byteLength(JSON.stringify(tokenPayload), "utf8") > 900) {
+      throw new HttpsError(
+        "invalid-argument",
+        "The Student Mode identifiers are too large for a secure token.",
+      );
+    }
+    const customToken = await dependencies.createCustomToken(
+      respondentUserID,
+      tokenPayload,
+    );
+    return {
+      ...result,
+      sessionID,
+      districtID: data.districtID,
+      studentID: data.studentID,
+      assignmentIDs: [assignmentID],
+      allowedOperations: [...studentModeOperationValues],
+      customToken,
+      issuedAt: issuedAt.toDate().toISOString(),
+      expiresAt: expiresAt.toDate().toISOString(),
+    };
+  },
+
+  endSession: async (
+    request: CallableRequest<EndStudentModeSessionRequest>,
+  ): Promise<
+    PrivilegedOperationResult & {
+      readonly sessionID: string;
+      readonly ended: true;
+      readonly disposition: "ended" | "revoked";
+    }
+  > => {
+    const data = parseEndStudentModeSessionRequest(request.data);
+    const sessionPath =
+      `districts/${data.districtID}/studentModeSessions/${data.sessionID}`;
+    const result = await executePrivilegedOperation(
+      dependencies.firestore,
+      request,
+      data,
+      {
+        action: "studentMode.session.end",
+        targetPath: () => sessionPath,
+        requiredCapability: "student.read.detail",
+        auditDetails: () => ({
+          sessionID: data.sessionID,
+          disposition: data.disposition,
+        }),
+        mutate: async ({ transaction, identity, membership }) => {
+          const reference = dependencies.firestore.doc(sessionPath);
+          const snapshot = await transaction.get(reference);
+          const session = requireExistingData(snapshot, "Student Mode session");
+          assertRecordVersion(
+            session.recordVersion,
+            data.expectedRecordVersion,
+          );
+          const schoolID = requireSchoolID(session, "Student Mode session");
+          const isIssuingEducator =
+            session.educatorUserID === identity.userID;
+          const isScopedAdministratorRevocation =
+            data.disposition === "revoked" &&
+            canManageSchool(membership, schoolID);
+          if (
+            session.districtID !== data.districtID ||
+            (!isIssuingEducator && !isScopedAdministratorRevocation)
+          ) {
+            throw new HttpsError(
+              "permission-denied",
+              "The member cannot end this Student Mode session.",
+            );
+          }
+          if (session.status !== "active") {
+            throw new HttpsError(
+              "failed-precondition",
+              "The Student Mode session is no longer active.",
+            );
+          }
+          transaction.update(reference, {
+            recordVersion: data.expectedRecordVersion + 1,
+            status: data.disposition,
+            endedAt: FieldValue.serverTimestamp(),
+            endedBy: identity.userID,
+          });
+          return {
+            recordVersion: data.expectedRecordVersion + 1,
+          };
+        },
+      },
+    );
+    return {
+      ...result,
+      sessionID: data.sessionID,
+      ended: true,
+      disposition: data.disposition,
+    };
+  },
+});
+
+const productionStudentModeHandlers = createStudentModeHandlers({
+  firestore: getFirestore(),
+  createCustomToken: async (userID, claims) =>
+    getAuth().createCustomToken(userID, claims),
+});
 
 const deletePersonalAccountDataHandler =
   createProductionDeletePersonalAccountDataHandler();
@@ -2048,7 +2432,11 @@ export const drainStudentClaimRefresh = onDocumentCreated(
 export const transitionPlan = onCall(callableOptions, transitionPlanHandler);
 export const issueStudentModeSession = onCall(
   callableOptions,
-  issueStudentModeSessionHandler,
+  productionStudentModeHandlers.issueSession,
+);
+export const endStudentModeSession = onCall(
+  callableOptions,
+  productionStudentModeHandlers.endSession,
 );
 export const deletePersonalAccountData = onCall(
   { ...callableOptions, timeoutSeconds: 540 },
