@@ -2295,11 +2295,10 @@ export const createStudentModeHandlers = (
           identity,
         );
         requireCapability(membership, "student.read.detail");
-        const sessionSnapshot = await transaction.get(
-          dependencies.firestore.doc(
-            `districts/${data.districtID}/studentModeSessions/${data.sessionID}`,
-          ),
+        const sessionReference = dependencies.firestore.doc(
+          `districts/${data.districtID}/studentModeSessions/${data.sessionID}`,
         );
+        const sessionSnapshot = await transaction.get(sessionReference);
         const session = requireExistingData(
           sessionSnapshot,
           "Student Mode session",
@@ -2400,17 +2399,28 @@ export const createStudentModeHandlers = (
             "The restored student is outside the educator's current scope.",
           );
         }
-        const assignment = requireExistingData(
-          assignmentSnapshot,
-          "Assignment",
-        );
+        const assignment = assignmentSnapshot.data();
         if (
+          assignment === undefined ||
           assignment.districtId !== data.districtID ||
           assignment.isActive !== true ||
           !isStudentModeAssignmentType(assignment) ||
           !assignmentContainsStudent(assignment, student, studentID)
         ) {
-          return { status: "revoked", recordVersion } as const;
+          const revokedRecordVersion = recordVersion + 1;
+          transaction.update(sessionReference, {
+            status: "revoked",
+            recordVersion: revokedRecordVersion,
+            endedAt: FieldValue.serverTimestamp(),
+            endedBy: identity.userID,
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedBy: identity.userID,
+            revocationReason: "assignment-no-longer-eligible",
+          });
+          return {
+            status: "revoked",
+            recordVersion: revokedRecordVersion,
+          } as const;
         }
         const expectedOperations = studentModeOperationsForAssignment(
           assignment,

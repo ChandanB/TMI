@@ -722,6 +722,52 @@ struct StudentModeRepositoryTests {
         }
     }
 
+    @Test("Local cleanup retry does not repeat an acknowledged server end")
+    func endSessionCleanupRetrySkipsServerMutation() async throws {
+        let lifecycle = StudentModeEndCleanupRetrySpy()
+        let repository = StudentModeRepository(
+            issueSession: { _ in throw StudentModeTransportTestError.offline },
+            endSession: { request in
+                try await lifecycle.end(request)
+            },
+            containmentStore: StudentModeContainmentStore(
+                load: { .missing },
+                save: { _ in },
+                clear: {
+                    await lifecycle.clearMarker()
+                }
+            ),
+            signOutRespondent: {
+                try await lifecycle.signOut()
+            }
+        )
+        let identity = staffIdentity()
+
+        await #expect(throws: StudentModeRepositoryError.authenticationRequired) {
+            try await repository.endSession(
+                sessionID: "opaque-session-a",
+                staffIdentity: identity,
+                expectedRecordVersion: 3,
+                disposition: .ended,
+                idempotencyKey: "end-first",
+                reasonCode: "secure-exit"
+            )
+        }
+
+        try await repository.endSession(
+            sessionID: "opaque-session-a",
+            staffIdentity: identity,
+            expectedRecordVersion: 3,
+            disposition: .ended,
+            idempotencyKey: "end-retry",
+            reasonCode: "secure-exit"
+        )
+
+        #expect(await lifecycle.endCallCount == 1)
+        #expect(await lifecycle.signOutCallCount == 2)
+        #expect(await lifecycle.markerClearCount == 1)
+    }
+
     private func staffIdentity() -> StudentModeStaffIdentity {
         StudentModeStaffIdentity(
             userID: "staff-a",
@@ -910,6 +956,35 @@ private actor StudentModePersistenceLifecycleSpy {
 
     func record(_ event: StudentModePersistenceEvent) {
         events.append(event)
+    }
+}
+
+private actor StudentModeEndCleanupRetrySpy {
+    private(set) var endCallCount = 0
+    private(set) var signOutCallCount = 0
+    private(set) var markerClearCount = 0
+
+    func end(_ request: StudentModeEndRequest) throws -> StudentModeEndResponse {
+        endCallCount += 1
+        guard endCallCount == 1 else {
+            throw StudentModeTransportTestError.offline
+        }
+        return StudentModeEndResponse(
+            sessionID: request.sessionID,
+            ended: true,
+            recordVersion: request.expectedRecordVersion + 1
+        )
+    }
+
+    func signOut() throws {
+        signOutCallCount += 1
+        if signOutCallCount == 1 {
+            throw StudentModeTransportTestError.offline
+        }
+    }
+
+    func clearMarker() {
+        markerClearCount += 1
     }
 }
 

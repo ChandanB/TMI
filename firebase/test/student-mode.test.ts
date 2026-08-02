@@ -468,6 +468,16 @@ describe("Student Mode callable trust boundary", () => {
     const issued = await handlers().issueSession(
       callableRequest(issueRequest()),
     );
+    const respondentUserID = issuedUserIDs.at(-1);
+    const respondentClaims = issuedClaims.at(-1);
+    if (respondentUserID === undefined || respondentClaims === undefined) {
+      throw new Error("Expected issued respondent credentials.");
+    }
+    const safeProfilePath =
+      `districts/${districtID}/students/${studentID}/studentSafe/profile`;
+    const respondentDB = testEnv
+      .authenticatedContext(respondentUserID, respondentClaims)
+      .firestore();
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await updateDoc(
         doc(
@@ -477,19 +487,45 @@ describe("Student Mode callable trust boundary", () => {
         { assignmentType: "careerExploration" },
       );
     });
+    await assertSucceeds(getDoc(doc(respondentDB, safeProfilePath)));
 
-    const restored = await handlers().restoreSession(
-      callableRequest(restoreRequest(issued.sessionID)),
-    );
+    const [restored, concurrentRestore] = await Promise.all([
+      handlers().restoreSession(
+        callableRequest(restoreRequest(issued.sessionID)),
+      ),
+      handlers().restoreSession(
+        callableRequest(restoreRequest(issued.sessionID)),
+      ),
+    ]);
 
-    expect(restored).toMatchObject({
-      status: "revoked",
-      sessionID: issued.sessionID,
-      districtID,
-      recordVersion: 1,
-    });
+    for (const result of [restored, concurrentRestore]) {
+      expect(result).toMatchObject({
+        status: "revoked",
+        sessionID: issued.sessionID,
+        districtID,
+        recordVersion: 2,
+      });
+    }
     expect(restored).not.toHaveProperty("customToken");
     expect(restored).not.toHaveProperty("profile");
+    await assertFails(getDoc(doc(respondentDB, safeProfilePath)));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const revoked = await getDoc(
+        doc(
+          context.firestore(),
+          `districts/${districtID}/studentModeSessions/${issued.sessionID}`,
+        ),
+      );
+      expect(revoked.data()).toMatchObject({
+        status: "revoked",
+        recordVersion: 2,
+        endedBy: staffUserID,
+        updatedBy: staffUserID,
+        revocationReason: "assignment-no-longer-eligible",
+      });
+      expect(revoked.get("endedAt")).toBeInstanceOf(Timestamp);
+      expect(revoked.get("updatedAt")).toBeInstanceOf(Timestamp);
+    });
   });
 
   it("denies restoration by a different staff identity", async () => {

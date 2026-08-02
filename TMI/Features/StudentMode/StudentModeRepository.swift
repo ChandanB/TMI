@@ -80,7 +80,7 @@ nonisolated enum StudentModeStartupResolution: Sendable, Equatable {
     case terminal(StudentModeContainmentRecord, StudentModeServerStatus)
 }
 
-nonisolated enum StudentModeEndDisposition: String, Sendable {
+nonisolated enum StudentModeEndDisposition: String, Hashable, Sendable {
     case ended
     case revoked
 }
@@ -137,6 +137,43 @@ nonisolated enum StudentModeRepositoryError: Error, Equatable, Sendable {
     case containmentCorrupt
 }
 
+private nonisolated struct StudentModeEndProgressKey: Hashable, Sendable {
+    let districtID: String
+    let sessionID: String
+    let expectedRecordVersion: Int
+    let disposition: StudentModeEndDisposition
+}
+
+private actor StudentModeEndProgress {
+    private var acknowledged: Set<StudentModeEndProgressKey> = []
+    private var inFlight: [StudentModeEndProgressKey: Task<Void, Error>] = [:]
+
+    func ensureAcknowledged(
+        for key: StudentModeEndProgressKey,
+        operation: @escaping @Sendable () async throws -> Void
+    ) async throws {
+        if acknowledged.contains(key) {
+            return
+        }
+        if let task = inFlight[key] {
+            try await task.value
+            return
+        }
+        let task = Task {
+            try await operation()
+        }
+        inFlight[key] = task
+        do {
+            try await task.value
+            inFlight[key] = nil
+            acknowledged.insert(key)
+        } catch {
+            inFlight[key] = nil
+            throw error
+        }
+    }
+}
+
 nonisolated struct StudentModeRepository: Sendable {
     typealias IssueSession = @Sendable (
         StudentModeIssueRequest
@@ -159,6 +196,7 @@ nonisolated struct StudentModeRepository: Sendable {
     private let persistedRespondentRecord: PersistedRespondentRecord
     private let signInRespondent: SignInRespondent
     private let signOutRespondent: SignOutRespondent
+    private let endProgress: StudentModeEndProgress
 
     init(
         issueSession: @escaping IssueSession,
@@ -178,6 +216,7 @@ nonisolated struct StudentModeRepository: Sendable {
         self.persistedRespondentRecord = persistedRespondentRecord
         self.signInRespondent = signInRespondent
         self.signOutRespondent = signOutRespondent
+        endProgress = StudentModeEndProgress()
     }
 
     func issueSession(
@@ -376,16 +415,24 @@ nonisolated struct StudentModeRepository: Sendable {
             idempotencyKey: idempotencyKey,
             reasonCode: reasonCode
         )
-        let response: StudentModeEndResponse
-        do {
-            response = try await endSessionTransport(request)
-        } catch {
-            throw map(error)
-        }
-        guard response.ended,
-              response.sessionID == sessionID,
-              response.recordVersion == expectedRecordVersion + 1 else {
-            throw StudentModeRepositoryError.invalidResponse
+        let progressKey = StudentModeEndProgressKey(
+            districtID: staffIdentity.districtID,
+            sessionID: sessionID,
+            expectedRecordVersion: expectedRecordVersion,
+            disposition: disposition
+        )
+        try await endProgress.ensureAcknowledged(for: progressKey) {
+            let response: StudentModeEndResponse
+            do {
+                response = try await endSessionTransport(request)
+            } catch {
+                throw map(error)
+            }
+            guard response.ended,
+                  response.sessionID == sessionID,
+                  response.recordVersion == expectedRecordVersion + 1 else {
+                throw StudentModeRepositoryError.invalidResponse
+            }
         }
         do {
             try await signOutRespondent()
