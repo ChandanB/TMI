@@ -7,6 +7,19 @@ import Testing
 struct StudentModeSessionTests {
     private let start = Date(timeIntervalSince1970: 2_000_000_000)
 
+    @Test("Cold launch is contained before asynchronous restoration starts")
+    func coldLaunchStartsContained() {
+        let session = StudentModeSession()
+
+        #expect(session.state == .restoring)
+        #expect(session.isStudentModeContained)
+        guard case .student(let profile) = session.rootPresentation else {
+            Issue.record("The first root presentation exposed the staff shell.")
+            return
+        }
+        #expect(profile == .restoring)
+    }
+
     @Test("Duration defaults to thirty minutes and caps at sixty")
     func durationPolicy() {
         #expect(StudentModeSession.duration(forRequestedMinutes: nil) == 30 * 60)
@@ -280,6 +293,211 @@ struct StudentModeSessionTests {
 struct StudentModeRepositoryTests {
     private let now = Date(timeIntervalSince1970: 2_000_000_000)
 
+    @Test("The durable marker contains only opaque containment identifiers")
+    func durableMarkerContainsNoStudentOrCredentialData() throws {
+        let encoded = try JSONEncoder().encode(containmentRecord())
+        let object = try #require(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+
+        #expect(Set(object.keys) == [
+            "schemaVersion",
+            "districtID",
+            "sessionID",
+        ])
+    }
+
+    @Test("An ordinary cold launch clears containment only after proving no persisted evidence")
+    @MainActor
+    func ordinaryColdLaunchClearsAfterProbe() async {
+        let repository = restorationRepository(
+            markerLoad: .missing,
+            persistedRespondent: nil
+        )
+        let session = StudentModeSession()
+
+        await session.restorePersistedContainment(
+            repository: repository,
+            staffIdentity: staffIdentity(),
+            now: now
+        )
+
+        #expect(session.state == .inactive)
+        #expect(session.rootPresentation == .staff)
+    }
+
+    @Test("Persisted respondent Auth restores a locked safe shell without a marker")
+    @MainActor
+    func persistedRespondentAuthRestoresContainment() async {
+        let repository = restorationRepository(
+            markerLoad: .missing,
+            persistedRespondent: containmentRecord()
+        )
+        let session = StudentModeSession()
+
+        await session.restorePersistedContainment(
+            repository: repository,
+            staffIdentity: staffIdentity(),
+            now: now
+        )
+
+        #expect(session.state == .locked(.coldRelaunch))
+        #expect(session.studentProfile == restoredProfile())
+        #expect(session.rootPresentation == .student(restoredProfile()))
+    }
+
+    @Test("Unavailable restoration remains fail-closed")
+    @MainActor
+    func unavailableRestorationRemainsContained() async {
+        let repository = restorationRepository(
+            markerLoad: .record(containmentRecord()),
+            restoreError: .unavailable
+        )
+        let session = StudentModeSession()
+
+        await session.restorePersistedContainment(
+            repository: repository,
+            staffIdentity: staffIdentity(),
+            now: now
+        )
+
+        #expect(session.state == .restoring)
+        #expect(session.rootPresentation == .student(.restoring))
+    }
+
+    @Test("Unavailable restoration can retry without releasing containment")
+    @MainActor
+    func unavailableRestorationCanRetry() async {
+        let attempts = StudentModeRetryRestorationSpy()
+        let repository = StudentModeRepository(
+            issueSession: { _ in throw StudentModeTransportTestError.offline },
+            restoreSession: { _ in
+                if await attempts.shouldFailAttempt() {
+                    throw StudentModeRepositoryError.unavailable
+                }
+                return self.restorationResponse()
+            },
+            endSession: { _ in throw StudentModeTransportTestError.offline },
+            containmentStore: StudentModeContainmentStore(
+                load: { .record(self.containmentRecord()) },
+                save: { _ in },
+                clear: {}
+            )
+        )
+        let session = StudentModeSession()
+
+        await session.restorePersistedContainment(
+            repository: repository,
+            staffIdentity: staffIdentity(),
+            now: now
+        )
+        #expect(session.state == .restoring)
+
+        await session.retryPersistedContainment(now: now)
+
+        #expect(session.state == .locked(.coldRelaunch))
+        #expect(await attempts.attemptCount == 2)
+    }
+
+    @Test("A corrupt durable marker remains fail-closed without contacting restoration")
+    @MainActor
+    func corruptMarkerRemainsContained() async {
+        let transport = StudentModeRestorationSpy()
+        let repository = restorationRepository(
+            markerLoad: .corrupt,
+            restorationSpy: transport
+        )
+        let session = StudentModeSession()
+
+        await session.restorePersistedContainment(
+            repository: repository,
+            staffIdentity: staffIdentity(),
+            now: now
+        )
+
+        #expect(session.state == .restoring)
+        #expect(session.rootPresentation == .student(.restoring))
+        #expect(await transport.restoreCount == 0)
+    }
+
+    @Test("A restored grant with expanded operations remains fail-closed")
+    @MainActor
+    func expandedRestoredOperationsRemainContained() async {
+        let repository = restorationRepository(
+            markerLoad: .record(containmentRecord()),
+            restoredOperations: [.readAssignment, .updateInterests]
+        )
+        let session = StudentModeSession()
+
+        await session.restorePersistedContainment(
+            repository: repository,
+            staffIdentity: staffIdentity(),
+            now: now
+        )
+
+        #expect(session.state == .restoring)
+        #expect(session.rootPresentation == .student(.restoring))
+    }
+
+    @Test("Authenticated exit after cold restoration ends server state then signs out and clears marker")
+    @MainActor
+    func restoredSessionExitsSecurely() async {
+        let lifecycle = StudentModePersistenceLifecycleSpy()
+        let repository = restorationRepository(
+            markerLoad: .record(containmentRecord()),
+            lifecycleSpy: lifecycle
+        )
+        let session = StudentModeSession(authenticateStaff: { true })
+        session.configureSecureExit(repository: repository)
+        await session.restorePersistedContainment(
+            repository: repository,
+            staffIdentity: staffIdentity(),
+            now: now
+        )
+
+        let exited = await session.exitStudentMode()
+
+        #expect(exited)
+        #expect(session.state == .inactive)
+        #expect(session.rootPresentation == .staff)
+        #expect(await lifecycle.events == [
+            .markerSaved,
+            .respondentSignedIn,
+            .serverEnded,
+            .respondentSignedOut,
+            .markerCleared,
+        ])
+    }
+
+    @Test("Verified terminal restoration requires authentication before sign-out and marker clear")
+    @MainActor
+    func verifiedTerminalRestorationExitsSecurely() async {
+        let lifecycle = StudentModePersistenceLifecycleSpy()
+        let repository = restorationRepository(
+            markerLoad: .record(containmentRecord()),
+            restoredStatus: .expired,
+            lifecycleSpy: lifecycle
+        )
+        let session = StudentModeSession(authenticateStaff: { true })
+        session.configureSecureExit(repository: repository)
+        await session.restorePersistedContainment(
+            repository: repository,
+            staffIdentity: staffIdentity(),
+            now: now
+        )
+
+        #expect(session.state == .expired)
+        let exited = await session.exitStudentMode()
+
+        #expect(exited)
+        #expect(session.state == .inactive)
+        #expect(session.rootPresentation == .staff)
+        #expect(await lifecycle.events == [
+            .respondentSignedOut,
+            .markerCleared,
+        ])
+    }
+
     @Test("Issuance preserves staff identity and validates the trusted response scope")
     func issuePreservesIdentity() async throws {
         let transport = StudentModeTransportSpy()
@@ -538,6 +756,94 @@ struct StudentModeRepositoryTests {
             )
         )
     }
+
+    private func containmentRecord() -> StudentModeContainmentRecord {
+        StudentModeContainmentRecord(
+            districtID: "district-a",
+            sessionID: "opaque-session-a"
+        )
+    }
+
+    private func restoredProfile() -> StudentModeProfile {
+        StudentModeProfile(
+            studentID: "student-a",
+            displayName: "Student",
+            grade: "7",
+            pronouns: nil
+        )
+    }
+
+    private func restorationResponse(
+        status: StudentModeServerStatus = .active,
+        operations: Set<StudentModeOperation> = StudentModeOperation.surveyAssignment
+    ) -> StudentModeRestoreResponse {
+        let isActive = status == .active
+        return StudentModeRestoreResponse(
+            status: status,
+            sessionID: "opaque-session-a",
+            districtID: "district-a",
+            studentID: isActive ? "student-a" : nil,
+            assignmentIDs: isActive ? ["assignment-a"] : nil,
+            allowedOperations: isActive ? operations : nil,
+            customToken: isActive ? "restored-respondent-token" : nil,
+            recordVersion: 1,
+            issuedAt: isActive ? now : nil,
+            expiresAt: isActive ? now.addingTimeInterval(1_800) : nil,
+            profile: isActive ? restoredProfile() : nil
+        )
+    }
+
+    private func restorationRepository(
+        markerLoad: StudentModeContainmentLoad,
+        persistedRespondent: StudentModeContainmentRecord? = nil,
+        restoreError: StudentModeRepositoryError? = nil,
+        restoredStatus: StudentModeServerStatus = .active,
+        restoredOperations: Set<StudentModeOperation> = StudentModeOperation.surveyAssignment,
+        restorationSpy: StudentModeRestorationSpy? = nil,
+        lifecycleSpy: StudentModePersistenceLifecycleSpy? = nil
+    ) -> StudentModeRepository {
+        StudentModeRepository(
+            issueSession: { _ in throw StudentModeTransportTestError.offline },
+            restoreSession: { request in
+                await restorationSpy?.recordRestore()
+                if let restoreError {
+                    throw restoreError
+                }
+                #expect(request.payload.keys.sorted() == [
+                    "districtID",
+                    "sessionID",
+                ])
+                return self.restorationResponse(
+                    status: restoredStatus,
+                    operations: restoredOperations
+                )
+            },
+            endSession: { request in
+                await lifecycleSpy?.record(.serverEnded)
+                return StudentModeEndResponse(
+                    sessionID: request.sessionID,
+                    ended: true,
+                    recordVersion: request.expectedRecordVersion + 1
+                )
+            },
+            containmentStore: StudentModeContainmentStore(
+                load: { markerLoad },
+                save: { _ in
+                    await lifecycleSpy?.record(.markerSaved)
+                },
+                clear: {
+                    await lifecycleSpy?.record(.markerCleared)
+                }
+            ),
+            persistedRespondentRecord: { persistedRespondent },
+            signInRespondent: { _ in
+                await lifecycleSpy?.record(.respondentSignedIn)
+            },
+            signOutRespondent: {
+                await lifecycleSpy?.record(.respondentSignedOut)
+            }
+        )
+    }
 }
 
 private actor StudentModeTransportSpy {
@@ -571,6 +877,39 @@ private actor StudentModeRespondentAuthSpy {
 
     func signOut() {
         signOutCount += 1
+    }
+}
+
+private actor StudentModeRestorationSpy {
+    private(set) var restoreCount = 0
+
+    func recordRestore() {
+        restoreCount += 1
+    }
+}
+
+private actor StudentModeRetryRestorationSpy {
+    private(set) var attemptCount = 0
+
+    func shouldFailAttempt() -> Bool {
+        attemptCount += 1
+        return attemptCount == 1
+    }
+}
+
+private enum StudentModePersistenceEvent: Equatable {
+    case markerSaved
+    case respondentSignedIn
+    case serverEnded
+    case respondentSignedOut
+    case markerCleared
+}
+
+private actor StudentModePersistenceLifecycleSpy {
+    private(set) var events: [StudentModePersistenceEvent] = []
+
+    func record(_ event: StudentModePersistenceEvent) {
+        events.append(event)
     }
 }
 

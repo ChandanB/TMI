@@ -19,6 +19,7 @@ import {
   createStudentModeHandlers,
   type EndStudentModeSessionRequest,
   type IssueStudentModeSessionRequest,
+  type RestoreStudentModeSessionRequest,
   type StudentModeRespondentClaims,
 } from "../src/index.js";
 import {
@@ -84,6 +85,15 @@ const endRequest = (
   expectedRecordVersion: 1,
   idempotencyKey: "end-session-1",
   reasonCode: "secure-exit",
+  ...overrides,
+});
+
+const restoreRequest = (
+  sessionID: string,
+  overrides: Partial<RestoreStudentModeSessionRequest> = {},
+): RestoreStudentModeSessionRequest => ({
+  districtID,
+  sessionID,
   ...overrides,
 });
 
@@ -386,6 +396,125 @@ describe("Student Mode callable trust boundary", () => {
         grade: "7",
       });
     });
+  });
+
+  it("restores an active issued session with only a safe profile and replacement token", async () => {
+    const issued = await handlers().issueSession(
+      callableRequest(issueRequest()),
+    );
+
+    const restored = await handlers().restoreSession(
+      callableRequest(restoreRequest(issued.sessionID)),
+    );
+
+    expect(restored).toMatchObject({
+      status: "active",
+      sessionID: issued.sessionID,
+      districtID,
+      studentID,
+      assignmentIDs: [assignmentID],
+      allowedOperations: [
+        "readStudentSafeProfile",
+        "readAssignment",
+        "writeDraft",
+        "submitAssignment",
+        "requestHelp",
+      ],
+      recordVersion: 1,
+      profile: {
+        studentID,
+        displayName: "Student One",
+        grade: "7",
+      },
+    });
+    expect(restored.status).toBe("active");
+    if (restored.status !== "active") {
+      throw new Error("Expected an active restored Student Mode session.");
+    }
+    expect(restored.customToken).toMatch(/^token:studentMode_/u);
+    expect(restored.profile).not.toHaveProperty("dateOfBirth");
+    expect(restored.profile).not.toHaveProperty("restrictedData");
+  });
+
+  it("returns verified terminal state without a respondent token after expiry", async () => {
+    const issued = await handlers().issueSession(
+      callableRequest(issueRequest()),
+    );
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(
+        doc(
+          context.firestore(),
+          `districts/${districtID}/studentModeSessions/${issued.sessionID}`,
+        ),
+        { expiresAt: Timestamp.fromMillis(Date.now() - 1) },
+      );
+    });
+
+    const restored = await handlers().restoreSession(
+      callableRequest(restoreRequest(issued.sessionID)),
+    );
+
+    expect(restored).toMatchObject({
+      status: "expired",
+      sessionID: issued.sessionID,
+      districtID,
+      recordVersion: 1,
+    });
+    expect(restored).not.toHaveProperty("customToken");
+    expect(restored).not.toHaveProperty("profile");
+  });
+
+  it("returns revoked instead of minting a token when the assignment type changes", async () => {
+    const issued = await handlers().issueSession(
+      callableRequest(issueRequest()),
+    );
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(
+        doc(
+          context.firestore(),
+          `districts/${districtID}/formAssignments/${assignmentID}`,
+        ),
+        { assignmentType: "careerExploration" },
+      );
+    });
+
+    const restored = await handlers().restoreSession(
+      callableRequest(restoreRequest(issued.sessionID)),
+    );
+
+    expect(restored).toMatchObject({
+      status: "revoked",
+      sessionID: issued.sessionID,
+      districtID,
+      recordVersion: 1,
+    });
+    expect(restored).not.toHaveProperty("customToken");
+    expect(restored).not.toHaveProperty("profile");
+  });
+
+  it("denies restoration by a different staff identity", async () => {
+    const issued = await handlers().issueSession(
+      callableRequest(issueRequest()),
+    );
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), `districts/${districtID}/members/teacher-2`),
+        activeMembership({
+          districtID,
+          capabilities: ["student.read.detail"],
+          assignedStudentIDs: [studentID],
+        }),
+      );
+    });
+
+    await expectHttpsError(
+      handlers().restoreSession(
+        callableRequest(restoreRequest(issued.sessionID), {
+          uid: "teacher-2",
+        }),
+      ),
+      "permission-denied",
+    );
   });
 
   it("ends or revokes an issued session and rejects later mutations", async () => {

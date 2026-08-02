@@ -169,6 +169,11 @@ export interface EndStudentModeSessionRequest
   readonly disposition: "ended" | "revoked";
 }
 
+export interface RestoreStudentModeSessionRequest {
+  readonly districtID: string;
+  readonly sessionID: string;
+}
+
 export interface StudentModeRespondentClaims
   extends Record<string, unknown> {
   readonly tmiDistrictID: string;
@@ -523,6 +528,17 @@ const parseEndStudentModeSessionRequest = (
       "disposition",
       ["ended", "revoked"] as const,
     ),
+  };
+};
+
+const parseRestoreStudentModeSessionRequest = (
+  value: unknown,
+): RestoreStudentModeSessionRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(data, new Set(["districtID", "sessionID"]));
+  return {
+    districtID: requireIdentifier(data.districtID, "districtID"),
+    sessionID: requireIdentifier(data.sessionID, "sessionID"),
   };
 };
 
@@ -1867,6 +1883,23 @@ interface StudentModeDependencies {
   ) => Promise<string>;
 }
 
+type StudentModeRestoredState =
+  | {
+    readonly status: "active";
+    readonly recordVersion: number;
+    readonly studentID: string;
+    readonly assignmentID: string;
+    readonly operations: readonly StudentModeOperation[];
+    readonly respondentUserID: string;
+    readonly issuedAt: Timestamp;
+    readonly expiresAt: Timestamp;
+    readonly profile: Readonly<Record<string, unknown>>;
+  }
+  | {
+    readonly status: "ended" | "revoked" | "expired";
+    readonly recordVersion: number;
+  };
+
 const assignmentContainsStudent = (
   assignment: DocumentData,
   student: DocumentData,
@@ -2227,6 +2260,232 @@ export const createStudentModeHandlers = (
     };
   },
 
+  restoreSession: async (
+    request: CallableRequest<RestoreStudentModeSessionRequest>,
+  ): Promise<
+    | {
+      readonly status: "active";
+      readonly sessionID: string;
+      readonly districtID: string;
+      readonly studentID: string;
+      readonly assignmentIDs: readonly [string];
+      readonly allowedOperations: readonly StudentModeOperation[];
+      readonly customToken: string;
+      readonly recordVersion: number;
+      readonly issuedAt: string;
+      readonly expiresAt: string;
+      readonly profile: Readonly<Record<string, unknown>>;
+    }
+    | {
+      readonly status: "ended" | "revoked" | "expired";
+      readonly sessionID: string;
+      readonly districtID: string;
+      readonly recordVersion: number;
+    }
+  > => {
+    const data = parseRestoreStudentModeSessionRequest(request.data);
+    const identity = parseTrustedCallableIdentity(request);
+    assertDistrict(identity, data.districtID);
+    const restored =
+      await dependencies.firestore.runTransaction<StudentModeRestoredState>(
+      async (transaction) => {
+        const membership = await requireTrustedMembership(
+          dependencies.firestore,
+          transaction,
+          identity,
+        );
+        requireCapability(membership, "student.read.detail");
+        const sessionSnapshot = await transaction.get(
+          dependencies.firestore.doc(
+            `districts/${data.districtID}/studentModeSessions/${data.sessionID}`,
+          ),
+        );
+        const session = requireExistingData(
+          sessionSnapshot,
+          "Student Mode session",
+        );
+        const recordVersion = requireInteger(
+          session.recordVersion,
+          "Student Mode session.recordVersion",
+          1,
+        );
+        if (
+          session.districtID !== data.districtID ||
+          session.educatorUserID !== identity.userID
+        ) {
+          throw new HttpsError(
+            "permission-denied",
+            "Only the issuing educator can restore this Student Mode session.",
+          );
+        }
+        if (session.status === "ended" || session.status === "revoked") {
+          return {
+            status: session.status,
+            recordVersion,
+          } as const;
+        }
+        const expiresAt = session.expiresAt;
+        if (!(expiresAt instanceof Timestamp)) {
+          throw new HttpsError(
+            "data-loss",
+            "The Student Mode session expiry is malformed.",
+          );
+        }
+        if (expiresAt.toMillis() <= Date.now()) {
+          return { status: "expired", recordVersion } as const;
+        }
+        if (session.status !== "active") {
+          throw new HttpsError(
+            "data-loss",
+            "The Student Mode session status is malformed.",
+          );
+        }
+        const studentID = requireIdentifier(
+          session.studentID,
+          "Student Mode session.studentID",
+        );
+        const assignmentIDs = requireIdentifierArray(
+          session.assignmentIDs,
+          "Student Mode session.assignmentIDs",
+          { allowEmpty: false, maximumCount: 1 },
+        );
+        const assignmentID = assignmentIDs[0];
+        const operations = session.allowedOperations;
+        const respondentUserID = requireIdentifier(
+          session.respondentUserID,
+          "Student Mode session.respondentUserID",
+        );
+        const issuedAt = session.issuedAt;
+        if (
+          assignmentID === undefined ||
+          !(issuedAt instanceof Timestamp) ||
+          !Array.isArray(operations) ||
+          operations.length === 0 ||
+          !operations.every(
+            (operation): operation is StudentModeOperation =>
+              typeof operation === "string" &&
+              studentModeOperationValues.includes(
+                operation as StudentModeOperation,
+              ),
+          )
+        ) {
+          throw new HttpsError(
+            "data-loss",
+            "The Student Mode session scope is malformed.",
+          );
+        }
+        const [studentSnapshot, assignmentSnapshot] = await Promise.all([
+          transaction.get(
+            dependencies.firestore.doc(
+              `districts/${data.districtID}/students/${studentID}`,
+            ),
+          ),
+          transaction.get(
+            dependencies.firestore.doc(
+              `districts/${data.districtID}/formAssignments/${assignmentID}`,
+            ),
+          ),
+        ]);
+        const student = requireExistingData(studentSnapshot, "Student");
+        const schoolID = requireSchoolID(student, "Student");
+        if (
+          student.districtId !== data.districtID ||
+          student.isArchived === true ||
+          !membership.assignedStudentIDs.has(studentID) ||
+          !membership.schoolIDs.has(schoolID) ||
+          !canReadStudentDetail(membership, studentID, schoolID)
+        ) {
+          throw new HttpsError(
+            "permission-denied",
+            "The restored student is outside the educator's current scope.",
+          );
+        }
+        const assignment = requireExistingData(
+          assignmentSnapshot,
+          "Assignment",
+        );
+        if (
+          assignment.districtId !== data.districtID ||
+          assignment.isActive !== true ||
+          !isStudentModeAssignmentType(assignment) ||
+          !assignmentContainsStudent(assignment, student, studentID)
+        ) {
+          return { status: "revoked", recordVersion } as const;
+        }
+        const expectedOperations = studentModeOperationsForAssignment(
+          assignment,
+        );
+        const storedOperationSet = new Set(operations);
+        if (
+          storedOperationSet.size !== operations.length ||
+          expectedOperations.length !== operations.length ||
+          !expectedOperations.every((operation) =>
+            storedOperationSet.has(operation),
+          )
+        ) {
+          throw new HttpsError(
+            "data-loss",
+            "The Student Mode session operations are malformed.",
+          );
+        }
+        return {
+          status: "active",
+          recordVersion,
+          studentID,
+          assignmentID,
+          operations: [...operations],
+          respondentUserID,
+          issuedAt,
+          expiresAt,
+          profile: studentSafeProfile(
+            student,
+            data.districtID,
+            studentID,
+          ),
+        } as const;
+      },
+      );
+    if (restored.status !== "active") {
+      return {
+        status: restored.status,
+        sessionID: data.sessionID,
+        districtID: data.districtID,
+        recordVersion: restored.recordVersion,
+      };
+    }
+    const tokenPayload: StudentModeRespondentClaims = {
+      tmiDistrictID: data.districtID,
+      tmiAccessClass: "respondent",
+      tmiStudentID: restored.studentID,
+      tmiSessionID: data.sessionID,
+      tmiAssignmentIDs: [restored.assignmentID],
+      tmiAllowedOperations: [...restored.operations],
+    };
+    if (Buffer.byteLength(JSON.stringify(tokenPayload), "utf8") > 900) {
+      throw new HttpsError(
+        "invalid-argument",
+        "The Student Mode identifiers are too large for a secure token.",
+      );
+    }
+    const customToken = await dependencies.createCustomToken(
+      restored.respondentUserID,
+      tokenPayload,
+    );
+    return {
+      status: "active",
+      sessionID: data.sessionID,
+      districtID: data.districtID,
+      studentID: restored.studentID,
+      assignmentIDs: [restored.assignmentID],
+      allowedOperations: [...restored.operations],
+      customToken,
+      recordVersion: restored.recordVersion,
+      issuedAt: restored.issuedAt.toDate().toISOString(),
+      expiresAt: restored.expiresAt.toDate().toISOString(),
+      profile: restored.profile,
+    };
+  },
+
   endSession: async (
     request: CallableRequest<EndStudentModeSessionRequest>,
   ): Promise<
@@ -2461,6 +2720,10 @@ export const transitionPlan = onCall(callableOptions, transitionPlanHandler);
 export const issueStudentModeSession = onCall(
   callableOptions,
   productionStudentModeHandlers.issueSession,
+);
+export const restoreStudentModeSession = onCall(
+  callableOptions,
+  productionStudentModeHandlers.restoreSession,
 );
 export const endStudentModeSession = onCall(
   callableOptions,

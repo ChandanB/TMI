@@ -17,8 +17,14 @@ struct StudentModeView: View {
 
             VStack(spacing: 0) {
                 customHeader
-                studentHeader
-                containedContent
+                ScrollView {
+                    VStack(spacing: 0) {
+                        studentHeader
+                        containedContent
+                            .frame(minHeight: 280)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
             }
         }
         .environment(\.studentAccessMode, .studentMode)
@@ -40,6 +46,9 @@ struct StudentModeView: View {
         }
         .interactiveDismissDisabled(true)
         .task {
+            guard !profile.studentID.isEmpty else {
+                return
+            }
             await studentContext.setActiveStudent(
                 profile.studentID,
                 student: nil,
@@ -55,6 +64,40 @@ struct StudentModeView: View {
     @ViewBuilder
     private var containedContent: some View {
         switch session.state {
+        case .restoring:
+            ContentUnavailableView {
+                Label("Student Mode Locked", systemImage: "lock.shield.fill")
+            } description: {
+                if session.isRestorationInProgress {
+                    Text(
+                        "Checking the protected session. Staff tools remain locked until "
+                            + "the session is safely resolved."
+                    )
+                } else {
+                    Text(
+                        "The protected session could not be checked. Staff tools remain "
+                            + "locked. Check the connection and try again."
+                    )
+                }
+            } actions: {
+                Button {
+                    Task { @MainActor in
+                        await session.retryPersistedContainment()
+                    }
+                } label: {
+                    if session.isRestorationInProgress {
+                        ProgressView()
+                    } else {
+                        Label("Try Again", systemImage: "arrow.clockwise")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(session.isRestorationInProgress)
+                .accessibilityIdentifier("studentMode.restore.retry")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityIdentifier("studentMode.restoring")
+
         case .active:
             ContentUnavailableView {
                 Label("Your Activity", systemImage: "list.clipboard")
@@ -87,33 +130,47 @@ struct StudentModeView: View {
     }
 
     private var customHeader: some View {
-        HStack {
-            Text("Student Mode")
-                .font(.headline)
-                .foregroundStyle(Color.tmiTextPrimary)
-
-            Spacer()
-
-            Button {
-                showingExitConfirmation = true
-            } label: {
-                Label("Exit", systemImage: "lock.shield.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.tmiWarning)
-                    .padding(.horizontal, TMISpacing.md)
-                    .padding(.vertical, TMISpacing.sm)
-                    .background(
-                        Color.tmiWarning.opacity(0.2),
-                        in: Capsule()
-                    )
+        ViewThatFits(in: .horizontal) {
+            HStack {
+                studentModeTitle
+                Spacer()
+                exitButton
             }
-            .buttonStyle(.plain)
-            .disabled(isExiting)
-            .accessibilityIdentifier("studentMode.exit")
+
+            VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                studentModeTitle
+                exitButton
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
         }
         .padding(.horizontal, TMISpacing.screenPadding)
         .padding(.vertical, TMISpacing.md)
         .background(Color.tmiBackground)
+    }
+
+    private var studentModeTitle: some View {
+        Text("Student Mode")
+            .font(.headline)
+            .foregroundStyle(Color.tmiTextPrimary)
+    }
+
+    private var exitButton: some View {
+        Button {
+            showingExitConfirmation = true
+        } label: {
+            Label("Exit", systemImage: "lock.shield.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.tmiWarning)
+                .padding(.horizontal, TMISpacing.md)
+                .padding(.vertical, TMISpacing.sm)
+                .background(
+                    Color.tmiWarning.opacity(0.2),
+                    in: Capsule()
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(isExiting)
+        .accessibilityIdentifier("studentMode.exit")
     }
 
     private var studentHeader: some View {
@@ -129,9 +186,11 @@ struct StudentModeView: View {
                     .font(.title2.bold())
                     .foregroundStyle(Color.tmiTextPrimary)
 
-                Text("Grade \(profile.grade)")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(Color.tmiTextSecondary)
+                if !profile.grade.isEmpty {
+                    Text("Grade \(profile.grade)")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(Color.tmiTextSecondary)
+                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -160,6 +219,8 @@ struct StudentModeView: View {
             "Student Mode locked after unsuccessful exit attempts."
         case .assignmentRevoked:
             "This activity is no longer available."
+        case .coldRelaunch:
+            "Student Mode was restored securely. Ask your educator to exit."
         }
     }
 

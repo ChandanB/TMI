@@ -55,10 +55,8 @@ struct MainTabView: View {
                     }
             }
         }
-        .task {
-            if let repository = dependencies.studentModeRepository {
-                studentModeSession.configureSecureExit(repository: repository)
-            }
+        .task(id: studentModeStartupIdentity) {
+            await restoreStudentModeStartup()
             updateNavigationPolicy()
             restoreSelectedTab()
             try? router.resumePendingDeepLink()
@@ -87,6 +85,29 @@ struct MainTabView: View {
                 from: oldPhase,
                 to: newPhase
             )
+        }
+    }
+
+    private var studentModeStartupIdentity: String? {
+        authStateModel.currentMembership.map {
+            "\($0.districtID):\($0.userID):\($0.version)"
+        }
+    }
+
+    private func restoreStudentModeStartup() async {
+        if let repository = dependencies.studentModeRepository,
+           let membership = authStateModel.currentMembership {
+            studentModeSession.configureSecureExit(repository: repository)
+            await studentModeSession.restorePersistedContainment(
+                repository: repository,
+                staffIdentity: StudentModeStaffIdentity(
+                    userID: membership.userID,
+                    districtID: membership.districtID,
+                    membershipVersion: membership.version
+                )
+            )
+        } else if dependencies.runtime != .production {
+            studentModeSession.completeNonProductionStartup()
         }
     }
     

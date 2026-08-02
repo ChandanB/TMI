@@ -37,6 +37,49 @@ nonisolated struct StudentModeIssueResponse: Sendable, Equatable {
     let expiresAt: Date
 }
 
+nonisolated struct StudentModeRestoreRequest: Sendable, Equatable {
+    let districtID: String
+    let sessionID: String
+
+    var payload: [String: Any] {
+        [
+            "districtID": districtID,
+            "sessionID": sessionID,
+        ]
+    }
+}
+
+nonisolated enum StudentModeServerStatus: String, Sendable, Equatable {
+    case active
+    case ended
+    case revoked
+    case expired
+
+    var isTerminal: Bool {
+        self != .active
+    }
+}
+
+nonisolated struct StudentModeRestoreResponse: Sendable, Equatable {
+    let status: StudentModeServerStatus
+    let sessionID: String
+    let districtID: String
+    let studentID: String?
+    let assignmentIDs: Set<String>?
+    let allowedOperations: Set<StudentModeOperation>?
+    let customToken: String?
+    let recordVersion: Int
+    let issuedAt: Date?
+    let expiresAt: Date?
+    let profile: StudentModeProfile?
+}
+
+nonisolated enum StudentModeStartupResolution: Sendable, Equatable {
+    case clear
+    case active(StudentModeGrant, StudentModeProfile)
+    case terminal(StudentModeContainmentRecord, StudentModeServerStatus)
+}
+
 nonisolated enum StudentModeEndDisposition: String, Sendable {
     case ended
     case revoked
@@ -83,7 +126,7 @@ nonisolated enum StudentModeCallableError: Error, Equatable, Sendable {
     case unknown
 }
 
-nonisolated enum StudentModeRepositoryError: Error, Equatable {
+nonisolated enum StudentModeRepositoryError: Error, Equatable, Sendable {
     case invalidRequest
     case invalidResponse
     case cancelled
@@ -91,31 +134,48 @@ nonisolated enum StudentModeRepositoryError: Error, Equatable {
     case conflict
     case validation
     case unavailable
+    case containmentCorrupt
 }
 
 nonisolated struct StudentModeRepository: Sendable {
     typealias IssueSession = @Sendable (
         StudentModeIssueRequest
     ) async throws -> StudentModeIssueResponse
+    typealias RestoreSession = @Sendable (
+        StudentModeRestoreRequest
+    ) async throws -> StudentModeRestoreResponse
     typealias EndSession = @Sendable (
         StudentModeEndRequest
     ) async throws -> StudentModeEndResponse
     typealias SignInRespondent = @Sendable (String) async throws -> Void
     typealias SignOutRespondent = @Sendable () async throws -> Void
+    typealias PersistedRespondentRecord = @Sendable () async throws
+        -> StudentModeContainmentRecord?
 
     private let issueSessionTransport: IssueSession
+    private let restoreSessionTransport: RestoreSession
     private let endSessionTransport: EndSession
+    private let containmentStore: StudentModeContainmentStore
+    private let persistedRespondentRecord: PersistedRespondentRecord
     private let signInRespondent: SignInRespondent
     private let signOutRespondent: SignOutRespondent
 
     init(
         issueSession: @escaping IssueSession,
+        restoreSession: @escaping RestoreSession = { _ in
+            throw StudentModeRepositoryError.unavailable
+        },
         endSession: @escaping EndSession,
+        containmentStore: StudentModeContainmentStore = .empty,
+        persistedRespondentRecord: @escaping PersistedRespondentRecord = { nil },
         signInRespondent: @escaping SignInRespondent = { _ in },
         signOutRespondent: @escaping SignOutRespondent = {}
     ) {
         issueSessionTransport = issueSession
+        restoreSessionTransport = restoreSession
         endSessionTransport = endSession
+        self.containmentStore = containmentStore
+        self.persistedRespondentRecord = persistedRespondentRecord
         self.signInRespondent = signInRespondent
         self.signOutRespondent = signOutRespondent
     }
@@ -173,7 +233,12 @@ nonisolated struct StudentModeRepository: Sendable {
             throw StudentModeRepositoryError.invalidResponse
         }
 
+        let containmentRecord = StudentModeContainmentRecord(
+            districtID: response.districtID,
+            sessionID: response.sessionID
+        )
         do {
+            try await containmentStore.save(containmentRecord)
             try await signInRespondent(response.customToken)
         } catch {
             throw map(error)
@@ -186,6 +251,105 @@ nonisolated struct StudentModeRepository: Sendable {
             issuedAt: response.issuedAt,
             expiresAt: response.expiresAt,
             staffIdentity: staffIdentity
+        )
+    }
+
+    func restorePersistedSession(
+        staffIdentity: StudentModeStaffIdentity,
+        now: Date = Date()
+    ) async throws -> StudentModeStartupResolution {
+        guard isValid(identity: staffIdentity) else {
+            throw StudentModeRepositoryError.authenticationRequired
+        }
+        let markerLoad = await containmentStore.load()
+        let respondentRecord: StudentModeContainmentRecord?
+        do {
+            respondentRecord = try await persistedRespondentRecord()
+        } catch {
+            throw map(error)
+        }
+        let record: StudentModeContainmentRecord
+        switch markerLoad {
+        case .missing:
+            guard let respondentRecord else {
+                return .clear
+            }
+            record = respondentRecord
+        case .record(let storedRecord):
+            if let respondentRecord, respondentRecord != storedRecord {
+                throw StudentModeRepositoryError.containmentCorrupt
+            }
+            record = storedRecord
+        case .corrupt:
+            throw StudentModeRepositoryError.containmentCorrupt
+        }
+        guard record.isValid,
+              record.districtID == staffIdentity.districtID else {
+            throw StudentModeRepositoryError.containmentCorrupt
+        }
+        let response: StudentModeRestoreResponse
+        do {
+            response = try await restoreSessionTransport(
+                StudentModeRestoreRequest(
+                    districtID: record.districtID,
+                    sessionID: record.sessionID
+                )
+            )
+        } catch {
+            throw map(error)
+        }
+        guard response.sessionID == record.sessionID,
+              response.districtID == record.districtID,
+              response.recordVersion > 0 else {
+            throw StudentModeRepositoryError.invalidResponse
+        }
+        if response.status.isTerminal {
+            return .terminal(record, response.status)
+        }
+        guard let studentID = response.studentID,
+              let assignmentIDs = response.assignmentIDs,
+              let allowedOperations = response.allowedOperations,
+              let customToken = response.customToken,
+              let issuedAt = response.issuedAt,
+              let expiresAt = response.expiresAt,
+              let profile = response.profile,
+              isValidIdentifier(studentID),
+              assignmentIDs.count == 1,
+              allowedOperations == StudentModeOperation.surveyAssignment,
+              !customToken.isEmpty,
+              profile.studentID == studentID,
+              issuedAt < expiresAt,
+              now < expiresAt,
+              expiresAt.timeIntervalSince(issuedAt)
+                <= StudentModeSession.duration(forRequestedMinutes: 60) else {
+            throw StudentModeRepositoryError.invalidResponse
+        }
+        let scope: StudentModeScope
+        do {
+            scope = try StudentModeScope(
+                districtID: response.districtID,
+                studentID: studentID,
+                assignmentIDs: assignmentIDs,
+                allowedOperations: allowedOperations
+            )
+            try await containmentStore.save(record)
+            try await signInRespondent(customToken)
+        } catch let error as StudentModeSessionError {
+            _ = error
+            throw StudentModeRepositoryError.invalidResponse
+        } catch {
+            throw map(error)
+        }
+        return .active(
+            StudentModeGrant(
+                sessionID: response.sessionID,
+                scope: scope,
+                recordVersion: response.recordVersion,
+                issuedAt: issuedAt,
+                expiresAt: expiresAt,
+                staffIdentity: staffIdentity
+            ),
+            profile
         )
     }
 
@@ -225,6 +389,21 @@ nonisolated struct StudentModeRepository: Sendable {
         }
         do {
             try await signOutRespondent()
+            try await containmentStore.clear()
+        } catch {
+            throw StudentModeRepositoryError.authenticationRequired
+        }
+    }
+
+    func releaseVerifiedTerminalSession(
+        _ record: StudentModeContainmentRecord
+    ) async throws {
+        guard record.isValid else {
+            throw StudentModeRepositoryError.containmentCorrupt
+        }
+        do {
+            try await signOutRespondent()
+            try await containmentStore.clear()
         } catch {
             throw StudentModeRepositoryError.authenticationRequired
         }
@@ -276,8 +455,15 @@ extension StudentModeRepository {
             issueSession: { request in
                 try await runtime.issueSession(request)
             },
+            restoreSession: { request in
+                try await runtime.restoreSession(request)
+            },
             endSession: { request in
                 try await runtime.endSession(request)
+            },
+            containmentStore: .keychain(),
+            persistedRespondentRecord: {
+                try await runtime.persistedRespondentRecord()
             },
             signInRespondent: { token in
                 try await runtime.signInRespondent(withCustomToken: token)
@@ -337,6 +523,40 @@ private final class FirebaseStudentModeRuntime: @unchecked Sendable {
         }
     }
 
+    func restoreSession(
+        _ request: StudentModeRestoreRequest
+    ) async throws -> StudentModeRestoreResponse {
+        do {
+            let result = try await functions
+                .httpsCallable("restoreStudentModeSession")
+                .call(request.payload)
+            return try Self.parseRestoreResponse(result.data)
+        } catch {
+            throw Self.callableError(from: error)
+        }
+    }
+
+    func persistedRespondentRecord() async throws
+        -> StudentModeContainmentRecord? {
+        guard let user = respondentAuth.currentUser else {
+            return nil
+        }
+        let token = try await user.getIDTokenResult(forcingRefresh: false)
+        guard token.claims["tmiAccessClass"] as? String == "respondent",
+              let districtID = token.claims["tmiDistrictID"] as? String,
+              let sessionID = token.claims["tmiSessionID"] as? String else {
+            throw StudentModeRepositoryError.containmentCorrupt
+        }
+        let record = StudentModeContainmentRecord(
+            districtID: districtID,
+            sessionID: sessionID
+        )
+        guard record.isValid else {
+            throw StudentModeRepositoryError.containmentCorrupt
+        }
+        return record
+    }
+
     func signInRespondent(withCustomToken token: String) async throws {
         _ = try await respondentAuth.signIn(withCustomToken: token)
     }
@@ -390,6 +610,73 @@ private final class FirebaseStudentModeRuntime: @unchecked Sendable {
             sessionID: sessionID,
             ended: ended,
             recordVersion: recordVersion
+        )
+    }
+
+    private static func parseRestoreResponse(
+        _ value: Any
+    ) throws -> StudentModeRestoreResponse {
+        guard let data = value as? [String: Any],
+              let statusValue = data["status"] as? String,
+              let status = StudentModeServerStatus(rawValue: statusValue),
+              let sessionID = data["sessionID"] as? String,
+              let districtID = data["districtID"] as? String,
+              let recordVersion = Self.integer(data["recordVersion"]) else {
+            throw StudentModeCallableError.malformedResponse
+        }
+        if status.isTerminal {
+            return StudentModeRestoreResponse(
+                status: status,
+                sessionID: sessionID,
+                districtID: districtID,
+                studentID: nil,
+                assignmentIDs: nil,
+                allowedOperations: nil,
+                customToken: nil,
+                recordVersion: recordVersion,
+                issuedAt: nil,
+                expiresAt: nil,
+                profile: nil
+            )
+        }
+        guard let studentID = data["studentID"] as? String,
+              let assignmentIDs = data["assignmentIDs"] as? [String],
+              let operationValues = data["allowedOperations"] as? [String],
+              let customToken = data["customToken"] as? String,
+              let issuedAt = Self.date(data["issuedAt"]),
+              let expiresAt = Self.date(data["expiresAt"]),
+              let profileData = data["profile"] as? [String: Any],
+              Self.integer(profileData["schemaVersion"]) == 1,
+              profileData["districtID"] as? String == districtID,
+              let profileStudentID = profileData["studentID"] as? String,
+              profileStudentID == studentID,
+              let displayName = profileData["displayName"] as? String,
+              let grade = profileData["grade"] as? String else {
+            throw StudentModeCallableError.malformedResponse
+        }
+        let operations = Set(
+            operationValues.compactMap(StudentModeOperation.init(rawValue:))
+        )
+        guard operations.count == operationValues.count else {
+            throw StudentModeCallableError.malformedResponse
+        }
+        return StudentModeRestoreResponse(
+            status: status,
+            sessionID: sessionID,
+            districtID: districtID,
+            studentID: studentID,
+            assignmentIDs: Set(assignmentIDs),
+            allowedOperations: operations,
+            customToken: customToken,
+            recordVersion: recordVersion,
+            issuedAt: issuedAt,
+            expiresAt: expiresAt,
+            profile: StudentModeProfile(
+                studentID: profileStudentID,
+                displayName: displayName,
+                grade: grade,
+                pronouns: profileData["pronouns"] as? String
+            )
         )
     }
 

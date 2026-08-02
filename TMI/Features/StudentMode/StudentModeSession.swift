@@ -76,6 +76,13 @@ nonisolated struct StudentModeProfile: Codable, Hashable, Sendable {
     let grade: String
     let pronouns: String?
 
+    static let restoring = StudentModeProfile(
+        studentID: "",
+        displayName: "Student",
+        grade: "",
+        pronouns: nil
+    )
+
     var firstName: String {
         displayName.split(whereSeparator: \.isWhitespace).first.map(String.init)
             ?? displayName
@@ -107,9 +114,11 @@ nonisolated enum StudentModeLockReason: Sendable, Equatable {
     case backgroundProtection
     case failedExitAttempts
     case assignmentRevoked
+    case coldRelaunch
 }
 
 nonisolated enum StudentModeState: Sendable, Equatable {
+    case restoring
     case inactive
     case active(StudentModeGrant)
     case locked(StudentModeLockReason)
@@ -138,6 +147,8 @@ final class StudentModeSession {
     typealias AuthenticateStaff = @MainActor @Sendable () async -> Bool
     typealias SecurelyEndRespondentSession =
         @MainActor @Sendable (StudentModeGrant) async throws -> Void
+    typealias SecurelyReleaseVerifiedTerminal =
+        @MainActor @Sendable (StudentModeContainmentRecord) async throws -> Void
 
     nonisolated static let defaultDurationMinutes = 30
     nonisolated static let maximumDurationMinutes = 60
@@ -145,26 +156,31 @@ final class StudentModeSession {
     nonisolated static let protectedBackgroundInterval: TimeInterval = 30
     nonisolated static let maximumFailedExitAttempts = 5
 
-    private(set) var state: StudentModeState = .inactive
+    private(set) var state: StudentModeState = .restoring
     private(set) var lastActivityAt: Date?
     private(set) var backgroundedAt: Date?
     private(set) var failedExitAttemptCount = 0
     private(set) var studentProfile: StudentModeProfile?
     private(set) var currentGrant: StudentModeGrant?
+    private(set) var verifiedTerminalRecord: StudentModeContainmentRecord?
+    private(set) var isRestorationInProgress = false
     private var authenticateStaffAction: AuthenticateStaff
     private var securelyEndRespondentSession: SecurelyEndRespondentSession
+    private var securelyReleaseVerifiedTerminal: SecurelyReleaseVerifiedTerminal
+    private var restorationRepository: StudentModeRepository?
+    private var restorationStaffIdentity: StudentModeStaffIdentity?
 
     var isStudentModeActive: Bool {
         state.isActive
     }
 
     var isStudentModeContained: Bool {
-        state != .inactive && currentGrant != nil && studentProfile != nil
+        state != .inactive
     }
 
     var rootPresentation: StudentModeRootPresentation {
-        if isStudentModeContained, let studentProfile {
-            return .student(studentProfile)
+        if isStudentModeContained {
+            return .student(studentProfile ?? .restoring)
         }
         return .staff
     }
@@ -175,10 +191,15 @@ final class StudentModeSession {
         },
         securelyEndRespondentSession: @escaping SecurelyEndRespondentSession = { _ in
             throw StudentModeRepositoryError.unavailable
+        },
+        securelyReleaseVerifiedTerminal:
+            @escaping SecurelyReleaseVerifiedTerminal = { _ in
+                throw StudentModeRepositoryError.unavailable
         }
     ) {
         authenticateStaffAction = authenticateStaff
         self.securelyEndRespondentSession = securelyEndRespondentSession
+        self.securelyReleaseVerifiedTerminal = securelyReleaseVerifiedTerminal
     }
 
     func configureSecureExit(repository: StudentModeRepository) {
@@ -192,6 +213,74 @@ final class StudentModeSession {
                 reasonCode: "secure-exit"
             )
         }
+        securelyReleaseVerifiedTerminal = { record in
+            try await repository.releaseVerifiedTerminalSession(record)
+        }
+    }
+
+    func restorePersistedContainment(
+        repository: StudentModeRepository,
+        staffIdentity: StudentModeStaffIdentity,
+        now: Date = Date()
+    ) async {
+        restorationRepository = repository
+        restorationStaffIdentity = staffIdentity
+        guard state == .restoring, !isRestorationInProgress else {
+            return
+        }
+        isRestorationInProgress = true
+        defer { isRestorationInProgress = false }
+        do {
+            switch try await repository.restorePersistedSession(
+                staffIdentity: staffIdentity,
+                now: now
+            ) {
+            case .clear:
+                secureReset(to: .inactive)
+            case .active(let grant, let profile):
+                currentGrant = grant
+                studentProfile = profile
+                verifiedTerminalRecord = nil
+                lastActivityAt = now
+                backgroundedAt = nil
+                failedExitAttemptCount = 0
+                state = .locked(.coldRelaunch)
+                clearRestorationDependencies()
+            case .terminal(let record, _):
+                currentGrant = nil
+                studentProfile = .restoring
+                verifiedTerminalRecord = record
+                lastActivityAt = nil
+                backgroundedAt = nil
+                failedExitAttemptCount = 0
+                state = .expired
+                clearRestorationDependencies()
+            }
+        } catch {
+            // Any unavailable, corrupt, or unauthorized restoration evidence
+            // intentionally leaves the synchronous restoring shell in place.
+        }
+    }
+
+    func retryPersistedContainment(now: Date = Date()) async {
+        guard state == .restoring,
+              !isRestorationInProgress,
+              let restorationRepository,
+              let restorationStaffIdentity else {
+            return
+        }
+        await restorePersistedContainment(
+            repository: restorationRepository,
+            staffIdentity: restorationStaffIdentity,
+            now: now
+        )
+    }
+
+    func completeNonProductionStartup() {
+        guard state == .restoring else {
+            return
+        }
+        secureReset(to: .inactive)
     }
 
     nonisolated static func duration(
@@ -217,6 +306,7 @@ final class StudentModeSession {
         }
         state = .active(grant)
         currentGrant = grant
+        verifiedTerminalRecord = nil
         studentProfile = profile ?? StudentModeProfile(
             studentID: grant.scope.studentID,
             displayName: "Student",
@@ -286,7 +376,7 @@ final class StudentModeSession {
     }
 
     func exitStudentMode() async -> Bool {
-        guard state != .inactive, let currentGrant else {
+        guard state != .inactive else {
             return true
         }
         let authenticated = await authenticateStaffAction()
@@ -295,7 +385,13 @@ final class StudentModeSession {
             return false
         }
         do {
-            try await securelyEndRespondentSession(currentGrant)
+            if let currentGrant {
+                try await securelyEndRespondentSession(currentGrant)
+            } else if let verifiedTerminalRecord {
+                try await securelyReleaseVerifiedTerminal(verifiedTerminalRecord)
+            } else {
+                return false
+            }
             secureReset(to: .inactive)
             return true
         } catch {
@@ -352,10 +448,17 @@ final class StudentModeSession {
     private func secureReset(to nextState: StudentModeState) {
         state = nextState
         currentGrant = nil
+        verifiedTerminalRecord = nil
         studentProfile = nil
         lastActivityAt = nil
         backgroundedAt = nil
         failedExitAttemptCount = 0
+        clearRestorationDependencies()
+    }
+
+    private func clearRestorationDependencies() {
+        restorationRepository = nil
+        restorationStaffIdentity = nil
     }
 
     private static func authenticateDeviceOwner() async -> Bool {
