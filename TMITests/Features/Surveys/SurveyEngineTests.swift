@@ -171,6 +171,201 @@ struct SurveyDefinitionTests {
             )
         }
     }
+
+    @Test("Definition limits accept exact boundaries and reject overflow")
+    func canonicalDefinitionLimits() throws {
+        let contract = try surveyDefinitionContract()
+        #expect(SurveyDefinition.maximumQuestionCount == contract.maximumQuestionCount)
+        #expect(SurveyDefinition.maximumBranchRuleCount == contract.maximumBranchRuleCount)
+        #expect(SurveyDefinition.maximumOptionCount == contract.maximumOptionCount)
+        #expect(SurveyDefinition.maximumTextLength == contract.maximumTextLength)
+        #expect(
+            SurveyDefinition.maximumIdentifierUTF8Bytes ==
+                contract.maximumIdentifierUTF8Bytes
+        )
+        #expect(SurveyDefinition.maximumPromptUTF8Bytes == contract.maximumPromptUTF8Bytes)
+        #expect(SurveyDefinition.maximumLabelUTF8Bytes == contract.maximumLabelUTF8Bytes)
+        #expect(
+            SurveyDefinition.maximumImageReferenceUTF8Bytes ==
+                contract.maximumImageReferenceUTF8Bytes
+        )
+        let boundaryOptionID = String(
+            repeating: "é",
+            count: contract.maximumIdentifierUTF8Bytes / 2
+        )
+        let options = (0..<contract.maximumOptionCount).map { index in
+            SurveyOption(
+                id: index == 0 ? boundaryOptionID : "option-\(index)",
+                label: index == 0
+                    ? String(repeating: "é", count: contract.maximumLabelUTF8Bytes / 2)
+                    : "Option \(index)",
+                imageReference: index == 0
+                    ? String(
+                        repeating: "é",
+                        count: contract.maximumImageReferenceUTF8Bytes / 2
+                    )
+                    : "survey/option-\(index)"
+            )
+        }
+        var questions = (0..<contract.maximumQuestionCount).map { index in
+            SurveyQuestion(
+                id: "question-\(index)",
+                prompt: "Question \(index)",
+                kind: .shortText(maxLength: contract.maximumTextLength),
+                isRequired: false
+            )
+        }
+        questions[0] = SurveyQuestion(
+            id: "question-0",
+            prompt: String(
+                repeating: "é",
+                count: contract.maximumPromptUTF8Bytes / 2
+            ),
+            kind: .imageChoice,
+            isRequired: false,
+            options: options
+        )
+        questions[contract.maximumQuestionCount - 1] = SurveyQuestion(
+            id: String(
+                repeating: "é",
+                count: contract.maximumIdentifierUTF8Bytes / 2
+            ),
+            prompt: "Boundary identifier",
+            kind: .shortText(maxLength: contract.maximumTextLength),
+            isRequired: false
+        )
+        let rules = (0..<contract.maximumBranchRuleCount).map { index in
+            SurveyBranchRule(
+                id: index == 0
+                    ? String(
+                        repeating: "é",
+                        count: contract.maximumIdentifierUTF8Bytes / 2
+                    )
+                    : "rule-\(index)",
+                sourceQuestionID: "question-0",
+                targetQuestionID: "question-1",
+                predicate: .equals(boundaryOptionID)
+            )
+        }
+        _ = try SurveyDefinition(
+            id: String(
+                repeating: "é",
+                count: contract.maximumIdentifierUTF8Bytes / 2
+            ),
+            version: 1,
+            title: "Boundary definition",
+            publishedAt: Date(timeIntervalSince1970: 1_000),
+            questions: questions,
+            branchRules: rules
+        )
+
+        #expect(throws: SurveyDefinitionError.self) {
+            _ = try boundedDefinition(
+                questions: (0...contract.maximumQuestionCount).map {
+                    textQuestion(id: "question-\($0)")
+                }
+            )
+        }
+        #expect(throws: SurveyDefinitionError.self) {
+            _ = try boundedDefinition(
+                questions: [choiceQuestion(), textQuestion(id: "target")],
+                branchRules: (0...contract.maximumBranchRuleCount).map {
+                    branchRule(id: "rule-\($0)")
+                }
+            )
+        }
+        #expect(throws: SurveyDefinitionError.self) {
+            _ = try boundedDefinition(questions: [choiceQuestion(
+                options: (0...contract.maximumOptionCount).map {
+                    SurveyOption(id: "option-\($0)", label: "Option")
+                }
+            )])
+        }
+        #expect(throws: SurveyDefinitionError.self) {
+            _ = try boundedDefinition(questions: [SurveyQuestion(
+                id: "multi",
+                prompt: "Multi",
+                kind: .multiSelect(maxSelections: 3),
+                isRequired: false,
+                options: [
+                    SurveyOption(id: "one", label: "One"),
+                    SurveyOption(id: "two", label: "Two"),
+                ]
+            )])
+        }
+        #expect(throws: SurveyDefinitionError.self) {
+            _ = try boundedDefinition(questions: [textQuestion(
+                id: "text",
+                maxLength: contract.maximumTextLength + 1
+            )])
+        }
+    }
+
+    @Test("Definition strings share Firebase UTF-8 and normalization rules")
+    func canonicalDefinitionStrings() throws {
+        let contract = try surveyDefinitionContract()
+        let invalidIdentifiers = [
+            ".",
+            "..",
+            " padded",
+            "path/segment",
+            "control\u{0000}",
+            String(repeating: "é", count: contract.maximumIdentifierUTF8Bytes / 2 + 1),
+        ]
+        for identifier in invalidIdentifiers {
+            #expect(throws: SurveyDefinitionError.self) {
+                _ = try boundedDefinition(id: identifier)
+            }
+        }
+        for prompt in [
+            " padded",
+            "control\u{0000}",
+            String(repeating: "é", count: contract.maximumPromptUTF8Bytes / 2 + 1),
+        ] {
+            #expect(throws: SurveyDefinitionError.self) {
+                _ = try boundedDefinition(questions: [SurveyQuestion(
+                    id: "choice",
+                    prompt: prompt,
+                    kind: .singleChoice,
+                    isRequired: false,
+                    options: [SurveyOption(id: "one", label: "One")]
+                )])
+            }
+        }
+        for label in [
+            " padded",
+            "control\u{0000}",
+            String(repeating: "é", count: contract.maximumLabelUTF8Bytes / 2 + 1),
+        ] {
+            #expect(throws: SurveyDefinitionError.self) {
+                _ = try boundedDefinition(questions: [choiceQuestion(
+                    options: [SurveyOption(id: "one", label: label)]
+                )])
+            }
+        }
+        for imageReference in [
+            " padded",
+            "control\u{0000}",
+            String(
+                repeating: "é",
+                count: contract.maximumImageReferenceUTF8Bytes / 2 + 1
+            ),
+        ] {
+            #expect(throws: SurveyDefinitionError.self) {
+                _ = try boundedDefinition(questions: [SurveyQuestion(
+                    id: "image",
+                    prompt: "Image",
+                    kind: .imageChoice,
+                    isRequired: false,
+                    options: [SurveyOption(
+                        id: "one",
+                        label: "One",
+                        imageReference: imageReference
+                    )]
+                )])
+            }
+        }
+    }
 }
 
 @Suite("Survey repository")
@@ -840,6 +1035,90 @@ struct SurveyRepositoryTests {
         #expect(reviewed.answers == submitted.answers)
         #expect(reviewed.frozenDefinition == submitted.frozenDefinition)
     }
+
+    @Test("Review result uses only canonical backend reviewer attribution")
+    func canonicalReviewerAttribution() async throws {
+        let definition = try surveyDefinition()
+        var submitted = SurveyResponse(
+            assignment: try surveyAssignment(),
+            definition: definition
+        )
+        try submitted.markSubmitted(
+            operationID: "submit-review-decoder",
+            submittedAt: Date(timeIntervalSince1970: 3_000),
+            serverRecordVersion: 1,
+            definition: definition,
+            sessionID: "session-1"
+        )
+        let request = SurveyReviewRequest(
+            response: submitted,
+            operationID: "review-decoder",
+            staffIdentity: StudentModeStaffIdentity(
+                userID: "stale-injected-reviewer",
+                districtID: submitted.districtID,
+                membershipVersion: 1
+            )
+        )
+        let result: [String: Any] = [
+            "operationID": request.operationID,
+            "recordVersion": 2,
+            "replayed": false,
+            "reviewedAt": "2026-08-03T12:00:00Z",
+            "reviewerUserID": "authenticated-reviewer",
+        ]
+
+        let reviewed = try SurveyReviewCallableResultDecoder.decode(
+            result,
+            request: request
+        )
+        #expect(reviewed.serverMetadata?.reviewedBy == "authenticated-reviewer")
+        #expect(reviewed.serverMetadata?.reviewedBy != request.staffIdentity.userID)
+
+        let storage = SurveyReviewStorage()
+        let repository = SurveyRepository(
+            loadDraft: { _ in nil },
+            saveDraft: { response in await storage.save(response) },
+            quarantineDraft: { _ in },
+            synchronizeDraft: { request in request.response },
+            submitResponse: { request in request.response },
+            reviewResponse: { request in
+                try SurveyReviewCallableResultDecoder.decode(
+                    [
+                        "operationID": request.operationID,
+                        "recordVersion": request.response.recordVersion + 1,
+                        "replayed": false,
+                        "reviewedAt": "2026-08-03T12:00:00Z",
+                        "reviewerUserID": "authenticated-reviewer",
+                    ],
+                    request: request
+                )
+            },
+            isOnline: { true }
+        )
+        _ = try await repository.review(
+            response: submitted,
+            operationID: request.operationID,
+            staffIdentity: request.staffIdentity
+        )
+        #expect(
+            await storage.response?.serverMetadata?.reviewedBy ==
+                "authenticated-reviewer"
+        )
+
+        for malformed in [
+            result.filter { $0.key != "reviewerUserID" },
+            result.merging(["reviewerUserID": " injected"]) { _, new in new },
+            result.merging(["operationID": "wrong-review"]) { _, new in new },
+            result.merging(["recordVersion": 3]) { _, new in new },
+        ] {
+            #expect(throws: SurveyRepositoryError.malformedResponse) {
+                _ = try SurveyReviewCallableResultDecoder.decode(
+                    malformed,
+                    request: request
+                )
+            }
+        }
+    }
 }
 
 private func surveyDefinition(
@@ -909,6 +1188,78 @@ private func surveyDefinition(
 private struct SurveySchemaFixture: Decodable {
     let definition: SurveyDefinition
     let response: SurveyStoredResponseDocument
+}
+
+private struct SurveyDefinitionContract: Decodable {
+    let maximumQuestionCount: Int
+    let maximumBranchRuleCount: Int
+    let maximumOptionCount: Int
+    let maximumTextLength: Int
+    let maximumIdentifierUTF8Bytes: Int
+    let maximumPromptUTF8Bytes: Int
+    let maximumLabelUTF8Bytes: Int
+    let maximumImageReferenceUTF8Bytes: Int
+}
+
+private func surveyDefinitionContract() throws -> SurveyDefinitionContract {
+    let url = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("firebase/fixtures/survey-contract-v1.json")
+    return try JSONDecoder().decode(
+        SurveyDefinitionContract.self,
+        from: Data(contentsOf: url)
+    )
+}
+
+private func boundedDefinition(
+    id: String = "bounded-definition",
+    questions: [SurveyQuestion] = [textQuestion(id: "text")],
+    branchRules: [SurveyBranchRule] = []
+) throws -> SurveyDefinition {
+    try SurveyDefinition(
+        id: id,
+        version: 1,
+        title: "Bounded definition",
+        publishedAt: Date(timeIntervalSince1970: 1_000),
+        questions: questions,
+        branchRules: branchRules
+    )
+}
+
+private func textQuestion(
+    id: String,
+    maxLength: Int = 120
+) -> SurveyQuestion {
+    SurveyQuestion(
+        id: id,
+        prompt: "Text",
+        kind: .shortText(maxLength: maxLength),
+        isRequired: false
+    )
+}
+
+private func choiceQuestion(
+    options: [SurveyOption] = [SurveyOption(id: "one", label: "One")]
+) -> SurveyQuestion {
+    SurveyQuestion(
+        id: "choice",
+        prompt: "Choice",
+        kind: .singleChoice,
+        isRequired: false,
+        options: options
+    )
+}
+
+private func branchRule(id: String) -> SurveyBranchRule {
+    SurveyBranchRule(
+        id: id,
+        sourceQuestionID: "choice",
+        targetQuestionID: "target",
+        predicate: .equals("one")
+    )
 }
 
 private func surveyAssignment(
@@ -1103,6 +1454,14 @@ private actor SurveyServerCounter {
     func synchronize(expectedVersion: Int) -> Int {
         expectedVersions.append(expectedVersion)
         return expectedVersion + 1
+    }
+}
+
+private actor SurveyReviewStorage {
+    private(set) var response: SurveyResponse?
+
+    func save(_ response: SurveyResponse) {
+        self.response = response
     }
 }
 

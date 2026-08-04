@@ -291,6 +291,15 @@ nonisolated enum SurveyDefinitionState: String, Codable, Equatable, Sendable {
 
 nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
     static let currentSchemaVersion = 1
+    static let maximumQuestionCount = 100
+    static let maximumBranchRuleCount = 200
+    static let maximumOptionCount = 100
+    static let maximumTextLength = 4_000
+    static let maximumIdentifierUTF8Bytes = 1_500
+    static let maximumPromptUTF8Bytes = 500
+    static let maximumLabelUTF8Bytes = 200
+    static let maximumImageReferenceUTF8Bytes = 500
+    private static let maximumSafeInteger = 9_007_199_254_740_991
 
     let schemaVersion: Int
     let state: SurveyDefinitionState
@@ -415,22 +424,25 @@ nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
     private func validateDefinition() throws {
         guard schemaVersion == Self.currentSchemaVersion,
               state == .published,
-              version > 0 else {
+              (1...Self.maximumSafeInteger).contains(version) else {
             throw SurveyDefinitionError.invalidVersion
         }
         guard Self.isValidIdentifier(id) else {
             throw SurveyDefinitionError.invalidIdentifier(id)
         }
-        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !questions.isEmpty else {
+        guard !title.isEmpty,
+              !questions.isEmpty,
+              questions.count <= Self.maximumQuestionCount,
+              branchRules.count <= Self.maximumBranchRuleCount else {
             throw SurveyDefinitionError.invalidQuestion(id)
         }
         var questionIDs: Set<String> = []
         for question in questions {
             guard Self.isValidIdentifier(question.id),
-                  !question.prompt.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                  ).isEmpty else {
+                  Self.isCanonicalString(
+                    question.prompt,
+                    maximumUTF8Bytes: Self.maximumPromptUTF8Bytes
+                  ) else {
                 throw SurveyDefinitionError.invalidQuestion(question.id)
             }
             guard questionIDs.insert(question.id).inserted else {
@@ -443,7 +455,9 @@ nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
             ($0.id, $0)
         })
         for rule in branchRules {
-            guard Self.isValidIdentifier(rule.id) else {
+            guard Self.isValidIdentifier(rule.id),
+                  (-Self.maximumSafeInteger...Self.maximumSafeInteger)
+                    .contains(rule.priority) else {
                 throw SurveyDefinitionError.invalidIdentifier(rule.id)
             }
             guard ruleIDs.insert(rule.id).inserted else {
@@ -465,23 +479,31 @@ nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
     }
 
     private func validate(_ question: SurveyQuestion) throws {
+        guard question.options.count <= Self.maximumOptionCount else {
+            throw SurveyDefinitionError.invalidQuestion(question.id)
+        }
         let requiresOptions: Bool
         switch question.kind {
         case .singleChoice, .imageChoice:
             requiresOptions = true
         case .multiSelect(let maximum):
             requiresOptions = true
-            if let maximum, maximum < 1 {
+            if let maximum,
+               !(1...question.options.count).contains(maximum) {
                 throw SurveyDefinitionError.invalidQuestion(question.id)
             }
         case .shortText(let maximum):
             requiresOptions = false
-            guard maximum > 0 else {
+            guard (1...Self.maximumTextLength).contains(maximum) else {
                 throw SurveyDefinitionError.invalidQuestion(question.id)
             }
         case .rating(let minimum, let maximum):
             requiresOptions = false
-            guard minimum < maximum else {
+            guard (-Self.maximumSafeInteger...Self.maximumSafeInteger)
+                    .contains(minimum),
+                  (-Self.maximumSafeInteger...Self.maximumSafeInteger)
+                    .contains(maximum),
+                  minimum < maximum else {
                 throw SurveyDefinitionError.invalidQuestion(question.id)
             }
         }
@@ -491,16 +513,24 @@ nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
         var optionIDs: Set<String> = []
         for option in question.options {
             guard Self.isValidIdentifier(option.id),
-                  !option.label.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                  ).isEmpty else {
+                  Self.isCanonicalString(
+                    option.label,
+                    maximumUTF8Bytes: Self.maximumLabelUTF8Bytes
+                  ) else {
                 throw SurveyDefinitionError.invalidQuestion(question.id)
             }
             guard optionIDs.insert(option.id).inserted else {
                 throw SurveyDefinitionError.duplicateOptionID(option.id)
             }
+            if let imageReference = option.imageReference,
+               !Self.isCanonicalString(
+                imageReference,
+                maximumUTF8Bytes: Self.maximumImageReferenceUTF8Bytes
+               ) {
+                throw SurveyDefinitionError.invalidQuestion(question.id)
+            }
             if case .imageChoice = question.kind,
-               option.imageReference?.isEmpty != false {
+               option.imageReference == nil {
                 throw SurveyDefinitionError.invalidQuestion(question.id)
             }
         }
@@ -568,8 +598,23 @@ nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
 
     private static func isValidIdentifier(_ value: String) -> Bool {
         !value.isEmpty &&
+            value != "." &&
+            value != ".." &&
             value == value.trimmingCharacters(in: .whitespacesAndNewlines) &&
+            value.utf8.count <= maximumIdentifierUTF8Bytes &&
             !value.contains("/") &&
+            value.unicodeScalars.allSatisfy {
+                !CharacterSet.controlCharacters.contains($0)
+            }
+    }
+
+    private static func isCanonicalString(
+        _ value: String,
+        maximumUTF8Bytes: Int
+    ) -> Bool {
+        !value.isEmpty &&
+            value == value.trimmingCharacters(in: .whitespacesAndNewlines) &&
+            value.utf8.count <= maximumUTF8Bytes &&
             value.unicodeScalars.allSatisfy {
                 !CharacterSet.controlCharacters.contains($0)
             }

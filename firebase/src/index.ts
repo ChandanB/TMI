@@ -2961,6 +2961,16 @@ const parseRespondentSurveyIdentity = <T>(
   };
 };
 
+const surveyDefinitionLimits = {
+  maximumQuestionCount: 100,
+  maximumBranchRuleCount: 200,
+  maximumOptionCount: 100,
+  maximumTextLength: 4_000,
+  maximumPromptUTF8Bytes: 500,
+  maximumLabelUTF8Bytes: 200,
+  maximumImageReferenceUTF8Bytes: 500,
+} as const;
+
 const parseSurveyDefinition = (
   data: DocumentData | undefined,
   expectedID: string,
@@ -2979,9 +2989,9 @@ const parseSurveyDefinition = (
     data.title.length === 0 ||
     !Array.isArray(data.questions) ||
     data.questions.length === 0 ||
-    data.questions.length > 100 ||
+    data.questions.length > surveyDefinitionLimits.maximumQuestionCount ||
     !Array.isArray(data.branchRules) ||
-    data.branchRules.length > 200
+    data.branchRules.length > surveyDefinitionLimits.maximumBranchRuleCount
   ) {
     return surveyDataLoss("The assigned survey definition is malformed.");
   }
@@ -3003,7 +3013,8 @@ const parseSurveyDefinition = (
         typeof question.prompt !== "string" ||
         question.prompt.length === 0 ||
         question.prompt !== question.prompt.trim() ||
-        Buffer.byteLength(question.prompt, "utf8") > 500 ||
+        Buffer.byteLength(question.prompt, "utf8") >
+          surveyDefinitionLimits.maximumPromptUTF8Bytes ||
         /\p{Cc}/u.test(question.prompt)
       ) {
         return surveyDataLoss("The survey question prompt is malformed.");
@@ -3011,7 +3022,10 @@ const parseSurveyDefinition = (
       if (typeof question.required !== "boolean") {
         return surveyDataLoss("The survey question required flag is malformed.");
       }
-      if (!Array.isArray(question.options) || question.options.length > 100) {
+      if (
+        !Array.isArray(question.options) ||
+        question.options.length > surveyDefinitionLimits.maximumOptionCount
+      ) {
         return surveyDataLoss("The survey question options are malformed.");
       }
       const optionIDs = new Set<string>();
@@ -3022,7 +3036,8 @@ const parseSurveyDefinition = (
           typeof option.label !== "string" ||
           option.label.length === 0 ||
           option.label !== option.label.trim() ||
-          Buffer.byteLength(option.label, "utf8") > 200 ||
+          Buffer.byteLength(option.label, "utf8") >
+            surveyDefinitionLimits.maximumLabelUTF8Bytes ||
           /\p{Cc}/u.test(option.label)
         ) {
           return surveyDataLoss("The survey option label is malformed.");
@@ -3033,7 +3048,10 @@ const parseSurveyDefinition = (
               option.imageReference.length === 0)) ||
           (option.imageReference !== undefined &&
             (typeof option.imageReference !== "string" ||
-              Buffer.byteLength(option.imageReference, "utf8") > 500 ||
+              option.imageReference.length === 0 ||
+              option.imageReference !== option.imageReference.trim() ||
+              Buffer.byteLength(option.imageReference, "utf8") >
+                surveyDefinitionLimits.maximumImageReferenceUTF8Bytes ||
               /\p{Cc}/u.test(option.imageReference)))
         ) {
           return surveyDataLoss("The survey option image reference is malformed.");
@@ -3078,7 +3096,7 @@ const parseSurveyDefinition = (
             question.maxLength,
             "survey question.maxLength",
             1,
-            4_000,
+            surveyDefinitionLimits.maximumTextLength,
           );
           return { ...base, maxLength };
         }
@@ -4215,8 +4233,12 @@ export const createSurveyHandlers = (
 
   reviewResponse: async (
     request: CallableRequest<ReviewSurveyResponseRequest>,
-  ): Promise<PrivilegedOperationResult & { readonly reviewedAt: string }> => {
+  ): Promise<PrivilegedOperationResult & {
+    readonly reviewedAt: string;
+    readonly reviewerUserID: string;
+  }> => {
     const data = parseReviewSurveyResponseRequest(request.data);
+    const reviewerIdentity = parseTrustedCallableIdentity(request);
     const result = await executePrivilegedOperation(
       dependencies.firestore,
       request,
@@ -4336,7 +4358,11 @@ export const createSurveyHandlers = (
     if (!(reviewedAt instanceof Timestamp)) {
       return surveyDataLoss("The survey review time is malformed.");
     }
-    return { ...result, reviewedAt: reviewedAt.toDate().toISOString() };
+    return {
+      ...result,
+      reviewedAt: reviewedAt.toDate().toISOString(),
+      reviewerUserID: reviewerIdentity.userID,
+    };
   },
 });
 

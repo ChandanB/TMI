@@ -1,0 +1,10 @@
+{
+  "maximumQuestionCount": 100,
+  "maximumBranchRuleCount": 200,
+  "maximumOptionCount": 100,
+  "maximumTextLength": 4000,
+  "maximumIdentifierUTF8Bytes": 1500,
+  "maximumPromptUTF8Bytes": 500,
+  "maximumLabelUTF8Bytes": 200,
+  "maximumImageReferenceUTF8Bytes": 500
+}

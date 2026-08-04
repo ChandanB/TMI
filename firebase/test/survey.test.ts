@@ -48,6 +48,21 @@ const sharedFixture = JSON.parse(
     readonly updatedAt: string;
   };
 };
+const surveyContract = JSON.parse(
+  readFileSync(
+    resolve(process.cwd(), "fixtures/survey-contract-v1.json"),
+    "utf8",
+  ),
+) as {
+  readonly maximumQuestionCount: number;
+  readonly maximumBranchRuleCount: number;
+  readonly maximumOptionCount: number;
+  readonly maximumTextLength: number;
+  readonly maximumIdentifierUTF8Bytes: number;
+  readonly maximumPromptUTF8Bytes: number;
+  readonly maximumLabelUTF8Bytes: number;
+  readonly maximumImageReferenceUTF8Bytes: number;
+};
 
 const completeAnswers = {
   single: { type: "single", value: "art" },
@@ -830,6 +845,200 @@ describe("Canonical survey transactions", () => {
     }
   });
 
+  it("accepts exact shared definition boundaries and rejects overflow or non-normalized strings", async () => {
+    const definitionPath = `catalogs/surveyDefinitions/items/${definitionID}__v${definitionVersion}`;
+    const responsePath = `districts/${districtID}/students/${studentID}/responses/${attemptID}`;
+    const boundaryIdentifier = "é".repeat(
+      surveyContract.maximumIdentifierUTF8Bytes / 2,
+    );
+    const singleOptions = [
+      {
+        id: "science",
+        label: "é".repeat(surveyContract.maximumLabelUTF8Bytes / 2),
+      },
+      { id: "art", label: "Art" },
+      { id: boundaryIdentifier, label: "Boundary" },
+      ...Array.from(
+        { length: surveyContract.maximumOptionCount - 3 },
+        (_, index) => ({ id: `extra-option-${index}`, label: `Option ${index}` }),
+      ),
+    ];
+    const extraQuestions = Array.from(
+      { length: surveyContract.maximumQuestionCount - definition.questions.length },
+      (_, index) => ({
+        id: index === 0 ? boundaryIdentifier : `extra-question-${index}`,
+        prompt: index === 0
+          ? "é".repeat(surveyContract.maximumPromptUTF8Bytes / 2)
+          : `Extra question ${index}`,
+        type: "shortText",
+        required: false,
+        maxLength: surveyContract.maximumTextLength,
+        options: [],
+      }),
+    );
+    const boundaryDefinition = {
+      ...definition,
+      questions: [
+        { ...definition.questions[0], options: singleOptions },
+        ...definition.questions.slice(1).map((question) =>
+          question.id === "image"
+            ? {
+                ...question,
+                options: question.options.map((option, index) =>
+                  index === 0
+                    ? {
+                        ...option,
+                        imageReference: "é".repeat(
+                          surveyContract.maximumImageReferenceUTF8Bytes / 2,
+                        ),
+                      }
+                    : option),
+              }
+            : question),
+        ...extraQuestions,
+      ],
+      branchRules: Array.from(
+        { length: surveyContract.maximumBranchRuleCount },
+        (_, index) => ({
+          id: index === 0 ? boundaryIdentifier : `boundary-rule-${index}`,
+          sourceQuestionID: "single",
+          targetQuestionID: "text",
+          priority: index,
+          effect: "show",
+          predicate: { type: "equals", value: "art" },
+        }),
+      ),
+    };
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), definitionPath), boundaryDefinition);
+    });
+    await expect(
+      handlers().saveDraft(callableRequest(saveRequest({
+        operationID: "boundary-definition",
+      }), { respondent: true })),
+    ).resolves.toMatchObject({ recordVersion: 1 });
+
+    const invalidDefinitions = [
+      {
+        ...boundaryDefinition,
+        questions: [
+          ...boundaryDefinition.questions,
+          {
+            id: "question-overflow",
+            prompt: "Overflow",
+            type: "shortText",
+            required: false,
+            maxLength: 1,
+            options: [],
+          },
+        ],
+      },
+      {
+        ...boundaryDefinition,
+        branchRules: [
+          ...boundaryDefinition.branchRules,
+          {
+            id: "rule-overflow",
+            sourceQuestionID: "single",
+            targetQuestionID: "text",
+            priority: 0,
+            effect: "show",
+            predicate: { type: "equals", value: "art" },
+          },
+        ],
+      },
+      {
+        ...definition,
+        questions: definition.questions.map((question) =>
+          question.id === "single"
+            ? {
+                ...question,
+                options: Array.from(
+                  { length: surveyContract.maximumOptionCount + 1 },
+                  (_, index) => ({ id: `overflow-${index}`, label: "Option" }),
+                ),
+              }
+            : question),
+      },
+      {
+        ...definition,
+        questions: definition.questions.map((question) =>
+          question.id === "multiple"
+            ? { ...question, maxSelections: question.options.length + 1 }
+            : question),
+      },
+      {
+        ...definition,
+        questions: definition.questions.map((question) =>
+          question.id === "text"
+            ? { ...question, maxLength: surveyContract.maximumTextLength + 1 }
+            : question),
+      },
+      ...[
+        " padded",
+        "control\u0000",
+        "é".repeat(surveyContract.maximumPromptUTF8Bytes / 2 + 1),
+      ].map((prompt) => ({
+        ...definition,
+        questions: definition.questions.map((question) =>
+          question.id === "text" ? { ...question, prompt } : question),
+      })),
+      ...[
+        ".",
+        "..",
+        " padded",
+        "path/segment",
+        "control\u0000",
+        "é".repeat(surveyContract.maximumIdentifierUTF8Bytes / 2 + 1),
+      ].map((id) => ({
+        ...definition,
+        questions: definition.questions.map((question) =>
+          question.id === "text" ? { ...question, id } : question),
+      })),
+      ...[
+        " padded",
+        "control\u0000",
+        "é".repeat(surveyContract.maximumLabelUTF8Bytes / 2 + 1),
+      ].map((label) => ({
+        ...definition,
+        questions: definition.questions.map((question) =>
+          question.id === "single"
+            ? {
+                ...question,
+                options: question.options.map((option, index) =>
+                  index === 0 ? { ...option, label } : option),
+              }
+            : question),
+      })),
+      ...[
+        " padded",
+        "control\u0000",
+        "é".repeat(surveyContract.maximumImageReferenceUTF8Bytes / 2 + 1),
+      ].map((imageReference) => ({
+        ...definition,
+        questions: definition.questions.map((question) =>
+          question.id === "image"
+            ? {
+                ...question,
+                options: question.options.map((option, index) =>
+                  index === 0 ? { ...option, imageReference } : option),
+              }
+            : question),
+      })),
+    ];
+    for (const [index, invalidDefinition] of invalidDefinitions.entries()) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), definitionPath), invalidDefinition);
+      });
+      await getFirestore().doc(responsePath).delete();
+      await expect(
+        handlers().saveDraft(callableRequest(saveRequest({
+          operationID: `invalid-boundary-${index}`,
+        }), { respondent: true })),
+      ).rejects.toBeDefined();
+    }
+  });
+
   it("rejects stored operation identifiers and result versions outside the shared bounds", async () => {
     await handlers().saveDraft(
       callableRequest(saveRequest(), { respondent: true }),
@@ -895,11 +1104,19 @@ describe("Canonical survey transactions", () => {
     const reviewed = await handlers().reviewResponse(
       callableRequest(reviewRequest()),
     );
-    expect(reviewed).toMatchObject({ recordVersion: 3, replayed: false });
+    expect(reviewed).toMatchObject({
+      recordVersion: 3,
+      replayed: false,
+      reviewerUserID: staffUserID,
+    });
     const replayed = await handlers().reviewResponse(
       callableRequest(reviewRequest()),
     );
-    expect(replayed).toMatchObject({ recordVersion: 3, replayed: true });
+    expect(replayed).toMatchObject({
+      recordVersion: 3,
+      replayed: true,
+      reviewerUserID: staffUserID,
+    });
     const snapshot = await getFirestore()
       .doc(`districts/${districtID}/students/${studentID}/responses/${attemptID}`)
       .get();

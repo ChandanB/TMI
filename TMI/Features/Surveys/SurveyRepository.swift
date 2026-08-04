@@ -1015,6 +1015,69 @@ nonisolated enum SurveyAssignmentMutationResultDecoder {
     }
 }
 
+nonisolated enum SurveyReviewCallableResultDecoder {
+    static func decode(
+        _ data: [String: Any],
+        request: SurveyReviewRequest
+    ) throws -> SurveyResponse {
+        let expectedKeys: Set<String> = [
+            "operationID", "recordVersion", "replayed", "reviewedAt",
+            "reviewerUserID",
+        ]
+        guard Set(data.keys) == expectedKeys,
+              data["operationID"] as? String == request.operationID,
+              data["replayed"] is Bool,
+              let recordVersion = integer(data["recordVersion"]),
+              recordVersion == request.response.recordVersion + 1,
+              let reviewedAt = date(data["reviewedAt"]),
+              let reviewerUserID = data["reviewerUserID"] as? String,
+              isValidIdentifier(reviewerUserID) else {
+            throw SurveyRepositoryError.malformedResponse
+        }
+        var response = request.response
+        do {
+            try response.markReviewed(
+                operationID: request.operationID,
+                reviewerID: reviewerUserID,
+                reviewedAt: reviewedAt,
+                serverRecordVersion: recordVersion
+            )
+            return response
+        } catch {
+            throw SurveyRepositoryError.malformedResponse
+        }
+    }
+
+    private static func isValidIdentifier(_ value: String) -> Bool {
+        !value.isEmpty &&
+            value != "." &&
+            value != ".." &&
+            value == value.trimmingCharacters(in: .whitespacesAndNewlines) &&
+            value.utf8.count <= 1_500 &&
+            !value.contains("/") &&
+            value.unicodeScalars.allSatisfy {
+                !CharacterSet.controlCharacters.contains($0)
+            }
+    }
+
+    private static func integer(_ value: Any?) -> Int? {
+        if let value = value as? Int {
+            return value
+        }
+        if let value = value as? NSNumber, !(value is Bool) {
+            return value.intValue
+        }
+        return nil
+    }
+
+    private static func date(_ value: Any?) -> Date? {
+        guard let value = value as? String else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    }
+}
+
 @MainActor
 private final class FirebaseSurveyRuntime: @unchecked Sendable {
     private let respondentFunctions: Functions
@@ -1074,33 +1137,27 @@ private final class FirebaseSurveyRuntime: @unchecked Sendable {
     func review(
         _ request: SurveyReviewRequest
     ) async throws -> SurveyResponse {
-        let result = try await call(
-            functions: staffFunctions,
-            name: "reviewSurveyResponse",
-            payload: [
+        do {
+            let result = try await staffFunctions
+                .httpsCallable("reviewSurveyResponse")
+                .call([
                 "districtID": request.response.districtID,
                 "studentID": request.response.studentID,
                 "responseID": request.response.responseID,
                 "expectedRecordVersion": request.response.recordVersion,
                 "idempotencyKey": request.operationID,
                 "reasonCode": "educator-survey-review",
-            ]
-        )
-        guard let reviewedAt = result.timestamp else {
-            throw SurveyRepositoryError.malformedResponse
-        }
-        var response = request.response
-        do {
-            try response.markReviewed(
-                operationID: request.operationID,
-                reviewerID: request.staffIdentity.userID,
-                reviewedAt: reviewedAt,
-                serverRecordVersion: result.recordVersion
+                ])
+            guard let data = result.data as? [String: Any] else {
+                throw SurveyRepositoryError.malformedResponse
+            }
+            return try SurveyReviewCallableResultDecoder.decode(
+                data,
+                request: request
             )
         } catch {
-            throw SurveyRepositoryError.malformedResponse
+            throw SurveyFirebaseErrorMapper.map(error)
         }
-        return response
     }
 
     func mutateAssignment(
