@@ -6,7 +6,11 @@ import {
 } from "../src/invitations.js";
 import {
   buildDebugInvitationRecord,
+  debugInvitationLogMessage,
   debugInvitationScope,
+  parseDebugInvitationArguments,
+  planDebugInvitationAdministration,
+  requireDebugInvitationProject,
 } from "../src/debugInvitation.js";
 
 const invitationCode = "VE1JLURlYnVnLUNhbm9uaWNhbC1JbnZpdGUtMjAyNiE";
@@ -90,4 +94,125 @@ describe("canonical Debug invitation", () => {
       /43-character opaque invitation/,
     );
   });
+});
+
+describe("Debug invitation administration", () => {
+  it.each(["seed", "revoke"] as const)(
+    "parses an exact %s command with one opaque code",
+    (action) => {
+      expect(parseDebugInvitationArguments([action, invitationCode])).toEqual({
+        action,
+        code: invitationCode,
+      });
+    },
+  );
+
+  it.each([
+    { argumentsList: [] },
+    { argumentsList: ["seed"] },
+    { argumentsList: ["seed", invitationCode, "unexpected"] },
+    { argumentsList: ["delete", invitationCode] },
+  ])("rejects invalid command arguments $argumentsList", ({ argumentsList }) => {
+    expect(() => parseDebugInvitationArguments(argumentsList)).toThrow(
+      /Usage: manage-debug-invitation\.mjs <seed\|revoke> <opaque-code>/,
+    );
+  });
+
+  it("rejects a command whose invitation code is not opaque", () => {
+    expect(() => parseDebugInvitationArguments(["seed", "too-short"])).toThrow(
+      /43-character opaque invitation/,
+    );
+  });
+
+  it("requires the exact production project guard", () => {
+    expect(requireDebugInvitationProject("tmi-education")).toBe(
+      "tmi-education",
+    );
+    expect(() => requireDebugInvitationProject(undefined)).toThrow(
+      /TMI_DEBUG_INVITATION_PROJECT=tmi-education/,
+    );
+    expect(() => requireDebugInvitationProject("demo-tmi")).toThrow(
+      /TMI_DEBUG_INVITATION_PROJECT=tmi-education/,
+    );
+  });
+
+  it("plans canonical creation when seeding an absent invitation", () => {
+    const invitation = buildDebugInvitationRecord(invitationCode, now);
+
+    expect(
+      planDebugInvitationAdministration("seed", invitation, undefined),
+    ).toEqual({ kind: "set", data: invitation.data });
+  });
+
+  it("plans canonical replacement when seeding an unconsumed invitation", () => {
+    const invitation = buildDebugInvitationRecord(invitationCode, now);
+
+    expect(
+      planDebugInvitationAdministration("seed", invitation, {
+        consumedByUserID: null,
+        recordVersion: 19,
+        isActive: false,
+      }),
+    ).toEqual({ kind: "set", data: invitation.data });
+  });
+
+  it("rejects a consumed seed without producing a write", () => {
+    const invitation = buildDebugInvitationRecord(invitationCode, now);
+
+    expect(() =>
+      planDebugInvitationAdministration("seed", invitation, {
+        consumedByUserID: "staff-already-consumed",
+      }),
+    ).toThrow(/consumed; rotate it explicitly/);
+  });
+
+  it("plans no write when revoking an absent invitation", () => {
+    const invitation = buildDebugInvitationRecord(invitationCode, now);
+
+    expect(
+      planDebugInvitationAdministration("revoke", invitation, undefined),
+    ).toEqual({ kind: "none" });
+  });
+
+  it("plans deactivation and increments a valid record version", () => {
+    const invitation = buildDebugInvitationRecord(invitationCode, now);
+
+    expect(
+      planDebugInvitationAdministration("revoke", invitation, {
+        recordVersion: 19,
+      }),
+    ).toEqual({
+      kind: "update",
+      data: { isActive: false, recordVersion: 20 },
+    });
+  });
+
+  it.each([undefined, "19", Number.NaN, 1.5, Number.MAX_SAFE_INTEGER])(
+    "uses a safe revoke version fallback for malformed value %s",
+    (recordVersion) => {
+      const invitation = buildDebugInvitationRecord(invitationCode, now);
+
+      expect(
+        planDebugInvitationAdministration("revoke", invitation, {
+          recordVersion,
+        }),
+      ).toEqual({
+        kind: "update",
+        data: { isActive: false, recordVersion: 2 },
+      });
+    },
+  );
+
+  it.each(["seed", "revoke"] as const)(
+    "formats a secret-safe %s log with only action and project",
+    (action) => {
+      const invitation = buildDebugInvitationRecord(invitationCode, now);
+      const message = debugInvitationLogMessage(action);
+
+      expect(message).toBe(`${action} tmi-education`);
+      expect(message).not.toContain(invitationCode);
+      expect(message).not.toContain(invitation.documentID);
+      expect(message).not.toContain(invitation.data.recipientEmailHash);
+    },
+  );
 });

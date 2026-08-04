@@ -1,67 +1,51 @@
 import { applicationDefault, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { pathToFileURL } from "node:url";
 import {
   buildDebugInvitationRecord,
+  debugInvitationLogMessage,
   debugInvitationScope,
+  parseDebugInvitationArguments,
+  planDebugInvitationAdministration,
+  requireDebugInvitationProject,
 } from "../lib/src/debugInvitation.js";
 
-const argumentsList = process.argv.slice(2);
-const [action, code] = argumentsList;
-if (
-  argumentsList.length !== 2 ||
-  !new Set(["seed", "revoke"]).has(action)
-) {
-  throw new Error(
-    "Usage: manage-debug-invitation.mjs <seed|revoke> <opaque-code>",
+export const main = async () => {
+  const command = parseDebugInvitationArguments(process.argv.slice(2));
+  requireDebugInvitationProject(
+    process.env.TMI_DEBUG_INVITATION_PROJECT,
   );
-}
-
-if (process.env.TMI_DEBUG_INVITATION_PROJECT !== debugInvitationScope.projectID) {
-  throw new Error("Set TMI_DEBUG_INVITATION_PROJECT=tmi-education explicitly.");
-}
-
-const invitation = buildDebugInvitationRecord(code, new Date());
-initializeApp({
-  credential: applicationDefault(),
-  projectId: debugInvitationScope.projectID,
-});
-
-const firestore = getFirestore();
-const reference = firestore.doc(
-  `staffInvitations/${invitation.documentID}`,
-);
-
-await firestore.runTransaction(async (transaction) => {
-  const snapshot = await transaction.get(reference);
-  if (action === "seed") {
-    if (snapshot.exists && snapshot.data()?.consumedByUserID != null) {
-      throw new Error(
-        "The Debug invitation is consumed; rotate it explicitly.",
-      );
-    }
-    transaction.set(reference, invitation.data, { merge: false });
-    return;
-  }
-
-  if (!snapshot.exists) {
-    return;
-  }
-
-  const currentVersion = snapshot.data()?.recordVersion;
-  const recordVersion =
-    typeof currentVersion === "number" &&
-    Number.isSafeInteger(currentVersion) &&
-    currentVersion >= 1 &&
-    currentVersion < Number.MAX_SAFE_INTEGER
-      ? currentVersion + 1
-      : 2;
-  transaction.update(reference, {
-    isActive: false,
-    recordVersion,
+  const invitation = buildDebugInvitationRecord(command.code, new Date());
+  initializeApp({
+    credential: applicationDefault(),
+    projectId: debugInvitationScope.projectID,
   });
-});
 
-const verb = action === "seed" ? "Seeded" : "Revoked";
-console.log(
-  `${verb} Debug invitation in ${debugInvitationScope.projectID}.`,
-);
+  const firestore = getFirestore();
+  const reference = firestore.doc(
+    `staffInvitations/${invitation.documentID}`,
+  );
+
+  await firestore.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    const administration = planDebugInvitationAdministration(
+      command.action,
+      invitation,
+      snapshot.exists ? snapshot.data() : undefined,
+    );
+    if (administration.kind === "set") {
+      transaction.set(reference, administration.data, { merge: false });
+    } else if (administration.kind === "update") {
+      transaction.update(reference, administration.data);
+    }
+  });
+
+  console.log(debugInvitationLogMessage(command.action));
+};
+
+const isMain =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  await main();
+}
