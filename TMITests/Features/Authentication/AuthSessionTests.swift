@@ -424,6 +424,30 @@ struct AuthSessionTests {
         }
     }
 
+    @Test("A foreign provisioned membership preserves identity and pending state")
+    func foreignProvisionedMembershipIsRecoverable() async {
+        let backend = AuthenticationBackendSpy()
+        let pendingStore = InMemoryPendingStaffRegistrationStore()
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: InvitationProvisionerStub(
+                result: .success(membership(userID: "different-staff"))
+            ),
+            pendingRegistrationStore: pendingStore,
+            requiresEmailVerification: false
+        )
+
+        await #expect(throws: StaffInvitationProvisioningError.claimRefreshPending) {
+            _ = try await repository.register(
+                registrationRequest(invitationCode: "invite-a")
+            )
+        }
+        #expect(backend.refreshIdentityCallCount == 1)
+        #expect(backend.deleteCurrentUserCallCount == 0)
+        #expect(await pendingStore.pendingRegistration() != nil)
+    }
+
     @Test("Signing in after email verification completes pending invitation provisioning")
     func signInCompletesPendingRegistration() async throws {
         let backend = AuthenticationBackendSpy()

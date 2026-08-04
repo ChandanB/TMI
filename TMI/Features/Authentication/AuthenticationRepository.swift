@@ -317,7 +317,8 @@ final class AuthenticationRepository: AuthenticationProviding {
         } catch {
             throw StaffInvitationProvisioningError.claimRefreshPending
         }
-        guard identity.userID == expectedIdentityID,
+        guard membership.userID == expectedIdentityID,
+              identity.userID == expectedIdentityID,
               identity.districtID == membership.districtID else {
             throw StaffInvitationProvisioningError.claimRefreshPending
         }
