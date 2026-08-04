@@ -394,57 +394,33 @@ export const buildDebugInvitationRecord = (code: string, now: Date) => {
 
 - [ ] **Step 4: Add the Admin manager**
 
-Create this ESM manager:
+Keep `firebase/scripts/manage-debug-invitation.mjs` as a thin, import-safe ESM
+adapter over the compiled helpers in `firebase/src/debugInvitation.ts`:
 
-~~~javascript
-import { applicationDefault, initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import {
-  buildDebugInvitationRecord,
-  debugInvitationScope,
-} from "../lib/src/debugInvitation.js";
-
-const [action, code] = process.argv.slice(2);
-if (!new Set(["seed", "revoke"]).has(action) || code === undefined) {
-  throw new Error("Usage: manage-debug-invitation.mjs <seed|revoke> <opaque-code>");
-}
-if (process.env.TMI_DEBUG_INVITATION_PROJECT !== debugInvitationScope.projectID) {
-  throw new Error("Set TMI_DEBUG_INVITATION_PROJECT=tmi-education explicitly.");
-}
-initializeApp({
-  credential: applicationDefault(),
-  projectId: debugInvitationScope.projectID,
-});
-const firestore = getFirestore();
-const invitation = buildDebugInvitationRecord(code, new Date());
-const reference = firestore.doc("staffInvitations/" + invitation.documentID);
-
-await firestore.runTransaction(async (transaction) => {
-  const snapshot = await transaction.get(reference);
-  if (action === "seed") {
-    if (snapshot.exists && snapshot.data()?.consumedByUserID != null) {
-      throw new Error("The Debug invitation is consumed; rotate it explicitly.");
-    }
-    transaction.set(reference, invitation.data, { merge: false });
-    return;
-  }
-  if (snapshot.exists) {
-    const version = snapshot.data()?.recordVersion;
-    transaction.update(reference, {
-      isActive: false,
-      recordVersion: typeof version === "number" ? version + 1 : 2,
-    });
-  }
-});
-const verb = action === "seed" ? "Seeded" : "Revoked";
-console.log(verb + " Debug invitation in " + debugInvitationScope.projectID + ".");
-~~~
+- Pass the action arguments to `parseDebugInvitationArguments`. It accepts
+  exactly one value, `seed` or `revoke`, and rejects missing or extra arguments.
+- Call `requireDebugInvitationProject` for the exact
+  `TMI_DEBUG_INVITATION_PROJECT=tmi-education` guard.
+- Read the invitation code from file descriptor 0 with `readFileSync`, then pass
+  the input to `readDebugInvitationCode`, which trims it and enforces the exact
+  43-character opaque format. Never accept the code in argv or an environment
+  variable.
+- Complete action, project, and code validation and build the canonical record
+  before calling `applicationDefault`, `initializeApp`, or `getFirestore`.
+- Inside one Firestore transaction, pass the snapshot data to
+  `planDebugInvitationAdministration`. An absent seed creates version 1; an
+  existing unconsumed seed or revoke increments a valid positive safe-integer
+  version; consumed seeds and malformed, non-positive, unsafe, or max-safe
+  versions fail closed without writing; an absent revoke is a no-op.
+- Apply only the returned `set` or `update` mutation, emit only the action and
+  project via `debugInvitationLogMessage`, and guard `main()` so importing the
+  script performs no initialization or mutation.
 
 Add package scripts:
 
 ~~~json
-"debug-invitation:seed": "npm run build && node scripts/manage-debug-invitation.mjs seed",
-"debug-invitation:revoke": "npm run build && node scripts/manage-debug-invitation.mjs revoke"
+"debug-invitation:seed": "npm run build --silent && node scripts/manage-debug-invitation.mjs seed",
+"debug-invitation:revoke": "npm run build --silent && node scripts/manage-debug-invitation.mjs revoke"
 ~~~
 
 - [ ] **Step 5: Verify and commit**
