@@ -142,8 +142,7 @@ nonisolated enum DebugStaffInvitationError: Error, Equatable {
 final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
     static let invitationAlias = "TMI-DEBUG-ACCESS-2026"
     static let allowedEmail = "tmi-debug@example.com"
-    static let opaqueInvitationCode =
-        "VE1JLURlYnVnLUNhbm9uaWNhbC1JbnZpdGUtMjAyNiE"
+    static let opaqueInvitationCode = "<DEBUG_INVITATION_OPAQUE_CODE>"
 
     private let delegate: any StaffInvitationProvisioning
 
