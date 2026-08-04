@@ -231,9 +231,13 @@ final class AuthenticationRepository: AuthenticationProviding {
         guard !requiresEmailVerification || identity.isEmailVerified else {
             return
         }
-        _ = try await invitationProvisioner.provision(
+        let membership = try await invitationProvisioner.provision(
             request: request,
             identity: identity
+        )
+        _ = try await refreshedIdentity(
+            afterProvisioning: membership,
+            expectedIdentityID: identity.userID
         )
     }
 
@@ -291,12 +295,33 @@ final class AuthenticationRepository: AuthenticationProviding {
             request: pendingRegistration.invitationAcceptanceRequest,
             identity: identity
         )
+        let refreshedIdentity = try await refreshedIdentity(
+            afterProvisioning: membership,
+            expectedIdentityID: pendingRegistration.identityID
+        )
         do {
             try await pendingRegistrationStore.clear()
         } catch {
             try? await pendingRegistrationStore.save(pendingRegistration)
         }
-        return AuthSession(identity: identity, membership: membership)
+        return AuthSession(identity: refreshedIdentity, membership: membership)
+    }
+
+    private func refreshedIdentity(
+        afterProvisioning membership: MembershipContext,
+        expectedIdentityID: String
+    ) async throws -> AuthIdentity {
+        let identity: AuthIdentity
+        do {
+            identity = try await backend.refreshIdentity()
+        } catch {
+            throw StaffInvitationProvisioningError.claimRefreshPending
+        }
+        guard identity.userID == expectedIdentityID,
+              identity.districtID == membership.districtID else {
+            throw StaffInvitationProvisioningError.claimRefreshPending
+        }
+        return identity
     }
 
     private func rollbackRegistration() async throws {

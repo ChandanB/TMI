@@ -137,6 +137,12 @@ struct AuthSessionTests {
         let backend = AuthenticationBackendSpy()
         backend.identityIsVerified = false
         let trustedMembership = membership(districtID: "trusted-district")
+        backend.refreshedIdentity = AuthIdentity(
+            userID: "staff-1",
+            email: "staff@example.edu",
+            isEmailVerified: false,
+            districtID: trustedMembership.districtID
+        )
         let provisioner = InvitationProvisionerStub(
             result: .success(trustedMembership)
         )
@@ -168,6 +174,35 @@ struct AuthSessionTests {
                 )
         )
         #expect(provisioner.lastProvisionedMembership == trustedMembership)
+        #expect(backend.refreshIdentityCallCount == 1)
+    }
+
+    @Test("Staff Access Setup refresh failure is recoverable")
+    func staffAccessSetupRefreshFailureIsRecoverable() async {
+        let backend = AuthenticationBackendSpy()
+        backend.refreshError = AuthenticationTestError.tokenRefreshFailed
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: InvitationProvisionerStub(
+                result: .success(membership())
+            ),
+            requiresEmailVerification: false
+        )
+
+        await #expect(throws: StaffInvitationProvisioningError.claimRefreshPending) {
+            try await repository.completeStaffOnboarding(
+                StaffOnboardingRequest(
+                    displayName: "Morgan Lee",
+                    invitationCode: "invite-a",
+                    privacyPolicyVersion: StaffPolicyVersions.privacyPolicyVersion,
+                    acceptableUsePolicyVersion:
+                        StaffPolicyVersions.acceptableUsePolicyVersion
+                )
+            )
+        }
+        #expect(backend.refreshIdentityCallCount == 1)
+        #expect(backend.deleteCurrentUserCallCount == 0)
     }
 
     @Test("A token refresh failure never returns a partial session")
@@ -202,6 +237,7 @@ struct AuthSessionTests {
             _ = try await repository.register(registrationRequest(invitationCode: "invite-a"))
         }
         #expect(backend.createUserCallCount == 1)
+        #expect(backend.refreshIdentityCallCount == 0)
         #expect(backend.deleteCurrentUserCallCount == 1)
     }
 
@@ -278,12 +314,21 @@ struct AuthSessionTests {
 
     @Test("Registration provisions unverified staff when verification is disabled")
     func registrationProvisionsWhenVerificationIsDisabled() async throws {
-        let backend = AuthenticationBackendSpy()
-        backend.identityIsVerified = false
-        let provisioner = InvitationProvisionerStub(
-            result: .success(membership())
+        let events = AuthenticationEventRecorder()
+        let refreshedIdentity = AuthIdentity(
+            userID: "staff-1",
+            email: "refreshed@example.edu",
+            isEmailVerified: false,
+            districtID: "district-a"
         )
-        let pendingStore = InMemoryPendingStaffRegistrationStore()
+        let backend = AuthenticationBackendSpy(events: events)
+        backend.identityIsVerified = false
+        backend.refreshedIdentity = refreshedIdentity
+        let provisioner = InvitationProvisionerStub(
+            result: .success(membership()),
+            events: events
+        )
+        let pendingStore = RecordingPendingRegistrationStore(events: events)
         let repository = AuthenticationRepository(
             backend: backend,
             sessionLoader: SessionLoaderStub(session: .signedOut),
@@ -298,8 +343,85 @@ struct AuthSessionTests {
 
         #expect(backend.sendVerificationCallCount == 0)
         #expect(provisioner.provisionCallCount == 1)
+        #expect(backend.refreshIdentityCallCount == 1)
+        #expect(session.identity == refreshedIdentity)
+        #expect(session.membership == membership())
         #expect(session.access(requiringEmailVerification: false) == .authorized)
+        #expect(await events.values == ["save", "provision", "refresh", "clear"])
         #expect(await pendingStore.pendingRegistration() == nil)
+    }
+
+    @Test("A post-provision refresh failure preserves identity and pending state")
+    func postProvisionRefreshFailureIsRecoverable() async {
+        let backend = AuthenticationBackendSpy()
+        backend.refreshError = AuthenticationTestError.tokenRefreshFailed
+        let pendingStore = InMemoryPendingStaffRegistrationStore()
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: InvitationProvisionerStub(
+                result: .success(membership())
+            ),
+            pendingRegistrationStore: pendingStore,
+            requiresEmailVerification: false
+        )
+
+        await #expect(throws: StaffInvitationProvisioningError.claimRefreshPending) {
+            _ = try await repository.register(
+                registrationRequest(invitationCode: "invite-a")
+            )
+        }
+        #expect(backend.refreshIdentityCallCount == 1)
+        #expect(backend.deleteCurrentUserCallCount == 0)
+        #expect(await pendingStore.pendingRegistration() != nil)
+    }
+
+    @Test("Mismatched refreshed claims preserve identity and pending state")
+    func mismatchedRefreshedClaimsAreRecoverable() async {
+        let mismatchedIdentities = [
+            AuthIdentity(
+                userID: "different-staff",
+                email: "staff@example.edu",
+                isEmailVerified: true,
+                districtID: "district-a"
+            ),
+            AuthIdentity(
+                userID: "staff-1",
+                email: "staff@example.edu",
+                isEmailVerified: true,
+                districtID: nil
+            ),
+            AuthIdentity(
+                userID: "staff-1",
+                email: "staff@example.edu",
+                isEmailVerified: true,
+                districtID: "district-b"
+            )
+        ]
+
+        for mismatchedIdentity in mismatchedIdentities {
+            let backend = AuthenticationBackendSpy()
+            backend.refreshedIdentity = mismatchedIdentity
+            let pendingStore = InMemoryPendingStaffRegistrationStore()
+            let repository = AuthenticationRepository(
+                backend: backend,
+                sessionLoader: SessionLoaderStub(session: .signedOut),
+                invitationProvisioner: InvitationProvisionerStub(
+                    result: .success(membership())
+                ),
+                pendingRegistrationStore: pendingStore,
+                requiresEmailVerification: false
+            )
+
+            await #expect(throws: StaffInvitationProvisioningError.claimRefreshPending) {
+                _ = try await repository.register(
+                    registrationRequest(invitationCode: "invite-a")
+                )
+            }
+            #expect(backend.refreshIdentityCallCount == 1)
+            #expect(backend.deleteCurrentUserCallCount == 0)
+            #expect(await pendingStore.pendingRegistration() != nil)
+        }
     }
 
     @Test("Signing in after email verification completes pending invitation provisioning")
@@ -456,8 +578,15 @@ private final class AuthenticationBackendSpy: AuthenticationBackend {
     var currentIdentityCallCount = 0
     var deleteCurrentUserCallCount = 0
     var sendVerificationCallCount = 0
+    var refreshIdentityCallCount = 0
     var refreshError: Error?
+    var refreshedIdentity: AuthIdentity?
     var identityIsVerified = true
+    private let events: AuthenticationEventRecorder?
+
+    init(events: AuthenticationEventRecorder? = nil) {
+        self.events = events
+    }
 
     func signIn(email: String, password: String) async throws -> AuthIdentity {
         identity
@@ -487,10 +616,12 @@ private final class AuthenticationBackendSpy: AuthenticationBackend {
     }
 
     func refreshIdentity() async throws -> AuthIdentity {
+        refreshIdentityCallCount += 1
+        await events?.append("refresh")
         if let refreshError {
             throw refreshError
         }
-        return identity
+        return refreshedIdentity ?? identity
     }
 
     func reauthenticate(password: String) async throws {}
@@ -537,15 +668,52 @@ private actor FailOnceClearingPendingRegistrationStore:
     }
 }
 
+private actor AuthenticationEventRecorder {
+    private(set) var values: [String] = []
+
+    func append(_ value: String) {
+        values.append(value)
+    }
+}
+
+private actor RecordingPendingRegistrationStore:
+    PendingStaffRegistrationStoring {
+    private var registration: PendingStaffRegistration?
+    private let events: AuthenticationEventRecorder
+
+    init(events: AuthenticationEventRecorder) {
+        self.events = events
+    }
+
+    func save(_ registration: PendingStaffRegistration) async {
+        self.registration = registration
+        await events.append("save")
+    }
+
+    func pendingRegistration() -> PendingStaffRegistration? {
+        registration
+    }
+
+    func clear() async {
+        registration = nil
+        await events.append("clear")
+    }
+}
+
 @MainActor
 private final class InvitationProvisionerStub: StaffInvitationProvisioning {
     let result: Result<MembershipContext, Error>
+    let events: AuthenticationEventRecorder?
     private(set) var provisionCallCount = 0
     private(set) var lastRequest: StaffInvitationAcceptanceRequest?
     private(set) var lastProvisionedMembership: MembershipContext?
 
-    init(result: Result<MembershipContext, Error>) {
+    init(
+        result: Result<MembershipContext, Error>,
+        events: AuthenticationEventRecorder? = nil
+    ) {
         self.result = result
+        self.events = events
     }
 
     func provision(
@@ -555,6 +723,7 @@ private final class InvitationProvisionerStub: StaffInvitationProvisioning {
         provisionCallCount += 1
         lastRequest = request
         let membership = try result.get()
+        await events?.append("provision")
         lastProvisionedMembership = membership
         return membership
     }
