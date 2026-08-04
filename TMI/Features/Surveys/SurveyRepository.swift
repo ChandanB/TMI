@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 @preconcurrency import FirebaseCore
 @preconcurrency import FirebaseFunctions
@@ -34,18 +35,29 @@ nonisolated struct SurveyReviewRequest: Sendable, Equatable {
     let staffIdentity: StudentModeStaffIdentity
 }
 
+nonisolated enum SurveyDraftLoad: Equatable, Sendable {
+    case missing
+    case draft(SurveyResponse)
+    case quarantined
+    case corrupt
+    case scopeMismatch
+}
+
 nonisolated struct SurveyDraftStore: Sendable {
-    typealias Load = @Sendable (SurveyAttemptKey) async -> SurveyResponse?
+    typealias Load = @Sendable (SurveyAttemptKey) async -> SurveyDraftLoad
     typealias Save = @Sendable (SurveyResponse) async throws -> Void
+    typealias Purge = @Sendable (SurveyAttemptKey) async throws -> Void
 
     let load: Load
     let save: Save
     let quarantine: Save
+    let purge: Purge
 
     static let memory = SurveyDraftStore(
-        load: { _ in nil },
+        load: { _ in .missing },
         save: { _ in },
-        quarantine: { _ in }
+        quarantine: { _ in },
+        purge: { _ in }
     )
 
     static func localFiles(
@@ -60,40 +72,128 @@ nonisolated struct SurveyDraftStore: Sendable {
                 try await backend.save(response)
             },
             quarantine: { response in
-                try await backend.save(response)
+                try await backend.quarantine(response)
+            },
+            purge: { key in
+                try await backend.purge(key)
             }
         )
     }
 }
 
 private actor SurveyLocalDraftFiles {
+    private struct Envelope: Codable {
+        let response: SurveyResponse
+        let localRevision: Int
+    }
+
     private let directory: URL?
 
     init(directory: URL?) {
         self.directory = directory
     }
 
-    func load(_ key: SurveyAttemptKey) -> SurveyResponse? {
-        guard let fileURL = fileURL(for: key),
-              let data = try? Data(contentsOf: fileURL) else {
-            return nil
+    func load(_ key: SurveyAttemptKey) -> SurveyDraftLoad {
+        guard let activeURL = fileURL(for: key, namespace: "active"),
+              let quarantineURL = fileURL(for: key, namespace: "quarantine") else {
+            return .corrupt
         }
-        return try? JSONDecoder().decode(SurveyResponse.self, from: data)
+        if FileManager.default.fileExists(atPath: quarantineURL.path) {
+            return .quarantined
+        }
+        guard FileManager.default.fileExists(atPath: activeURL.path) else {
+            return .missing
+        }
+        let data: Data
+        do {
+            data = try Data(contentsOf: activeURL)
+        } catch {
+            try? quarantineFile(at: activeURL, as: quarantineURL)
+            return .corrupt
+        }
+        guard let envelope = try? JSONDecoder().decode(
+            Envelope.self,
+            from: data
+        ) else {
+            try? quarantineFile(at: activeURL, as: quarantineURL)
+            return .corrupt
+        }
+        var response = envelope.response
+        response.restoreLocalRevision(envelope.localRevision)
+        guard response.attemptKey == key else {
+            try? quarantineFile(at: activeURL, as: quarantineURL)
+            return .scopeMismatch
+        }
+        return .draft(response)
     }
 
     func save(_ response: SurveyResponse) throws {
-        guard let fileURL = fileURL(for: response.attemptKey) else {
+        guard let fileURL = fileURL(
+            for: response.attemptKey,
+            namespace: "active"
+        ) else {
             throw SurveyRepositoryError.unavailable
         }
         try FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        let data = try JSONEncoder().encode(response)
+        let data = try JSONEncoder().encode(
+            Envelope(response: response, localRevision: response.localRevision)
+        )
         try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
     }
 
-    private func fileURL(for key: SurveyAttemptKey) -> URL? {
+    func quarantine(_ response: SurveyResponse) throws {
+        guard let activeURL = fileURL(
+            for: response.attemptKey,
+            namespace: "active"
+        ), let quarantineURL = fileURL(
+            for: response.attemptKey,
+            namespace: "quarantine"
+        ) else {
+            throw SurveyRepositoryError.unavailable
+        }
+        try FileManager.default.createDirectory(
+            at: quarantineURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let data = try JSONEncoder().encode(
+            Envelope(response: response, localRevision: response.localRevision)
+        )
+        try data.write(
+            to: quarantineURL,
+            options: [.atomic, .completeFileProtection]
+        )
+        try? FileManager.default.removeItem(at: activeURL)
+    }
+
+    func purge(_ key: SurveyAttemptKey) throws {
+        for namespace in ["active", "quarantine"] {
+            guard let url = fileURL(for: key, namespace: namespace) else {
+                continue
+            }
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
+    private func quarantineFile(at activeURL: URL, as quarantineURL: URL) throws {
+        try FileManager.default.createDirectory(
+            at: quarantineURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        if FileManager.default.fileExists(atPath: quarantineURL.path) {
+            try FileManager.default.removeItem(at: quarantineURL)
+        }
+        try FileManager.default.moveItem(at: activeURL, to: quarantineURL)
+    }
+
+    private func fileURL(
+        for key: SurveyAttemptKey,
+        namespace: String
+    ) -> URL? {
         let baseDirectory: URL?
         if let directory {
             baseDirectory = directory
@@ -106,19 +206,28 @@ private actor SurveyLocalDraftFiles {
                 isDirectory: true
             )
         }
-        let name = [
+        let canonical = [
             key.districtID,
             key.studentID,
             key.assignmentID,
             key.attemptID,
-        ].joined(separator: "--")
-        return baseDirectory?.appendingPathComponent("\(name).json")
+        ].map { value in
+            "\(value.utf8.count):\(value)"
+        }.joined(separator: "|")
+        let name = SHA256.hash(data: Data(canonical.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+        return baseDirectory?
+            .appendingPathComponent(namespace, isDirectory: true)
+            .appendingPathComponent("\(name).json")
     }
 }
 
 actor SurveyRepository {
-    typealias LoadDraft = @Sendable (SurveyAttemptKey) async -> SurveyResponse?
+    typealias LegacyLoadDraft = @Sendable (SurveyAttemptKey) async -> SurveyResponse?
+    typealias LoadDraft = @Sendable (SurveyAttemptKey) async -> SurveyDraftLoad
     typealias SaveDraft = @Sendable (SurveyResponse) async throws -> Void
+    typealias PurgeDraft = @Sendable (SurveyAttemptKey) async throws -> Void
     typealias SynchronizeDraft = @Sendable (
         SurveyDraftSyncRequest
     ) async throws -> SurveyResponse
@@ -133,13 +242,14 @@ actor SurveyRepository {
     private let loadDraft: LoadDraft
     private let saveDraft: SaveDraft
     private let quarantineDraft: SaveDraft
+    private let purgeDraft: PurgeDraft
     private let synchronizeDraft: SynchronizeDraft
     private let submitResponse: SubmitResponse
     private let reviewResponse: ReviewResponse
     private let isOnline: IsOnline
 
     init(
-        loadDraft: @escaping LoadDraft,
+        loadDraft: @escaping LegacyLoadDraft,
         saveDraft: @escaping SaveDraft,
         quarantineDraft: @escaping SaveDraft,
         synchronizeDraft: @escaping SynchronizeDraft,
@@ -147,9 +257,15 @@ actor SurveyRepository {
         reviewResponse: @escaping ReviewResponse,
         isOnline: @escaping IsOnline
     ) {
-        self.loadDraft = loadDraft
+        self.loadDraft = { key in
+            if let response = await loadDraft(key) {
+                return .draft(response)
+            }
+            return .missing
+        }
         self.saveDraft = saveDraft
         self.quarantineDraft = quarantineDraft
+        self.purgeDraft = { _ in }
         self.synchronizeDraft = synchronizeDraft
         self.submitResponse = submitResponse
         self.reviewResponse = reviewResponse
@@ -163,15 +279,14 @@ actor SurveyRepository {
         reviewResponse: @escaping ReviewResponse,
         isOnline: @escaping IsOnline
     ) {
-        self.init(
-            loadDraft: draftStore.load,
-            saveDraft: draftStore.save,
-            quarantineDraft: draftStore.quarantine,
-            synchronizeDraft: synchronizeDraft,
-            submitResponse: submitResponse,
-            reviewResponse: reviewResponse,
-            isOnline: isOnline
-        )
+        self.loadDraft = draftStore.load
+        self.saveDraft = draftStore.save
+        self.quarantineDraft = draftStore.quarantine
+        self.purgeDraft = draftStore.purge
+        self.synchronizeDraft = synchronizeDraft
+        self.submitResponse = submitResponse
+        self.reviewResponse = reviewResponse
+        self.isOnline = isOnline
     }
 
     func autosave(
@@ -182,6 +297,10 @@ actor SurveyRepository {
         definition: SurveyDefinition,
         grant: StudentModeGrant
     ) async throws -> SurveyResponse {
+        try await quarantineIfExpired(
+            assignment: assignment,
+            grant: grant
+        )
         try validate(
             assignment: assignment,
             definition: definition,
@@ -197,7 +316,7 @@ actor SurveyRepository {
             throw SurveyRepositoryError.validation
         }
         let key = attemptKey(for: assignment)
-        var response = await loadDraft(key) ?? SurveyResponse(
+        var response = try await activeDraft(for: key) ?? SurveyResponse(
             assignment: assignment,
             definition: definition
         )
@@ -228,12 +347,20 @@ actor SurveyRepository {
         assignment: SurveyAssignment,
         grant: StudentModeGrant
     ) async throws -> SurveyResponse? {
+        try await quarantineIfExpired(
+            assignment: assignment,
+            grant: grant
+        )
         try validateScope(
             assignment: assignment,
             grant: grant,
             operation: .writeDraft
         )
-        return await loadDraft(attemptKey(for: assignment))
+        guard assignment.state == .active else {
+            try await quarantineExisting(assignment: assignment)
+            throw SurveyRepositoryError.revoked
+        }
+        return try await activeDraft(for: assignment.attemptKey)
     }
 
     func synchronize(
@@ -241,6 +368,10 @@ actor SurveyRepository {
         definition: SurveyDefinition,
         grant: StudentModeGrant
     ) async throws -> SurveyResponse {
+        try await quarantineIfExpired(
+            assignment: assignment,
+            grant: grant
+        )
         try validate(
             assignment: assignment,
             definition: definition,
@@ -254,7 +385,7 @@ actor SurveyRepository {
         guard await isOnline() else {
             throw SurveyRepositoryError.offline
         }
-        guard let draft = await loadDraft(attemptKey(for: assignment)) else {
+        guard let draft = try await activeDraft(for: assignment.attemptKey) else {
             throw SurveyRepositoryError.validation
         }
         do {
@@ -292,6 +423,10 @@ actor SurveyRepository {
         definition: SurveyDefinition,
         grant: StudentModeGrant
     ) async throws -> SurveyResponse {
+        try await quarantineIfExpired(
+            assignment: assignment,
+            grant: grant
+        )
         try validate(
             assignment: assignment,
             definition: definition,
@@ -303,7 +438,7 @@ actor SurveyRepository {
             throw SurveyRepositoryError.revoked
         }
         guard Self.isValidIdentifier(operationID),
-              var draft = await loadDraft(attemptKey(for: assignment)) else {
+              var draft = try await activeDraft(for: assignment.attemptKey) else {
             throw SurveyRepositoryError.validation
         }
         if draft.state != .draft {
@@ -430,6 +565,7 @@ actor SurveyRepository {
               grant.scope.studentID == assignment.studentID,
               grant.scope.assignmentIDs == [assignment.assignmentID],
               grant.scope.allowedOperations.contains(operation),
+              grant.expiresAt > Date(),
               Self.isValidIdentifier(grant.sessionID) else {
             throw SurveyRepositoryError.authorization
         }
@@ -450,16 +586,59 @@ actor SurveyRepository {
     }
 
     private func quarantineExisting(
-        assignment: SurveyAssignment
+        assignment: SurveyAssignment,
+        reason: SurveyQuarantineReason = .assignmentRevoked
     ) async throws {
-        guard var existing = await loadDraft(attemptKey(for: assignment)) else {
+        let load = await loadDraft(assignment.attemptKey)
+        guard case .draft(var existing) = load else {
             return
         }
-        existing.quarantine(.assignmentRevoked)
+        existing.quarantine(reason)
         do {
             try await quarantineDraft(existing)
         } catch {
             throw map(error)
+        }
+    }
+
+    private func quarantineIfExpired(
+        assignment: SurveyAssignment,
+        grant: StudentModeGrant
+    ) async throws {
+        guard grant.expiresAt <= Date() else { return }
+        if grant.scope.districtID == assignment.districtID,
+           grant.scope.studentID == assignment.studentID,
+           grant.scope.assignmentIDs == [assignment.assignmentID] {
+            try await quarantineExisting(
+                assignment: assignment,
+                reason: .authorizationRejected
+            )
+        }
+        throw SurveyRepositoryError.authorization
+    }
+
+    func purge(assignment: SurveyAssignment) async throws {
+        do {
+            try await purgeDraft(assignment.attemptKey)
+        } catch {
+            throw map(error)
+        }
+    }
+
+    private func activeDraft(
+        for key: SurveyAttemptKey
+    ) async throws -> SurveyResponse? {
+        switch await loadDraft(key) {
+        case .missing:
+            return nil
+        case .draft(let response):
+            return response
+        case .quarantined:
+            throw SurveyRepositoryError.revoked
+        case .scopeMismatch:
+            throw SurveyRepositoryError.authorization
+        case .corrupt:
+            throw SurveyRepositoryError.malformedResponse
         }
     }
 
@@ -479,6 +658,9 @@ actor SurveyRepository {
         if error is CancellationError {
             return .cancelled
         }
+        if error is SurveyDefinitionError {
+            return .validation
+        }
         if error is SurveyResponseMutationError {
             return .immutableResponse
         }
@@ -488,7 +670,11 @@ actor SurveyRepository {
     private static func isValidIdentifier(_ value: String) -> Bool {
         !value.isEmpty &&
             value == value.trimmingCharacters(in: .whitespacesAndNewlines) &&
-            !value.contains("/")
+            value.utf8.count <= SurveyResponse.maximumOperationIDBytes &&
+            !value.contains("/") &&
+            value.unicodeScalars.allSatisfy {
+                !CharacterSet.controlCharacters.contains($0)
+            }
     }
 }
 
@@ -625,7 +811,7 @@ private final class FirebaseSurveyRuntime: @unchecked Sendable {
                 "districtID": request.response.districtID,
                 "studentID": request.response.studentID,
                 "responseID": request.response.responseID,
-                "expectedRecordVersion": request.response.serverRecordVersion,
+                "expectedRecordVersion": request.response.recordVersion,
                 "idempotencyKey": request.operationID,
                 "reasonCode": "educator-survey-review",
             ]
@@ -658,7 +844,7 @@ private final class FirebaseSurveyRuntime: @unchecked Sendable {
             "attemptID": response.attemptID,
             "definitionID": response.definitionID,
             "definitionVersion": response.definitionVersion,
-            "expectedRecordVersion": response.serverRecordVersion,
+            "expectedRecordVersion": response.recordVersion,
             "operationID": operationID,
             "answers": response.answers.mapValues { answer in
                 Self.payload(answer: answer)
@@ -745,6 +931,9 @@ private final class FirebaseSurveyRuntime: @unchecked Sendable {
         case .aborted, .alreadyExists:
             return .conflict
         case .failedPrecondition:
+            if message.contains("session") {
+                return .authorization
+            }
             if message.contains("revoked") || message.contains("assignment") {
                 return .revoked
             }

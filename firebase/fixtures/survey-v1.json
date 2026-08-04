@@ -1,0 +1,87 @@
+{
+  "definition": {
+    "schemaVersion": 1,
+    "definitionID": "interest-discovery",
+    "version": 3,
+    "state": "published",
+    "title": "Interest discovery",
+    "publishedAt": "1970-01-01T00:16:40Z",
+    "questions": [
+      {
+        "id": "single",
+        "prompt": "Pick one",
+        "type": "singleChoice",
+        "required": true,
+        "options": [
+          { "id": "science", "label": "Science" },
+          { "id": "art", "label": "Art" }
+        ]
+      },
+      {
+        "id": "multiple",
+        "prompt": "Pick several",
+        "type": "multiSelect",
+        "required": true,
+        "maxSelections": 2,
+        "options": [
+          { "id": "building", "label": "Building" },
+          { "id": "drawing", "label": "Drawing" }
+        ]
+      },
+      {
+        "id": "text",
+        "prompt": "Tell us more",
+        "type": "shortText",
+        "required": true,
+        "maxLength": 120,
+        "options": []
+      },
+      {
+        "id": "rating",
+        "prompt": "Rate it",
+        "type": "rating",
+        "required": true,
+        "minimum": 1,
+        "maximum": 5,
+        "options": []
+      },
+      {
+        "id": "image",
+        "prompt": "Pick a place",
+        "type": "imageChoice",
+        "required": true,
+        "options": [
+          {
+            "id": "forest",
+            "label": "Forest",
+            "imageReference": "survey/forest"
+          },
+          {
+            "id": "city",
+            "label": "City",
+            "imageReference": "survey/city"
+          }
+        ]
+      }
+    ],
+    "branchRules": []
+  },
+  "response": {
+    "schemaVersion": 1,
+    "responseID": "attempt-1",
+    "districtID": "district-1",
+    "studentID": "student-1",
+    "assignmentID": "assignment-1",
+    "attemptID": "attempt-1",
+    "definitionID": "interest-discovery",
+    "definitionVersion": 3,
+    "state": "draft",
+    "recordVersion": 1,
+    "answers": {
+      "single": { "type": "single", "value": "science" }
+    },
+    "operationIDs": ["sync-1"],
+    "syncState": "synced",
+    "hasPendingChanges": false
+  }
+}

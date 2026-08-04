@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   assertFails,
   assertSucceeds,
@@ -34,6 +36,12 @@ const definitionVersion = 3;
 const sessionID = "session-1";
 const respondentUserID = "respondent-1";
 const staffUserID = "teacher-1";
+const sharedFixture = JSON.parse(
+  readFileSync(resolve(process.cwd(), "fixtures/survey-v1.json"), "utf8"),
+) as {
+  readonly definition: Record<string, unknown>;
+  readonly response: { readonly answers: SaveSurveyDraftRequest["answers"] };
+};
 
 const completeAnswers = {
   single: { type: "single", value: "art" },
@@ -49,22 +57,32 @@ const definition = {
   version: definitionVersion,
   state: "published",
   title: "Interest discovery",
+  publishedAt: Timestamp.fromMillis(1_000),
   questions: [
     {
       id: "single",
+      prompt: "Pick one",
       type: "singleChoice",
       required: true,
-      options: [{ id: "science" }, { id: "art" }],
+      options: [
+        { id: "science", label: "Science" },
+        { id: "art", label: "Art" },
+      ],
     },
     {
       id: "multiple",
+      prompt: "Pick several",
       type: "multiSelect",
       required: true,
       maxSelections: 2,
-      options: [{ id: "building" }, { id: "drawing" }],
+      options: [
+        { id: "building", label: "Building" },
+        { id: "drawing", label: "Drawing" },
+      ],
     },
     {
       id: "text",
+      prompt: "Tell us more",
       type: "shortText",
       required: true,
       maxLength: 120,
@@ -72,6 +90,7 @@ const definition = {
     },
     {
       id: "rating",
+      prompt: "Rate it",
       type: "rating",
       required: true,
       minimum: 1,
@@ -80,9 +99,13 @@ const definition = {
     },
     {
       id: "image",
+      prompt: "Pick a place",
       type: "imageChoice",
       required: true,
-      options: [{ id: "forest" }, { id: "city" }],
+      options: [
+        { id: "forest", label: "Forest", imageReference: "survey/forest" },
+        { id: "city", label: "City", imageReference: "survey/city" },
+      ],
     },
   ],
   branchRules: [],
@@ -213,6 +236,7 @@ describe("Canonical survey transactions", () => {
           districtId: districtID,
           schoolId: "school-1",
           assignmentType: "survey",
+          assignedBy: staffUserID,
           isActive: true,
           studentIDs: [studentID],
           definitionID,
@@ -270,6 +294,139 @@ describe("Canonical survey transactions", () => {
     });
   });
 
+  it("accepts the shared Swift and TypeScript v1 schema fixture", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), `catalogs/surveyDefinitions/items/${definitionID}__v${definitionVersion}`),
+        {
+          ...sharedFixture.definition,
+          definitionID,
+          version: definitionVersion,
+          publishedAt: Timestamp.fromDate(
+            new Date(sharedFixture.definition.publishedAt as string),
+          ),
+        },
+      );
+    });
+    const result = await handlers().saveDraft(
+      callableRequest(saveRequest({
+        answers: sharedFixture.response.answers,
+        operationID: "fixture-sync",
+      }), { respondent: true }),
+    );
+    expect(result).toMatchObject({ recordVersion: 1, replayed: false });
+    const stored = await getFirestore()
+      .doc(`districts/${districtID}/students/${studentID}/responses/${attemptID}`)
+      .get();
+    expect(stored.data()).toMatchObject({
+      schemaVersion: 1,
+      state: "draft",
+      recordVersion: 1,
+      syncState: "synced",
+      hasPendingChanges: false,
+      answers: sharedFixture.response.answers,
+    });
+  });
+
+  it("replays the original result only for the original respondent session", async () => {
+    await handlers().saveDraft(
+      callableRequest(saveRequest(), { respondent: true }),
+    );
+    await handlers().saveDraft(
+      callableRequest(saveRequest({
+        expectedRecordVersion: 1,
+        operationID: "save-2",
+        answers: { ...completeAnswers, text: { type: "text", value: "Robotics" } },
+      }), { respondent: true }),
+    );
+    const replayed = await handlers().saveDraft(
+      callableRequest(saveRequest(), { respondent: true }),
+    );
+    expect(replayed).toMatchObject({ recordVersion: 1, replayed: true });
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), `districts/${districtID}/studentModeSessions/session-2`),
+        {
+          districtID,
+          schoolId: "school-1",
+          studentID,
+          assignmentIDs: [assignmentID],
+          allowedOperations: [
+            "readStudentSafeProfile",
+            "readAssignment",
+            "writeDraft",
+            "submitAssignment",
+            "requestHelp",
+          ],
+          respondentUserID: "respondent-2",
+          educatorUserID: staffUserID,
+          status: "active",
+          recordVersion: 1,
+          expiresAt: Timestamp.fromMillis(Date.now() + 60_000),
+        },
+      );
+    });
+    await expectHttpsError(
+      handlers().saveDraft(callableRequest(saveRequest(), {
+        respondent: true,
+        uid: "respondent-2",
+        claims: { tmiSessionID: "session-2" },
+      })),
+      "permission-denied",
+    );
+  });
+
+  it("rejects oversized operation IDs and full operation histories", async () => {
+    await expectHttpsError(
+      handlers().saveDraft(callableRequest(saveRequest({
+        operationID: "x".repeat(129),
+      }), { respondent: true })),
+      "invalid-argument",
+    );
+
+    const operationIDs = Array.from({ length: 128 }, (_, index) => `seed-${index}`);
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), `districts/${districtID}/students/${studentID}/responses/${attemptID}`),
+        {
+          schemaVersion: 1,
+          responseID: attemptID,
+          districtID,
+          studentID,
+          assignmentID,
+          attemptID,
+          definitionID,
+          definitionVersion,
+          state: "draft",
+          recordVersion: 128,
+          answers: completeAnswers,
+          operationIDs,
+          operationResults: Object.fromEntries(operationIDs.map((operationID, index) => [
+            operationID,
+            {
+              fingerprint: `fingerprint-${index}`,
+              userID: respondentUserID,
+              sessionID,
+              recordVersion: index + 1,
+            },
+          ])),
+          respondentUserID,
+          respondentSessionID: sessionID,
+          syncState: "synced",
+          hasPendingChanges: false,
+        },
+      );
+    });
+    await expectHttpsError(
+      handlers().saveDraft(callableRequest(saveRequest({
+        expectedRecordVersion: 128,
+        operationID: "overflow",
+      }), { respondent: true })),
+      "resource-exhausted",
+    );
+  });
+
   it("submits exactly once with immutable source history and server time", async () => {
     await handlers().saveDraft(
       callableRequest(saveRequest(), { respondent: true }),
@@ -297,7 +454,11 @@ describe("Canonical survey transactions", () => {
         attemptID,
         respondentSessionID: sessionID,
       },
-      submissionOperationID: "submit-1",
+      serverMetadata: {
+        submissionOperationID: "submit-1",
+        reviewedBy: null,
+        reviewOperationID: null,
+      },
       recordVersion: 2,
     });
     expect(snapshot.get("submittedAt")).toMatchObject({
@@ -439,6 +600,42 @@ describe("Canonical survey transactions", () => {
     }
   });
 
+  it("rejects definitions missing canonical prompts, labels, image references, or publish time", async () => {
+    const definitionPath = `catalogs/surveyDefinitions/items/${definitionID}__v${definitionVersion}`;
+    for (const [index, malformed] of [
+      { ...definition, publishedAt: null },
+      {
+        ...definition,
+        questions: definition.questions.map((question) =>
+          question.id === "text" ? { ...question, prompt: "" } : question),
+      },
+      {
+        ...definition,
+        questions: definition.questions.map((question) =>
+          question.id === "single"
+            ? { ...question, options: [{ id: "science", label: "" }] }
+            : question),
+      },
+      {
+        ...definition,
+        questions: definition.questions.map((question) =>
+          question.id === "image"
+            ? { ...question, options: [{ id: "forest", label: "Forest" }] }
+            : question),
+      },
+    ].entries()) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), definitionPath), malformed);
+      });
+      await expectHttpsError(
+        handlers().saveDraft(callableRequest(saveRequest({
+          operationID: `malformed-${index}`,
+        }), { respondent: true })),
+        "failed-precondition",
+      );
+    }
+  });
+
   it("denies edits and downgrade after submit while staff review preserves answers", async () => {
     await handlers().saveDraft(
       callableRequest(saveRequest(), { respondent: true }),
@@ -467,7 +664,11 @@ describe("Canonical survey transactions", () => {
     expect(snapshot.data()).toMatchObject({
       state: "reviewed",
       answers: completeAnswers,
-      reviewedBy: staffUserID,
+      serverMetadata: {
+        submissionOperationID: "submit-1",
+        reviewedBy: staffUserID,
+        reviewOperationID: "review-1",
+      },
       recordVersion: 3,
     });
   });
@@ -531,5 +732,33 @@ describe("Canonical survey transactions", () => {
       trustedClaims(districtID),
     ).firestore();
     await assertFails(updateDoc(doc(staffDB, responsePath), { state: "reviewed" }));
+  });
+
+  it("rules prevent clients from minting or rewriting canonical survey assignments", async () => {
+    const staffDB = testEnv.authenticatedContext(
+      staffUserID,
+      trustedClaims(districtID),
+    ).firestore();
+    await assertFails(setDoc(
+      doc(staffDB, `districts/${districtID}/formAssignments/forged-survey`),
+      {
+        districtId: districtID,
+        schoolId: "school-1",
+        assignedBy: staffUserID,
+        assignmentType: "survey",
+        isActive: true,
+        studentIDs: [studentID],
+        definitionID,
+        definitionVersion,
+        attemptID: "forged-attempt",
+      },
+    ));
+    await assertFails(updateDoc(
+      doc(staffDB, `districts/${districtID}/formAssignments/${assignmentID}`),
+      {
+        definitionVersion: definitionVersion + 1,
+        attemptID: "rewritten-attempt",
+      },
+    ));
   });
 });

@@ -122,10 +122,14 @@ nonisolated enum SurveyResponseMutationError: Error, Equatable, Sendable {
     case immutable
     case invalidTransition
     case invalidRecordVersion
+    case invalidOperationID
+    case historyLimitReached
 }
 
 nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
     static let currentSchemaVersion = 1
+    static let maximumOperationCount = 128
+    static let maximumOperationIDBytes = 128
 
     let schemaVersion: Int
     let responseID: String
@@ -137,7 +141,7 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
     let definitionVersion: Int
     private(set) var state: SurveyResponseState
     private(set) var recordVersion: Int
-    private(set) var serverRecordVersion: Int
+    private(set) var localRevision: Int
     private(set) var answers: [String: SurveyAnswer]
     private(set) var operationIDs: Set<String>
     private(set) var syncState: SurveySyncState
@@ -147,6 +151,29 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
     private(set) var frozenDefinition: SurveyDefinition?
     private(set) var sourceHistory: SurveySourceHistory?
     private(set) var serverMetadata: SurveyServerMetadata?
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case responseID
+        case districtID
+        case studentID
+        case assignmentID
+        case attemptID
+        case definitionID
+        case definitionVersion
+        case state
+        case recordVersion
+        case answers
+        case operationIDs
+        case syncState
+        case quarantineReason
+        case hasPendingChanges
+        case submittedAt
+        case reviewedAt
+        case frozenDefinition
+        case sourceHistory
+        case serverMetadata
+    }
 
     var attemptKey: SurveyAttemptKey {
         SurveyAttemptKey(
@@ -171,7 +198,7 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
         definitionVersion = definition.version
         state = .draft
         recordVersion = 0
-        serverRecordVersion = 0
+        localRevision = 0
         answers = [:]
         operationIDs = []
         syncState = .synced
@@ -181,6 +208,95 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
         frozenDefinition = nil
         sourceHistory = nil
         serverMetadata = nil
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        responseID = try container.decode(String.self, forKey: .responseID)
+        districtID = try container.decode(String.self, forKey: .districtID)
+        studentID = try container.decode(String.self, forKey: .studentID)
+        assignmentID = try container.decode(String.self, forKey: .assignmentID)
+        attemptID = try container.decode(String.self, forKey: .attemptID)
+        definitionID = try container.decode(String.self, forKey: .definitionID)
+        definitionVersion = try container.decode(Int.self, forKey: .definitionVersion)
+        state = try container.decode(SurveyResponseState.self, forKey: .state)
+        recordVersion = try container.decode(Int.self, forKey: .recordVersion)
+        localRevision = 0
+        answers = try container.decode(
+            [String: SurveyAnswer].self,
+            forKey: .answers
+        )
+        operationIDs = Set(try container.decode([String].self, forKey: .operationIDs))
+        let syncValue = try container.decode(String.self, forKey: .syncState)
+        switch syncValue {
+        case "synced":
+            syncState = .synced
+        case "pending":
+            syncState = .pending
+        case "quarantined":
+            syncState = .quarantined(
+                try container.decode(
+                    SurveyQuarantineReason.self,
+                    forKey: .quarantineReason
+                )
+            )
+        default:
+            throw DecodingError.dataCorruptedError(
+                forKey: .syncState,
+                in: container,
+                debugDescription: "Unknown survey synchronization state."
+            )
+        }
+        hasPendingChanges = try container.decode(
+            Bool.self,
+            forKey: .hasPendingChanges
+        )
+        submittedAt = try container.decodeIfPresent(Date.self, forKey: .submittedAt)
+        reviewedAt = try container.decodeIfPresent(Date.self, forKey: .reviewedAt)
+        frozenDefinition = try container.decodeIfPresent(
+            SurveyDefinition.self,
+            forKey: .frozenDefinition
+        )
+        sourceHistory = try container.decodeIfPresent(
+            SurveySourceHistory.self,
+            forKey: .sourceHistory
+        )
+        serverMetadata = try container.decodeIfPresent(
+            SurveyServerMetadata.self,
+            forKey: .serverMetadata
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(responseID, forKey: .responseID)
+        try container.encode(districtID, forKey: .districtID)
+        try container.encode(studentID, forKey: .studentID)
+        try container.encode(assignmentID, forKey: .assignmentID)
+        try container.encode(attemptID, forKey: .attemptID)
+        try container.encode(definitionID, forKey: .definitionID)
+        try container.encode(definitionVersion, forKey: .definitionVersion)
+        try container.encode(state, forKey: .state)
+        try container.encode(recordVersion, forKey: .recordVersion)
+        try container.encode(answers, forKey: .answers)
+        try container.encode(operationIDs.sorted(), forKey: .operationIDs)
+        switch syncState {
+        case .synced:
+            try container.encode("synced", forKey: .syncState)
+        case .pending:
+            try container.encode("pending", forKey: .syncState)
+        case .quarantined(let reason):
+            try container.encode("quarantined", forKey: .syncState)
+            try container.encode(reason, forKey: .quarantineReason)
+        }
+        try container.encode(hasPendingChanges, forKey: .hasPendingChanges)
+        try container.encodeIfPresent(submittedAt, forKey: .submittedAt)
+        try container.encodeIfPresent(reviewedAt, forKey: .reviewedAt)
+        try container.encodeIfPresent(frozenDefinition, forKey: .frozenDefinition)
+        try container.encodeIfPresent(sourceHistory, forKey: .sourceHistory)
+        try container.encodeIfPresent(serverMetadata, forKey: .serverMetadata)
     }
 
     mutating func apply(
@@ -194,9 +310,15 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
         if operationIDs.contains(operationID) {
             return false
         }
+        guard Self.isValidOperationID(operationID) else {
+            throw SurveyResponseMutationError.invalidOperationID
+        }
+        guard operationIDs.count < Self.maximumOperationCount else {
+            throw SurveyResponseMutationError.historyLimitReached
+        }
         answers[questionID] = answer
         operationIDs.insert(operationID)
-        recordVersion += 1
+        localRevision += 1
         syncState = .pending
         hasPendingChanges = true
         return true
@@ -204,9 +326,12 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
 
     mutating func markSynchronized(serverRecordVersion: Int) {
         recordVersion = serverRecordVersion
-        self.serverRecordVersion = serverRecordVersion
         syncState = .synced
         hasPendingChanges = false
+    }
+
+    mutating func restoreLocalRevision(_ revision: Int) {
+        localRevision = revision
     }
 
     mutating func quarantine(_ reason: SurveyQuarantineReason) {
@@ -227,12 +352,11 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
             }
             throw SurveyResponseMutationError.immutable
         }
-        guard serverRecordVersion > self.serverRecordVersion else {
+        guard serverRecordVersion > recordVersion else {
             throw SurveyResponseMutationError.invalidRecordVersion
         }
         state = .submitted
         recordVersion = serverRecordVersion
-        self.serverRecordVersion = serverRecordVersion
         operationIDs.insert(operationID)
         syncState = .synced
         hasPendingChanges = false
@@ -265,13 +389,12 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
         guard state == .submitted else {
             throw SurveyResponseMutationError.invalidTransition
         }
-        guard serverRecordVersion > self.serverRecordVersion,
+        guard serverRecordVersion > recordVersion,
               let metadata = serverMetadata else {
             throw SurveyResponseMutationError.invalidRecordVersion
         }
         state = .reviewed
         recordVersion = serverRecordVersion
-        self.serverRecordVersion = serverRecordVersion
         operationIDs.insert(operationID)
         self.reviewedAt = reviewedAt
         serverMetadata = SurveyServerMetadata(
@@ -279,5 +402,15 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
             reviewedBy: reviewerID,
             reviewOperationID: operationID
         )
+    }
+
+    private static func isValidOperationID(_ value: String) -> Bool {
+        !value.isEmpty &&
+            value == value.trimmingCharacters(in: .whitespacesAndNewlines) &&
+            value.utf8.count <= maximumOperationIDBytes &&
+            !value.contains("/") &&
+            value.unicodeScalars.allSatisfy {
+                !CharacterSet.controlCharacters.contains($0)
+            }
     }
 }

@@ -42,6 +42,38 @@ struct SurveyDefinitionTests {
         #expect(try JSONDecoder().decode(SurveyDefinition.self, from: data) == definition)
     }
 
+    @Test("Shared v1 fixture round-trips canonical definition and response fields")
+    func sharedSchemaFixtureRoundTrip() throws {
+        let fixtureURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("firebase/fixtures/survey-v1.json")
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let fixture = try decoder.decode(
+            SurveySchemaFixture.self,
+            from: Data(contentsOf: fixtureURL)
+        )
+
+        #expect(fixture.definition.id == "interest-discovery")
+        #expect(fixture.definition.questions.last?.options.first?.imageReference == "survey/forest")
+        #expect(fixture.response.recordVersion == 1)
+        #expect(fixture.response.syncState == .synced)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let responseObject = try #require(
+            JSONSerialization.jsonObject(
+                with: try encoder.encode(fixture.response)
+            ) as? [String: Any]
+        )
+        #expect(responseObject["recordVersion"] as? Int == 1)
+        #expect(responseObject["syncState"] as? String == "synced")
+        #expect(responseObject["serverRecordVersion"] == nil)
+        #expect(responseObject["localRevision"] == nil)
+    }
+
     @Test("Visibility uses priority then stable rule ID and preserves question order")
     func deterministicBranching() throws {
         let definition = try surveyDefinition(branchRules: [
@@ -167,12 +199,52 @@ struct SurveyRepositoryTests {
             grant: grant
         )
 
-        #expect(first.recordVersion == 1)
-        #expect(repeated.recordVersion == 1)
+        #expect(first.recordVersion == 0)
+        #expect(first.localRevision == 1)
+        #expect(repeated.recordVersion == 0)
+        #expect(repeated.localRevision == 1)
         #expect(resumed == repeated)
         #expect(resumed?.syncState == .pending)
         #expect(resumed?.hasPendingChanges == true)
         #expect(await harness.saveCount == 1)
+    }
+
+    @Test("Multiple offline edits synchronize once against the last server version")
+    func multipleOfflineEditsUseAuthoritativeServerVersion() async throws {
+        let server = SurveyServerCounter()
+        let harness = SurveyRepositoryHarness(serverCounter: server)
+        let repository = harness.repository()
+        let assignment = try surveyAssignment()
+        let grant = try studentModeGrant(assignment: assignment)
+        let definition = try surveyDefinition()
+
+        _ = try await repository.autosave(
+            answer: .single("science"),
+            for: "single",
+            operationID: "offline-1",
+            assignment: assignment,
+            definition: definition,
+            grant: grant
+        )
+        let local = try await repository.autosave(
+            answer: .multiple(["building"]),
+            for: "multiple",
+            operationID: "offline-2",
+            assignment: assignment,
+            definition: definition,
+            grant: grant
+        )
+        let synchronized = try await repository.synchronize(
+            assignment: assignment,
+            definition: definition,
+            grant: grant
+        )
+
+        #expect(local.recordVersion == 0)
+        #expect(local.localRevision == 2)
+        #expect(synchronized.recordVersion == 1)
+        #expect(synchronized.localRevision == 2)
+        #expect(await server.expectedVersions == [0])
     }
 
     @Test("Cross-student scope is rejected")
@@ -190,6 +262,47 @@ struct SurveyRepositoryTests {
                 assignment: assignment,
                 definition: try surveyDefinition(),
                 grant: grant
+            )
+        }
+    }
+
+    @Test("Expired sessions are authorization failures and definition errors stay validation failures")
+    func typedAuthorizationAndValidationErrors() async throws {
+        let harness = SurveyRepositoryHarness()
+        let repository = harness.repository()
+        let assignment = try surveyAssignment()
+        let activeGrant = try studentModeGrant(assignment: assignment)
+        _ = try await repository.autosave(
+            answer: .single("science"),
+            for: "single",
+            operationID: "before-expiry",
+            assignment: assignment,
+            definition: try surveyDefinition(),
+            grant: activeGrant
+        )
+        let expiredGrant = try studentModeGrant(
+            assignment: assignment,
+            expiresAt: .distantPast
+        )
+        await #expect(throws: SurveyRepositoryError.authorization) {
+            _ = try await repository.resume(
+                assignment: assignment,
+                grant: expiredGrant
+            )
+        }
+        #expect(
+            await harness.storedResponse?.syncState ==
+                .quarantined(.authorizationRejected)
+        )
+
+        await #expect(throws: SurveyRepositoryError.validation) {
+            _ = try await repository.autosave(
+                answer: .rating(4),
+                for: "single",
+                operationID: "wrong-answer-type",
+                assignment: assignment,
+                definition: try surveyDefinition(),
+                grant: activeGrant
             )
         }
     }
@@ -235,6 +348,131 @@ struct SurveyRepositoryTests {
         #expect(stored?.syncState == .quarantined(.assignmentRevoked))
         #expect(stored?.hasPendingChanges == true)
         #expect(await harness.quarantineCount == 1)
+    }
+
+    @Test("Resume of revoked work quarantines it and purge removes history")
+    func revokedResumeQuarantinesAndPurges() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = SurveyDraftStore.localFiles(directory: directory)
+        let repository = SurveyRepository(
+            draftStore: store,
+            synchronizeDraft: { request in request.response },
+            submitResponse: { request in request.response },
+            reviewResponse: { request in request.response },
+            isOnline: { true }
+        )
+        let assignment = try surveyAssignment()
+        let grant = try studentModeGrant(assignment: assignment)
+        _ = try await repository.autosave(
+            answer: .single("science"),
+            for: "single",
+            operationID: "queued",
+            assignment: assignment,
+            definition: try surveyDefinition(),
+            grant: grant
+        )
+
+        await #expect(throws: SurveyRepositoryError.revoked) {
+            _ = try await repository.resume(
+                assignment: assignment.revoked(),
+                grant: grant
+            )
+        }
+        #expect(await store.load(assignment.attemptKey) == .quarantined)
+        try await store.purge(assignment.attemptKey)
+        #expect(await store.load(assignment.attemptKey) == .missing)
+    }
+
+    @Test("Local filenames cannot collide and mismatched embedded scope is denied")
+    func localDraftKeyIsolation() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = SurveyDraftStore.localFiles(directory: directory)
+        let definition = try surveyDefinition()
+        let firstAssignment = try SurveyAssignment(
+            assignmentID: "assignment",
+            attemptID: "attempt",
+            districtID: "a",
+            studentID: "b--c",
+            definitionID: definition.id,
+            definitionVersion: definition.version,
+            state: .active,
+            assignedAt: Date()
+        )
+        let secondAssignment = try SurveyAssignment(
+            assignmentID: "assignment",
+            attemptID: "attempt",
+            districtID: "a--b",
+            studentID: "c",
+            definitionID: definition.id,
+            definitionVersion: definition.version,
+            state: .active,
+            assignedAt: Date()
+        )
+        let first = SurveyResponse(
+            assignment: firstAssignment,
+            definition: definition
+        )
+        let second = SurveyResponse(
+            assignment: secondAssignment,
+            definition: definition
+        )
+        try await store.save(first)
+        let activeDirectory = directory.appendingPathComponent(
+            "active",
+            isDirectory: true
+        )
+        let firstFile = try #require(
+            FileManager.default.contentsOfDirectory(
+                at: activeDirectory,
+                includingPropertiesForKeys: nil
+            ).first
+        )
+        try await store.save(second)
+
+        #expect(await store.load(first.attemptKey) == .draft(first))
+        #expect(await store.load(second.attemptKey) == .draft(second))
+
+        let files = try FileManager.default.contentsOfDirectory(
+            at: activeDirectory,
+            includingPropertiesForKeys: nil
+        )
+        let secondFile = try #require(files.first { $0 != firstFile })
+        try Data(contentsOf: secondFile).write(to: firstFile, options: .atomic)
+        let firstLoad = await store.load(first.attemptKey)
+        #expect(firstLoad == .scopeMismatch)
+    }
+
+    @Test("Operation history and identifier length are bounded")
+    func operationHistoryBounds() async throws {
+        var response = SurveyResponse(
+            assignment: try surveyAssignment(),
+            definition: try surveyDefinition()
+        )
+        for index in 0..<SurveyResponse.maximumOperationCount {
+            _ = try response.apply(
+                answer: .text("\(index)"),
+                questionID: "text",
+                operationID: "operation-\(index)"
+            )
+        }
+        #expect(throws: SurveyResponseMutationError.historyLimitReached) {
+            _ = try response.apply(
+                answer: .text("overflow"),
+                questionID: "text",
+                operationID: "overflow"
+            )
+        }
+        #expect(throws: SurveyResponseMutationError.invalidOperationID) {
+            _ = try response.apply(
+                answer: .text("large"),
+                questionID: "text",
+                operationID: String(repeating: "x", count: 129)
+            )
+        }
     }
 
     @Test("Submission is online-only, idempotent, and immutable")
@@ -386,6 +624,11 @@ private func surveyDefinition(
     )
 }
 
+private struct SurveySchemaFixture: Decodable {
+    let definition: SurveyDefinition
+    let response: SurveyResponse
+}
+
 private func surveyAssignment(
     studentID: String = "student-1"
 ) throws -> SurveyAssignment {
@@ -402,7 +645,8 @@ private func surveyAssignment(
 }
 
 private func studentModeGrant(
-    assignment: SurveyAssignment
+    assignment: SurveyAssignment,
+    expiresAt: Date = .distantFuture
 ) throws -> StudentModeGrant {
     let scope = try StudentModeScope(
         districtID: "district-1",
@@ -415,7 +659,7 @@ private func studentModeGrant(
         scope: scope,
         recordVersion: 1,
         issuedAt: Date(timeIntervalSince1970: 2_000),
-        expiresAt: Date(timeIntervalSince1970: 9_000),
+        expiresAt: expiresAt,
         staffIdentity: StudentModeStaffIdentity(
             userID: "staff-1",
             districtID: "district-1",
@@ -455,6 +699,11 @@ private actor SurveyRepositoryHarness {
     private(set) var submitCount = 0
     private(set) var quarantineCount = 0
     private var online = true
+    private let serverCounter: SurveyServerCounter?
+
+    init(serverCounter: SurveyServerCounter? = nil) {
+        self.serverCounter = serverCounter
+    }
 
     nonisolated func repository() -> SurveyRepository {
         SurveyRepository(
@@ -503,9 +752,14 @@ private actor SurveyRepositoryHarness {
 
     private func synchronize(
         _ request: SurveyDraftSyncRequest
-    ) throws -> SurveyResponse {
+    ) async throws -> SurveyResponse {
         var response = request.response
-        response.markSynchronized(serverRecordVersion: response.recordVersion)
+        let version = if let serverCounter {
+            await serverCounter.synchronize(expectedVersion: response.recordVersion)
+        } else {
+            response.recordVersion
+        }
+        response.markSynchronized(serverRecordVersion: version)
         storedResponse = response
         return response
     }
@@ -538,5 +792,14 @@ private actor SurveyRepositoryHarness {
         )
         storedResponse = response
         return response
+    }
+}
+
+private actor SurveyServerCounter {
+    private(set) var expectedVersions: [Int] = []
+
+    func synchronize(expectedVersion: Int) -> Int {
+        expectedVersions.append(expectedVersion)
+        return expectedVersion + 1
     }
 }

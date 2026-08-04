@@ -21,6 +21,15 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
     let assignedAt: Date
     let revokedAt: Date?
 
+    var attemptKey: SurveyAttemptKey {
+        SurveyAttemptKey(
+            districtID: districtID,
+            studentID: studentID,
+            assignmentID: assignmentID,
+            attemptID: attemptID
+        )
+    }
+
     private enum CodingKeys: String, CodingKey {
         case assignmentID
         case attemptID

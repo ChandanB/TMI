@@ -2797,6 +2797,13 @@ const parseSurveyMutationRequest = (
       "answers",
     ]),
   );
+  const operationID = requireIdentifier(data.operationID, "operationID");
+  if (Buffer.byteLength(operationID, "utf8") > 128) {
+    throw new HttpsError(
+      "invalid-argument",
+      "operationID must not exceed 128 UTF-8 bytes.",
+    );
+  }
   return {
     districtID: requireIdentifier(data.districtID, "districtID"),
     studentID: requireIdentifier(data.studentID, "studentID"),
@@ -2813,7 +2820,7 @@ const parseSurveyMutationRequest = (
       "expectedRecordVersion",
       0,
     ),
-    operationID: requireIdentifier(data.operationID, "operationID"),
+    operationID,
     answers: parseSurveyAnswers(data.answers),
   };
 };
@@ -2826,8 +2833,15 @@ const parseReviewSurveyResponseRequest = (
     data,
     withBaseFields("studentID", "responseID"),
   );
+  const base = parseBaseRequest(data);
+  if (Buffer.byteLength(base.idempotencyKey, "utf8") > 128) {
+    throw new HttpsError(
+      "invalid-argument",
+      "idempotencyKey must not exceed 128 UTF-8 bytes.",
+    );
+  }
   return {
-    ...parseBaseRequest(data),
+    ...base,
     studentID: requireIdentifier(data.studentID, "studentID"),
     responseID: requireIdentifier(data.responseID, "responseID"),
   };
@@ -2894,6 +2908,9 @@ const parseSurveyDefinition = (
     data.state !== "published" ||
     data.definitionID !== expectedID ||
     data.version !== expectedVersion ||
+    !(data.publishedAt instanceof Timestamp) ||
+    typeof data.title !== "string" ||
+    data.title.length === 0 ||
     !Array.isArray(data.questions) ||
     data.questions.length === 0 ||
     data.questions.length > 100 ||
@@ -2916,6 +2933,15 @@ const parseSurveyDefinition = (
         "survey question.type",
         surveyQuestionTypeValues,
       );
+      if (
+        typeof question.prompt !== "string" ||
+        question.prompt.length === 0 ||
+        question.prompt !== question.prompt.trim() ||
+        Buffer.byteLength(question.prompt, "utf8") > 500 ||
+        /\p{Cc}/u.test(question.prompt)
+      ) {
+        return surveyDataLoss("The survey question prompt is malformed.");
+      }
       if (typeof question.required !== "boolean") {
         return surveyDataLoss("The survey question required flag is malformed.");
       }
@@ -2926,6 +2952,26 @@ const parseSurveyDefinition = (
       for (const rawOption of question.options) {
         const option = requireRecord(rawOption, "survey option");
         const optionID = requireIdentifier(option.id, "survey option.id");
+        if (
+          typeof option.label !== "string" ||
+          option.label.length === 0 ||
+          option.label !== option.label.trim() ||
+          Buffer.byteLength(option.label, "utf8") > 200 ||
+          /\p{Cc}/u.test(option.label)
+        ) {
+          return surveyDataLoss("The survey option label is malformed.");
+        }
+        if (
+          (type === "imageChoice" &&
+            (typeof option.imageReference !== "string" ||
+              option.imageReference.length === 0)) ||
+          (option.imageReference !== undefined &&
+            (typeof option.imageReference !== "string" ||
+              Buffer.byteLength(option.imageReference, "utf8") > 500 ||
+              /\p{Cc}/u.test(option.imageReference)))
+        ) {
+          return surveyDataLoss("The survey option image reference is malformed.");
+        }
         if (optionIDs.has(optionID)) {
           return surveyDataLoss("The survey question repeats an option ID.");
         }
@@ -3351,11 +3397,21 @@ const requireSurveyScope = async (
   return { identity, assignment, definition: parsedDefinition };
 };
 
+const maximumSurveyOperationCount = 128;
+
+interface StoredSurveyOperationResult {
+  readonly fingerprint: string;
+  readonly userID: string;
+  readonly sessionID: string | null;
+  readonly recordVersion: number;
+}
+
 const requireStoredOperationIDs = (value: unknown): string[] => {
   if (
     !Array.isArray(value) ||
-    value.length > 1_000 ||
-    !value.every((item) => typeof item === "string") ||
+    value.length > maximumSurveyOperationCount ||
+    !value.every((item) =>
+      typeof item === "string" && Buffer.byteLength(item, "utf8") <= 128) ||
     new Set(value).size !== value.length
   ) {
     return surveyDataLoss("The survey response operation history is malformed.");
@@ -3363,26 +3419,79 @@ const requireStoredOperationIDs = (value: unknown): string[] => {
   return value;
 };
 
+const requireStoredOperationResults = (
+  value: unknown,
+  operationIDs: readonly string[],
+): Readonly<Record<string, StoredSurveyOperationResult>> => {
+  const record = requireRecord(value, "survey response operation results");
+  if (
+    Object.keys(record).length !== operationIDs.length ||
+    !operationIDs.every((operationID) => operationID in record)
+  ) {
+    return surveyDataLoss("The survey response operation results are malformed.");
+  }
+  const results: Record<string, StoredSurveyOperationResult> = {};
+  for (const operationID of operationIDs) {
+    const result = requireRecord(
+      record[operationID],
+      "survey response operation result",
+    );
+    if (
+      typeof result.fingerprint !== "string" ||
+      result.fingerprint.length !== 64 ||
+      typeof result.userID !== "string" ||
+      (result.sessionID !== null && typeof result.sessionID !== "string")
+    ) {
+      return surveyDataLoss("The survey response operation result is malformed.");
+    }
+    results[operationID] = {
+      fingerprint: result.fingerprint,
+      userID: result.userID,
+      sessionID: result.sessionID,
+      recordVersion: requireInteger(
+        result.recordVersion,
+        "survey response operation result.recordVersion",
+        1,
+      ),
+    };
+  }
+  return results;
+};
+
 const exactSurveyReplay = (
   response: DocumentData,
   operationID: string,
   fingerprint: string,
-): boolean => {
+  identity: RespondentSurveyIdentity,
+): number | undefined => {
   const operationIDs = requireStoredOperationIDs(response.operationIDs);
   if (!operationIDs.includes(operationID)) {
-    return false;
+    return undefined;
   }
-  const fingerprints = requireRecord(
-    response.operationFingerprints,
-    "survey response operation fingerprints",
+  const results = requireStoredOperationResults(
+    response.operationResults,
+    operationIDs,
   );
-  if (fingerprints[operationID] !== fingerprint) {
+  const result = results[operationID];
+  if (result === undefined) {
+    return surveyDataLoss("The survey replay result is missing.");
+  }
+  if (
+    result.userID !== identity.userID ||
+    result.sessionID !== identity.sessionID
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "The survey operation belongs to a different respondent session.",
+    );
+  }
+  if (result.fingerprint !== fingerprint) {
     throw new HttpsError(
       "already-exists",
       "The survey operation ID was reused with different content.",
     );
   }
-  return true;
+  return result.recordVersion;
 };
 
 export const createSurveyHandlers = (
@@ -3407,18 +3516,16 @@ export const createSurveyHandlers = (
       );
       const snapshot = await transaction.get(reference);
       const response = snapshot.data();
-      if (response !== undefined && exactSurveyReplay(
+      const replayVersion = response === undefined ? undefined : exactSurveyReplay(
         response,
         data.operationID,
         fingerprint,
-      )) {
+        scope.identity,
+      );
+      if (replayVersion !== undefined) {
         return {
           operationID: data.operationID,
-          recordVersion: requireInteger(
-            response.recordVersion,
-            "survey response.recordVersion",
-            1,
-          ),
+          recordVersion: replayVersion,
           replayed: true,
         };
       }
@@ -3439,7 +3546,14 @@ export const createSurveyHandlers = (
           recordVersion: 1,
           answers: data.answers,
           operationIDs: [data.operationID],
-          operationFingerprints: { [data.operationID]: fingerprint },
+          operationResults: {
+            [data.operationID]: {
+              fingerprint,
+              userID: scope.identity.userID,
+              sessionID: scope.identity.sessionID,
+              recordVersion: 1,
+            },
+          },
           respondentUserID: scope.identity.userID,
           respondentSessionID: scope.identity.sessionID,
           syncState: "synced",
@@ -3478,17 +3592,28 @@ export const createSurveyHandlers = (
         return surveyDataLoss("The stored survey response scope is malformed.");
       }
       const operationIDs = requireStoredOperationIDs(response.operationIDs);
-      const fingerprints = requireRecord(
-        response.operationFingerprints,
-        "survey response operation fingerprints",
+      if (operationIDs.length >= maximumSurveyOperationCount) {
+        throw new HttpsError(
+          "resource-exhausted",
+          "The survey operation history is full.",
+        );
+      }
+      const operationResults = requireStoredOperationResults(
+        response.operationResults,
+        operationIDs,
       );
       const nextVersion = currentVersion + 1;
       transaction.update(reference, {
         answers: data.answers,
         operationIDs: [...operationIDs, data.operationID],
-        operationFingerprints: {
-          ...fingerprints,
-          [data.operationID]: fingerprint,
+        operationResults: {
+          ...operationResults,
+          [data.operationID]: {
+            fingerprint,
+            userID: scope.identity.userID,
+            sessionID: scope.identity.sessionID,
+            recordVersion: nextVersion,
+          },
         },
         respondentUserID: scope.identity.userID,
         respondentSessionID: scope.identity.sessionID,
@@ -3533,21 +3658,22 @@ export const createSurveyHandlers = (
           "A synchronized survey draft is required before submission.",
         );
       }
-      if (
-        response.submissionOperationID === data.operationID &&
-        response.submissionFingerprint === fingerprint &&
-        (response.state === "submitted" || response.state === "reviewed")
-      ) {
+      const replayVersion = exactSurveyReplay(
+        response,
+        data.operationID,
+        fingerprint,
+        scope.identity,
+      );
+      if (replayVersion !== undefined) {
+        if (response.state !== "submitted" && response.state !== "reviewed") {
+          return surveyDataLoss("The survey submission replay state is malformed.");
+        }
         if (!(response.submittedAt instanceof Timestamp)) {
           return surveyDataLoss("The survey submission time is malformed.");
         }
         return {
           operationID: data.operationID,
-          recordVersion: requireInteger(
-            response.recordVersion,
-            "survey response.recordVersion",
-            2,
-          ),
+          recordVersion: replayVersion,
           replayed: true,
         };
       }
@@ -3572,13 +3698,35 @@ export const createSurveyHandlers = (
         );
       }
       const operationIDs = requireStoredOperationIDs(response.operationIDs);
+      if (operationIDs.length >= maximumSurveyOperationCount) {
+        throw new HttpsError(
+          "resource-exhausted",
+          "The survey operation history is full.",
+        );
+      }
+      const operationResults = requireStoredOperationResults(
+        response.operationResults,
+        operationIDs,
+      );
       const nextVersion = currentVersion + 1;
       transaction.update(reference, {
         state: "submitted",
         recordVersion: nextVersion,
         operationIDs: [...operationIDs, data.operationID],
-        submissionOperationID: data.operationID,
-        submissionFingerprint: fingerprint,
+        operationResults: {
+          ...operationResults,
+          [data.operationID]: {
+            fingerprint,
+            userID: scope.identity.userID,
+            sessionID: scope.identity.sessionID,
+            recordVersion: nextVersion,
+          },
+        },
+        serverMetadata: {
+          submissionOperationID: data.operationID,
+          reviewedBy: null,
+          reviewOperationID: null,
+        },
         submittedAt: FieldValue.serverTimestamp(),
         frozenDefinition: scope.definition.data,
         sourceHistory: {
@@ -3676,15 +3824,49 @@ export const createSurveyHandlers = (
               "Only a submitted survey response can be reviewed.",
             );
           }
+          const operationIDs = requireStoredOperationIDs(response.operationIDs);
+          if (operationIDs.length >= maximumSurveyOperationCount) {
+            throw new HttpsError(
+              "resource-exhausted",
+              "The survey operation history is full.",
+            );
+          }
+          const operationResults = requireStoredOperationResults(
+            response.operationResults,
+            operationIDs,
+          );
+          const serverMetadata = requireRecord(
+            response.serverMetadata,
+            "survey response server metadata",
+          );
+          if (typeof serverMetadata.submissionOperationID !== "string") {
+            return surveyDataLoss("The survey submission metadata is malformed.");
+          }
+          const nextVersion = data.expectedRecordVersion + 1;
           transaction.update(responseReference, {
             state: "reviewed",
-            recordVersion: data.expectedRecordVersion + 1,
+            recordVersion: nextVersion,
+            operationIDs: [...operationIDs, data.idempotencyKey],
+            operationResults: {
+              ...operationResults,
+              [data.idempotencyKey]: {
+                fingerprint: createHash("sha256")
+                  .update(JSON.stringify(data))
+                  .digest("hex"),
+                userID: identity.userID,
+                sessionID: null,
+                recordVersion: nextVersion,
+              },
+            },
             reviewedAt: FieldValue.serverTimestamp(),
-            reviewedBy: identity.userID,
-            reviewOperationID: data.idempotencyKey,
+            serverMetadata: {
+              submissionOperationID: serverMetadata.submissionOperationID,
+              reviewedBy: identity.userID,
+              reviewOperationID: data.idempotencyKey,
+            },
             updatedAt: FieldValue.serverTimestamp(),
           });
-          return { recordVersion: data.expectedRecordVersion + 1 };
+          return { recordVersion: nextVersion };
         },
       },
     );

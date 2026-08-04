@@ -818,6 +818,12 @@ service cloud.firestore {
         allow create: if hasActiveMembership(districtID)
           && request.resource.data.get('assignedBy', '') == request.auth.uid
           && request.resource.data.get('districtId', districtID) == districtID
+          && request.resource.data.get('assignmentType', '') != 'survey'
+          && !request.resource.data.keys().hasAny([
+            'definitionID',
+            'definitionVersion',
+            'attemptID'
+          ])
           && request.resource.data.get('studentIDs', []).hasOnly(
             membership(districtID).get('assignedStudentIDs', [])
           );
@@ -825,6 +831,17 @@ service cloud.firestore {
           && resource.data.get('assignedBy', '') == request.auth.uid
           && request.resource.data.get('assignedBy', '') == request.auth.uid
           && request.resource.data.get('districtId', districtID) == districtID
+          && resource.data.get('assignmentType', '') != 'survey'
+          && request.resource.data.get('assignmentType', '') != 'survey'
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'assignmentType',
+            'definitionID',
+            'definitionVersion',
+            'attemptID',
+            'studentIDs',
+            'isActive',
+            'districtId'
+          ])
           && request.resource.data.get('studentIDs', []).hasOnly(
             membership(districtID).get('assignedStudentIDs', [])
           );
