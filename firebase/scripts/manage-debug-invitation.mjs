@@ -1,5 +1,6 @@
 import { applicationDefault, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import {
   buildDebugInvitationRecord,
@@ -7,15 +8,17 @@ import {
   debugInvitationScope,
   parseDebugInvitationArguments,
   planDebugInvitationAdministration,
+  readDebugInvitationCode,
   requireDebugInvitationProject,
 } from "../lib/src/debugInvitation.js";
 
 export const main = async () => {
-  const command = parseDebugInvitationArguments(process.argv.slice(2));
+  const action = parseDebugInvitationArguments(process.argv.slice(2));
   requireDebugInvitationProject(
     process.env.TMI_DEBUG_INVITATION_PROJECT,
   );
-  const invitation = buildDebugInvitationRecord(command.code, new Date());
+  const code = readDebugInvitationCode(readFileSync(0, "utf8"));
+  const invitation = buildDebugInvitationRecord(code, new Date());
   initializeApp({
     credential: applicationDefault(),
     projectId: debugInvitationScope.projectID,
@@ -29,7 +32,7 @@ export const main = async () => {
   await firestore.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(reference);
     const administration = planDebugInvitationAdministration(
-      command.action,
+      action,
       invitation,
       snapshot.exists ? snapshot.data() : undefined,
     );
@@ -40,7 +43,7 @@ export const main = async () => {
     }
   });
 
-  console.log(debugInvitationLogMessage(command.action));
+  console.log(debugInvitationLogMessage(action));
 };
 
 const isMain =

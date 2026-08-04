@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { fileURLToPath } from "node:url";
 import {
   hashInvitationCode,
   hashInvitationRecipientEmail,
@@ -10,11 +13,13 @@ import {
   debugInvitationScope,
   parseDebugInvitationArguments,
   planDebugInvitationAdministration,
+  readDebugInvitationCode,
   requireDebugInvitationProject,
 } from "../src/debugInvitation.js";
 
 const invitationCode = "VE1JLURlYnVnLUNhbm9uaWNhbC1JbnZpdGUtMjAyNiE";
 const now = new Date("2026-08-04T16:30:00.000Z");
+const firebaseRoot = fileURLToPath(new URL("..", import.meta.url));
 
 describe("canonical Debug invitation", () => {
   it("exports the exact bounded project and staff scope", () => {
@@ -98,30 +103,36 @@ describe("canonical Debug invitation", () => {
 
 describe("Debug invitation administration", () => {
   it.each(["seed", "revoke"] as const)(
-    "parses an exact %s command with one opaque code",
+    "parses an exact %s action without accepting a code in argv",
     (action) => {
-      expect(parseDebugInvitationArguments([action, invitationCode])).toEqual({
-        action,
-        code: invitationCode,
-      });
+      expect(parseDebugInvitationArguments([action])).toBe(action);
+      expect(() =>
+        parseDebugInvitationArguments([action, invitationCode]),
+      ).toThrow(/Usage: manage-debug-invitation\.mjs <seed\|revoke>$/);
     },
   );
 
   it.each([
     { argumentsList: [] },
-    { argumentsList: ["seed"] },
-    { argumentsList: ["seed", invitationCode, "unexpected"] },
+    { argumentsList: ["seed", "unexpected"] },
+    { argumentsList: ["delete"] },
     { argumentsList: ["delete", invitationCode] },
   ])("rejects invalid command arguments $argumentsList", ({ argumentsList }) => {
     expect(() => parseDebugInvitationArguments(argumentsList)).toThrow(
-      /Usage: manage-debug-invitation\.mjs <seed\|revoke> <opaque-code>/,
+      /Usage: manage-debug-invitation\.mjs <seed\|revoke>$/,
     );
   });
 
-  it("rejects a command whose invitation code is not opaque", () => {
-    expect(() => parseDebugInvitationArguments(["seed", "too-short"])).toThrow(
+  it("reads exactly one trimmed opaque invitation from stdin", () => {
+    expect(readDebugInvitationCode(`  ${invitationCode}\n`)).toBe(
+      invitationCode,
+    );
+    expect(() => readDebugInvitationCode("too-short")).toThrow(
       /43-character opaque invitation/,
     );
+    expect(() =>
+      readDebugInvitationCode(`${invitationCode}\n${invitationCode}`),
+    ).toThrow(/43-character opaque invitation/);
   });
 
   it("requires the exact production project guard", () => {
@@ -153,7 +164,10 @@ describe("Debug invitation administration", () => {
         recordVersion: 19,
         isActive: false,
       }),
-    ).toEqual({ kind: "set", data: invitation.data });
+    ).toEqual({
+      kind: "set",
+      data: { ...invitation.data, recordVersion: 20 },
+    });
   });
 
   it("rejects a consumed seed without producing a write", () => {
@@ -187,21 +201,74 @@ describe("Debug invitation administration", () => {
     });
   });
 
-  it.each([undefined, "19", Number.NaN, 1.5, Number.MAX_SAFE_INTEGER])(
-    "uses a safe revoke version fallback for malformed value %s",
-    (recordVersion) => {
+  it.each([
+    undefined,
+    "19",
+    Number.NaN,
+    0,
+    -1,
+    1.5,
+    Number.MAX_SAFE_INTEGER,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])("fails closed for malformed seed version %s", (recordVersion) => {
+    const invitation = buildDebugInvitationRecord(invitationCode, now);
+
+    expect(() =>
+      planDebugInvitationAdministration("seed", invitation, {
+        consumedByUserID: null,
+        recordVersion,
+      }),
+    ).toThrow(/valid positive recordVersion below Number\.MAX_SAFE_INTEGER/);
+  });
+
+  it.each([
+    undefined,
+    "19",
+    Number.NaN,
+    0,
+    -1,
+    1.5,
+    Number.MAX_SAFE_INTEGER,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])("fails closed for malformed revoke version %s", (recordVersion) => {
       const invitation = buildDebugInvitationRecord(invitationCode, now);
 
-      expect(
+      expect(() =>
         planDebugInvitationAdministration("revoke", invitation, {
           recordVersion,
         }),
-      ).toEqual({
-        kind: "update",
-        data: { isActive: false, recordVersion: 2 },
-      });
-    },
-  );
+      ).toThrow(/valid positive recordVersion below Number\.MAX_SAFE_INTEGER/);
+  });
+
+  it("does not expose a stdin secret when the subprocess rejects it", async () => {
+    const distinctiveSecret =
+      "DISTINCTIVE_DEBUG_INVITATION_SECRET_THAT_MUST_NOT_LEAK";
+    const child = spawn(
+      "npm",
+      ["run", "debug-invitation:seed"],
+      {
+        cwd: firebaseRoot,
+        env: {
+          ...process.env,
+          TMI_DEBUG_INVITATION_PROJECT: "tmi-education",
+        },
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    let output = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => { output += chunk; });
+    child.stderr.on("data", (chunk: string) => { output += chunk; });
+    child.stdin.end(`${distinctiveSecret}\n`);
+
+    const [exitCode] = await once(child, "close");
+
+    expect(exitCode).not.toBe(0);
+    expect(output).toMatch(/43-character opaque invitation/);
+    expect(output).not.toContain(distinctiveSecret);
+    expect(output).not.toContain("<opaque-code>");
+  });
 
   it.each(["seed", "revoke"] as const)(
     "formats a secret-safe %s log with only action and project",

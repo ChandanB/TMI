@@ -14,15 +14,9 @@ export const debugInvitationScope = {
 
 const opaqueInvitationPattern = /^[A-Za-z0-9_-]{43}$/;
 const thirtyDaysInMilliseconds = 30 * 86_400_000;
-const commandUsage =
-  "Usage: manage-debug-invitation.mjs <seed|revoke> <opaque-code>";
+const commandUsage = "Usage: manage-debug-invitation.mjs <seed|revoke>";
 
 export type DebugInvitationAction = "seed" | "revoke";
-
-export interface DebugInvitationCommand {
-  readonly action: DebugInvitationAction;
-  readonly code: string;
-}
 
 const requireOpaqueInvitationCode = (code: string): string => {
   if (!opaqueInvitationPattern.test(code)) {
@@ -35,19 +29,20 @@ const requireOpaqueInvitationCode = (code: string): string => {
 
 export const parseDebugInvitationArguments = (
   argumentsList: readonly string[],
-): DebugInvitationCommand => {
+): DebugInvitationAction => {
   const action = argumentsList[0];
-  const code = argumentsList[1];
   if (
-    argumentsList.length !== 2 ||
-    (action !== "seed" && action !== "revoke") ||
-    code === undefined
+    argumentsList.length !== 1 ||
+    (action !== "seed" && action !== "revoke")
   ) {
     throw new Error(commandUsage);
   }
 
-  return { action, code: requireOpaqueInvitationCode(code) };
+  return action;
 };
+
+export const readDebugInvitationCode = (standardInput: string): string =>
+  requireOpaqueInvitationCode(standardInput.trim());
 
 export const requireDebugInvitationProject = (
   projectID: string | undefined,
@@ -110,30 +105,51 @@ export const planDebugInvitationAdministration = (
   existingData: Readonly<Record<string, unknown>> | undefined,
 ): DebugInvitationAdministration => {
   if (action === "seed") {
+    if (existingData === undefined) {
+      return { kind: "set", data: invitation.data };
+    }
     if (existingData?.consumedByUserID != null) {
       throw new Error(
         "The Debug invitation is consumed; rotate it explicitly.",
       );
     }
-    return { kind: "set", data: invitation.data };
+    return {
+      kind: "set",
+      data: {
+        ...invitation.data,
+        recordVersion: nextExistingRecordVersion(existingData),
+      },
+    };
   }
 
   if (existingData === undefined) {
     return { kind: "none" };
   }
 
-  const currentVersion = existingData.recordVersion;
-  const recordVersion =
-    typeof currentVersion === "number" &&
-    Number.isSafeInteger(currentVersion) &&
-    currentVersion >= 1 &&
-    currentVersion < Number.MAX_SAFE_INTEGER
-      ? currentVersion + 1
-      : 2;
   return {
     kind: "update",
-    data: { isActive: false, recordVersion },
+    data: {
+      isActive: false,
+      recordVersion: nextExistingRecordVersion(existingData),
+    },
   };
+};
+
+const nextExistingRecordVersion = (
+  existingData: Readonly<Record<string, unknown>>,
+): number => {
+  const currentVersion = existingData.recordVersion;
+  if (
+    typeof currentVersion !== "number" ||
+    !Number.isSafeInteger(currentVersion) ||
+    currentVersion < 1 ||
+    currentVersion >= Number.MAX_SAFE_INTEGER
+  ) {
+    throw new Error(
+      "Existing Debug invitation requires a valid positive recordVersion below Number.MAX_SAFE_INTEGER.",
+    );
+  }
+  return currentVersion + 1;
 };
 
 export const debugInvitationLogMessage = (
