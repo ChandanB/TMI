@@ -20,7 +20,7 @@ struct StudentSurveyFlow: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var currentStepIndex = 0
-    @State private var responses: [String: SurveyResponse.SurveyAnswerValue] = [:]
+    @State private var responses: [String: LegacySurveyResponse.SurveyAnswerValue] = [:]
     @State private var showingResults = false
     @State private var surveyStartTime = Date()
 

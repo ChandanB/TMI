@@ -15,10 +15,10 @@ struct SurveyStep: Identifiable {
     let title: String
     let subtitle: String?
     let type: SurveyStepType
-    let options: [SurveyOption]
+    let options: [LegacySurveyOption]
     let isRequired: Bool
 
-    init(id: String, title: String, subtitle: String? = nil, type: SurveyStepType, options: [SurveyOption] = [], isRequired: Bool = true) {
+    init(id: String, title: String, subtitle: String? = nil, type: SurveyStepType, options: [LegacySurveyOption] = [], isRequired: Bool = true) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -37,7 +37,7 @@ enum SurveyStepType {
     case dreamJob        // Special career dream input
 }
 
-struct SurveyOption: Identifiable {
+struct LegacySurveyOption: Identifiable {
     let id: String
     let text: String
     let icon: String
@@ -55,7 +55,7 @@ struct SurveyOption: Identifiable {
 
 // MARK: - Survey Response
 
-nonisolated struct SurveyResponse: Codable, Identifiable, Sendable {
+nonisolated struct LegacySurveyResponse: Codable, Identifiable, Sendable {
     let id: UUID
     let studentId: String
     let responses: [String: SurveyAnswerValue]
@@ -297,14 +297,14 @@ struct SurveyConfiguration {
             subtitle: "Select all that interest you",
             type: .multiSelect,
             options: [
-                SurveyOption(id: "audio_media", text: "Audio & Media", icon: "mic.fill", interestCategory: "audio_media", weight: 1.0),
-                SurveyOption(id: "health_wellness", text: "Health & Wellness", icon: "heart.fill", interestCategory: "health_wellness", weight: 1.0),
-                SurveyOption(id: "technology", text: "Technology & Gaming", icon: "laptopcomputer", interestCategory: "technology", weight: 1.0),
-                SurveyOption(id: "creative_arts", text: "Creative Arts", icon: "paintpalette.fill", interestCategory: "creative_arts", weight: 1.0),
-                SurveyOption(id: "sports", text: "Sports & Athletics", icon: "figure.run", interestCategory: "sports_athletics", weight: 1.0),
-                SurveyOption(id: "business", text: "Business & Entrepreneurship", icon: "briefcase.fill", interestCategory: "business_entrepreneurship", weight: 1.0),
-                SurveyOption(id: "education", text: "Education & Teaching", icon: "book.fill", interestCategory: "education", weight: 1.0),
-                SurveyOption(id: "social_services", text: "Helping Others", icon: "hands.sparkles.fill", interestCategory: "social_services", weight: 1.0)
+                LegacySurveyOption(id: "audio_media", text: "Audio & Media", icon: "mic.fill", interestCategory: "audio_media", weight: 1.0),
+                LegacySurveyOption(id: "health_wellness", text: "Health & Wellness", icon: "heart.fill", interestCategory: "health_wellness", weight: 1.0),
+                LegacySurveyOption(id: "technology", text: "Technology & Gaming", icon: "laptopcomputer", interestCategory: "technology", weight: 1.0),
+                LegacySurveyOption(id: "creative_arts", text: "Creative Arts", icon: "paintpalette.fill", interestCategory: "creative_arts", weight: 1.0),
+                LegacySurveyOption(id: "sports", text: "Sports & Athletics", icon: "figure.run", interestCategory: "sports_athletics", weight: 1.0),
+                LegacySurveyOption(id: "business", text: "Business & Entrepreneurship", icon: "briefcase.fill", interestCategory: "business_entrepreneurship", weight: 1.0),
+                LegacySurveyOption(id: "education", text: "Education & Teaching", icon: "book.fill", interestCategory: "education", weight: 1.0),
+                LegacySurveyOption(id: "social_services", text: "Helping Others", icon: "hands.sparkles.fill", interestCategory: "social_services", weight: 1.0)
             ]
         ),
 
@@ -323,10 +323,10 @@ struct SurveyConfiguration {
             subtitle: "Choose your preferred way",
             type: .singleSelect,
             options: [
-                SurveyOption(id: "video", text: "Watching videos", icon: "play.rectangle.fill"),
-                SurveyOption(id: "reading", text: "Reading articles & books", icon: "book.fill"),
-                SurveyOption(id: "hands_on", text: "Hands-on practice", icon: "hand.raised.fill"),
-                SurveyOption(id: "collaboration", text: "Working with others", icon: "person.2.fill")
+                LegacySurveyOption(id: "video", text: "Watching videos", icon: "play.rectangle.fill"),
+                LegacySurveyOption(id: "reading", text: "Reading articles & books", icon: "book.fill"),
+                LegacySurveyOption(id: "hands_on", text: "Hands-on practice", icon: "hand.raised.fill"),
+                LegacySurveyOption(id: "collaboration", text: "Working with others", icon: "person.2.fill")
             ]
         ),
 

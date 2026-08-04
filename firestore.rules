@@ -476,36 +476,21 @@ service cloud.firestore {
 
         match /responses/{responseID} {
           allow read: if canReadStudent(
-            districtID,
-            studentID,
-            studentData(districtID, studentID)
-          );
-          allow create: if canCollaborateOnStudent(districtID, studentID)
-            || (
-              respondentMayWriteRecord(
-                districtID,
-                studentID,
-                'writeDraft'
-              )
-              && request.resource.data.get('assignmentID', '')
-                == respondentAssignmentID(districtID)
-              && request.resource.data.get('status', '') == 'draft'
-            );
-          allow update: if respondentMayUpdateRecord(
               districtID,
               studentID,
-              request.resource.data.get('status', '') == 'submitted'
-                ? 'submitAssignment'
-                : 'writeDraft'
+              studentData(districtID, studentID)
             )
-            && request.resource.data.get('assignmentID', '')
-              == respondentAssignmentID(districtID)
-            && resource.data.get('assignmentID', '')
-              == respondentAssignmentID(districtID)
-            && resource.data.get('status', '') == 'draft'
-            && request.resource.data.get('status', '')
-              in ['draft', 'submitted'];
-          allow delete: if false;
+            || (
+              respondentMay(districtID, studentID, 'readAssignment')
+              && resource.data.get('districtID', '') == districtID
+              && resource.data.get('studentID', '') == studentID
+              && resource.data.get('assignmentID', '')
+                == respondentAssignmentID(districtID)
+              && resource.data.get('attemptID', '') == responseID
+            );
+          // Draft synchronization, submission, and review are trusted
+          // transactions. No client may directly mutate canonical history.
+          allow create, update, delete: if false;
         }
 
         match /progress/{entryID} {
@@ -920,12 +905,31 @@ service cloud.firestore {
           ]
         )
         || (
-          catalogName == 'careers'
-          && resource.data.get('isApproved', false) == true
-          && respondentMay(
-            trustedDistrictID(),
-            request.auth.token.get('tmiStudentID', ''),
-            'readCareerCatalog'
+          (
+            catalogName == 'careers'
+            && resource.data.get('isApproved', false) == true
+            && respondentMay(
+              trustedDistrictID(),
+              request.auth.token.get('tmiStudentID', ''),
+              'readCareerCatalog'
+            )
+          )
+          || (
+            catalogName == 'surveyDefinitions'
+            && resource.data.get('state', '') == 'published'
+            && respondentMay(
+              trustedDistrictID(),
+              request.auth.token.get('tmiStudentID', ''),
+              'readAssignment'
+            )
+            && respondentAssignment(trustedDistrictID()).get(
+              'definitionID',
+              ''
+            ) == resource.data.get('definitionID', '')
+            && respondentAssignment(trustedDistrictID()).get(
+              'definitionVersion',
+              0
+            ) == resource.data.get('version', -1)
           )
         );
       allow write: if false;

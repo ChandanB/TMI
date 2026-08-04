@@ -802,7 +802,7 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
     }
   });
 
-  it("writes only scoped student response state", async () => {
+  it("writes scoped non-survey state while survey history stays trusted", async () => {
     const db = respondentContext().firestore();
     const scopedFields = {
       districtID,
@@ -810,15 +810,6 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
       respondentSessionID: sessionID,
     };
     const writes: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
-      [
-        `districts/${districtID}/students/${studentID}/responses/response-1`,
-        {
-          ...scopedFields,
-          assignmentID,
-          status: "draft",
-          answers: { q1: "answer" },
-        },
-      ],
       [
         `districts/${districtID}/students/${studentID}/interests/interest-1`,
         { ...scopedFields, interestID: "career-tech" },
@@ -843,13 +834,18 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
     for (const [path, data] of writes) {
       await assertSucceeds(setDoc(doc(db, path), data));
     }
-    await assertSucceeds(
-      updateDoc(
+    await assertFails(
+      setDoc(
         doc(
           db,
           `districts/${districtID}/students/${studentID}/responses/response-1`,
         ),
-        { status: "submitted" },
+        {
+          ...scopedFields,
+          assignmentID,
+          state: "draft",
+          answers: { q1: "answer" },
+        },
       ),
     );
   });
@@ -887,7 +883,7 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
         doc(db, `districts/${districtID}/formAssignments/${assignmentID}`),
       ),
     );
-    await assertSucceeds(
+    await assertFails(
       setDoc(
         doc(
           db,
@@ -923,26 +919,29 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
     );
   });
 
-  it("allows one draft submission transition and freezes submitted answers", async () => {
+  it("denies every direct survey response lifecycle mutation", async () => {
     const db = respondentContext().firestore();
     const response = doc(
       db,
       `districts/${districtID}/students/${studentID}/responses/immutable`,
     );
-    await assertSucceeds(
-      setDoc(response, {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(
+        context.firestore(),
+        `districts/${districtID}/students/${studentID}/responses/immutable`,
+      ), {
         districtID,
         studentID,
         respondentSessionID: sessionID,
         assignmentID,
-        status: "draft",
+        attemptID: "immutable",
+        state: "submitted",
         answers: { q1: "first" },
-      }),
-    );
-    await assertSucceeds(updateDoc(response, { answers: { q1: "revised" } }));
-    await assertSucceeds(updateDoc(response, { status: "submitted" }));
+      });
+    });
+    await assertSucceeds(getDoc(response));
     await assertFails(updateDoc(response, { answers: { q1: "mutated" } }));
-    await assertFails(updateDoc(response, { status: "draft" }));
+    await assertFails(updateDoc(response, { state: "draft" }));
   });
 
   it("denies every staff-only read class and cross-scope read", async () => {

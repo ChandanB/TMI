@@ -174,6 +174,38 @@ export interface RestoreStudentModeSessionRequest {
   readonly sessionID: string;
 }
 
+type SurveyAnswerType =
+  | "single"
+  | "multiple"
+  | "text"
+  | "rating"
+  | "image";
+
+interface SurveyAnswerPayload {
+  readonly type: SurveyAnswerType;
+  readonly value: string | number | readonly string[];
+}
+
+export interface SaveSurveyDraftRequest {
+  readonly districtID: string;
+  readonly studentID: string;
+  readonly assignmentID: string;
+  readonly attemptID: string;
+  readonly definitionID: string;
+  readonly definitionVersion: number;
+  readonly expectedRecordVersion: number;
+  readonly operationID: string;
+  readonly answers: Readonly<Record<string, SurveyAnswerPayload>>;
+}
+
+export interface SubmitSurveyResponseRequest
+  extends SaveSurveyDraftRequest {}
+
+export interface ReviewSurveyResponseRequest extends PrivilegedBaseRequest {
+  readonly studentID: string;
+  readonly responseID: string;
+}
+
 export interface StudentModeRespondentClaims
   extends Record<string, unknown> {
   readonly tmiDistrictID: string;
@@ -2576,6 +2608,1101 @@ const productionStudentModeHandlers = createStudentModeHandlers({
     getAuth().createCustomToken(userID, claims),
 });
 
+const surveyAnswerTypeValues = [
+  "single",
+  "multiple",
+  "text",
+  "rating",
+  "image",
+] as const satisfies readonly SurveyAnswerType[];
+const surveyQuestionTypeValues = [
+  "singleChoice",
+  "multiSelect",
+  "shortText",
+  "rating",
+  "imageChoice",
+] as const;
+type SurveyQuestionType = (typeof surveyQuestionTypeValues)[number];
+const surveyBranchEffectValues = ["show", "hide"] as const;
+const surveyPredicateTypeValues = [
+  "equals",
+  "contains",
+  "ratingAtLeast",
+  "textIsNotEmpty",
+] as const;
+type SurveyPredicateType = (typeof surveyPredicateTypeValues)[number];
+
+interface ParsedSurveyQuestion {
+  readonly id: string;
+  readonly type: SurveyQuestionType;
+  readonly required: boolean;
+  readonly optionIDs: ReadonlySet<string>;
+  readonly maxSelections?: number;
+  readonly maxLength?: number;
+  readonly minimum?: number;
+  readonly maximum?: number;
+}
+
+interface ParsedSurveyBranchRule {
+  readonly id: string;
+  readonly sourceQuestionID: string;
+  readonly targetQuestionID: string;
+  readonly priority: number;
+  readonly effect: "show" | "hide";
+  readonly predicate: {
+    readonly type: SurveyPredicateType;
+    readonly value?: string | number;
+  };
+}
+
+interface ParsedSurveyDefinition {
+  readonly data: DocumentData;
+  readonly definitionID: string;
+  readonly version: number;
+  readonly questions: readonly ParsedSurveyQuestion[];
+  readonly branchRules: readonly ParsedSurveyBranchRule[];
+}
+
+interface RespondentSurveyIdentity {
+  readonly userID: string;
+  readonly districtID: string;
+  readonly studentID: string;
+  readonly sessionID: string;
+  readonly assignmentID: string;
+  readonly operations: ReadonlySet<string>;
+}
+
+interface SurveyScopeData {
+  readonly identity: RespondentSurveyIdentity;
+  readonly assignment: DocumentData;
+  readonly definition: ParsedSurveyDefinition;
+}
+
+interface SurveyDependencies {
+  readonly firestore: Firestore;
+}
+
+const surveyResponsePath = (
+  districtID: string,
+  studentID: string,
+  attemptID: string,
+): string =>
+  `districts/${districtID}/students/${studentID}/responses/${attemptID}`;
+
+const surveyDefinitionPath = (
+  definitionID: string,
+  version: number,
+): string =>
+  `catalogs/surveyDefinitions/items/${definitionID}__v${version}`;
+
+const surveyDataLoss = (message: string): never => {
+  throw new HttpsError("failed-precondition", message);
+};
+
+const parseSurveyAnswers = (
+  value: unknown,
+): Readonly<Record<string, SurveyAnswerPayload>> => {
+  const record = requireRecord(value, "answers");
+  const entries = Object.entries(record);
+  if (entries.length > 100) {
+    throw new HttpsError(
+      "invalid-argument",
+      "answers contains too many questions.",
+    );
+  }
+  const answers: Record<string, SurveyAnswerPayload> = {};
+  for (const [questionID, rawAnswer] of entries) {
+    requireIdentifier(questionID, "answer questionID");
+    const answer = requireRecord(rawAnswer, `answers.${questionID}`);
+    rejectUnexpectedFields(answer, new Set(["type", "value"]));
+    const type = requireEnum(
+      answer.type,
+      `answers.${questionID}.type`,
+      surveyAnswerTypeValues,
+    );
+    switch (type) {
+      case "single":
+      case "image":
+        answers[questionID] = {
+          type,
+          value: requireIdentifier(
+            answer.value,
+            `answers.${questionID}.value`,
+          ),
+        };
+        break;
+      case "multiple": {
+        const values = requireIdentifierArray(
+          answer.value,
+          `answers.${questionID}.value`,
+          { allowEmpty: true, maximumCount: 100 },
+        );
+        if (new Set(values).size !== values.length) {
+          throw new HttpsError(
+            "invalid-argument",
+            `answers.${questionID}.value contains duplicates.`,
+          );
+        }
+        answers[questionID] = { type, value: [...values].sort() };
+        break;
+      }
+      case "text": {
+        if (
+          typeof answer.value !== "string" ||
+          Buffer.byteLength(answer.value, "utf8") > 4_000 ||
+          /\p{Cc}/u.test(answer.value)
+        ) {
+          throw new HttpsError(
+            "invalid-argument",
+            `answers.${questionID}.value is malformed.`,
+          );
+        }
+        answers[questionID] = { type, value: answer.value };
+        break;
+      }
+      case "rating":
+        answers[questionID] = {
+          type,
+          value: requireInteger(
+            answer.value,
+            `answers.${questionID}.value`,
+            Number.MIN_SAFE_INTEGER,
+          ),
+        };
+        break;
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(answers).sort(([left], [right]) =>
+      left < right ? -1 : left > right ? 1 : 0,
+    ),
+  );
+};
+
+const parseSurveyMutationRequest = (
+  value: unknown,
+): SaveSurveyDraftRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(
+    data,
+    new Set([
+      "districtID",
+      "studentID",
+      "assignmentID",
+      "attemptID",
+      "definitionID",
+      "definitionVersion",
+      "expectedRecordVersion",
+      "operationID",
+      "answers",
+    ]),
+  );
+  return {
+    districtID: requireIdentifier(data.districtID, "districtID"),
+    studentID: requireIdentifier(data.studentID, "studentID"),
+    assignmentID: requireIdentifier(data.assignmentID, "assignmentID"),
+    attemptID: requireIdentifier(data.attemptID, "attemptID"),
+    definitionID: requireIdentifier(data.definitionID, "definitionID"),
+    definitionVersion: requireInteger(
+      data.definitionVersion,
+      "definitionVersion",
+      1,
+    ),
+    expectedRecordVersion: requireInteger(
+      data.expectedRecordVersion,
+      "expectedRecordVersion",
+      0,
+    ),
+    operationID: requireIdentifier(data.operationID, "operationID"),
+    answers: parseSurveyAnswers(data.answers),
+  };
+};
+
+const parseReviewSurveyResponseRequest = (
+  value: unknown,
+): ReviewSurveyResponseRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(
+    data,
+    withBaseFields("studentID", "responseID"),
+  );
+  return {
+    ...parseBaseRequest(data),
+    studentID: requireIdentifier(data.studentID, "studentID"),
+    responseID: requireIdentifier(data.responseID, "responseID"),
+  };
+};
+
+const parseRespondentSurveyIdentity = <T>(
+  request: CallableRequest<T>,
+): RespondentSurveyIdentity => {
+  if (request.auth === undefined) {
+    throw new HttpsError("unauthenticated", "Authentication is required.");
+  }
+  if (request.app === undefined) {
+    throw new HttpsError(
+      "failed-precondition",
+      "App Check verification is required.",
+    );
+  }
+  const token = request.auth.token;
+  const assignmentIDs = requireIdentifierArray(
+    token.tmiAssignmentIDs,
+    "trusted assignment IDs",
+    { allowEmpty: false, maximumCount: 1 },
+  );
+  const operations = requireIdentifierArray(
+    token.tmiAllowedOperations,
+    "trusted operations",
+    { allowEmpty: false, maximumCount: studentModeOperationValues.length },
+  );
+  const assignmentID = assignmentIDs[0];
+  if (
+    token.tmiAccessClass !== "respondent" ||
+    assignmentID === undefined ||
+    new Set(operations).size !== operations.length ||
+    !operations.every((operation) =>
+      studentModeOperationValues.includes(
+        operation as StudentModeOperation,
+      ))
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "The respondent credential scope is malformed.",
+    );
+  }
+  return {
+    userID: request.auth.uid,
+    districtID: requireIdentifier(token.tmiDistrictID, "trusted districtID"),
+    studentID: requireIdentifier(token.tmiStudentID, "trusted studentID"),
+    sessionID: requireIdentifier(token.tmiSessionID, "trusted sessionID"),
+    assignmentID,
+    operations: new Set(operations),
+  };
+};
+
+const parseSurveyDefinition = (
+  data: DocumentData | undefined,
+  expectedID: string,
+  expectedVersion: number,
+): ParsedSurveyDefinition => {
+  if (data === undefined) {
+    return surveyDataLoss("The assigned survey definition does not exist.");
+  }
+  if (
+    data.schemaVersion !== 1 ||
+    data.state !== "published" ||
+    data.definitionID !== expectedID ||
+    data.version !== expectedVersion ||
+    !Array.isArray(data.questions) ||
+    data.questions.length === 0 ||
+    data.questions.length > 100 ||
+    !Array.isArray(data.branchRules) ||
+    data.branchRules.length > 200
+  ) {
+    return surveyDataLoss("The assigned survey definition is malformed.");
+  }
+  const questionIDs = new Set<string>();
+  const questions: ParsedSurveyQuestion[] = data.questions.map(
+    (rawQuestion: unknown) => {
+      const question = requireRecord(rawQuestion, "survey question");
+      const id = requireIdentifier(question.id, "survey question.id");
+      if (questionIDs.has(id)) {
+        return surveyDataLoss("The survey definition repeats a question ID.");
+      }
+      questionIDs.add(id);
+      const type = requireEnum(
+        question.type,
+        "survey question.type",
+        surveyQuestionTypeValues,
+      );
+      if (typeof question.required !== "boolean") {
+        return surveyDataLoss("The survey question required flag is malformed.");
+      }
+      if (!Array.isArray(question.options) || question.options.length > 100) {
+        return surveyDataLoss("The survey question options are malformed.");
+      }
+      const optionIDs = new Set<string>();
+      for (const rawOption of question.options) {
+        const option = requireRecord(rawOption, "survey option");
+        const optionID = requireIdentifier(option.id, "survey option.id");
+        if (optionIDs.has(optionID)) {
+          return surveyDataLoss("The survey question repeats an option ID.");
+        }
+        optionIDs.add(optionID);
+      }
+      const base = {
+        id,
+        type,
+        required: question.required,
+        optionIDs,
+      };
+      switch (type) {
+        case "singleChoice":
+        case "imageChoice":
+          if (optionIDs.size === 0) {
+            return surveyDataLoss("A choice question has no options.");
+          }
+          return base;
+        case "multiSelect": {
+          if (optionIDs.size === 0) {
+            return surveyDataLoss("A multi-select question has no options.");
+          }
+          const maxSelections = question.maxSelections === undefined
+            ? optionIDs.size
+            : requireInteger(
+              question.maxSelections,
+              "survey question.maxSelections",
+              1,
+              optionIDs.size,
+            );
+          return { ...base, maxSelections };
+        }
+        case "shortText": {
+          if (optionIDs.size !== 0) {
+            return surveyDataLoss("A text question cannot have options.");
+          }
+          const maxLength = requireInteger(
+            question.maxLength,
+            "survey question.maxLength",
+            1,
+            4_000,
+          );
+          return { ...base, maxLength };
+        }
+        case "rating": {
+          if (optionIDs.size !== 0) {
+            return surveyDataLoss("A rating question cannot have options.");
+          }
+          const minimum = requireInteger(
+            question.minimum,
+            "survey question.minimum",
+            Number.MIN_SAFE_INTEGER,
+          );
+          const maximum = requireInteger(
+            question.maximum,
+            "survey question.maximum",
+            minimum + 1,
+          );
+          return { ...base, minimum, maximum };
+        }
+      }
+    },
+  );
+  const questionsByID = new Map(questions.map((question) => [question.id, question]));
+  const ruleIDs = new Set<string>();
+  const branchRules: ParsedSurveyBranchRule[] = data.branchRules.map(
+    (rawRule: unknown) => {
+      const rule = requireRecord(rawRule, "survey branch rule");
+      const id = requireIdentifier(rule.id, "survey branch rule.id");
+      if (ruleIDs.has(id)) {
+        return surveyDataLoss("The survey definition repeats a branch rule ID.");
+      }
+      ruleIDs.add(id);
+      const sourceQuestionID = requireIdentifier(
+        rule.sourceQuestionID,
+        "survey branch rule.sourceQuestionID",
+      );
+      const targetQuestionID = requireIdentifier(
+        rule.targetQuestionID,
+        "survey branch rule.targetQuestionID",
+      );
+      const source = questionsByID.get(sourceQuestionID);
+      if (source === undefined || !questionsByID.has(targetQuestionID)) {
+        return surveyDataLoss("A survey branch references an unknown question.");
+      }
+      const predicateData = requireRecord(
+        rule.predicate,
+        "survey branch rule.predicate",
+      );
+      const predicateType = requireEnum(
+        predicateData.type,
+        "survey branch rule.predicate.type",
+        surveyPredicateTypeValues,
+      );
+      let predicate: ParsedSurveyBranchRule["predicate"];
+      switch (predicateType) {
+        case "equals":
+        case "contains": {
+          const optionID = requireIdentifier(
+            predicateData.value,
+            "survey branch rule.predicate.value",
+          );
+          const expectedType = predicateType === "contains"
+            ? "multiSelect"
+            : source.type;
+          if (
+            (predicateType === "contains" && expectedType !== source.type) ||
+            (predicateType === "equals" &&
+              source.type !== "singleChoice" &&
+              source.type !== "imageChoice") ||
+            !source.optionIDs.has(optionID)
+          ) {
+            return surveyDataLoss("A survey branch predicate is incompatible.");
+          }
+          predicate = { type: predicateType, value: optionID };
+          break;
+        }
+        case "ratingAtLeast": {
+          if (
+            source.type !== "rating" ||
+            source.minimum === undefined ||
+            source.maximum === undefined
+          ) {
+            return surveyDataLoss("A survey branch predicate is incompatible.");
+          }
+          const value = requireInteger(
+            predicateData.value,
+            "survey branch rule.predicate.value",
+            source.minimum,
+            source.maximum,
+          );
+          predicate = { type: predicateType, value };
+          break;
+        }
+        case "textIsNotEmpty":
+          if (source.type !== "shortText") {
+            return surveyDataLoss("A survey branch predicate is incompatible.");
+          }
+          predicate = { type: predicateType };
+          break;
+      }
+      return {
+        id,
+        sourceQuestionID,
+        targetQuestionID,
+        priority: requireInteger(
+          rule.priority,
+          "survey branch rule.priority",
+          Number.MIN_SAFE_INTEGER,
+        ),
+        effect: requireEnum(
+          rule.effect,
+          "survey branch rule.effect",
+          surveyBranchEffectValues,
+        ),
+        predicate,
+      };
+    },
+  );
+  const dependencies = new Map<string, Set<string>>();
+  for (const rule of branchRules) {
+    const existing = dependencies.get(rule.targetQuestionID) ?? new Set<string>();
+    existing.add(rule.sourceQuestionID);
+    dependencies.set(rule.targetQuestionID, existing);
+  }
+  const visited = new Set<string>();
+  const visiting = new Set<string>();
+  const visit = (questionID: string): void => {
+    if (visiting.has(questionID)) {
+      return surveyDataLoss("The survey branch graph contains a cycle.");
+    }
+    if (visited.has(questionID)) {
+      return;
+    }
+    visiting.add(questionID);
+    for (const dependency of dependencies.get(questionID) ?? []) {
+      visit(dependency);
+    }
+    visiting.delete(questionID);
+    visited.add(questionID);
+  };
+  for (const question of questions) {
+    visit(question.id);
+  }
+  return {
+    data,
+    definitionID: expectedID,
+    version: expectedVersion,
+    questions,
+    branchRules,
+  };
+};
+
+const validateAnswersAgainstDefinition = (
+  answers: Readonly<Record<string, SurveyAnswerPayload>>,
+  definition: ParsedSurveyDefinition,
+  requireVisible: boolean,
+): void => {
+  const questionsByID = new Map(
+    definition.questions.map((question) => [question.id, question]),
+  );
+  for (const [questionID, answer] of Object.entries(answers)) {
+    const question = questionsByID.get(questionID);
+    if (question === undefined) {
+      throw new HttpsError(
+        "invalid-argument",
+        "An answer references an unknown question.",
+      );
+    }
+    const typeMatches =
+      (question.type === "singleChoice" && answer.type === "single") ||
+      (question.type === "multiSelect" && answer.type === "multiple") ||
+      (question.type === "shortText" && answer.type === "text") ||
+      (question.type === "rating" && answer.type === "rating") ||
+      (question.type === "imageChoice" && answer.type === "image");
+    if (!typeMatches) {
+      throw new HttpsError("invalid-argument", "An answer has the wrong type.");
+    }
+    if (typeof answer.value === "string") {
+      if (
+        (answer.type === "single" || answer.type === "image") &&
+        !question.optionIDs.has(answer.value)
+      ) {
+        throw new HttpsError("invalid-argument", "An answer option is unknown.");
+      }
+      if (answer.type === "text" && answer.value.length > (question.maxLength ?? 0)) {
+        throw new HttpsError("invalid-argument", "A text answer is too long.");
+      }
+    } else if (Array.isArray(answer.value)) {
+      if (
+        answer.value.length > (question.maxSelections ?? 0) ||
+        !answer.value.every((optionID) => question.optionIDs.has(optionID))
+      ) {
+        throw new HttpsError("invalid-argument", "A multi-select answer is invalid.");
+      }
+    } else {
+      if (
+        typeof answer.value !== "number" ||
+        answer.value < (question.minimum ?? Number.MAX_SAFE_INTEGER) ||
+        answer.value > (question.maximum ?? Number.MIN_SAFE_INTEGER)
+      ) {
+        throw new HttpsError("invalid-argument", "A rating answer is out of range.");
+      }
+    }
+  }
+  if (!requireVisible) {
+    return;
+  }
+  const rulesByTarget = new Map<string, ParsedSurveyBranchRule[]>();
+  for (const rule of definition.branchRules) {
+    const rules = rulesByTarget.get(rule.targetQuestionID) ?? [];
+    rules.push(rule);
+    rulesByTarget.set(rule.targetQuestionID, rules);
+  }
+  const visibility = new Map<string, boolean>();
+  const predicateMatches = (
+    rule: ParsedSurveyBranchRule,
+    answer: SurveyAnswerPayload | undefined,
+  ): boolean => {
+    if (answer === undefined) {
+      return false;
+    }
+    switch (rule.predicate.type) {
+      case "equals":
+        return answer.value === rule.predicate.value;
+      case "contains":
+        return Array.isArray(answer.value) &&
+          answer.value.includes(rule.predicate.value as string);
+      case "ratingAtLeast":
+        return typeof answer.value === "number" &&
+          answer.value >= (rule.predicate.value as number);
+      case "textIsNotEmpty":
+        return typeof answer.value === "string" && answer.value.trim().length > 0;
+    }
+  };
+  const isVisible = (questionID: string): boolean => {
+    const cached = visibility.get(questionID);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const rules = rulesByTarget.get(questionID);
+    if (rules === undefined || rules.length === 0) {
+      visibility.set(questionID, true);
+      return true;
+    }
+    const ordered = [...rules].sort((left, right) =>
+      left.priority !== right.priority
+        ? right.priority - left.priority
+        : left.id < right.id ? -1 : left.id > right.id ? 1 : 0,
+    );
+    for (const rule of ordered) {
+      if (
+        isVisible(rule.sourceQuestionID) &&
+        predicateMatches(rule, answers[rule.sourceQuestionID])
+      ) {
+        const result = rule.effect === "show";
+        visibility.set(questionID, result);
+        return result;
+      }
+    }
+    visibility.set(questionID, false);
+    return false;
+  };
+  for (const question of definition.questions) {
+    if (!question.required || !isVisible(question.id)) {
+      continue;
+    }
+    const answer = answers[question.id];
+    const meaningful = answer !== undefined &&
+      (typeof answer.value === "number" ||
+        (typeof answer.value === "string" && answer.value.trim().length > 0) ||
+        (Array.isArray(answer.value) && answer.value.length > 0));
+    if (!meaningful) {
+      throw new HttpsError(
+        "failed-precondition",
+        `A required visible answer is missing for ${question.id}.`,
+      );
+    }
+  }
+};
+
+const surveyRequestFingerprint = (
+  data: SaveSurveyDraftRequest,
+): string => createHash("sha256").update(JSON.stringify(data)).digest("hex");
+
+const requireSurveyScope = async (
+  firestore: Firestore,
+  transaction: Transaction,
+  request: CallableRequest<SaveSurveyDraftRequest>,
+  data: SaveSurveyDraftRequest,
+  operation: "writeDraft" | "submitAssignment",
+): Promise<SurveyScopeData> => {
+  const identity = parseRespondentSurveyIdentity(request);
+  if (
+    identity.districtID !== data.districtID ||
+    identity.studentID !== data.studentID ||
+    identity.assignmentID !== data.assignmentID ||
+    !identity.operations.has(operation)
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "The survey request is outside the respondent session scope.",
+    );
+  }
+  const sessionReference = firestore.doc(
+    `districts/${identity.districtID}/studentModeSessions/${identity.sessionID}`,
+  );
+  const assignmentReference = firestore.doc(
+    `districts/${identity.districtID}/formAssignments/${identity.assignmentID}`,
+  );
+  const studentReference = firestore.doc(
+    `districts/${identity.districtID}/students/${identity.studentID}`,
+  );
+  const definitionReference = firestore.doc(
+    surveyDefinitionPath(data.definitionID, data.definitionVersion),
+  );
+  const [sessionSnapshot, assignmentSnapshot, studentSnapshot, definitionSnapshot] =
+    await Promise.all([
+      transaction.get(sessionReference),
+      transaction.get(assignmentReference),
+      transaction.get(studentReference),
+      transaction.get(definitionReference),
+    ]);
+  const session = sessionSnapshot.data();
+  const assignment = assignmentSnapshot.data();
+  const student = studentSnapshot.data();
+  const expiresAt = session?.expiresAt;
+  const storedAssignments = session?.assignmentIDs;
+  const storedOperations = session?.allowedOperations;
+  if (
+    session === undefined ||
+    session.status !== "active" ||
+    !(expiresAt instanceof Timestamp) ||
+    expiresAt.toMillis() <= Date.now() ||
+    session.districtID !== identity.districtID ||
+    session.studentID !== identity.studentID ||
+    session.respondentUserID !== identity.userID ||
+    !Array.isArray(storedAssignments) ||
+    storedAssignments.length !== 1 ||
+    storedAssignments[0] !== identity.assignmentID ||
+    !Array.isArray(storedOperations) ||
+    storedOperations.length !== identity.operations.size ||
+    !storedOperations.every((value: unknown) =>
+      typeof value === "string" && identity.operations.has(value))
+  ) {
+    throw new HttpsError(
+      "failed-precondition",
+      "The respondent session is no longer active.",
+    );
+  }
+  if (
+    assignment === undefined ||
+    assignment.districtId !== identity.districtID ||
+    assignment.assignmentType !== "survey" ||
+    assignment.isActive !== true ||
+    !Array.isArray(assignment.studentIDs) ||
+    !assignment.studentIDs.includes(identity.studentID) ||
+    assignment.definitionID !== data.definitionID ||
+    assignment.definitionVersion !== data.definitionVersion ||
+    assignment.attemptID !== data.attemptID
+  ) {
+    throw new HttpsError(
+      "failed-precondition",
+      "The survey assignment is revoked or does not match this attempt.",
+    );
+  }
+  if (
+    student === undefined ||
+    student.districtId !== identity.districtID ||
+    student.isArchived === true
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "The assigned student is unavailable.",
+    );
+  }
+  const parsedDefinition = parseSurveyDefinition(
+    definitionSnapshot.data(),
+    data.definitionID,
+    data.definitionVersion,
+  );
+  validateAnswersAgainstDefinition(data.answers, parsedDefinition, false);
+  return { identity, assignment, definition: parsedDefinition };
+};
+
+const requireStoredOperationIDs = (value: unknown): string[] => {
+  if (
+    !Array.isArray(value) ||
+    value.length > 1_000 ||
+    !value.every((item) => typeof item === "string") ||
+    new Set(value).size !== value.length
+  ) {
+    return surveyDataLoss("The survey response operation history is malformed.");
+  }
+  return value;
+};
+
+const exactSurveyReplay = (
+  response: DocumentData,
+  operationID: string,
+  fingerprint: string,
+): boolean => {
+  const operationIDs = requireStoredOperationIDs(response.operationIDs);
+  if (!operationIDs.includes(operationID)) {
+    return false;
+  }
+  const fingerprints = requireRecord(
+    response.operationFingerprints,
+    "survey response operation fingerprints",
+  );
+  if (fingerprints[operationID] !== fingerprint) {
+    throw new HttpsError(
+      "already-exists",
+      "The survey operation ID was reused with different content.",
+    );
+  }
+  return true;
+};
+
+export const createSurveyHandlers = (
+  dependencies: SurveyDependencies,
+) => ({
+  saveDraft: async (
+    request: CallableRequest<SaveSurveyDraftRequest>,
+  ): Promise<PrivilegedOperationResult> => {
+    const data = parseSurveyMutationRequest(request.data);
+    const identity = parseRespondentSurveyIdentity(request);
+    const fingerprint = surveyRequestFingerprint(data);
+    return dependencies.firestore.runTransaction(async (transaction) => {
+      const scope = await requireSurveyScope(
+        dependencies.firestore,
+        transaction,
+        request,
+        data,
+        "writeDraft",
+      );
+      const reference = dependencies.firestore.doc(
+        surveyResponsePath(data.districtID, data.studentID, data.attemptID),
+      );
+      const snapshot = await transaction.get(reference);
+      const response = snapshot.data();
+      if (response !== undefined && exactSurveyReplay(
+        response,
+        data.operationID,
+        fingerprint,
+      )) {
+        return {
+          operationID: data.operationID,
+          recordVersion: requireInteger(
+            response.recordVersion,
+            "survey response.recordVersion",
+            1,
+          ),
+          replayed: true,
+        };
+      }
+      if (response === undefined) {
+        if (data.expectedRecordVersion !== 0) {
+          throw new HttpsError("aborted", "The survey draft version is stale.");
+        }
+        transaction.create(reference, {
+          schemaVersion: 1,
+          responseID: data.attemptID,
+          districtID: data.districtID,
+          studentID: data.studentID,
+          assignmentID: data.assignmentID,
+          attemptID: data.attemptID,
+          definitionID: data.definitionID,
+          definitionVersion: data.definitionVersion,
+          state: "draft",
+          recordVersion: 1,
+          answers: data.answers,
+          operationIDs: [data.operationID],
+          operationFingerprints: { [data.operationID]: fingerprint },
+          respondentUserID: scope.identity.userID,
+          respondentSessionID: scope.identity.sessionID,
+          syncState: "synced",
+          hasPendingChanges: false,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return {
+          operationID: data.operationID,
+          recordVersion: 1,
+          replayed: false,
+        };
+      }
+      const currentVersion = requireInteger(
+        response.recordVersion,
+        "survey response.recordVersion",
+        1,
+      );
+      if (
+        currentVersion !== data.expectedRecordVersion ||
+        response.state !== "draft"
+      ) {
+        throw new HttpsError(
+          response.state === "draft" ? "aborted" : "failed-precondition",
+          "The survey response can no longer be edited.",
+        );
+      }
+      if (
+        response.districtID !== data.districtID ||
+        response.studentID !== data.studentID ||
+        response.assignmentID !== data.assignmentID ||
+        response.attemptID !== data.attemptID ||
+        response.definitionID !== data.definitionID ||
+        response.definitionVersion !== data.definitionVersion
+      ) {
+        return surveyDataLoss("The stored survey response scope is malformed.");
+      }
+      const operationIDs = requireStoredOperationIDs(response.operationIDs);
+      const fingerprints = requireRecord(
+        response.operationFingerprints,
+        "survey response operation fingerprints",
+      );
+      const nextVersion = currentVersion + 1;
+      transaction.update(reference, {
+        answers: data.answers,
+        operationIDs: [...operationIDs, data.operationID],
+        operationFingerprints: {
+          ...fingerprints,
+          [data.operationID]: fingerprint,
+        },
+        respondentUserID: scope.identity.userID,
+        respondentSessionID: scope.identity.sessionID,
+        recordVersion: nextVersion,
+        syncState: "synced",
+        hasPendingChanges: false,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return {
+        operationID: data.operationID,
+        recordVersion: nextVersion,
+        replayed: false,
+      };
+    });
+  },
+
+  submitResponse: async (
+    request: CallableRequest<SubmitSurveyResponseRequest>,
+  ): Promise<PrivilegedOperationResult & { readonly submittedAt: string }> => {
+    const data = parseSurveyMutationRequest(request.data);
+    parseRespondentSurveyIdentity(request);
+    const fingerprint = surveyRequestFingerprint(data);
+    const result = await dependencies.firestore.runTransaction<
+      PrivilegedOperationResult
+    >(async (transaction) => {
+      const scope = await requireSurveyScope(
+        dependencies.firestore,
+        transaction,
+        request,
+        data,
+        "submitAssignment",
+      );
+      validateAnswersAgainstDefinition(data.answers, scope.definition, true);
+      const reference = dependencies.firestore.doc(
+        surveyResponsePath(data.districtID, data.studentID, data.attemptID),
+      );
+      const snapshot = await transaction.get(reference);
+      const response = snapshot.data();
+      if (response === undefined) {
+        throw new HttpsError(
+          "failed-precondition",
+          "A synchronized survey draft is required before submission.",
+        );
+      }
+      if (
+        response.submissionOperationID === data.operationID &&
+        response.submissionFingerprint === fingerprint &&
+        (response.state === "submitted" || response.state === "reviewed")
+      ) {
+        if (!(response.submittedAt instanceof Timestamp)) {
+          return surveyDataLoss("The survey submission time is malformed.");
+        }
+        return {
+          operationID: data.operationID,
+          recordVersion: requireInteger(
+            response.recordVersion,
+            "survey response.recordVersion",
+            2,
+          ),
+          replayed: true,
+        };
+      }
+      const currentVersion = requireInteger(
+        response.recordVersion,
+        "survey response.recordVersion",
+        1,
+      );
+      if (
+        currentVersion !== data.expectedRecordVersion ||
+        response.state !== "draft"
+      ) {
+        throw new HttpsError(
+          response.state === "draft" ? "aborted" : "failed-precondition",
+          "The survey response cannot be submitted from its current state.",
+        );
+      }
+      if (JSON.stringify(response.answers) !== JSON.stringify(data.answers)) {
+        throw new HttpsError(
+          "aborted",
+          "The submitted answers do not match the current draft version.",
+        );
+      }
+      const operationIDs = requireStoredOperationIDs(response.operationIDs);
+      const nextVersion = currentVersion + 1;
+      transaction.update(reference, {
+        state: "submitted",
+        recordVersion: nextVersion,
+        operationIDs: [...operationIDs, data.operationID],
+        submissionOperationID: data.operationID,
+        submissionFingerprint: fingerprint,
+        submittedAt: FieldValue.serverTimestamp(),
+        frozenDefinition: scope.definition.data,
+        sourceHistory: {
+          definitionID: data.definitionID,
+          definitionVersion: data.definitionVersion,
+          assignmentID: data.assignmentID,
+          attemptID: data.attemptID,
+          respondentSessionID: scope.identity.sessionID,
+        },
+        syncState: "synced",
+        hasPendingChanges: false,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return {
+        operationID: data.operationID,
+        recordVersion: nextVersion,
+        replayed: false,
+      };
+    });
+    const submittedSnapshot = await dependencies.firestore.doc(
+      surveyResponsePath(data.districtID, data.studentID, data.attemptID),
+    ).get();
+    const submittedAt = submittedSnapshot.get("submittedAt");
+    if (!(submittedAt instanceof Timestamp)) {
+      return surveyDataLoss("The survey submission time is malformed.");
+    }
+    return {
+      operationID: result.operationID,
+      recordVersion: result.recordVersion,
+      replayed: result.replayed,
+      submittedAt: submittedAt.toDate().toISOString(),
+    };
+  },
+
+  reviewResponse: async (
+    request: CallableRequest<ReviewSurveyResponseRequest>,
+  ): Promise<PrivilegedOperationResult & { readonly reviewedAt: string }> => {
+    const data = parseReviewSurveyResponseRequest(request.data);
+    const result = await executePrivilegedOperation(
+      dependencies.firestore,
+      request,
+      data,
+      {
+        action: "survey.response.review",
+        targetPath: () => surveyResponsePath(
+          data.districtID,
+          data.studentID,
+          data.responseID,
+        ),
+        requiredCapability: "student.write.detail",
+        auditDetails: () => ({
+          studentID: data.studentID,
+          responseID: data.responseID,
+        }),
+        mutate: async ({ transaction, membership, identity }) => {
+          const responseReference = dependencies.firestore.doc(
+            surveyResponsePath(
+              data.districtID,
+              data.studentID,
+              data.responseID,
+            ),
+          );
+          const studentReference = dependencies.firestore.doc(
+            `districts/${data.districtID}/students/${data.studentID}`,
+          );
+          const [responseSnapshot, studentSnapshot] = await Promise.all([
+            transaction.get(responseReference),
+            transaction.get(studentReference),
+          ]);
+          const response = requireExistingData(
+            responseSnapshot,
+            "Survey response",
+          );
+          const student = requireExistingData(studentSnapshot, "Student");
+          const schoolID = requireSchoolID(student, "Student");
+          if (
+            student.districtId !== data.districtID ||
+            !canReadStudentDetail(membership, data.studentID, schoolID) ||
+            response.districtID !== data.districtID ||
+            response.studentID !== data.studentID ||
+            response.responseID !== data.responseID
+          ) {
+            throw new HttpsError(
+              "permission-denied",
+              "The survey response is outside the member's scope.",
+            );
+          }
+          assertRecordVersion(
+            response.recordVersion,
+            data.expectedRecordVersion,
+          );
+          if (response.state !== "submitted") {
+            throw new HttpsError(
+              "failed-precondition",
+              "Only a submitted survey response can be reviewed.",
+            );
+          }
+          transaction.update(responseReference, {
+            state: "reviewed",
+            recordVersion: data.expectedRecordVersion + 1,
+            reviewedAt: FieldValue.serverTimestamp(),
+            reviewedBy: identity.userID,
+            reviewOperationID: data.idempotencyKey,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          return { recordVersion: data.expectedRecordVersion + 1 };
+        },
+      },
+    );
+    const snapshot = await dependencies.firestore.doc(
+      surveyResponsePath(data.districtID, data.studentID, data.responseID),
+    ).get();
+    const reviewedAt = snapshot.get("reviewedAt");
+    if (!(reviewedAt instanceof Timestamp)) {
+      return surveyDataLoss("The survey review time is malformed.");
+    }
+    return { ...result, reviewedAt: reviewedAt.toDate().toISOString() };
+  },
+});
+
+const productionSurveyHandlers = createSurveyHandlers({
+  firestore: getFirestore(),
+});
+
 const deletePersonalAccountDataHandler =
   createProductionDeletePersonalAccountDataHandler();
 const provisionStaffMembershipHandler =
@@ -2738,6 +3865,18 @@ export const restoreStudentModeSession = onCall(
 export const endStudentModeSession = onCall(
   callableOptions,
   productionStudentModeHandlers.endSession,
+);
+export const saveSurveyDraft = onCall(
+  callableOptions,
+  productionSurveyHandlers.saveDraft,
+);
+export const submitSurveyResponse = onCall(
+  callableOptions,
+  productionSurveyHandlers.submitResponse,
+);
+export const reviewSurveyResponse = onCall(
+  callableOptions,
+  productionSurveyHandlers.reviewResponse,
 );
 export const deletePersonalAccountData = onCall(
   { ...callableOptions, timeoutSeconds: 540 },

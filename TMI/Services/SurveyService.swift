@@ -317,10 +317,10 @@ final class SurveyService {
 
   /// Save student interest survey response
   func saveStudentSurveyResponse(
-    _ responses: [String: SurveyResponse.SurveyAnswerValue],
+    _ responses: [String: LegacySurveyResponse.SurveyAnswerValue],
     for studentId: String,
     duration: TimeInterval
-  ) async throws -> SurveyResponse {
+  ) async throws -> LegacySurveyResponse {
     _ = responses
     _ = studentId
     _ = duration
@@ -328,7 +328,7 @@ final class SurveyService {
   }
 
   /// Fetch latest interest survey for student
-  func fetchLatestStudentSurvey(for studentId: String) async throws -> SurveyResponse? {
+  func fetchLatestStudentSurvey(for studentId: String) async throws -> LegacySurveyResponse? {
     _ = studentId
     throw SurveyServiceError.studentSurveyPersistenceUnavailable
   }
@@ -356,7 +356,7 @@ final class SurveyService {
 
   // MARK: - Analysis Helpers
 
-  private func analyzeInterests(from responses: [String: SurveyResponse.SurveyAnswerValue]) -> [InterestCluster] {
+  private func analyzeInterests(from responses: [String: LegacySurveyResponse.SurveyAnswerValue]) -> [InterestCluster] {
     // Extract selected interests
     var selectedInterestIds: [String] = []
     if case .options(let options) = responses["interests"] {
@@ -572,7 +572,7 @@ extension SurveyService {
 
 // MARK: - Firestore Conversion Extensions
 
-nonisolated extension SurveyResponse {
+nonisolated extension LegacySurveyResponse {
   func toFirestoreData() -> [String: Any] {
     var data: [String: Any] = [
       "id": id.uuidString,

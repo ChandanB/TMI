@@ -9,7 +9,7 @@ import SwiftUI
 
 struct SurveyResultsView: View {
     let studentId: String
-    let responses: [String: SurveyResponse.SurveyAnswerValue]
+    let responses: [String: LegacySurveyResponse.SurveyAnswerValue]
     let surveyDuration: TimeInterval
     var context: SurveyContext = .studentDetail
     var onDismiss: (() -> Void)?

@@ -97,7 +97,7 @@ struct MultiSelectStepView: View {
 }
 
 struct MultiSelectOption: View {
-    let option: SurveyOption
+    let option: LegacySurveyOption
     let isSelected: Bool
     let onTap: () -> Void
 
@@ -180,7 +180,7 @@ struct SingleSelectStepView: View {
 }
 
 struct SingleSelectOption: View {
-    let option: SurveyOption
+    let option: LegacySurveyOption
     let isSelected: Bool
     let onTap: () -> Void
 
