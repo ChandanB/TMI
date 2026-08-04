@@ -486,10 +486,24 @@ Expected: all succeed; Release compilation does not require the Debug type.
 With authorized Application Default Credentials:
 
 ~~~bash
-TMI_DEBUG_INVITATION_PROJECT=tmi-education npm --prefix firebase run debug-invitation:seed -- VE1JLURlYnVnLUNhbm9uaWNhbC1JbnZpdGUtMjAyNiE
+printf 'Debug invitation code: ' >&2
+IFS= read -r -s TMI_DEBUG_INVITATION_CODE
+printf '\n' >&2
+printf '%s' "$TMI_DEBUG_INVITATION_CODE" | TMI_DEBUG_INVITATION_PROJECT=tmi-education npm --prefix firebase run debug-invitation:seed
+unset TMI_DEBUG_INVITATION_CODE
 ~~~
 
 Expected: success without printing the token.
+
+For the GA revoke/remove action, use the same stdin-only flow:
+
+~~~bash
+printf 'Debug invitation code for revocation: ' >&2
+IFS= read -r -s TMI_DEBUG_INVITATION_CODE
+printf '\n' >&2
+printf '%s' "$TMI_DEBUG_INVITATION_CODE" | TMI_DEBUG_INVITATION_PROJECT=tmi-education npm --prefix firebase run debug-invitation:revoke
+unset TMI_DEBUG_INVITATION_CODE
+~~~
 
 - [ ] **Step 4: Run ordinary Debug acceptance**
 
