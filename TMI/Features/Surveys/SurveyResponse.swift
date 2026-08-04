@@ -227,7 +227,23 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
             [String: SurveyAnswer].self,
             forKey: .answers
         )
-        operationIDs = Set(try container.decode([String].self, forKey: .operationIDs))
+        let decodedOperationIDs = try container.decode(
+            [String].self,
+            forKey: .operationIDs
+        )
+        guard schemaVersion == Self.currentSchemaVersion,
+              recordVersion >= 0,
+              answers.count <= 100,
+              decodedOperationIDs.count <= Self.maximumOperationCount,
+              Set(decodedOperationIDs).count == decodedOperationIDs.count,
+              decodedOperationIDs.allSatisfy(Self.isValidOperationID) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .operationIDs,
+                in: container,
+                debugDescription: "The canonical survey response is malformed."
+            )
+        }
+        operationIDs = Set(decodedOperationIDs)
         let syncValue = try container.decode(String.self, forKey: .syncState)
         switch syncValue {
         case "synced":
@@ -355,6 +371,7 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
         guard serverRecordVersion > recordVersion else {
             throw SurveyResponseMutationError.invalidRecordVersion
         }
+        try validateNewOperationID(operationID)
         state = .submitted
         recordVersion = serverRecordVersion
         operationIDs.insert(operationID)
@@ -393,6 +410,7 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
               let metadata = serverMetadata else {
             throw SurveyResponseMutationError.invalidRecordVersion
         }
+        try validateNewOperationID(operationID)
         state = .reviewed
         recordVersion = serverRecordVersion
         operationIDs.insert(operationID)
@@ -406,11 +424,92 @@ nonisolated struct SurveyResponse: Codable, Equatable, Sendable {
 
     private static func isValidOperationID(_ value: String) -> Bool {
         !value.isEmpty &&
+            value != "." &&
+            value != ".." &&
             value == value.trimmingCharacters(in: .whitespacesAndNewlines) &&
             value.utf8.count <= maximumOperationIDBytes &&
             !value.contains("/") &&
             value.unicodeScalars.allSatisfy {
                 !CharacterSet.controlCharacters.contains($0)
             }
+    }
+
+    func validateNewOperationID(_ operationID: String) throws {
+        guard Self.isValidOperationID(operationID),
+              !operationIDs.contains(operationID) else {
+            throw SurveyResponseMutationError.invalidOperationID
+        }
+        guard operationIDs.count < Self.maximumOperationCount else {
+            throw SurveyResponseMutationError.historyLimitReached
+        }
+    }
+}
+
+nonisolated struct SurveyStoredOperationResult: Codable, Equatable, Sendable {
+    let fingerprint: String
+    let userID: String
+    let sessionID: String?
+    let recordVersion: Int
+}
+
+nonisolated struct SurveyStoredResponseDocument: Codable, Equatable, Sendable {
+    let response: SurveyResponse
+    let operationResults: [String: SurveyStoredOperationResult]
+    let respondentUserID: String
+    let respondentSessionID: String
+    let createdAt: Date
+    let updatedAt: Date
+
+    private enum CodingKeys: String, CodingKey {
+        case operationResults
+        case respondentUserID
+        case respondentSessionID
+        case createdAt
+        case updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        response = try SurveyResponse(from: decoder)
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        operationResults = try container.decode(
+            [String: SurveyStoredOperationResult].self,
+            forKey: .operationResults
+        )
+        respondentUserID = try container.decode(
+            String.self,
+            forKey: .respondentUserID
+        )
+        respondentSessionID = try container.decode(
+            String.self,
+            forKey: .respondentSessionID
+        )
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        guard operationResults.count <= SurveyResponse.maximumOperationCount,
+              Set(operationResults.keys) == response.operationIDs,
+              !respondentUserID.isEmpty,
+              !respondentSessionID.isEmpty,
+              operationResults.values.allSatisfy({ result in
+                  result.fingerprint.count == 64 &&
+                      !result.userID.isEmpty &&
+                      result.recordVersion > 0 &&
+                      result.recordVersion <= response.recordVersion
+              }) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .operationResults,
+                in: container,
+                debugDescription: "The stored survey operation envelope is malformed."
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        try response.encode(to: encoder)
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(operationResults, forKey: .operationResults)
+        try container.encode(respondentUserID, forKey: .respondentUserID)
+        try container.encode(respondentSessionID, forKey: .respondentSessionID)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
     }
 }

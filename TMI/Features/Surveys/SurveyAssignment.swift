@@ -18,6 +18,7 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
     let definitionID: String
     let definitionVersion: Int
     let state: SurveyAssignmentState
+    let recordVersion: Int
     let assignedAt: Date
     let revokedAt: Date?
 
@@ -38,6 +39,7 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
         case definitionID
         case definitionVersion
         case state
+        case recordVersion
         case assignedAt
         case revokedAt
     }
@@ -50,6 +52,7 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
         definitionID: String,
         definitionVersion: Int,
         state: SurveyAssignmentState,
+        recordVersion: Int = 1,
         assignedAt: Date,
         revokedAt: Date? = nil
     ) throws {
@@ -63,7 +66,7 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
         guard identifiers.allSatisfy(Self.isValidIdentifier) else {
             throw SurveyAssignmentError.invalidIdentifier
         }
-        guard definitionVersion > 0 else {
+        guard definitionVersion > 0, recordVersion > 0 else {
             throw SurveyAssignmentError.invalidVersion
         }
         self.assignmentID = assignmentID
@@ -73,6 +76,7 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
         self.definitionID = definitionID
         self.definitionVersion = definitionVersion
         self.state = state
+        self.recordVersion = recordVersion
         self.assignedAt = assignedAt
         self.revokedAt = revokedAt
     }
@@ -96,6 +100,10 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
                 forKey: .definitionVersion
             ),
             state: container.decode(SurveyAssignmentState.self, forKey: .state),
+            recordVersion: container.decodeIfPresent(
+                Int.self,
+                forKey: .recordVersion
+            ) ?? 1,
             assignedAt: container.decode(Date.self, forKey: .assignedAt),
             revokedAt: container.decodeIfPresent(Date.self, forKey: .revokedAt)
         )
@@ -110,6 +118,7 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
             definitionID: definitionID,
             definitionVersion: definitionVersion,
             state: .revoked,
+            recordVersion: recordVersion + 1,
             assignedAt: assignedAt,
             revokedAt: date
         )
@@ -123,6 +132,7 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
         definitionID: String,
         definitionVersion: Int,
         state: SurveyAssignmentState,
+        recordVersion: Int,
         assignedAt: Date,
         revokedAt: Date?
     ) {
@@ -133,6 +143,7 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
         self.definitionID = definitionID
         self.definitionVersion = definitionVersion
         self.state = state
+        self.recordVersion = recordVersion
         self.assignedAt = assignedAt
         self.revokedAt = revokedAt
     }
@@ -153,6 +164,7 @@ nonisolated struct SurveyAssignment: Codable, Equatable, Sendable {
             definitionID: definitionID,
             definitionVersion: definitionVersion,
             state: .active,
+            recordVersion: recordVersion + 1,
             assignedAt: date
         )
     }

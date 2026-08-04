@@ -27,6 +27,7 @@ import {
   parseBaseRequest,
   parseTrustedCallableIdentity,
   rejectUnexpectedFields,
+  isValidIdentifier,
   requireBoolean,
   requireEnum,
   requireIdentifier,
@@ -204,6 +205,35 @@ export interface SubmitSurveyResponseRequest
 export interface ReviewSurveyResponseRequest extends PrivilegedBaseRequest {
   readonly studentID: string;
   readonly responseID: string;
+}
+
+type SurveyAssignmentMutationAction = "create" | "reassign" | "revoke";
+
+export interface MutateSurveyAssignmentRequest extends PrivilegedBaseRequest {
+  readonly action: SurveyAssignmentMutationAction;
+  readonly assignmentID: string;
+  readonly studentID: string;
+  readonly definitionID: string;
+  readonly definitionVersion: number;
+}
+
+export interface SurveyAssignmentMutationResult
+  extends PrivilegedOperationResult {
+  readonly assignment: SurveyAssignmentMutationEnvelope;
+}
+
+interface SurveyAssignmentMutationEnvelope {
+  readonly schemaVersion: 1;
+  readonly recordVersion: number;
+  readonly assignmentID: string;
+  readonly attemptID: string;
+  readonly districtID: string;
+  readonly studentID: string;
+  readonly definitionID: string;
+  readonly definitionVersion: number;
+  readonly state: "active" | "revoked";
+  readonly assignedAt: string;
+  readonly revokedAt: string | null;
 }
 
 export interface StudentModeRespondentClaims
@@ -2699,6 +2729,10 @@ const surveyDataLoss = (message: string): never => {
   throw new HttpsError("failed-precondition", message);
 };
 
+const storedSurveyDataLoss = (message: string): never => {
+  throw new HttpsError("data-loss", message);
+};
+
 const parseSurveyAnswers = (
   value: unknown,
 ): Readonly<Record<string, SurveyAnswerPayload>> => {
@@ -2844,6 +2878,38 @@ const parseReviewSurveyResponseRequest = (
     ...base,
     studentID: requireIdentifier(data.studentID, "studentID"),
     responseID: requireIdentifier(data.responseID, "responseID"),
+  };
+};
+
+const parseMutateSurveyAssignmentRequest = (
+  value: unknown,
+): MutateSurveyAssignmentRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(
+    data,
+    withBaseFields(
+      "action",
+      "assignmentID",
+      "studentID",
+      "definitionID",
+      "definitionVersion",
+    ),
+  );
+  return {
+    ...parseBaseRequest(data),
+    action: requireEnum(
+      data.action,
+      "action",
+      ["create", "reassign", "revoke"] as const,
+    ),
+    assignmentID: requireIdentifier(data.assignmentID, "assignmentID"),
+    studentID: requireIdentifier(data.studentID, "studentID"),
+    definitionID: requireIdentifier(data.definitionID, "definitionID"),
+    definitionVersion: requireInteger(
+      data.definitionVersion,
+      "definitionVersion",
+      1,
+    ),
   };
 };
 
@@ -3341,11 +3407,17 @@ const requireSurveyScope = async (
   const expiresAt = session?.expiresAt;
   const storedAssignments = session?.assignmentIDs;
   const storedOperations = session?.allowedOperations;
+  if (expiresAt instanceof Timestamp && expiresAt.toMillis() <= Date.now()) {
+    throw new HttpsError(
+      "failed-precondition",
+      "The respondent session has expired.",
+      { kind: "survey-session-expired" },
+    );
+  }
   if (
     session === undefined ||
     session.status !== "active" ||
     !(expiresAt instanceof Timestamp) ||
-    expiresAt.toMillis() <= Date.now() ||
     session.districtID !== identity.districtID ||
     session.studentID !== identity.studentID ||
     session.respondentUserID !== identity.userID ||
@@ -3360,6 +3432,7 @@ const requireSurveyScope = async (
     throw new HttpsError(
       "failed-precondition",
       "The respondent session is no longer active.",
+      { kind: "survey-session-revoked" },
     );
   }
   if (
@@ -3376,6 +3449,7 @@ const requireSurveyScope = async (
     throw new HttpsError(
       "failed-precondition",
       "The survey assignment is revoked or does not match this attempt.",
+      { kind: "survey-assignment-revoked" },
     );
   }
   if (
@@ -3411,10 +3485,12 @@ const requireStoredOperationIDs = (value: unknown): string[] => {
     !Array.isArray(value) ||
     value.length > maximumSurveyOperationCount ||
     !value.every((item) =>
-      typeof item === "string" && Buffer.byteLength(item, "utf8") <= 128) ||
+      isValidIdentifier(item) && Buffer.byteLength(item, "utf8") <= 128) ||
     new Set(value).size !== value.length
   ) {
-    return surveyDataLoss("The survey response operation history is malformed.");
+    return storedSurveyDataLoss(
+      "The survey response operation history is malformed.",
+    );
   }
   return value;
 };
@@ -3422,13 +3498,16 @@ const requireStoredOperationIDs = (value: unknown): string[] => {
 const requireStoredOperationResults = (
   value: unknown,
   operationIDs: readonly string[],
+  responseRecordVersion: number,
 ): Readonly<Record<string, StoredSurveyOperationResult>> => {
   const record = requireRecord(value, "survey response operation results");
   if (
     Object.keys(record).length !== operationIDs.length ||
     !operationIDs.every((operationID) => operationID in record)
   ) {
-    return surveyDataLoss("The survey response operation results are malformed.");
+    return storedSurveyDataLoss(
+      "The survey response operation results are malformed.",
+    );
   }
   const results: Record<string, StoredSurveyOperationResult> = {};
   for (const operationID of operationIDs) {
@@ -3442,17 +3521,25 @@ const requireStoredOperationResults = (
       typeof result.userID !== "string" ||
       (result.sessionID !== null && typeof result.sessionID !== "string")
     ) {
-      return surveyDataLoss("The survey response operation result is malformed.");
+      return storedSurveyDataLoss(
+        "The survey response operation result is malformed.",
+      );
+    }
+    const recordVersion = requireInteger(
+      result.recordVersion,
+      "survey response operation result.recordVersion",
+      1,
+    );
+    if (recordVersion > responseRecordVersion) {
+      return storedSurveyDataLoss(
+        "The survey response operation result version is malformed.",
+      );
     }
     results[operationID] = {
       fingerprint: result.fingerprint,
       userID: result.userID,
       sessionID: result.sessionID,
-      recordVersion: requireInteger(
-        result.recordVersion,
-        "survey response operation result.recordVersion",
-        1,
-      ),
+      recordVersion,
     };
   }
   return results;
@@ -3471,10 +3558,11 @@ const exactSurveyReplay = (
   const results = requireStoredOperationResults(
     response.operationResults,
     operationIDs,
+    requireInteger(response.recordVersion, "survey response.recordVersion", 1),
   );
   const result = results[operationID];
   if (result === undefined) {
-    return surveyDataLoss("The survey replay result is missing.");
+    return storedSurveyDataLoss("The survey replay result is missing.");
   }
   if (
     result.userID !== identity.userID ||
@@ -3494,9 +3582,371 @@ const exactSurveyReplay = (
   return result.recordVersion;
 };
 
+const surveyAssignmentEnvelopeKeys = new Set([
+  "schemaVersion",
+  "recordVersion",
+  "assignmentID",
+  "attemptID",
+  "districtID",
+  "studentID",
+  "definitionID",
+  "definitionVersion",
+  "state",
+  "assignedAt",
+  "revokedAt",
+]);
+
+const requireSurveyAssignmentEnvelope = (
+  value: unknown,
+  data: MutateSurveyAssignmentRequest,
+  recordVersion: number,
+): SurveyAssignmentMutationEnvelope => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return storedSurveyDataLoss(
+      "The survey assignment operation result is malformed.",
+    );
+  }
+  const assignment = value as Record<string, unknown>;
+  if (
+    Object.keys(assignment).length !== surveyAssignmentEnvelopeKeys.size ||
+    !Object.keys(assignment).every((key) =>
+      surveyAssignmentEnvelopeKeys.has(key)) ||
+    assignment.schemaVersion !== 1 ||
+    assignment.recordVersion !== recordVersion ||
+    assignment.assignmentID !== data.assignmentID ||
+    !isValidIdentifier(assignment.attemptID) ||
+    assignment.districtID !== data.districtID ||
+    assignment.studentID !== data.studentID ||
+    assignment.definitionID !== data.definitionID ||
+    assignment.definitionVersion !== data.definitionVersion ||
+    (assignment.state !== "active" && assignment.state !== "revoked") ||
+    typeof assignment.assignedAt !== "string"
+  ) {
+    return storedSurveyDataLoss(
+      "The survey assignment operation result is malformed.",
+    );
+  }
+  const assignedAt = new Date(assignment.assignedAt);
+  if (
+    Number.isNaN(assignedAt.getTime()) ||
+    assignedAt.toISOString() !== assignment.assignedAt
+  ) {
+    return storedSurveyDataLoss(
+      "The survey assignment operation timestamp is malformed.",
+    );
+  }
+  if (assignment.state === "active" && assignment.revokedAt !== null) {
+    return storedSurveyDataLoss(
+      "The active survey assignment result cannot be revoked.",
+    );
+  }
+  if (assignment.state === "revoked") {
+    if (typeof assignment.revokedAt !== "string") {
+      return storedSurveyDataLoss(
+        "The revoked survey assignment result is missing its timestamp.",
+      );
+    }
+    const revokedAt = new Date(assignment.revokedAt);
+    if (
+      Number.isNaN(revokedAt.getTime()) ||
+      revokedAt.toISOString() !== assignment.revokedAt ||
+      revokedAt < assignedAt
+    ) {
+      return storedSurveyDataLoss(
+        "The survey assignment revocation timestamp is malformed.",
+      );
+    }
+  }
+  return assignment as unknown as SurveyAssignmentMutationEnvelope;
+};
+
+const requireStoredSurveyAssignmentForMutation = (
+  assignment: DocumentData,
+  data: MutateSurveyAssignmentRequest,
+  schoolID: string,
+): {
+  readonly attemptID: string;
+  readonly assignedAt: Timestamp;
+} => {
+  const attemptID = assignment.attemptID;
+  const assignedAt = assignment.assignedAt;
+  const revokedAt = assignment.revokedAt;
+  if (
+    assignment.schemaVersion !== 1 ||
+    assignment.assignmentID !== data.assignmentID ||
+    assignment.districtId !== data.districtID ||
+    assignment.schoolId !== schoolID ||
+    assignment.assignmentType !== "survey" ||
+    typeof assignment.isActive !== "boolean" ||
+    !Array.isArray(assignment.studentIDs) ||
+    assignment.studentIDs.length !== 1 ||
+    assignment.studentIDs[0] !== data.studentID ||
+    assignment.definitionID !== data.definitionID ||
+    assignment.definitionVersion !== data.definitionVersion ||
+    !isValidIdentifier(attemptID) ||
+    !isValidIdentifier(assignment.assignedBy) ||
+    !isValidIdentifier(assignment.createdBy) ||
+    !isValidIdentifier(assignment.updatedBy) ||
+    !(assignedAt instanceof Timestamp) ||
+    !(assignment.createdAt instanceof Timestamp) ||
+    !(assignment.updatedAt instanceof Timestamp) ||
+    (revokedAt !== null && !(revokedAt instanceof Timestamp)) ||
+    (assignment.isActive === true && revokedAt !== null) ||
+    (assignment.isActive === false && !(revokedAt instanceof Timestamp))
+  ) {
+    return storedSurveyDataLoss(
+      "The stored survey assignment schema is malformed.",
+    );
+  }
+  return { attemptID, assignedAt };
+};
+
 export const createSurveyHandlers = (
   dependencies: SurveyDependencies,
 ) => ({
+  mutateAssignment: async (
+    request: CallableRequest<MutateSurveyAssignmentRequest>,
+  ): Promise<SurveyAssignmentMutationResult> => {
+    if (request.app === undefined) {
+      throw new HttpsError(
+        "failed-precondition",
+        "App Check verification is required.",
+      );
+    }
+    const data = parseMutateSurveyAssignmentRequest(request.data);
+    if (data.action === "create" && data.expectedRecordVersion !== 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "A new survey assignment must expect record version zero.",
+      );
+    }
+    if (data.action !== "create" && data.expectedRecordVersion < 1) {
+      throw new HttpsError(
+        "invalid-argument",
+        "An existing survey assignment must expect a positive record version.",
+      );
+    }
+    const assignmentPath =
+      `districts/${data.districtID}/formAssignments/${data.assignmentID}`;
+    const generatedAttemptID = createHash("sha256")
+      .update([
+        data.districtID,
+        data.assignmentID,
+        data.action,
+        data.idempotencyKey,
+      ].join("\u0000"))
+      .digest("hex");
+    const operationTimestamp = Timestamp.now();
+    const operationTimestampISO = operationTimestamp.toDate().toISOString();
+    let operationAssignment: SurveyAssignmentMutationEnvelope | undefined;
+    const result = await executePrivilegedOperation(
+      dependencies.firestore,
+      request,
+      data,
+      {
+        action: `survey.assignment.${data.action}`,
+        targetPath: () => assignmentPath,
+        requiredCapability: "student.write.detail",
+        auditDetails: () => {
+          if (operationAssignment === undefined) {
+            return storedSurveyDataLoss(
+              "The survey assignment operation result was not captured.",
+            );
+          }
+          return {
+            action: data.action,
+            assignmentID: data.assignmentID,
+            studentID: data.studentID,
+            definitionID: data.definitionID,
+            definitionVersion: data.definitionVersion,
+            generatedAttemptID:
+              data.action === "revoke" ? null : generatedAttemptID,
+            assignment: operationAssignment,
+          };
+        },
+        mutate: async ({ transaction, membership, identity }) => {
+          const assignmentReference = dependencies.firestore.doc(
+            assignmentPath,
+          );
+          const studentReference = dependencies.firestore.doc(
+            `districts/${data.districtID}/students/${data.studentID}`,
+          );
+          const definitionReference = dependencies.firestore.doc(
+            surveyDefinitionPath(data.definitionID, data.definitionVersion),
+          );
+          const [assignmentSnapshot, studentSnapshot, definitionSnapshot] =
+            await Promise.all([
+              transaction.get(assignmentReference),
+              transaction.get(studentReference),
+              transaction.get(definitionReference),
+            ]);
+          const student = requireExistingData(studentSnapshot, "Student");
+          const schoolID = requireSchoolID(student, "Student");
+          if (
+            student.districtId !== data.districtID ||
+            student.isArchived === true ||
+            !canReadStudentDetail(membership, data.studentID, schoolID)
+          ) {
+            throw new HttpsError(
+              "permission-denied",
+              "The survey assignment student is outside the member's scope.",
+            );
+          }
+          parseSurveyDefinition(
+            definitionSnapshot.data(),
+            data.definitionID,
+            data.definitionVersion,
+          );
+          if (data.action === "create") {
+            if (assignmentSnapshot.exists) {
+              throw new HttpsError(
+                "already-exists",
+                "The survey assignment already exists.",
+              );
+            }
+            operationAssignment = {
+              schemaVersion: 1,
+              recordVersion: 1,
+              assignmentID: data.assignmentID,
+              attemptID: generatedAttemptID,
+              districtID: data.districtID,
+              studentID: data.studentID,
+              definitionID: data.definitionID,
+              definitionVersion: data.definitionVersion,
+              state: "active",
+              assignedAt: operationTimestampISO,
+              revokedAt: null,
+            };
+            transaction.create(assignmentReference, {
+              schemaVersion: 1,
+              recordVersion: 1,
+              assignmentID: data.assignmentID,
+              attemptID: generatedAttemptID,
+              districtId: data.districtID,
+              schoolId: schoolID,
+              assignmentType: "survey",
+              isActive: true,
+              studentIDs: [data.studentID],
+              definitionID: data.definitionID,
+              definitionVersion: data.definitionVersion,
+              assignedBy: identity.userID,
+              assignedAt: operationTimestamp,
+              revokedAt: null,
+              createdAt: operationTimestamp,
+              createdBy: identity.userID,
+              updatedAt: operationTimestamp,
+              updatedBy: identity.userID,
+            });
+            return { recordVersion: 1 };
+          }
+          const assignment = requireExistingData(
+            assignmentSnapshot,
+            "Survey assignment",
+          );
+          assertRecordVersion(
+            assignment.recordVersion,
+            data.expectedRecordVersion,
+          );
+          const storedAssignment = requireStoredSurveyAssignmentForMutation(
+            assignment,
+            data,
+            schoolID,
+          );
+          const nextVersion = data.expectedRecordVersion + 1;
+          if (data.action === "reassign") {
+            if (generatedAttemptID === storedAssignment.attemptID) {
+              return storedSurveyDataLoss(
+                "A reassignment must generate a new attempt identity.",
+              );
+            }
+            operationAssignment = {
+              schemaVersion: 1,
+              recordVersion: nextVersion,
+              assignmentID: data.assignmentID,
+              attemptID: generatedAttemptID,
+              districtID: data.districtID,
+              studentID: data.studentID,
+              definitionID: data.definitionID,
+              definitionVersion: data.definitionVersion,
+              state: "active",
+              assignedAt: operationTimestampISO,
+              revokedAt: null,
+            };
+            transaction.update(assignmentReference, {
+              recordVersion: nextVersion,
+              attemptID: generatedAttemptID,
+              isActive: true,
+              assignedBy: identity.userID,
+              assignedAt: operationTimestamp,
+              revokedAt: null,
+              updatedAt: operationTimestamp,
+              updatedBy: identity.userID,
+            });
+          } else {
+            if (assignment.isActive !== true) {
+              throw new HttpsError(
+                "failed-precondition",
+                "The survey assignment is already revoked.",
+              );
+            }
+            operationAssignment = {
+              schemaVersion: 1,
+              recordVersion: nextVersion,
+              assignmentID: data.assignmentID,
+              attemptID: storedAssignment.attemptID,
+              districtID: data.districtID,
+              studentID: data.studentID,
+              definitionID: data.definitionID,
+              definitionVersion: data.definitionVersion,
+              state: "revoked",
+              assignedAt: storedAssignment.assignedAt.toDate().toISOString(),
+              revokedAt: operationTimestampISO,
+            };
+            transaction.update(assignmentReference, {
+              recordVersion: nextVersion,
+              isActive: false,
+              revokedAt: operationTimestamp,
+              updatedAt: operationTimestamp,
+              updatedBy: identity.userID,
+            });
+          }
+          return { recordVersion: nextVersion };
+        },
+      },
+    );
+    if (result.replayed) {
+      const auditSnapshot = await dependencies.firestore.doc(
+        `districts/${data.districtID}/auditEvents/${data.idempotencyKey}`,
+      ).get();
+      const audit = auditSnapshot.data();
+      if (audit === undefined) {
+        return storedSurveyDataLoss(
+          "The survey assignment audit result is missing.",
+        );
+      }
+      const details = audit.details;
+      if (typeof details !== "object" || details === null) {
+        return storedSurveyDataLoss(
+          "The survey assignment audit details are malformed.",
+        );
+      }
+      operationAssignment = requireSurveyAssignmentEnvelope(
+        (details as Record<string, unknown>).assignment,
+        data,
+        result.recordVersion,
+      );
+    }
+    if (operationAssignment === undefined) {
+      return storedSurveyDataLoss(
+        "The survey assignment operation result is missing.",
+      );
+    }
+    return {
+      ...result,
+      assignment: operationAssignment,
+    };
+  },
+
   saveDraft: async (
     request: CallableRequest<SaveSurveyDraftRequest>,
   ): Promise<PrivilegedOperationResult> => {
@@ -3601,6 +4051,7 @@ export const createSurveyHandlers = (
       const operationResults = requireStoredOperationResults(
         response.operationResults,
         operationIDs,
+        currentVersion,
       );
       const nextVersion = currentVersion + 1;
       transaction.update(reference, {
@@ -3707,6 +4158,7 @@ export const createSurveyHandlers = (
       const operationResults = requireStoredOperationResults(
         response.operationResults,
         operationIDs,
+        currentVersion,
       );
       const nextVersion = currentVersion + 1;
       transaction.update(reference, {
@@ -3825,6 +4277,12 @@ export const createSurveyHandlers = (
             );
           }
           const operationIDs = requireStoredOperationIDs(response.operationIDs);
+          if (operationIDs.includes(data.idempotencyKey)) {
+            throw new HttpsError(
+              "already-exists",
+              "The review ID collides with an existing survey operation.",
+            );
+          }
           if (operationIDs.length >= maximumSurveyOperationCount) {
             throw new HttpsError(
               "resource-exhausted",
@@ -3834,6 +4292,7 @@ export const createSurveyHandlers = (
           const operationResults = requireStoredOperationResults(
             response.operationResults,
             operationIDs,
+            data.expectedRecordVersion,
           );
           const serverMetadata = requireRecord(
             response.serverMetadata,
@@ -4051,6 +4510,10 @@ export const endStudentModeSession = onCall(
 export const saveSurveyDraft = onCall(
   callableOptions,
   productionSurveyHandlers.saveDraft,
+);
+export const mutateSurveyAssignment = onCall(
+  callableOptions,
+  productionSurveyHandlers.mutateAssignment,
 );
 export const submitSurveyResponse = onCall(
   callableOptions,

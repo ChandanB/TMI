@@ -69,7 +69,7 @@
   "response": {
     "schemaVersion": 1,
     "responseID": "attempt-1",
-    "districtID": "district-1",
+    "districtID": "d1",
     "studentID": "student-1",
     "assignmentID": "assignment-1",
     "attemptID": "attempt-1",
@@ -81,7 +81,19 @@
       "single": { "type": "single", "value": "science" }
     },
     "operationIDs": ["sync-1"],
+    "operationResults": {
+      "sync-1": {
+        "fingerprint": "0d8757817f3bed61b94c0ac43b985f9ebe3de3b97bd8d79aacf76e07cf5e0e4e",
+        "userID": "respondent-1",
+        "sessionID": "session-1",
+        "recordVersion": 1
+      }
+    },
+    "respondentUserID": "respondent-1",
+    "respondentSessionID": "session-1",
     "syncState": "synced",
-    "hasPendingChanges": false
+    "hasPendingChanges": false,
+    "createdAt": "1970-01-01T00:33:20Z",
+    "updatedAt": "1970-01-01T00:33:21Z"
   }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import FirebaseFunctions
 import Testing
 @testable import TMI
 
@@ -52,15 +53,16 @@ struct SurveyDefinitionTests {
             .appendingPathComponent("firebase/fixtures/survey-v1.json")
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        let fixtureData = try Data(contentsOf: fixtureURL)
         let fixture = try decoder.decode(
             SurveySchemaFixture.self,
-            from: Data(contentsOf: fixtureURL)
+            from: fixtureData
         )
 
         #expect(fixture.definition.id == "interest-discovery")
         #expect(fixture.definition.questions.last?.options.first?.imageReference == "survey/forest")
-        #expect(fixture.response.recordVersion == 1)
-        #expect(fixture.response.syncState == .synced)
+        #expect(fixture.response.response.recordVersion == 1)
+        #expect(fixture.response.response.syncState == .synced)
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let responseObject = try #require(
@@ -68,10 +70,13 @@ struct SurveyDefinitionTests {
                 with: try encoder.encode(fixture.response)
             ) as? [String: Any]
         )
-        #expect(responseObject["recordVersion"] as? Int == 1)
-        #expect(responseObject["syncState"] as? String == "synced")
-        #expect(responseObject["serverRecordVersion"] == nil)
-        #expect(responseObject["localRevision"] == nil)
+        let fixtureObject = try #require(
+            JSONSerialization.jsonObject(with: fixtureData) as? [String: Any]
+        )
+        let expectedResponse = try #require(
+            fixtureObject["response"] as? [String: Any]
+        )
+        #expect(responseObject as NSDictionary == expectedResponse as NSDictionary)
     }
 
     @Test("Visibility uses priority then stable rule ID and preserves question order")
@@ -266,7 +271,7 @@ struct SurveyRepositoryTests {
         }
     }
 
-    @Test("Expired sessions are authorization failures and definition errors stay validation failures")
+    @Test("Expired sessions are typed failures and definition errors stay validation failures")
     func typedAuthorizationAndValidationErrors() async throws {
         let harness = SurveyRepositoryHarness()
         let repository = harness.repository()
@@ -284,7 +289,7 @@ struct SurveyRepositoryTests {
             assignment: assignment,
             expiresAt: .distantPast
         )
-        await #expect(throws: SurveyRepositoryError.authorization) {
+        await #expect(throws: SurveyRepositoryError.expired) {
             _ = try await repository.resume(
                 assignment: assignment,
                 grant: expiredGrant
@@ -380,7 +385,10 @@ struct SurveyRepositoryTests {
                 grant: grant
             )
         }
-        #expect(await store.load(assignment.attemptKey) == .quarantined)
+        #expect(
+            await store.load(assignment.attemptKey) ==
+                .quarantined(.assignmentRevoked)
+        )
         try await store.purge(assignment.attemptKey)
         #expect(await store.load(assignment.attemptKey) == .missing)
     }
@@ -472,6 +480,280 @@ struct SurveyRepositoryTests {
                 questionID: "text",
                 operationID: String(repeating: "x", count: 129)
             )
+        }
+        for reserved in [".", ".."] {
+            #expect(throws: SurveyResponseMutationError.invalidOperationID) {
+                _ = try response.apply(
+                    answer: .text("reserved"),
+                    questionID: "text",
+                    operationID: reserved
+                )
+            }
+        }
+        #expect(throws: SurveyResponseMutationError.historyLimitReached) {
+            try response.markSubmitted(
+                operationID: "submit-overflow",
+                submittedAt: Date(timeIntervalSince1970: 3_000),
+                serverRecordVersion: 1,
+                definition: try surveyDefinition(),
+                sessionID: "session-1"
+            )
+        }
+
+        var submitted = SurveyResponse(
+            assignment: try surveyAssignment(),
+            definition: try surveyDefinition()
+        )
+        for index in 0..<(SurveyResponse.maximumOperationCount - 1) {
+            _ = try submitted.apply(
+                answer: .text("\(index)"),
+                questionID: "text",
+                operationID: "review-history-\(index)"
+            )
+        }
+        try submitted.markSubmitted(
+            operationID: "submit-at-limit",
+            submittedAt: Date(timeIntervalSince1970: 3_000),
+            serverRecordVersion: 1,
+            definition: try surveyDefinition(),
+            sessionID: "session-1"
+        )
+        #expect(throws: SurveyResponseMutationError.historyLimitReached) {
+            try submitted.markReviewed(
+                operationID: "review-overflow",
+                reviewerID: "teacher-1",
+                reviewedAt: Date(timeIntervalSince1970: 4_000),
+                serverRecordVersion: 2
+            )
+        }
+    }
+
+    @Test("Repository reports local and Firebase history exhaustion actionably")
+    func repositoryHistoryErrorsAreTyped() async throws {
+        let harness = SurveyRepositoryHarness()
+        let repository = harness.repository()
+        let assignment = try surveyAssignment()
+        let definition = try surveyDefinition()
+        let grant = try studentModeGrant(assignment: assignment)
+        for index in 0..<SurveyResponse.maximumOperationCount {
+            _ = try await repository.autosave(
+                answer: .text("\(index)"),
+                for: "text",
+                operationID: "history-\(index)",
+                assignment: assignment,
+                definition: definition,
+                grant: grant
+            )
+        }
+        await #expect(throws: SurveyRepositoryError.historyLimitReached) {
+            _ = try await repository.autosave(
+                answer: .text("overflow"),
+                for: "text",
+                operationID: "history-overflow",
+                assignment: assignment,
+                definition: definition,
+                grant: grant
+            )
+        }
+        await #expect(throws: SurveyRepositoryError.historyLimitReached) {
+            _ = try await repository.submit(
+                operationID: "submit-history-overflow",
+                assignment: assignment,
+                definition: definition,
+                grant: grant
+            )
+        }
+        #expect(await harness.submitCount == 0)
+
+        let firebaseError = NSError(
+            domain: FunctionsErrorDomain,
+            code: FunctionsErrorCode.resourceExhausted.rawValue
+        )
+        #expect(
+            SurveyFirebaseErrorMapper.map(firebaseError) ==
+                .historyLimitReached
+        )
+        for (kind, expected) in [
+            ("survey-session-expired", SurveyRepositoryError.expired),
+            ("survey-session-revoked", SurveyRepositoryError.revoked),
+            ("survey-assignment-revoked", SurveyRepositoryError.revoked),
+        ] {
+            let error = NSError(
+                domain: FunctionsErrorDomain,
+                code: FunctionsErrorCode.failedPrecondition.rawValue,
+                userInfo: [FunctionsErrorDetailsKey: ["kind": kind]]
+            )
+            #expect(SurveyFirebaseErrorMapper.map(error) == expected)
+        }
+    }
+
+    @Test("Server revocation and expiry quarantine pending work with distinct errors")
+    func serverRevocationAndExpiryQuarantine() async throws {
+        for (error, reason) in [
+            (SurveyRepositoryError.revoked, SurveyQuarantineReason.assignmentRevoked),
+            (SurveyRepositoryError.expired, SurveyQuarantineReason.authorizationRejected),
+        ] {
+            for endpoint in ["synchronize", "submit"] {
+                let directory = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                defer { try? FileManager.default.removeItem(at: directory) }
+                let store = SurveyDraftStore.localFiles(directory: directory)
+                let repository = SurveyRepository(
+                    draftStore: store,
+                    synchronizeDraft: { request in
+                        if endpoint == "synchronize" {
+                            throw error
+                        }
+                        var response = request.response
+                        response.markSynchronized(
+                            serverRecordVersion: response.recordVersion + 1
+                        )
+                        return response
+                    },
+                    submitResponse: { request in
+                        if endpoint == "submit" {
+                            throw error
+                        }
+                        return request.response
+                    },
+                    reviewResponse: { request in request.response },
+                    isOnline: { true }
+                )
+                let assignment = try surveyAssignment()
+                let definition = try surveyDefinition()
+                let grant = try studentModeGrant(assignment: assignment)
+                if endpoint == "submit" {
+                    try await completeDraft(
+                        repository: repository,
+                        assignment: assignment,
+                        definition: definition,
+                        grant: grant
+                    )
+                } else {
+                    _ = try await repository.autosave(
+                        answer: .single("science"),
+                        for: "single",
+                        operationID: "queued-\(reason.rawValue)",
+                        assignment: assignment,
+                        definition: definition,
+                        grant: grant
+                    )
+                }
+
+                await #expect(throws: error) {
+                    if endpoint == "submit" {
+                        _ = try await repository.submit(
+                            operationID: "submit-server-denial",
+                            assignment: assignment,
+                            definition: definition,
+                            grant: grant
+                        )
+                    } else {
+                        _ = try await repository.synchronize(
+                            assignment: assignment,
+                            definition: definition,
+                            grant: grant
+                        )
+                    }
+                }
+                #expect(
+                    await store.load(assignment.attemptKey) ==
+                        .quarantined(reason)
+                )
+                let resumeError: SurveyRepositoryError = reason == .assignmentRevoked
+                    ? .revoked
+                    : .expired
+                await #expect(throws: resumeError) {
+                    _ = try await repository.resume(
+                        assignment: assignment,
+                        grant: grant
+                    )
+                }
+            }
+        }
+    }
+
+    @Test("Swift staff operation sends trusted assignment mutations and accepts server attempts")
+    func staffAssignmentMutation() async throws {
+        let recorder = SurveyAssignmentMutationRecorder()
+        let harness = SurveyRepositoryHarness(
+            assignmentRecorder: recorder
+        )
+        let repository = harness.repository()
+        let request = SurveyAssignmentMutationRequest(
+            action: .create,
+            assignmentID: "assignment-created",
+            studentID: "student-1",
+            definitionID: "interest-discovery",
+            definitionVersion: 3,
+            expectedRecordVersion: 0,
+            operationID: "assignment-create-1",
+            reasonCode: "educator-survey-assignment"
+        )
+        let assignment = try await repository.mutateAssignment(
+            request,
+            districtID: "district-1"
+        )
+
+        #expect(assignment.attemptID == "server-attempt")
+        #expect(await recorder.requests == [request])
+    }
+
+    @Test("Swift assignment callable result validates the exact trusted schema")
+    func strictAssignmentCallableResult() throws {
+        let request = SurveyAssignmentMutationRequest(
+            action: .create,
+            assignmentID: "assignment-created",
+            studentID: "student-1",
+            definitionID: "interest-discovery",
+            definitionVersion: 3,
+            expectedRecordVersion: 0,
+            operationID: "assignment-create-1",
+            reasonCode: "educator-survey-assignment"
+        )
+        let assignment: [String: Any] = [
+            "schemaVersion": 1,
+            "recordVersion": 1,
+            "assignmentID": request.assignmentID,
+            "attemptID": "server-attempt",
+            "districtID": "district-1",
+            "studentID": request.studentID,
+            "definitionID": request.definitionID,
+            "definitionVersion": request.definitionVersion,
+            "state": "active",
+            "assignedAt": "2026-08-03T12:00:00Z",
+            "revokedAt": NSNull(),
+        ]
+        let result: [String: Any] = [
+            "operationID": request.operationID,
+            "recordVersion": 1,
+            "replayed": false,
+            "assignment": assignment,
+        ]
+
+        let decoded = try SurveyAssignmentMutationResultDecoder.decode(
+            result,
+            request: request,
+            districtID: "district-1"
+        )
+        #expect(decoded.attemptID == "server-attempt")
+
+        for malformed in [
+            result.merging(["operationID": "wrong-operation"]) { _, new in new },
+            result.merging([
+                "assignment": assignment.merging(["studentID": "student-2"]) { _, new in new },
+            ]) { _, new in new },
+            result.merging([
+                "assignment": assignment.merging(["revokedAt": "2026-08-03T12:01:00Z"]) { _, new in new },
+            ]) { _, new in new },
+        ] {
+            #expect(throws: SurveyRepositoryError.malformedResponse) {
+                _ = try SurveyAssignmentMutationResultDecoder.decode(
+                    malformed,
+                    request: request,
+                    districtID: "district-1"
+                )
+            }
         }
     }
 
@@ -626,7 +908,7 @@ private func surveyDefinition(
 
 private struct SurveySchemaFixture: Decodable {
     let definition: SurveyDefinition
-    let response: SurveyResponse
+    let response: SurveyStoredResponseDocument
 }
 
 private func surveyAssignment(
@@ -700,9 +982,17 @@ private actor SurveyRepositoryHarness {
     private(set) var quarantineCount = 0
     private var online = true
     private let serverCounter: SurveyServerCounter?
+    private let synchronizationError: SurveyRepositoryError?
+    private let assignmentRecorder: SurveyAssignmentMutationRecorder?
 
-    init(serverCounter: SurveyServerCounter? = nil) {
+    init(
+        serverCounter: SurveyServerCounter? = nil,
+        synchronizationError: SurveyRepositoryError? = nil,
+        assignmentRecorder: SurveyAssignmentMutationRecorder? = nil
+    ) {
         self.serverCounter = serverCounter
+        self.synchronizationError = synchronizationError
+        self.assignmentRecorder = assignmentRecorder
     }
 
     nonisolated func repository() -> SurveyRepository {
@@ -724,6 +1014,15 @@ private actor SurveyRepositoryHarness {
             },
             reviewResponse: { [weak self] request in
                 try await self?.review(request) ?? request.response
+            },
+            mutateAssignment: { [weak self] request, districtID in
+                guard let recorder = await self?.assignmentRecorder else {
+                    throw SurveyRepositoryError.unavailable
+                }
+                return try await recorder.mutate(
+                    request,
+                    districtID: districtID
+                )
             },
             isOnline: { [weak self] in
                 await self?.online ?? false
@@ -753,6 +1052,9 @@ private actor SurveyRepositoryHarness {
     private func synchronize(
         _ request: SurveyDraftSyncRequest
     ) async throws -> SurveyResponse {
+        if let synchronizationError {
+            throw synchronizationError
+        }
         var response = request.response
         let version = if let serverCounter {
             await serverCounter.synchronize(expectedVersion: response.recordVersion)
@@ -801,5 +1103,30 @@ private actor SurveyServerCounter {
     func synchronize(expectedVersion: Int) -> Int {
         expectedVersions.append(expectedVersion)
         return expectedVersion + 1
+    }
+}
+
+private actor SurveyAssignmentMutationRecorder {
+    private(set) var requests: [SurveyAssignmentMutationRequest] = []
+
+    func mutate(
+        _ request: SurveyAssignmentMutationRequest,
+        districtID: String
+    ) throws -> SurveyAssignment {
+        requests.append(request)
+        return try SurveyAssignment(
+            assignmentID: request.assignmentID,
+            attemptID: "server-attempt",
+            districtID: districtID,
+            studentID: request.studentID,
+            definitionID: request.definitionID,
+            definitionVersion: request.definitionVersion,
+            state: request.action == .revoke ? .revoked : .active,
+            recordVersion: request.expectedRecordVersion + 1,
+            assignedAt: Date(timeIntervalSince1970: 5_000),
+            revokedAt: request.action == .revoke
+                ? Date(timeIntervalSince1970: 6_000)
+                : nil
+        )
     }
 }

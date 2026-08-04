@@ -17,6 +17,7 @@ import {
 import { getFirestore } from "firebase-admin/firestore";
 import {
   createSurveyHandlers,
+  type MutateSurveyAssignmentRequest,
   type ReviewSurveyResponseRequest,
   type SaveSurveyDraftRequest,
   type SubmitSurveyResponseRequest,
@@ -40,7 +41,12 @@ const sharedFixture = JSON.parse(
   readFileSync(resolve(process.cwd(), "fixtures/survey-v1.json"), "utf8"),
 ) as {
   readonly definition: Record<string, unknown>;
-  readonly response: { readonly answers: SaveSurveyDraftRequest["answers"] };
+  readonly response: Record<string, unknown> & {
+    readonly answers: SaveSurveyDraftRequest["answers"];
+    readonly operationIDs: readonly string[];
+    readonly createdAt: string;
+    readonly updatedAt: string;
+  };
 };
 
 const completeAnswers = {
@@ -200,11 +206,37 @@ const reviewRequest = (
   ...overrides,
 });
 
+const assignmentRequest = (
+  overrides: Partial<MutateSurveyAssignmentRequest> = {},
+): MutateSurveyAssignmentRequest => ({
+  districtID,
+  expectedRecordVersion: 0,
+  idempotencyKey: "assign-survey-1",
+  reasonCode: "educator-survey-assignment",
+  action: "create",
+  assignmentID: "survey-assignment-create",
+  studentID,
+  definitionID,
+  definitionVersion,
+  ...overrides,
+});
+
 const expectHttpsError = async (
   promise: Promise<unknown>,
   code: string,
 ): Promise<void> => {
   await expect(promise).rejects.toMatchObject({ code });
+};
+
+const expectHttpsErrorKind = async (
+  promise: Promise<unknown>,
+  code: string,
+  kind: string,
+): Promise<void> => {
+  await expect(promise).rejects.toMatchObject({
+    code,
+    details: { kind },
+  });
 };
 
 describe("Canonical survey transactions", () => {
@@ -233,6 +265,9 @@ describe("Canonical survey transactions", () => {
           recordVersion: 1,
         }),
         setDoc(doc(db, `districts/${districtID}/formAssignments/${assignmentID}`), {
+          schemaVersion: 1,
+          recordVersion: 1,
+          assignmentID,
           districtId: districtID,
           schoolId: "school-1",
           assignmentType: "survey",
@@ -242,6 +277,8 @@ describe("Canonical survey transactions", () => {
           definitionID,
           definitionVersion,
           attemptID,
+          assignedAt: Timestamp.fromMillis(2_000),
+          revokedAt: null,
         }),
         setDoc(doc(db, `districts/${districtID}/studentModeSessions/${sessionID}`), {
           districtID,
@@ -296,36 +333,191 @@ describe("Canonical survey transactions", () => {
 
   it("accepts the shared Swift and TypeScript v1 schema fixture", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
-      await setDoc(
-        doc(context.firestore(), `catalogs/surveyDefinitions/items/${definitionID}__v${definitionVersion}`),
-        {
-          ...sharedFixture.definition,
-          definitionID,
-          version: definitionVersion,
-          publishedAt: Timestamp.fromDate(
-            new Date(sharedFixture.definition.publishedAt as string),
-          ),
-        },
-      );
+      await Promise.all([
+        setDoc(
+          doc(context.firestore(), `catalogs/surveyDefinitions/items/${definitionID}__v${definitionVersion}`),
+          {
+            ...sharedFixture.definition,
+            definitionID,
+            version: definitionVersion,
+            publishedAt: Timestamp.fromDate(
+              new Date(sharedFixture.definition.publishedAt as string),
+            ),
+          },
+        ),
+        setDoc(
+          doc(context.firestore(), `districts/${districtID}/students/${studentID}/responses/${attemptID}`),
+          {
+            ...sharedFixture.response,
+            createdAt: Timestamp.fromDate(
+              new Date(sharedFixture.response.createdAt),
+            ),
+            updatedAt: Timestamp.fromDate(
+              new Date(sharedFixture.response.updatedAt),
+            ),
+          },
+        ),
+      ]);
     });
+    const fixtureOperationID = sharedFixture.response.operationIDs[0];
+    if (fixtureOperationID === undefined) {
+      throw new Error("The shared fixture must include one operation ID.");
+    }
     const result = await handlers().saveDraft(
       callableRequest(saveRequest({
         answers: sharedFixture.response.answers,
-        operationID: "fixture-sync",
+        operationID: fixtureOperationID,
       }), { respondent: true }),
     );
-    expect(result).toMatchObject({ recordVersion: 1, replayed: false });
+    expect(result).toEqual({
+      operationID: "sync-1",
+      recordVersion: 1,
+      replayed: true,
+    });
     const stored = await getFirestore()
       .doc(`districts/${districtID}/students/${studentID}/responses/${attemptID}`)
       .get();
-    expect(stored.data()).toMatchObject({
-      schemaVersion: 1,
-      state: "draft",
+    const storedData = stored.data();
+    expect({
+      ...storedData,
+      createdAt: (storedData?.createdAt as Timestamp)
+        .toDate().toISOString().replace(".000Z", "Z"),
+      updatedAt: (storedData?.updatedAt as Timestamp)
+        .toDate().toISOString().replace(".000Z", "Z"),
+    }).toEqual(sharedFixture.response);
+  });
+
+  it("creates, replays, reassigns, and revokes through the trusted assignment path", async () => {
+    const created = await handlers().mutateAssignment(
+      callableRequest(assignmentRequest()),
+    );
+    const replayed = await handlers().mutateAssignment(
+      callableRequest(assignmentRequest()),
+    );
+    expect(created).toMatchObject({ recordVersion: 1, replayed: false });
+    expect(replayed).toEqual({ ...created, replayed: true });
+    expect(created.assignment.attemptID).toMatch(/^[a-f0-9]{64}$/);
+    expect(created.assignment).toMatchObject({
+      assignmentID: "survey-assignment-create",
+      districtID,
+      studentID,
+      definitionID,
+      definitionVersion,
+      state: "active",
       recordVersion: 1,
-      syncState: "synced",
-      hasPendingChanges: false,
-      answers: sharedFixture.response.answers,
     });
+
+    const reassigned = await handlers().mutateAssignment(callableRequest(
+      assignmentRequest({
+        action: "reassign",
+        expectedRecordVersion: 1,
+        idempotencyKey: "reassign-survey-1",
+      }),
+    ));
+    expect(reassigned.assignment.attemptID).not.toBe(created.assignment.attemptID);
+    expect(reassigned.assignment).toMatchObject({
+      state: "active",
+      recordVersion: 2,
+    });
+
+    const revoked = await handlers().mutateAssignment(callableRequest(
+      assignmentRequest({
+        action: "revoke",
+        expectedRecordVersion: 2,
+        idempotencyKey: "revoke-survey-1",
+      }),
+    ));
+    expect(revoked.assignment).toMatchObject({
+      attemptID: reassigned.assignment.attemptID,
+      state: "revoked",
+      recordVersion: 3,
+    });
+    expect(revoked.assignment.revokedAt).toEqual(expect.any(String));
+
+    const replayedCreateAfterMutations = await handlers().mutateAssignment(
+      callableRequest(assignmentRequest()),
+    );
+    expect(replayedCreateAfterMutations).toEqual({ ...created, replayed: true });
+  });
+
+  it("validates stored assignments before committing trusted mutations", async () => {
+    const created = await handlers().mutateAssignment(
+      callableRequest(assignmentRequest()),
+    );
+    const path = `districts/${districtID}/formAssignments/${created.assignment.assignmentID}`;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), path), {
+        attemptID: "unsafe/attempt",
+        assignedAt: "not-a-timestamp",
+      });
+    });
+
+    await expectHttpsError(
+      handlers().mutateAssignment(callableRequest(assignmentRequest({
+        action: "revoke",
+        expectedRecordVersion: 1,
+        idempotencyKey: "revoke-malformed-assignment",
+      }))),
+      "data-loss",
+    );
+    const stored = await getFirestore().doc(path).get();
+    expect(stored.data()).toMatchObject({
+      recordVersion: 1,
+      isActive: true,
+      attemptID: "unsafe/attempt",
+      assignedAt: "not-a-timestamp",
+    });
+  });
+
+  it("rejects assignment cross-scope, stale, missing-definition, attempt injection, auth, and App Check", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `districts/${districtID}/students/student-2`), {
+        districtId: districtID,
+        schoolId: "school-1",
+        assignedMemberIDs: [],
+        isArchived: false,
+        recordVersion: 1,
+      });
+    });
+    await expectHttpsError(
+      handlers().mutateAssignment(callableRequest(assignmentRequest({
+        studentID: "student-2",
+      }))),
+      "permission-denied",
+    );
+    await expectHttpsError(
+      handlers().mutateAssignment(callableRequest(assignmentRequest({
+        action: "reassign",
+        assignmentID,
+        expectedRecordVersion: 99,
+      }))),
+      "aborted",
+    );
+    await expectHttpsError(
+      handlers().mutateAssignment(callableRequest(assignmentRequest({
+        definitionVersion: 999,
+      }))),
+      "failed-precondition",
+    );
+    await expectHttpsError(
+      handlers().mutateAssignment(callableRequest({
+        ...assignmentRequest(),
+        attemptID: "client-attempt",
+      } as MutateSurveyAssignmentRequest)),
+      "invalid-argument",
+    );
+    await expectHttpsError(
+      handlers().mutateAssignment(callableRequest(assignmentRequest(), {
+        includeAuth: false,
+      })),
+      "unauthenticated",
+    );
+    await expectHttpsError(
+      handlers().mutateAssignment(callableRequest(assignmentRequest(), {
+        includeAppCheck: false,
+      })),
+      "failed-precondition",
+    );
   });
 
   it("replays the original result only for the original respondent session", async () => {
@@ -500,9 +692,10 @@ describe("Canonical survey transactions", () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await updateDoc(doc(context.firestore(), assignmentPath), { isActive: false });
     });
-    await expectHttpsError(
+    await expectHttpsErrorKind(
       handlers().saveDraft(callableRequest(saveRequest(), { respondent: true })),
       "failed-precondition",
+      "survey-assignment-revoked",
     );
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
@@ -550,9 +743,10 @@ describe("Canonical survey transactions", () => {
         expiresAt: Timestamp.fromMillis(Date.now() - 1),
       });
     });
-    await expectHttpsError(
+    await expectHttpsErrorKind(
       handlers().submitResponse(callableRequest(submitRequest({ expectedRecordVersion: 0 }), { respondent: true })),
       "failed-precondition",
+      "survey-session-expired",
     );
   });
 
@@ -636,6 +830,54 @@ describe("Canonical survey transactions", () => {
     }
   });
 
+  it("rejects stored operation identifiers and result versions outside the shared bounds", async () => {
+    await handlers().saveDraft(
+      callableRequest(saveRequest(), { respondent: true }),
+    );
+    const path = `districts/${districtID}/students/${studentID}/responses/${attemptID}`;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), path), {
+        operationIDs: ["x".repeat(129)],
+        operationResults: {
+          ["x".repeat(129)]: {
+            fingerprint: "0".repeat(64),
+            userID: respondentUserID,
+            sessionID,
+            recordVersion: 1,
+          },
+        },
+      });
+    });
+    await expectHttpsError(
+      handlers().saveDraft(callableRequest(saveRequest({
+        expectedRecordVersion: 1,
+        operationID: "after-unsafe-history",
+      }), { respondent: true })),
+      "data-loss",
+    );
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), path), {
+        operationIDs: ["save-1"],
+        operationResults: {
+          "save-1": {
+            fingerprint: "0".repeat(64),
+            userID: respondentUserID,
+            sessionID,
+            recordVersion: 2,
+          },
+        },
+      });
+    });
+    await expectHttpsError(
+      handlers().saveDraft(callableRequest(saveRequest({
+        expectedRecordVersion: 1,
+        operationID: "after-future-result",
+      }), { respondent: true })),
+      "data-loss",
+    );
+  });
+
   it("denies edits and downgrade after submit while staff review preserves answers", async () => {
     await handlers().saveDraft(
       callableRequest(saveRequest(), { respondent: true }),
@@ -671,6 +913,74 @@ describe("Canonical survey transactions", () => {
       },
       recordVersion: 3,
     });
+    expect(snapshot.get("operationIDs")).toEqual([
+      "save-1",
+      "submit-1",
+      "review-1",
+    ]);
+    expect(snapshot.get("operationResults.review-1")).toMatchObject({
+      userID: staffUserID,
+      sessionID: null,
+      recordVersion: 3,
+    });
+  });
+
+  it("rejects a staff review ID that collides with any respondent operation", async () => {
+    await handlers().saveDraft(callableRequest(saveRequest({
+      operationID: "review-1",
+    }), { respondent: true }));
+    await handlers().submitResponse(callableRequest(submitRequest({
+      operationID: "submit-after-collision",
+    }), { respondent: true }));
+
+    await expectHttpsError(
+      handlers().reviewResponse(callableRequest(reviewRequest())),
+      "already-exists",
+    );
+    const snapshot = await getFirestore()
+      .doc(`districts/${districtID}/students/${studentID}/responses/${attemptID}`)
+      .get();
+    expect(snapshot.get("state")).toBe("submitted");
+    expect(snapshot.get("operationIDs")).toEqual([
+      "review-1",
+      "submit-after-collision",
+    ]);
+    expect(snapshot.get("operationResults.review-1")).toMatchObject({
+      userID: respondentUserID,
+      sessionID,
+      recordVersion: 1,
+    });
+  });
+
+  it("binds an exact review replay to the original staff identity and request", async () => {
+    await handlers().saveDraft(callableRequest(saveRequest(), { respondent: true }));
+    await handlers().submitResponse(callableRequest(submitRequest(), { respondent: true }));
+    const first = await handlers().reviewResponse(
+      callableRequest(reviewRequest()),
+    );
+    const replayed = await handlers().reviewResponse(
+      callableRequest(reviewRequest()),
+    );
+    expect(first).toMatchObject({ recordVersion: 3, replayed: false });
+    expect(replayed).toMatchObject({ recordVersion: 3, replayed: true });
+
+    const secondStaff = "teacher-2";
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), `districts/${districtID}/members/${secondStaff}`),
+        activeMembership({
+          districtID,
+          capabilities: ["student.read.detail", "student.write.detail"],
+          assignedStudentIDs: [studentID],
+        }),
+      );
+    });
+    await expectHttpsError(
+      handlers().reviewResponse(callableRequest(reviewRequest(), {
+        uid: secondStaff,
+      })),
+      "already-exists",
+    );
   });
 
   it("requires trusted staff membership, capability, and exact student scope for review", async () => {

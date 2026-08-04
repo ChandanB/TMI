@@ -8,6 +8,8 @@ nonisolated enum SurveyRepositoryError: Error, Equatable, Sendable {
     case validation
     case conflict
     case revoked
+    case expired
+    case historyLimitReached
     case authorization
     case offline
     case unavailable
@@ -35,10 +37,27 @@ nonisolated struct SurveyReviewRequest: Sendable, Equatable {
     let staffIdentity: StudentModeStaffIdentity
 }
 
+nonisolated enum SurveyAssignmentMutationAction: String, Sendable {
+    case create
+    case reassign
+    case revoke
+}
+
+nonisolated struct SurveyAssignmentMutationRequest: Sendable, Equatable {
+    let action: SurveyAssignmentMutationAction
+    let assignmentID: String
+    let studentID: String
+    let definitionID: String
+    let definitionVersion: Int
+    let expectedRecordVersion: Int
+    let operationID: String
+    let reasonCode: String
+}
+
 nonisolated enum SurveyDraftLoad: Equatable, Sendable {
     case missing
     case draft(SurveyResponse)
-    case quarantined
+    case quarantined(SurveyQuarantineReason)
     case corrupt
     case scopeMismatch
 }
@@ -99,7 +118,17 @@ private actor SurveyLocalDraftFiles {
             return .corrupt
         }
         if FileManager.default.fileExists(atPath: quarantineURL.path) {
-            return .quarantined
+            guard let data = try? Data(contentsOf: quarantineURL),
+                  let envelope = try? JSONDecoder().decode(
+                    Envelope.self,
+                    from: data
+                  ),
+                  envelope.response.attemptKey == key,
+                  case .quarantined(let reason) =
+                    envelope.response.syncState else {
+                return .corrupt
+            }
+            return .quarantined(reason)
         }
         guard FileManager.default.fileExists(atPath: activeURL.path) else {
             return .missing
@@ -237,6 +266,10 @@ actor SurveyRepository {
     typealias ReviewResponse = @Sendable (
         SurveyReviewRequest
     ) async throws -> SurveyResponse
+    typealias MutateAssignment = @Sendable (
+        SurveyAssignmentMutationRequest,
+        String
+    ) async throws -> SurveyAssignment
     typealias IsOnline = @Sendable () async -> Bool
 
     private let loadDraft: LoadDraft
@@ -246,6 +279,7 @@ actor SurveyRepository {
     private let synchronizeDraft: SynchronizeDraft
     private let submitResponse: SubmitResponse
     private let reviewResponse: ReviewResponse
+    private let performAssignmentMutation: MutateAssignment
     private let isOnline: IsOnline
 
     init(
@@ -255,6 +289,9 @@ actor SurveyRepository {
         synchronizeDraft: @escaping SynchronizeDraft,
         submitResponse: @escaping SubmitResponse,
         reviewResponse: @escaping ReviewResponse,
+        mutateAssignment: @escaping MutateAssignment = { _, _ in
+            throw SurveyRepositoryError.unavailable
+        },
         isOnline: @escaping IsOnline
     ) {
         self.loadDraft = { key in
@@ -269,6 +306,7 @@ actor SurveyRepository {
         self.synchronizeDraft = synchronizeDraft
         self.submitResponse = submitResponse
         self.reviewResponse = reviewResponse
+        self.performAssignmentMutation = mutateAssignment
         self.isOnline = isOnline
     }
 
@@ -277,6 +315,9 @@ actor SurveyRepository {
         synchronizeDraft: @escaping SynchronizeDraft,
         submitResponse: @escaping SubmitResponse,
         reviewResponse: @escaping ReviewResponse,
+        mutateAssignment: @escaping MutateAssignment = { _, _ in
+            throw SurveyRepositoryError.unavailable
+        },
         isOnline: @escaping IsOnline
     ) {
         self.loadDraft = draftStore.load
@@ -286,6 +327,7 @@ actor SurveyRepository {
         self.synchronizeDraft = synchronizeDraft
         self.submitResponse = submitResponse
         self.reviewResponse = reviewResponse
+        self.performAssignmentMutation = mutateAssignment
         self.isOnline = isOnline
     }
 
@@ -407,13 +449,18 @@ actor SurveyRepository {
             )
             try await saveDraft(synchronized)
             return synchronized
-        } catch SurveyRepositoryError.revoked {
-            var quarantined = draft
-            quarantined.quarantine(.assignmentRevoked)
-            try await quarantineDraft(quarantined)
-            throw SurveyRepositoryError.revoked
         } catch {
-            throw map(error)
+            let mapped = map(error)
+            if mapped == .revoked || mapped == .expired {
+                var quarantined = draft
+                quarantined.quarantine(
+                    mapped == .revoked
+                        ? .assignmentRevoked
+                        : .authorizationRejected
+                )
+                try await quarantineDraft(quarantined)
+            }
+            throw mapped
         }
     }
 
@@ -446,6 +493,11 @@ actor SurveyRepository {
                 return draft
             }
             throw SurveyRepositoryError.immutableResponse
+        }
+        do {
+            try draft.validateNewOperationID(operationID)
+        } catch {
+            throw map(error)
         }
         guard await isOnline() else {
             throw SurveyRepositoryError.offline
@@ -482,15 +534,20 @@ actor SurveyRepository {
             }
             try await saveDraft(submitted)
             return submitted
-        } catch SurveyRepositoryError.revoked {
-            var quarantined = draft
-            quarantined.quarantine(.assignmentRevoked)
-            try await quarantineDraft(quarantined)
-            throw SurveyRepositoryError.revoked
         } catch is SurveyDefinitionError {
             throw SurveyRepositoryError.validation
         } catch {
-            throw map(error)
+            let mapped = map(error)
+            if mapped == .revoked || mapped == .expired {
+                var quarantined = draft
+                quarantined.quarantine(
+                    mapped == .revoked
+                        ? .assignmentRevoked
+                        : .authorizationRejected
+                )
+                try await quarantineDraft(quarantined)
+            }
+            throw mapped
         }
     }
 
@@ -511,6 +568,11 @@ actor SurveyRepository {
                 return response
             }
             throw SurveyRepositoryError.immutableResponse
+        }
+        do {
+            try response.validateNewOperationID(operationID)
+        } catch {
+            throw map(error)
         }
         guard await isOnline() else {
             throw SurveyRepositoryError.offline
@@ -534,6 +596,47 @@ actor SurveyRepository {
             }
             try await saveDraft(reviewed)
             return reviewed
+        } catch {
+            throw map(error)
+        }
+    }
+
+    func mutateAssignment(
+        _ request: SurveyAssignmentMutationRequest,
+        districtID: String
+    ) async throws -> SurveyAssignment {
+        guard Self.isValidIdentifier(districtID),
+              Self.isValidIdentifier(request.assignmentID),
+              Self.isValidIdentifier(request.studentID),
+              Self.isValidIdentifier(request.definitionID),
+              Self.isValidIdentifier(request.operationID),
+              !request.reasonCode.isEmpty,
+              request.definitionVersion > 0,
+              (request.action == .create
+                ? request.expectedRecordVersion == 0
+                : request.expectedRecordVersion > 0) else {
+            throw SurveyRepositoryError.validation
+        }
+        guard await isOnline() else {
+            throw SurveyRepositoryError.offline
+        }
+        do {
+            let assignment = try await performAssignmentMutation(
+                request,
+                districtID
+            )
+            guard assignment.assignmentID == request.assignmentID,
+                  assignment.districtID == districtID,
+                  assignment.studentID == request.studentID,
+                  assignment.definitionID == request.definitionID,
+                  assignment.definitionVersion == request.definitionVersion,
+                  assignment.recordVersion == request.expectedRecordVersion + 1,
+                  assignment.state == (request.action == .revoke
+                    ? .revoked
+                    : .active) else {
+                throw SurveyRepositoryError.malformedResponse
+            }
+            return assignment
         } catch {
             throw map(error)
         }
@@ -614,7 +717,7 @@ actor SurveyRepository {
                 reason: .authorizationRejected
             )
         }
-        throw SurveyRepositoryError.authorization
+        throw SurveyRepositoryError.expired
     }
 
     func purge(assignment: SurveyAssignment) async throws {
@@ -633,8 +736,15 @@ actor SurveyRepository {
             return nil
         case .draft(let response):
             return response
-        case .quarantined:
-            throw SurveyRepositoryError.revoked
+        case .quarantined(let reason):
+            switch reason {
+            case .assignmentRevoked:
+                throw SurveyRepositoryError.revoked
+            case .authorizationRejected:
+                throw SurveyRepositoryError.expired
+            case .malformedServerResponse:
+                throw SurveyRepositoryError.malformedResponse
+            }
         case .scopeMismatch:
             throw SurveyRepositoryError.authorization
         case .corrupt:
@@ -660,6 +770,10 @@ actor SurveyRepository {
         }
         if error is SurveyDefinitionError {
             return .validation
+        }
+        if let mutationError = error as? SurveyResponseMutationError,
+           mutationError == .historyLimitReached {
+            return .historyLimitReached
         }
         if error is SurveyResponseMutationError {
             return .immutableResponse
@@ -711,6 +825,12 @@ extension SurveyRepository {
             reviewResponse: { request in
                 try await runtime.review(request)
             },
+            mutateAssignment: { request, districtID in
+                try await runtime.mutateAssignment(
+                    request,
+                    districtID: districtID
+                )
+            },
             isOnline: {
                 connectivity.isOnline
             }
@@ -742,6 +862,156 @@ private nonisolated final class SurveyConnectivity: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return currentIsOnline
+    }
+}
+
+nonisolated enum SurveyFirebaseErrorMapper {
+    static func map(_ error: Error) -> SurveyRepositoryError {
+        if let repositoryError = error as? SurveyRepositoryError {
+            return repositoryError
+        }
+        let nsError = error as NSError
+        guard nsError.domain == FunctionsErrorDomain,
+              let code = FunctionsErrorCode(rawValue: nsError.code) else {
+            return error is CancellationError ? .cancelled : .unavailable
+        }
+        let details = nsError.userInfo[FunctionsErrorDetailsKey]
+            as? [String: Any]
+        let kind = details?["kind"] as? String
+        let message = nsError.localizedDescription.lowercased()
+        switch code {
+        case .cancelled:
+            return .cancelled
+        case .invalidArgument, .outOfRange:
+            return .validation
+        case .permissionDenied, .unauthenticated:
+            return .authorization
+        case .aborted, .alreadyExists:
+            return .conflict
+        case .resourceExhausted:
+            return .historyLimitReached
+        case .failedPrecondition:
+            if kind == "survey-session-expired" {
+                return .expired
+            }
+            if kind == "survey-session-revoked" ||
+                kind == "survey-assignment-revoked" {
+                return .revoked
+            }
+            if message.contains("expired") {
+                return .expired
+            }
+            if message.contains("revoked") || message.contains("assignment") {
+                return .revoked
+            }
+            if message.contains("required") || message.contains("malformed") {
+                return .validation
+            }
+            if message.contains("edited") || message.contains("state") {
+                return .immutableResponse
+            }
+            return .conflict
+        case .unavailable, .deadlineExceeded:
+            return .unavailable
+        case .dataLoss, .internal:
+            return .malformedResponse
+        default:
+            return .unavailable
+        }
+    }
+}
+
+nonisolated enum SurveyAssignmentMutationResultDecoder {
+    static func decode(
+        _ data: [String: Any],
+        request: SurveyAssignmentMutationRequest,
+        districtID: String
+    ) throws -> SurveyAssignment {
+        let expectedResultKeys: Set<String> = [
+            "operationID", "recordVersion", "replayed", "assignment",
+        ]
+        let expectedAssignmentKeys: Set<String> = [
+            "schemaVersion", "recordVersion", "assignmentID", "attemptID",
+            "districtID", "studentID", "definitionID", "definitionVersion",
+            "state", "assignedAt", "revokedAt",
+        ]
+        guard Set(data.keys) == expectedResultKeys,
+              data["operationID"] as? String == request.operationID,
+              data["replayed"] is Bool,
+              let resultVersion = integer(data["recordVersion"]),
+              let assignment = data["assignment"] as? [String: Any],
+              Set(assignment.keys) == expectedAssignmentKeys,
+              integer(assignment["schemaVersion"]) == 1,
+              let recordVersion = integer(assignment["recordVersion"]),
+              resultVersion == recordVersion,
+              recordVersion == request.expectedRecordVersion + 1,
+              assignment["assignmentID"] as? String == request.assignmentID,
+              let attemptID = assignment["attemptID"] as? String,
+              assignment["districtID"] as? String == districtID,
+              assignment["studentID"] as? String == request.studentID,
+              assignment["definitionID"] as? String == request.definitionID,
+              integer(assignment["definitionVersion"]) == request.definitionVersion,
+              let stateValue = assignment["state"] as? String,
+              let state = SurveyAssignmentState(rawValue: stateValue),
+              state == expectedState(for: request.action),
+              let assignedAt = date(assignment["assignedAt"]) else {
+            throw SurveyRepositoryError.malformedResponse
+        }
+
+        let revokedAt: Date?
+        switch state {
+        case .active:
+            guard assignment["revokedAt"] is NSNull else {
+                throw SurveyRepositoryError.malformedResponse
+            }
+            revokedAt = nil
+        case .revoked:
+            guard let parsed = date(assignment["revokedAt"]),
+                  parsed >= assignedAt else {
+                throw SurveyRepositoryError.malformedResponse
+            }
+            revokedAt = parsed
+        }
+
+        do {
+            return try SurveyAssignment(
+                assignmentID: request.assignmentID,
+                attemptID: attemptID,
+                districtID: districtID,
+                studentID: request.studentID,
+                definitionID: request.definitionID,
+                definitionVersion: request.definitionVersion,
+                state: state,
+                recordVersion: recordVersion,
+                assignedAt: assignedAt,
+                revokedAt: revokedAt
+            )
+        } catch {
+            throw SurveyRepositoryError.malformedResponse
+        }
+    }
+
+    private static func expectedState(
+        for action: SurveyAssignmentMutationAction
+    ) -> SurveyAssignmentState {
+        action == .revoke ? .revoked : .active
+    }
+
+    private static func integer(_ value: Any?) -> Int? {
+        if let value = value as? Int {
+            return value
+        }
+        if let value = value as? NSNumber, !(value is Bool) {
+            return value.intValue
+        }
+        return nil
+    }
+
+    private static func date(_ value: Any?) -> Date? {
+        guard let value = value as? String else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 }
 
@@ -833,6 +1103,37 @@ private final class FirebaseSurveyRuntime: @unchecked Sendable {
         return response
     }
 
+    func mutateAssignment(
+        _ request: SurveyAssignmentMutationRequest,
+        districtID: String
+    ) async throws -> SurveyAssignment {
+        do {
+            let result = try await staffFunctions
+                .httpsCallable("mutateSurveyAssignment")
+                .call([
+                    "districtID": districtID,
+                    "action": request.action.rawValue,
+                    "assignmentID": request.assignmentID,
+                    "studentID": request.studentID,
+                    "definitionID": request.definitionID,
+                    "definitionVersion": request.definitionVersion,
+                    "expectedRecordVersion": request.expectedRecordVersion,
+                    "idempotencyKey": request.operationID,
+                    "reasonCode": request.reasonCode,
+                ])
+            guard let data = result.data as? [String: Any] else {
+                throw SurveyRepositoryError.malformedResponse
+            }
+            return try SurveyAssignmentMutationResultDecoder.decode(
+                data,
+                request: request,
+                districtID: districtID
+            )
+        } catch {
+            throw SurveyFirebaseErrorMapper.map(error)
+        }
+    }
+
     private func payload(
         response: SurveyResponse,
         operationID: String
@@ -890,7 +1191,7 @@ private final class FirebaseSurveyRuntime: @unchecked Sendable {
                 timestamp: timestamp
             )
         } catch {
-            throw Self.map(error)
+            throw SurveyFirebaseErrorMapper.map(error)
         }
     }
 
@@ -911,47 +1212,6 @@ private final class FirebaseSurveyRuntime: @unchecked Sendable {
         return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 
-    private static func map(_ error: Error) -> SurveyRepositoryError {
-        if let repositoryError = error as? SurveyRepositoryError {
-            return repositoryError
-        }
-        let nsError = error as NSError
-        guard nsError.domain == FunctionsErrorDomain,
-              let code = FunctionsErrorCode(rawValue: nsError.code) else {
-            return error is CancellationError ? .cancelled : .unavailable
-        }
-        let message = nsError.localizedDescription.lowercased()
-        switch code {
-        case .cancelled:
-            return .cancelled
-        case .invalidArgument, .outOfRange:
-            return .validation
-        case .permissionDenied, .unauthenticated:
-            return .authorization
-        case .aborted, .alreadyExists:
-            return .conflict
-        case .failedPrecondition:
-            if message.contains("session") {
-                return .authorization
-            }
-            if message.contains("revoked") || message.contains("assignment") {
-                return .revoked
-            }
-            if message.contains("required") || message.contains("malformed") {
-                return .validation
-            }
-            if message.contains("edited") || message.contains("state") {
-                return .immutableResponse
-            }
-            return .conflict
-        case .unavailable, .deadlineExceeded:
-            return .unavailable
-        case .dataLoss, .internal:
-            return .malformedResponse
-        default:
-            return .unavailable
-        }
-    }
 }
 
 private nonisolated struct SurveyCallableResult: Sendable {
