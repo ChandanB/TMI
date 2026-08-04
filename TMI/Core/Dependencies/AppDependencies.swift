@@ -44,13 +44,21 @@ nonisolated struct AppDependencies: Sendable {
         let membership = MembershipRepository(
             store: FirebaseMembershipStore(firestore: firestore)
         )
+        let firebaseInvitationProvisioner = FirebaseStaffInvitationProvisioner()
+#if DEBUG
+        let invitationProvisioner: any StaffInvitationProvisioning =
+            DebugStaffInvitationProvisioner(delegate: firebaseInvitationProvisioner)
+#else
+        let invitationProvisioner: any StaffInvitationProvisioning =
+            firebaseInvitationProvisioner
+#endif
         let authentication = AuthenticationRepository(
             backend: FirebaseAuthenticationBackend(),
             sessionLoader: FirebaseAuthenticationSessionLoader(
                 membershipProvider: membership,
                 requiresEmailVerification: flags.staffEmailVerificationRequired
             ),
-            invitationProvisioner: FirebaseStaffInvitationProvisioner(),
+            invitationProvisioner: invitationProvisioner,
             pendingRegistrationStore: SecurePendingStaffRegistrationStore(),
             requiresEmailVerification: flags.staffEmailVerificationRequired
         )

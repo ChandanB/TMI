@@ -25,6 +25,33 @@ struct AppDependenciesTests {
         #expect(source.contains("SecurePendingStaffRegistrationStore"))
     }
 
+    @Test("Production gates the Debug invitation alias and injects the selected provisioner")
+    func productionGatesDebugInvitationAlias() throws {
+        let source = try self.source(
+            "TMI/Core/Dependencies/AppDependencies.swift",
+            root: self.repositoryRoot
+        )
+        let compactSource = source.removingWhitespace
+
+        #expect(
+            compactSource.contains(
+                """
+                letfirebaseInvitationProvisioner=FirebaseStaffInvitationProvisioner()
+                #ifDEBUG
+                letinvitationProvisioner:anyStaffInvitationProvisioning=DebugStaffInvitationProvisioner(delegate:firebaseInvitationProvisioner)
+                #else
+                letinvitationProvisioner:anyStaffInvitationProvisioning=firebaseInvitationProvisioner
+                #endif
+                """.removingWhitespace
+            )
+        )
+        #expect(
+            compactSource.contains(
+                "invitationProvisioner:invitationProvisioner"
+            )
+        )
+    }
+
     @Test("Preview composes an in-memory membership fixture")
     func previewComposition() async throws {
         let membership = MembershipContext(
