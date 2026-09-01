@@ -16,7 +16,10 @@ struct SimplifiedRegistrationViewTests {
         #expect(contentView.contains("@State private var isRegistrationOperationActive = false"))
         #expect(contentView.contains("AuthenticationView(onCreateAccount:"))
         #expect(contentView.contains("isRegistrationPresented = true"))
-        #expect(contentView.contains(".sheet(isPresented: $isRegistrationPresented)"))
+        #expect(contentView.contains(".sheet("))
+        #expect(contentView.contains("isPresented: $isRegistrationPresented"))
+        #expect(contentView.contains("onDismiss: {"))
+        #expect(contentView.contains("self.isRegistrationOperationActive = false"))
         #expect(contentView.contains("SimplifiedRegistrationView("))
         #expect(contentView.contains("isPresented: self.$isRegistrationPresented"))
         #expect(
@@ -35,7 +38,7 @@ struct SimplifiedRegistrationViewTests {
             contentView.range(of: ".foregroundStyle(Color.tmiTextPrimary)")?.upperBound
         )
         let sheetStart = try #require(
-            contentView.range(of: ".sheet(isPresented: $isRegistrationPresented)")?.lowerBound
+            contentView.range(of: ".sheet(")?.lowerBound
         )
         #expect(sheetStart > routingEnd)
     }
@@ -61,11 +64,8 @@ struct SimplifiedRegistrationViewTests {
         #expect(source.contains("@Binding private var isPresented: Bool"))
         #expect(source.contains("@Binding private var isOperationActive: Bool"))
         #expect(source.contains("@State private var flow = StaffRegistrationFlow()"))
-        #expect(
-            source.contains(
-                "if await self.flow.submit(request, using: authentication)"
-            )
-        )
+        #expect(source.contains("guard flow.reserveSubmission() else"))
+        #expect(source.contains("self.flow.performReservedSubmission("))
         #expect(source.contains("self.flow.retryRecovery(using: authentication)"))
         #expect(
             source.contains("authStateModel.authenticatedSession?.profile.userID")
@@ -74,8 +74,43 @@ struct SimplifiedRegistrationViewTests {
         #expect(source.contains("flow.acceptPublishedIdentity("))
         #expect(source.contains("authentication.registration.cancel"))
         #expect(source.contains("authentication.registration.retryRecovery"))
+        #expect(source.contains(".disabled(flow.isOperationActive || flow.recoveryAvailable)"))
+        #expect(source.contains("isOperationActive = false"))
+        #expect(!source.contains("Binding<Bool> = .constant"))
+        #expect(source.contains("SimplifiedRegistrationPreview"))
         #expect(!source.contains("@Environment(\\.dismiss)"))
         #expect(!source.contains("@State private var isRegistering"))
+
+        let reservation = try #require(source.range(of: "flow.reserveSubmission()")?.lowerBound)
+        let task = try #require(source.range(of: "Task {")?.lowerBound)
+        #expect(reservation < task)
+    }
+
+    @Test("Retained registration presenters pass live bindings and clear stale locks")
+    func retainedPresentersUseLiveBindings() throws {
+        let legacy = try source(at: "TMI/Views/Authentication/RegistrationView.swift")
+        let roleSelection = try source(
+            at: "TMI/Views/Authentication/RoleSelectionView.swift"
+        )
+
+        #expect(legacy.contains("@Binding private var isPresented: Bool"))
+        #expect(legacy.contains("@Binding private var isOperationActive: Bool"))
+        #expect(legacy.contains("isPresented: $isPresented"))
+        #expect(legacy.contains("isOperationActive: $isOperationActive"))
+        #expect(!legacy.contains("SimplifiedRegistrationView()"))
+        #expect(roleSelection.contains("@State private var isRegistrationOperationActive = false"))
+        #expect(roleSelection.contains("isPresented: self.$showingRegistrationView"))
+        #expect(
+            roleSelection.contains(
+                "isOperationActive: self.$isRegistrationOperationActive"
+            )
+        )
+        #expect(
+            roleSelection.contains(
+                ".interactiveDismissDisabled(self.isRegistrationOperationActive)"
+            )
+        )
+        #expect(roleSelection.contains("self.isRegistrationOperationActive = false"))
     }
 
     @Test("Registration sheet avoids oversized fixed minimum frame constraints")
@@ -107,7 +142,7 @@ struct SimplifiedRegistrationViewTests {
         #expect(registration.contains("dependencies.authentication"))
         #expect(!registration.contains("AuthenticationService.shared"))
         #expect(!legacyRegistration.contains("AuthenticationService.shared"))
-        #expect(legacyRegistration.contains("SimplifiedRegistrationView()"))
+        #expect(legacyRegistration.contains("SimplifiedRegistrationView("))
         #expect(signIn.contains("I've Verified My Email"))
         #expect(signIn.contains("authentication.refresh()"))
         #expect(signIn.contains("authentication.sendVerification()"))

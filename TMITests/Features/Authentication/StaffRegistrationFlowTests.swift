@@ -12,7 +12,8 @@ struct StaffRegistrationFlowTests {
         )
         let flow = StaffRegistrationFlow()
 
-        let accepted = await flow.submit(request(), using: authentication)
+        let accepted = flow.reserveSubmission()
+        await flow.performReservedSubmission(request(), using: authentication)
 
         #expect(accepted)
         #expect(flow.phase == .awaitingAuthorization(userID: "created-user"))
@@ -33,7 +34,8 @@ struct StaffRegistrationFlowTests {
         )
         let flow = StaffRegistrationFlow()
 
-        let accepted = await flow.submit(request(), using: authentication)
+        let accepted = flow.reserveSubmission()
+        await flow.performReservedSubmission(request(), using: authentication)
 
         #expect(accepted)
         #expect(
@@ -46,6 +48,8 @@ struct StaffRegistrationFlowTests {
         #expect(flow.recoveryAvailable == false)
         #expect(authentication.registerCallCount == 1)
         #expect(authentication.refreshCallCount == 0)
+        #expect(flow.reserveSubmission())
+        #expect(flow.phase == .reserved)
     }
 
     @Test("Ambiguous result recovers without creating a second identity")
@@ -61,7 +65,8 @@ struct StaffRegistrationFlowTests {
         )
         let flow = StaffRegistrationFlow()
 
-        let accepted = await flow.submit(request(), using: authentication)
+        let accepted = flow.reserveSubmission()
+        await flow.performReservedSubmission(request(), using: authentication)
 
         #expect(accepted)
         #expect(flow.recoveryAvailable)
@@ -72,7 +77,7 @@ struct StaffRegistrationFlowTests {
         #expect(authentication.registerCallCount == 1)
         #expect(authentication.refreshCallCount == 1)
 
-        let duplicateAccepted = await flow.submit(request(), using: authentication)
+        let duplicateAccepted = flow.reserveSubmission()
 
         #expect(duplicateAccepted == false)
         #expect(authentication.registerCallCount == 1)
@@ -91,7 +96,8 @@ struct StaffRegistrationFlowTests {
             registerResults: [.success(session(userID: "created-user"))]
         )
         let flow = StaffRegistrationFlow()
-        await flow.submit(request(), using: authentication)
+        #expect(flow.reserveSubmission())
+        await flow.performReservedSubmission(request(), using: authentication)
 
         #expect(flow.finishAuthorization(with: nil) == false)
         #expect(flow.isOperationActive == false)
@@ -104,7 +110,8 @@ struct StaffRegistrationFlowTests {
             registerResults: [.success(session(userID: "created-user"))]
         )
         let flow = StaffRegistrationFlow()
-        await flow.submit(request(), using: authentication)
+        #expect(flow.reserveSubmission())
+        await flow.performReservedSubmission(request(), using: authentication)
 
         #expect(flow.finishAuthorization(with: "other-user") == false)
         #expect(
@@ -122,7 +129,8 @@ struct StaffRegistrationFlowTests {
         )
         let flow = StaffRegistrationFlow()
 
-        await flow.submit(request(), using: authentication)
+        #expect(flow.reserveSubmission())
+        await flow.performReservedSubmission(request(), using: authentication)
 
         #expect(
             flow.phase == .failed(
@@ -133,6 +141,34 @@ struct StaffRegistrationFlowTests {
         #expect(flow.isOperationActive == false)
         #expect(authentication.registerCallCount == 1)
         #expect(authentication.refreshCallCount == 0)
+    }
+
+    @Test("Immediate duplicate reservation runs one submission path")
+    func immediateDuplicateReservationRunsOnce() async {
+        let authentication = RegistrationFlowAuthenticationFake(
+            registerResults: [.success(session(userID: "created-user"))]
+        )
+        let flow = StaffRegistrationFlow()
+        var secretClearCount = 0
+        var authorizationPathCount = 0
+
+        let firstReservation = flow.reserveSubmission()
+        let duplicateReservation = flow.reserveSubmission()
+
+        #expect(firstReservation)
+        #expect(duplicateReservation == false)
+
+        for reservation in [firstReservation, duplicateReservation] where reservation {
+            await flow.performReservedSubmission(request(), using: authentication)
+            secretClearCount += 1
+            if flow.expectedIdentityID != nil {
+                authorizationPathCount += 1
+            }
+        }
+
+        #expect(authentication.registerCallCount == 1)
+        #expect(secretClearCount == 1)
+        #expect(authorizationPathCount == 1)
     }
 
     private func request() -> StaffRegistrationRequest {

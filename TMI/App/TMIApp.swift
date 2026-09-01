@@ -310,7 +310,12 @@ struct ContentView: View {
         }
         .foregroundColor(Color.tmiTextPrimary)
         .foregroundStyle(Color.tmiTextPrimary)
-        .sheet(isPresented: $isRegistrationPresented) {
+        .sheet(
+            isPresented: $isRegistrationPresented,
+            onDismiss: {
+                self.isRegistrationOperationActive = false
+            }
+        ) {
             SimplifiedRegistrationView(
                 isPresented: self.$isRegistrationPresented,
                 isOperationActive: self.$isRegistrationOperationActive

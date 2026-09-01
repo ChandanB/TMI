@@ -23,6 +23,7 @@ struct RoleSelectionView: View {
   @State private var appearAnimation = false
   @State private var showingInfoSheet = false
   @State private var showingRegistrationView = false
+  @State private var isRegistrationOperationActive = false
   @Environment(\.dismiss) private var dismiss
   @Environment(\.appDependencies) private var dependencies
 
@@ -129,9 +130,18 @@ struct RoleSelectionView: View {
         }
     }
     // Present the RegistrationView sheet with selected context
-    .sheet(isPresented: $showingRegistrationView) {
-      RegistrationView()
+    .sheet(
+      isPresented: $showingRegistrationView,
+      onDismiss: {
+        self.isRegistrationOperationActive = false
+      }
+    ) {
+      RegistrationView(
+        isPresented: self.$showingRegistrationView,
+        isOperationActive: self.$isRegistrationOperationActive
+      )
         .tmiSheetStyle()
+        .interactiveDismissDisabled(self.isRegistrationOperationActive)
     }
     .onAppear {
       // Trigger animations

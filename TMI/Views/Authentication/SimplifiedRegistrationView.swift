@@ -77,8 +77,8 @@ struct SimplifiedRegistrationView: View {
     }
 
     init(
-        isPresented: Binding<Bool> = .constant(true),
-        isOperationActive: Binding<Bool> = .constant(false)
+        isPresented: Binding<Bool>,
+        isOperationActive: Binding<Bool>
     ) {
         _isPresented = isPresented
         _isOperationActive = isOperationActive
@@ -195,7 +195,7 @@ struct SimplifiedRegistrationView: View {
                                     isLoading: flow.isOperationActive,
                                     action: register
                                 )
-                                .disabled(flow.isOperationActive)
+                                .disabled(flow.isOperationActive || flow.recoveryAvailable)
                                 .accessibilityIdentifier("authentication.registration.submit")
                                 .padding(.top, 8)
 
@@ -230,7 +230,7 @@ struct SimplifiedRegistrationView: View {
                         guard !self.flow.isOperationActive else {
                             return
                         }
-                        self.isPresented = false
+                        self.closeRegistration()
                     }
                     .foregroundColor(Color.tmiTextPrimary)
                     .disabled(flow.isOperationActive)
@@ -247,7 +247,7 @@ struct SimplifiedRegistrationView: View {
             initial: true
         ) { _, userID in
             if self.flow.acceptPublishedIdentity(userID) {
-                self.isPresented = false
+                self.closeRegistration()
             }
         }
     }
@@ -306,13 +306,18 @@ struct SimplifiedRegistrationView: View {
             privacyPolicyVersion: StaffPolicyVersions.privacyPolicyVersion,
             acceptableUsePolicyVersion: StaffPolicyVersions.acceptableUsePolicyVersion
         )
+        guard flow.reserveSubmission() else {
+            return
+        }
         validationErrorMessage = nil
 
         Task {
-            if await self.flow.submit(request, using: authentication) {
-                self.clearRegistrationSecrets()
-                await self.finishAuthorizationIfReady()
-            }
+            await self.flow.performReservedSubmission(
+                request,
+                using: authentication
+            )
+            self.clearRegistrationSecrets()
+            await self.finishAuthorizationIfReady()
         }
     }
 
@@ -338,8 +343,13 @@ struct SimplifiedRegistrationView: View {
         if flow.finishAuthorization(
             with: authStateModel.authenticatedSession?.profile.userID
         ) {
-            isPresented = false
+            closeRegistration()
         }
+    }
+
+    private func closeRegistration() {
+        isOperationActive = false
+        isPresented = false
     }
 
     private func clearRegistrationSecrets() {
@@ -414,6 +424,18 @@ struct AccountTypeButton: View {
 }
 
 #Preview {
-    SimplifiedRegistrationView()
+    SimplifiedRegistrationPreview()
         .environment(\.authStateModel, AuthStateModel(automaticallyStart: false))
+}
+
+private struct SimplifiedRegistrationPreview: View {
+    @State private var isPresented = true
+    @State private var isOperationActive = false
+
+    var body: some View {
+        SimplifiedRegistrationView(
+            isPresented: $isPresented,
+            isOperationActive: $isOperationActive
+        )
+    }
 }

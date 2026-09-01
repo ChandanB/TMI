@@ -5,6 +5,7 @@ import Observation
 final class StaffRegistrationFlow {
     enum Phase: Equatable {
         case idle
+        case reserved
         case submitting
         case recovering
         case awaitingAuthorization(userID: String)
@@ -16,7 +17,7 @@ final class StaffRegistrationFlow {
 
     var isOperationActive: Bool {
         switch phase {
-        case .submitting, .recovering, .awaitingAuthorization:
+        case .reserved, .submitting, .recovering, .awaitingAuthorization:
             true
         case .idle, .failed, .complete:
             false
@@ -44,12 +45,22 @@ final class StaffRegistrationFlow {
         return nil
     }
 
-    @discardableResult
-    func submit(
+    func reserveSubmission() -> Bool {
+        switch phase {
+        case .idle, .failed(_, recoveryAvailable: false):
+            phase = .reserved
+            return true
+        case .reserved, .submitting, .recovering, .awaitingAuthorization,
+             .failed(_, recoveryAvailable: true), .complete:
+            return false
+        }
+    }
+
+    func performReservedSubmission(
         _ request: StaffRegistrationRequest,
         using authentication: any AuthenticationProviding
-    ) async -> Bool {
-        guard !isOperationActive, !recoveryAvailable else { return false }
+    ) async {
+        guard phase == .reserved else { return }
         phase = .submitting
         do {
             try accept(try await authentication.register(request))
@@ -61,7 +72,6 @@ final class StaffRegistrationFlow {
                 recoveryAvailable: false
             )
         }
-        return true
     }
 
     func retryRecovery(using authentication: any AuthenticationProviding) async {
