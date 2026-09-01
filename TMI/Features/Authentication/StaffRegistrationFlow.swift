@@ -44,11 +44,12 @@ final class StaffRegistrationFlow {
         return nil
     }
 
+    @discardableResult
     func submit(
         _ request: StaffRegistrationRequest,
         using authentication: any AuthenticationProviding
-    ) async {
-        guard !isOperationActive, !recoveryAvailable else { return }
+    ) async -> Bool {
+        guard !isOperationActive, !recoveryAvailable else { return false }
         phase = .submitting
         do {
             try accept(try await authentication.register(request))
@@ -60,6 +61,7 @@ final class StaffRegistrationFlow {
                 recoveryAvailable: false
             )
         }
+        return true
     }
 
     func retryRecovery(using authentication: any AuthenticationProviding) async {

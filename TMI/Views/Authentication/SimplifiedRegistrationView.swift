@@ -63,16 +63,25 @@ struct SimplifiedRegistrationView: View {
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var selectedAccountType: AccountType = .teacher
-    @State private var isRegistering = false
-    @State private var errorMessage: String?
+    @State private var flow = StaffRegistrationFlow()
+    @State private var validationErrorMessage: String?
 
-    @Environment(\.dismiss) private var dismiss
+    @Binding private var isPresented: Bool
+    @Binding private var isOperationActive: Bool
     @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) private var authStateModel
     @FocusState private var focusedField: Field?
 
     enum Field: Hashable {
         case displayName, email, invitationCode
+    }
+
+    init(
+        isPresented: Binding<Bool> = .constant(true),
+        isOperationActive: Binding<Bool> = .constant(false)
+    ) {
+        _isPresented = isPresented
+        _isOperationActive = isOperationActive
     }
 
     var body: some View {
@@ -169,7 +178,7 @@ struct SimplifiedRegistrationView: View {
                                     "authentication.registration.confirmPassword"
                                 )
 
-                                if let errorMessage = errorMessage {
+                                if let errorMessage {
                                     Text(errorMessage)
                                         .font(.system(size: 14))
                                         .foregroundColor(.red.opacity(0.9))
@@ -178,15 +187,30 @@ struct SimplifiedRegistrationView: View {
                                 }
 
                                 TMIButton(
-                                    text: isRegistering ? "Creating Account..." : "Create Account",
+                                    text: flow.isOperationActive
+                                        ? "Creating Account..."
+                                        : "Create Account",
                                     icon: "checkmark.circle",
                                     style: .primary,
-                                    isLoading: isRegistering,
+                                    isLoading: flow.isOperationActive,
                                     action: register
                                 )
-                                .disabled(isRegistering)
+                                .disabled(flow.isOperationActive)
                                 .accessibilityIdentifier("authentication.registration.submit")
                                 .padding(.top, 8)
+
+                                if flow.recoveryAvailable {
+                                    TMIButton(
+                                        text: "Continue Account Setup",
+                                        icon: "arrow.clockwise",
+                                        style: .secondary,
+                                        action: retryRecovery
+                                    )
+                                    .disabled(flow.isOperationActive)
+                                    .accessibilityIdentifier(
+                                        "authentication.registration.retryRecovery"
+                                    )
+                                }
                             }
                         }
                         .padding(.horizontal, 20)
@@ -203,85 +227,125 @@ struct SimplifiedRegistrationView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
-                        dismiss()
+                        guard !self.flow.isOperationActive else {
+                            return
+                        }
+                        self.isPresented = false
                     }
                     .foregroundColor(Color.tmiTextPrimary)
+                    .disabled(flow.isOperationActive)
+                    .accessibilityIdentifier("authentication.registration.cancel")
                 }
             }
         }
         .accessibilityIdentifier("authentication.registration.screen")
+        .onChange(of: flow.isOperationActive, initial: true) { _, isActive in
+            self.isOperationActive = isActive
+        }
+        .onChange(
+            of: authStateModel.authenticatedSession?.profile.userID,
+            initial: true
+        ) { _, userID in
+            if self.flow.acceptPublishedIdentity(userID) {
+                self.isPresented = false
+            }
+        }
+    }
+
+    private var errorMessage: String? {
+        validationErrorMessage ?? flow.errorMessage
     }
 
     private func register() {
+        guard !flow.isOperationActive, !flow.recoveryAvailable else {
+            return
+        }
+
         // Validate
         guard !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Please enter your name"
+            validationErrorMessage = "Please enter your name"
             return
         }
 
         guard !email.isEmpty else {
-            errorMessage = "Please enter an email address"
+            validationErrorMessage = "Please enter an email address"
             return
         }
 
         guard isValidEmail(email) else {
-            errorMessage = "Please enter a valid email address"
+            validationErrorMessage = "Please enter a valid email address"
             return
         }
 
         guard !invitationCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Enter the staff invitation code provided by your institution"
+            validationErrorMessage = "Enter the staff invitation code provided by your institution"
             return
         }
 
         guard password.count >= 8 else {
-            errorMessage = "Password must be at least 8 characters"
+            validationErrorMessage = "Password must be at least 8 characters"
             return
         }
 
         guard password == confirmPassword else {
-            errorMessage = "Passwords do not match"
+            validationErrorMessage = "Passwords do not match"
             return
         }
 
-        isRegistering = true
-        errorMessage = nil
+        guard let authentication = dependencies.authentication else {
+            validationErrorMessage = AuthenticationPresentationPolicy.registrationFailureMessage
+            return
+        }
+
+        let request = StaffRegistrationRequest(
+            displayName: displayName,
+            email: email,
+            password: password,
+            requestedRole: selectedAccountType.staffRole,
+            invitationCode: invitationCode,
+            privacyPolicyVersion: StaffPolicyVersions.privacyPolicyVersion,
+            acceptableUsePolicyVersion: StaffPolicyVersions.acceptableUsePolicyVersion
+        )
+        validationErrorMessage = nil
 
         Task {
-            do {
-                guard let authentication = dependencies.authentication else {
-                    throw AuthenticationRepositoryError.registrationRollbackFailed
-                }
-                _ = try await authentication.register(
-                    StaffRegistrationRequest(
-                        displayName: displayName,
-                        email: email,
-                        password: password,
-                        requestedRole: selectedAccountType.staffRole,
-                        invitationCode: invitationCode,
-                        privacyPolicyVersion: StaffPolicyVersions.privacyPolicyVersion,
-                        acceptableUsePolicyVersion: StaffPolicyVersions.acceptableUsePolicyVersion
-                    )
-                )
-
-                password = ""
-                confirmPassword = ""
-                invitationCode = ""
-
-                // Trusted invitation provisioning authorizes access immediately.
-                await authStateModel.fetch()
-
-                isRegistering = false
-                dismiss()
-            } catch {
-                password = ""
-                confirmPassword = ""
-                isRegistering = false
-                errorMessage = AuthenticationPresentationPolicy.registrationMessage(
-                    for: error
-                )
+            if await self.flow.submit(request, using: authentication) {
+                self.clearRegistrationSecrets()
+                await self.finishAuthorizationIfReady()
             }
         }
+    }
+
+    private func retryRecovery() {
+        guard let authentication = dependencies.authentication else {
+            validationErrorMessage = AuthenticationPresentationPolicy.registrationFailureMessage
+            return
+        }
+        validationErrorMessage = nil
+
+        Task {
+            await self.flow.retryRecovery(using: authentication)
+            await self.finishAuthorizationIfReady()
+        }
+    }
+
+    private func finishAuthorizationIfReady() async {
+        guard flow.expectedIdentityID != nil else {
+            return
+        }
+
+        await authStateModel.fetch()
+        if flow.finishAuthorization(
+            with: authStateModel.authenticatedSession?.profile.userID
+        ) {
+            isPresented = false
+        }
+    }
+
+    private func clearRegistrationSecrets() {
+        password = ""
+        confirmPassword = ""
+        invitationCode = ""
     }
 
     private func focusBinding(for field: Field) -> Binding<Bool> {

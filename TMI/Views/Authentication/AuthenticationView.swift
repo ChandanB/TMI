@@ -8,7 +8,6 @@ import SwiftUI
 struct AuthenticationView: View {
   @Environment(\.authStateModel) var stateModel
   @Environment(\.appDependencies) private var dependencies
-  @State private var showingRegistration = false
   @State private var showingForgotPassword = false
   @State private var isRefreshingVerification = false
   @State private var verificationMessage: String?
@@ -20,6 +19,12 @@ struct AuthenticationView: View {
   @State private var animateEmail = false
   @State private var animatePassword = false
   @State private var animateButtons = false
+
+  let onCreateAccount: @MainActor () -> Void
+
+  init(onCreateAccount: @escaping @MainActor () -> Void = {}) {
+    self.onCreateAccount = onCreateAccount
+  }
 
   var body: some View {
     ZStack {
@@ -177,7 +182,7 @@ struct AuthenticationView: View {
                 // Enhanced Sign Up Section
                 VStack(spacing: 12) {
                   Button(action: {
-                    showingRegistration = true
+                    self.onCreateAccount()
                   }) {
                     ViewThatFits(in: .horizontal) {
                       HStack(spacing: 0) {
@@ -232,10 +237,6 @@ struct AuthenticationView: View {
         await stateModel.fetch()
       }
       .navigationBarTitleDisplayMode(.inline)
-      .sheet(isPresented: $showingRegistration) {
-        SimplifiedRegistrationView()
-          .tmiSheetStyle()
-      }
       .alert("Reset Password", isPresented: $showingForgotPassword) {
         TextField("Email", text: Binding(
           get: { stateModel.email },

@@ -289,6 +289,8 @@ struct ContentView: View {
     @Environment(AppRouter.self) private var appRouter
     
     @State private var hasBootstrapped = false
+    @State private var isRegistrationPresented = false
+    @State private var isRegistrationOperationActive = false
 
     var body: some View {
         Group {
@@ -301,11 +303,21 @@ struct ContentView: View {
             } else if authStateModel.canRetryAuthorization {
                 AuthenticationRecoveryView()
             } else {
-                AuthenticationView()
+                AuthenticationView(onCreateAccount: {
+                    self.isRegistrationPresented = true
+                })
             }
         }
         .foregroundColor(Color.tmiTextPrimary)
         .foregroundStyle(Color.tmiTextPrimary)
+        .sheet(isPresented: $isRegistrationPresented) {
+            SimplifiedRegistrationView(
+                isPresented: self.$isRegistrationPresented,
+                isOperationActive: self.$isRegistrationOperationActive
+            )
+            .tmiSheetStyle()
+            .interactiveDismissDisabled(self.isRegistrationOperationActive)
+        }
         .onChange(of: authStateModel.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
                 Task {

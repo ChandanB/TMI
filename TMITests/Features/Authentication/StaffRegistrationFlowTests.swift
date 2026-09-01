@@ -12,8 +12,9 @@ struct StaffRegistrationFlowTests {
         )
         let flow = StaffRegistrationFlow()
 
-        await flow.submit(request(), using: authentication)
+        let accepted = await flow.submit(request(), using: authentication)
 
+        #expect(accepted)
         #expect(flow.phase == .awaitingAuthorization(userID: "created-user"))
         #expect(flow.isOperationActive)
         #expect(flow.expectedIdentityID == "created-user")
@@ -32,8 +33,9 @@ struct StaffRegistrationFlowTests {
         )
         let flow = StaffRegistrationFlow()
 
-        await flow.submit(request(), using: authentication)
+        let accepted = await flow.submit(request(), using: authentication)
 
+        #expect(accepted)
         #expect(
             flow.phase == .failed(
                 message: AuthenticationPresentationPolicy.registrationFailureMessage,
@@ -59,8 +61,9 @@ struct StaffRegistrationFlowTests {
         )
         let flow = StaffRegistrationFlow()
 
-        await flow.submit(request(), using: authentication)
+        let accepted = await flow.submit(request(), using: authentication)
 
+        #expect(accepted)
         #expect(flow.recoveryAvailable)
         #expect(
             flow.errorMessage
@@ -69,8 +72,9 @@ struct StaffRegistrationFlowTests {
         #expect(authentication.registerCallCount == 1)
         #expect(authentication.refreshCallCount == 1)
 
-        await flow.submit(request(), using: authentication)
+        let duplicateAccepted = await flow.submit(request(), using: authentication)
 
+        #expect(duplicateAccepted == false)
         #expect(authentication.registerCallCount == 1)
         #expect(authentication.refreshCallCount == 1)
 
