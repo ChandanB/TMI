@@ -45,14 +45,45 @@ progress, the existing disabled/loading controls prevent duplicate requests.
 ### Success-gated dismissal
 
 `SimplifiedRegistrationView` will no longer dismiss merely because the
-repository call returned. After registration it will request an authorization
-refresh and wait for `AuthStateModel` to publish a fully trusted authenticated
-session for the created identity. Only that confirmed state closes the form.
+repository call returned. The form will record the `identity.userID` returned
+by the successful repository registration. After registration it will request
+an authorization refresh and wait for `AuthStateModel` to publish a fully
+trusted authenticated session whose profile, claim, and membership belong to
+that exact user ID. `isLoggedIn` alone is not a sufficient dismissal condition.
+Only the matching confirmed session closes the form.
 
 If registration or authorization fails, the form remains visible and presents
 a standard staff-mode error. Sensitive values such as the password and
-invitation code remain cleared according to the existing behavior. The user can
-correct the input or retry without being silently redirected.
+invitation code remain cleared according to the existing behavior. After a
+terminal rollback, the user can correct the input or retry without being
+silently redirected.
+
+### Ambiguous post-commit recovery
+
+`StaffInvitationProvisioningError.claimRefreshPending` is recovery state, not a
+fresh-registration failure. The repository deliberately preserves both the
+Firebase identity and encrypted pending registration because the server may
+already have committed canonical records.
+
+When registration reports this condition, the form remains presented, enters
+recovery, and calls the existing `AuthenticationProviding.refresh()` path to
+continue the pending registration idempotently. It must not call `register()`
+or create another Firebase identity. If the immediate recovery attempt remains
+pending, the form exits its non-dismissible operation state, displays recovery
+guidance, and offers a retry action that calls `refresh()` again. A retry never
+submits the original Create Account request.
+
+Recovery records the identity returned by `refresh()` and applies the same
+identity-specific trusted-session dismissal gate. A missing or mismatched
+identity fails closed and keeps the form visible.
+
+### Dismissal control
+
+Once submission or pending-registration recovery begins, registration is
+non-dismissible until the active operation reaches a terminal failure or a
+matching trusted-session success. The toolbar Cancel action is disabled during
+that interval, and the root-owned sheet disables interactive dismissal. Cancel
+remains available before submission and after a terminal failure.
 
 ### Security and rollback
 
@@ -72,11 +103,17 @@ trusted claim, and active matching membership.
 2. The form calls the canonical authentication repository.
 3. Firebase may emit intermediate identity callbacks, but the root keeps the
    form presented.
-4. On canonical provisioning success, the form requests authorization refresh.
-5. After `AuthStateModel` publishes `.authenticated`, the root dismisses the
-   form and the app routes to the staff workspace.
-6. On failure or rollback, the form remains visible with an actionable error;
-   the root does not silently return the user to sign-in.
+4. On a terminal pre-commit failure, the repository rolls back the identity;
+   the form remains visible with an actionable error and permits correction or
+   retry.
+5. On `claimRefreshPending`, the identity and pending record remain; the form
+   invokes `refresh()` idempotently and never creates a second identity.
+6. On canonical repository success, the form records the returned identity ID,
+   clears secrets, and requests authorization refresh.
+7. After `AuthStateModel` publishes `.authenticated` for that exact identity,
+   the root dismisses the form and reveals the staff workspace.
+8. An unrelated, stale, missing, or mismatched authenticated identity never
+   dismisses registration.
 
 ## Verification
 
@@ -85,11 +122,17 @@ Automated coverage will prove:
 - Registration presentation survives an intermediate authenticated callback.
 - A terminal provisioning failure followed by identity deletion leaves the
   form visible and displays the error.
-- A successful repository result does not dismiss before a trusted session is
-  published.
-- Publishing the trusted authenticated session dismisses registration and
-  routes to staff content.
+- An ambiguous post-commit result preserves the form and identity, invokes the
+  existing pending-registration `refresh()` path, and never calls user creation
+  or `register()` a second time.
+- A successful repository result does not dismiss before a trusted session for
+  the returned identity is published.
+- An authenticated session for a different identity does not dismiss the form.
+- Publishing the matching trusted authenticated session dismisses registration
+  and routes to staff content.
 - Cancel still dismisses registration when no submission is in progress.
+- Cancel during submission or recovery does not dismiss registration.
+- Interactive sheet dismissal is disabled during submission or recovery.
 - Existing authentication, Debug invitation, and Release-isolation tests pass.
 
 The focused suite will be followed by Debug and Release builds. Live acceptance
