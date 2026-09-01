@@ -105,6 +105,8 @@ nonisolated enum AuthenticationPresentationPolicy {
         "We couldn't sign you in. Check your credentials and try again."
     static let registrationFailureMessage =
         "We couldn't create the account. Check the invitation and entered information, then try again."
+    static let registrationRecoveryMessage =
+        "Your account was created, but organization access is still being prepared. Continue setup to retry securely."
     static let passwordResetConfirmation =
         "If an account matches that email, a password reset link will be sent."
 
