@@ -81,6 +81,35 @@ final class Release1AcceptanceUITests: XCTestCase {
         )
         app.secureTextFields["authentication.registration.confirmPassword"]
             .typeText("\n")
+        app.buttons["authentication.registration.submit"].tap()
+
+        let cancel = app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier == %@ AND enabled == false",
+                    "authentication.registration.cancel"
+                )
+            )
+            .firstMatch
+        XCTAssertTrue(
+            cancel.exists,
+            "Cancel must be disabled while registration authorization is in flight."
+        )
+        let registrationScreen = element(
+            "authentication.registration.screen",
+            in: app
+        )
+        XCTAssertTrue(
+            registrationScreen.exists,
+            "Registration must remain presented after authentication publishes identity."
+        )
+#if !os(macOS)
+        app.swipeDown()
+        XCTAssertTrue(
+            registrationScreen.exists,
+            "Interactive dismissal must be locked while registration is in flight."
+        )
+#endif
 
         XCTAssertFalse(
             app.staticTexts["Verify Your Email"].exists,

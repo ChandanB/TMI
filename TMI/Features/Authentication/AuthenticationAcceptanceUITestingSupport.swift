@@ -85,6 +85,7 @@ private final class AuthenticationAcceptanceUITestingRepository: AuthenticationP
         identityProvider.authenticate(
             userID: AuthenticationAcceptanceFixture.invitationUserID
         )
+        try await Task.sleep(for: .seconds(2))
         return AuthenticationAcceptanceFixture.session(
             userID: AuthenticationAcceptanceFixture.invitationUserID,
             email: request.email
@@ -334,6 +335,8 @@ struct AuthenticationAcceptanceUITestingContent: View {
     @State private var authStateModel: AuthStateModel
     @State private var appRouter = AppRouter()
     @State private var studentContext = StudentContextStateModel()
+    @State private var isRegistrationPresented = false
+    @State private var isRegistrationOperationActive = false
 
     private let dependencies: AppDependencies
 
@@ -384,8 +387,23 @@ struct AuthenticationAcceptanceUITestingContent: View {
                         "uiTesting.authentication.staffWorkspace"
                     )
             } else {
-                AuthenticationView()
+                AuthenticationView(onCreateAccount: {
+                    self.isRegistrationPresented = true
+                })
             }
+        }
+        .sheet(
+            isPresented: $isRegistrationPresented,
+            onDismiss: {
+                self.isRegistrationOperationActive = false
+            }
+        ) {
+            SimplifiedRegistrationView(
+                isPresented: self.$isRegistrationPresented,
+                isOperationActive: self.$isRegistrationOperationActive
+            )
+            .tmiSheetStyle()
+            .interactiveDismissDisabled(self.isRegistrationOperationActive)
         }
         .environment(\.appDependencies, dependencies)
         .environment(\.authStateModel, authStateModel)
