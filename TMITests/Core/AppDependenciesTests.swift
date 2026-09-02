@@ -25,31 +25,32 @@ struct AppDependenciesTests {
         #expect(source.contains("SecurePendingStaffRegistrationStore"))
     }
 
-    @Test("Production gates the Debug invitation alias and injects the selected provisioner")
-    func productionGatesDebugInvitationAlias() throws {
+    @Test("Production assembly gates both Debug authentication decorators")
+    func productionGatesDebugAuthenticationDecorators() throws {
         let source = try self.source(
             "TMI/Core/Dependencies/AppDependencies.swift",
             root: self.repositoryRoot
         )
         let compactSource = source.removingWhitespace
 
-        #expect(
-            compactSource.contains(
-                """
-                letfirebaseInvitationProvisioner=FirebaseStaffInvitationProvisioner()
-                #ifDEBUG
-                letinvitationProvisioner:anyStaffInvitationProvisioning=DebugStaffInvitationProvisioner(delegate:firebaseInvitationProvisioner)
-                #else
-                letinvitationProvisioner:anyStaffInvitationProvisioning=firebaseInvitationProvisioner
-                #endif
-                """.removingWhitespace
+        #expect(compactSource.contains(
+            """
+            letfirebaseInvitationProvisioner=FirebaseStaffInvitationProvisioner()
+            letfirebaseSessionLoader=FirebaseAuthenticationSessionLoader(
+            membershipProvider:membership,
+            requiresEmailVerification:flags.staffEmailVerificationRequired
             )
-        )
-        #expect(
-            compactSource.contains(
-                "invitationProvisioner:invitationProvisioner"
-            )
-        )
+            #ifDEBUG
+            letinvitationProvisioner:anyStaffInvitationProvisioning=DebugStaffInvitationProvisioner(delegate:firebaseInvitationProvisioner)
+            letsessionLoader:anyAuthenticationSessionLoading=DebugAuthenticationSessionLoader(delegate:firebaseSessionLoader)
+            #else
+            letinvitationProvisioner:anyStaffInvitationProvisioning=firebaseInvitationProvisioner
+            letsessionLoader:anyAuthenticationSessionLoading=firebaseSessionLoader
+            #endif
+            """.removingWhitespace
+        ))
+        #expect(compactSource.contains("sessionLoader:sessionLoader"))
+        #expect(compactSource.contains("invitationProvisioner:invitationProvisioner"))
     }
 
     @Test("Preview composes an in-memory membership fixture")
