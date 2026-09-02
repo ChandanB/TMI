@@ -85,7 +85,7 @@ private final class AuthenticationAcceptanceUITestingRepository: AuthenticationP
         identityProvider.authenticate(
             userID: AuthenticationAcceptanceFixture.invitationUserID
         )
-        try await Task.sleep(for: .seconds(2))
+        try await Task.sleep(for: .seconds(3))
         return AuthenticationAcceptanceFixture.session(
             userID: AuthenticationAcceptanceFixture.invitationUserID,
             email: request.email
