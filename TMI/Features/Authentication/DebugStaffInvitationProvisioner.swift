@@ -9,6 +9,8 @@ nonisolated enum DebugStaffInvitationError: Error, Equatable {
 final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
     static let invitationAlias = "TMI-DEBUG-ACCESS-2026"
     static let allowedEmail = "tmi-debug@example.com"
+    static let districtID = "district-debug"
+    static let schoolID = "school-debug"
 
     private let delegate: any StaffInvitationProvisioning
 
@@ -53,8 +55,8 @@ final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
     static func membership(for identity: AuthIdentity) -> MembershipContext {
         MembershipContext(
             userID: identity.userID,
-            districtID: "district-debug",
-            schoolIDs: ["school-debug"],
+            districtID: districtID,
+            schoolIDs: [schoolID],
             role: .teacher,
             capabilities: [.studentReadDetail, .studentWriteDetail],
             assignedStudentIDs: [],
@@ -69,7 +71,7 @@ final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
                 userID: identity.userID,
                 email: identity.email,
                 isEmailVerified: identity.isEmailVerified,
-                districtID: "district-debug"
+                districtID: districtID
             ),
             membership: membership(for: identity)
         )

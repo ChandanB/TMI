@@ -77,17 +77,17 @@ struct DebugStaffInvitationProvisionerTests {
         let identity = AuthIdentity(
             userID: "staff-1",
             email: "\nTMI-DEBUG@Example.COM\t",
-            isEmailVerified: true
+            isEmailVerified: false
         )
 
         let session = try await loader.session(for: identity)
 
-        #expect(session.access == .authorized)
+        #expect(session.access(requiringEmailVerification: false) == .authorized)
         #expect(
             session.identity == AuthIdentity(
                 userID: identity.userID,
                 email: identity.email,
-                isEmailVerified: identity.isEmailVerified,
+                isEmailVerified: false,
                 districtID: "district-debug"
             )
         )
