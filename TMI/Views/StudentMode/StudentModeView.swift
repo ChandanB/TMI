@@ -9,6 +9,7 @@ struct StudentModeView: View {
     @State private var showingExitConfirmation = false
     @State private var isExiting = false
     @State private var showingExitFailure = false
+    @State private var surveyRepository: SurveyRepository?
 
     var body: some View {
         ZStack {
@@ -58,6 +59,9 @@ struct StudentModeView: View {
         }
         .onAppear {
             session.updateActivity()
+            if session.isStudentModeActive, surveyRepository == nil {
+                surveyRepository = .firebase()
+            }
         }
     }
 
@@ -98,13 +102,22 @@ struct StudentModeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityIdentifier("studentMode.restoring")
 
-        case .active:
-            ContentUnavailableView {
-                Label("Your Activity", systemImage: "list.clipboard")
-            } description: {
-                Text("Your educator will guide you through the assigned activity.")
+        case .active(let grant):
+            if let assignment = surveyAssignment(for: grant),
+               let definition = Self.interestSurveyDefinition,
+               let surveyRepository {
+                StudentSurveyFlow(
+                    assignment: assignment,
+                    definition: definition,
+                    grant: grant,
+                    repository: surveyRepository
+                )
+            } else {
+                ProgressView("Getting your activity ready…")
+                    .task {
+                        if surveyRepository == nil { surveyRepository = .firebase() }
+                    }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .locked(let reason):
             ContentUnavailableView {
@@ -232,6 +245,87 @@ struct StudentModeView: View {
             showingExitFailure = !success
         }
     }
+
+    private func surveyAssignment(for grant: StudentModeGrant) -> SurveyAssignment? {
+        guard let assignmentID = grant.scope.assignmentIDs.first else { return nil }
+        return try? SurveyAssignment(
+            assignmentID: assignmentID,
+            attemptID: grant.sessionID,
+            districtID: grant.scope.districtID,
+            studentID: grant.scope.studentID,
+            definitionID: "interest-discovery",
+            definitionVersion: 1,
+            state: .active,
+            assignedAt: grant.issuedAt
+        )
+    }
+
+    private static let interestSurveyDefinition = try? SurveyDefinition(
+        id: "interest-discovery",
+        version: 1,
+        title: "Things I Like",
+        publishedAt: Date(timeIntervalSince1970: 1_735_689_600),
+        questions: [
+            SurveyQuestion(
+                id: "activities",
+                prompt: "What kinds of things do you enjoy?",
+                kind: .multiSelect(maxSelections: 2),
+                isRequired: true,
+                options: [
+                    SurveyOption(id: "create", label: "Making or creating things"),
+                    SurveyOption(id: "help", label: "Helping people"),
+                    SurveyOption(id: "explore", label: "Exploring how things work"),
+                ]
+            ),
+            SurveyQuestion(
+                id: "create-detail",
+                prompt: "What do you like to create?",
+                kind: .singleChoice,
+                isRequired: true,
+                options: [
+                    SurveyOption(id: "art", label: "Art or designs"),
+                    SurveyOption(id: "build", label: "Things I can build"),
+                    SurveyOption(id: "stories", label: "Stories or music"),
+                ]
+            ),
+            SurveyQuestion(
+                id: "helping",
+                prompt: "Do you like helping other people?",
+                kind: .singleChoice,
+                isRequired: true,
+                options: [
+                    SurveyOption(id: "yes", label: "Yes"),
+                    SurveyOption(id: "sometimes", label: "Sometimes"),
+                    SurveyOption(id: "not-now", label: "Not right now"),
+                ]
+            ),
+            SurveyQuestion(
+                id: "help-detail",
+                prompt: "When do you most enjoy helping?",
+                kind: .singleChoice,
+                isRequired: true,
+                options: [
+                    SurveyOption(id: "team", label: "When I am part of a team"),
+                    SurveyOption(id: "teach", label: "When I can explain something"),
+                    SurveyOption(id: "care", label: "When someone needs care"),
+                ]
+            ),
+        ],
+        branchRules: [
+            SurveyBranchRule(
+                id: "show-create-detail",
+                sourceQuestionID: "activities",
+                targetQuestionID: "create-detail",
+                predicate: .contains("create")
+            ),
+            SurveyBranchRule(
+                id: "show-help-detail",
+                sourceQuestionID: "helping",
+                targetQuestionID: "help-detail",
+                predicate: .equals("yes")
+            ),
+        ]
+    )
 }
 
 #Preview {
