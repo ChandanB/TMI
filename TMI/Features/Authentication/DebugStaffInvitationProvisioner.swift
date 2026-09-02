@@ -9,12 +9,18 @@ nonisolated enum DebugStaffInvitationError: Error, Equatable {
 final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
     static let invitationAlias = "TMI-DEBUG-ACCESS-2026"
     static let allowedEmail = "tmi-debug@example.com"
-    static let opaqueInvitationCode = "VE1JLURlYnVnLUNhbm9uaWNhbC1JbnZpdGUtMjAyNiE"
 
     private let delegate: any StaffInvitationProvisioning
 
     init(delegate: any StaffInvitationProvisioning) {
         self.delegate = delegate
+    }
+
+    func requiresTrustedClaimRefresh(
+        request: StaffInvitationAcceptanceRequest,
+        identity: AuthIdentity
+    ) -> Bool {
+        !Self.isAllowed(request: request, identity: identity)
     }
 
     func provision(
@@ -24,24 +30,65 @@ final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
         guard request.invitationCode == Self.invitationAlias else {
             return try await delegate.provision(request: request, identity: identity)
         }
-
-        let normalizedEmail = identity.email?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        guard normalizedEmail == Self.allowedEmail else {
+        guard Self.isAllowed(identity: identity) else {
             throw DebugStaffInvitationError.emailNotAllowed
         }
 
-        let translatedRequest = StaffInvitationAcceptanceRequest(
-            displayName: request.displayName,
-            invitationCode: Self.opaqueInvitationCode,
-            privacyPolicyVersion: request.privacyPolicyVersion,
-            acceptableUsePolicyVersion: request.acceptableUsePolicyVersion
+        return Self.membership(for: identity)
+    }
+
+    static func isAllowed(
+        request: StaffInvitationAcceptanceRequest,
+        identity: AuthIdentity
+    ) -> Bool {
+        request.invitationCode == invitationAlias && isAllowed(identity: identity)
+    }
+
+    static func isAllowed(identity: AuthIdentity) -> Bool {
+        identity.email?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() == allowedEmail
+    }
+
+    static func membership(for identity: AuthIdentity) -> MembershipContext {
+        MembershipContext(
+            userID: identity.userID,
+            districtID: "district-debug",
+            schoolIDs: ["school-debug"],
+            role: .teacher,
+            capabilities: [.studentReadDetail, .studentWriteDetail],
+            assignedStudentIDs: [],
+            isActive: true,
+            version: 1
         )
-        return try await delegate.provision(
-            request: translatedRequest,
-            identity: identity
+    }
+
+    static func session(for identity: AuthIdentity) -> AuthSession {
+        AuthSession(
+            identity: AuthIdentity(
+                userID: identity.userID,
+                email: identity.email,
+                isEmailVerified: identity.isEmailVerified,
+                districtID: "district-debug"
+            ),
+            membership: membership(for: identity)
         )
+    }
+}
+
+@MainActor
+final class DebugAuthenticationSessionLoader: AuthenticationSessionLoading {
+    private let delegate: any AuthenticationSessionLoading
+
+    init(delegate: any AuthenticationSessionLoading) {
+        self.delegate = delegate
+    }
+
+    func session(for identity: AuthIdentity) async throws -> AuthSession {
+        guard DebugStaffInvitationProvisioner.isAllowed(identity: identity) else {
+            return try await delegate.session(for: identity)
+        }
+        return DebugStaffInvitationProvisioner.session(for: identity)
     }
 }
 #endif

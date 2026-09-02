@@ -112,10 +112,24 @@ protocol AuthenticationSessionLoading {
 
 @MainActor
 protocol StaffInvitationProvisioning {
+    func requiresTrustedClaimRefresh(
+        request: StaffInvitationAcceptanceRequest,
+        identity: AuthIdentity
+    ) -> Bool
+
     func provision(
         request: StaffInvitationAcceptanceRequest,
         identity: AuthIdentity
     ) async throws -> MembershipContext
+}
+
+extension StaffInvitationProvisioning {
+    func requiresTrustedClaimRefresh(
+        request: StaffInvitationAcceptanceRequest,
+        identity: AuthIdentity
+    ) -> Bool {
+        true
+    }
 }
 
 nonisolated protocol PendingStaffRegistrationStoring: Sendable {

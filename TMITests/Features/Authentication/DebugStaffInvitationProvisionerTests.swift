@@ -5,8 +5,8 @@ import Testing
 @Suite("Debug staff invitation provisioning")
 @MainActor
 struct DebugStaffInvitationProvisionerTests {
-    @Test("The Debug alias normalizes the allowed email and delegates an opaque invitation")
-    func aliasTranslatesForAllowedEmail() async throws {
+    @Test("The Debug alias and allowed email synthesize canonical membership")
+    func aliasSynthesizesMembershipForAllowedEmail() async throws {
         let delegate = RecordingStaffInvitationProvisioner()
         let provisioner = DebugStaffInvitationProvisioner(delegate: delegate)
         let identity = AuthIdentity(
@@ -26,17 +26,91 @@ struct DebugStaffInvitationProvisionerTests {
             identity: identity
         )
 
-        #expect(membership == delegate.membership)
-        #expect(delegate.provisionCallCount == 1)
-        #expect(delegate.lastIdentity == identity)
         #expect(
-            delegate.lastRequest == StaffInvitationAcceptanceRequest(
-                displayName: request.displayName,
-                invitationCode: DebugStaffInvitationProvisioner.opaqueInvitationCode,
-                privacyPolicyVersion: request.privacyPolicyVersion,
-                acceptableUsePolicyVersion: request.acceptableUsePolicyVersion
+            membership == MembershipContext(
+                userID: identity.userID,
+                districtID: "district-debug",
+                schoolIDs: ["school-debug"],
+                role: .teacher,
+                capabilities: [.studentReadDetail, .studentWriteDetail],
+                assignedStudentIDs: [],
+                isActive: true,
+                version: 1
             )
         )
+        #expect(delegate.provisionCallCount == 0)
+    }
+
+    @Test("Canonical Debug provisioning does not require trusted claim refresh")
+    func canonicalDebugProvisioningSkipsTrustedClaimRefresh() {
+        let delegate = RecordingStaffInvitationProvisioner()
+        let provisioner = DebugStaffInvitationProvisioner(delegate: delegate)
+        let identity = AuthIdentity(
+            userID: "staff-1",
+            email: " TMI-DEBUG@Example.COM ",
+            isEmailVerified: true
+        )
+
+        #expect(
+            provisioner.requiresTrustedClaimRefresh(
+                request: self.aliasRequest,
+                identity: identity
+            ) == false
+        )
+        #expect(
+            provisioner.requiresTrustedClaimRefresh(
+                request: StaffInvitationAcceptanceRequest(
+                    displayName: "Morgan Lee",
+                    invitationCode: "ordinary-opaque-invitation",
+                    privacyPolicyVersion: "privacy-v3",
+                    acceptableUsePolicyVersion: "aup-v4"
+                ),
+                identity: identity
+            )
+        )
+    }
+
+    @Test("The Debug session loader synthesizes an authorized canonical session")
+    func sessionLoaderSynthesizesCanonicalSession() async throws {
+        let delegate = RecordingAuthenticationSessionLoader()
+        let loader = DebugAuthenticationSessionLoader(delegate: delegate)
+        let identity = AuthIdentity(
+            userID: "staff-1",
+            email: "\nTMI-DEBUG@Example.COM\t",
+            isEmailVerified: true
+        )
+
+        let session = try await loader.session(for: identity)
+
+        #expect(session.access == .authorized)
+        #expect(
+            session.identity == AuthIdentity(
+                userID: identity.userID,
+                email: identity.email,
+                isEmailVerified: identity.isEmailVerified,
+                districtID: "district-debug"
+            )
+        )
+        #expect(session.membership == DebugStaffInvitationProvisioner.membership(for: identity))
+        #expect(delegate.sessionCallCount == 0)
+    }
+
+    @Test("The Debug session loader delegates other identities unchanged")
+    func sessionLoaderDelegatesOtherIdentities() async throws {
+        let delegate = RecordingAuthenticationSessionLoader()
+        let loader = DebugAuthenticationSessionLoader(delegate: delegate)
+        let identity = AuthIdentity(
+            userID: "staff-5",
+            email: "other@example.com",
+            isEmailVerified: true,
+            districtID: "district-a"
+        )
+
+        let session = try await loader.session(for: identity)
+
+        #expect(session == delegate.session)
+        #expect(delegate.sessionCallCount == 1)
+        #expect(delegate.lastIdentity == identity)
     }
 
     @Test("The Debug alias rejects the wrong email without delegation")
@@ -135,6 +209,26 @@ private final class RecordingStaffInvitationProvisioner: StaffInvitationProvisio
         lastRequest = request
         lastIdentity = identity
         return membership
+    }
+}
+
+@MainActor
+private final class RecordingAuthenticationSessionLoader: AuthenticationSessionLoading {
+    let session = AuthSession(
+        identity: AuthIdentity(
+            userID: "delegate-user",
+            isEmailVerified: true,
+            districtID: "delegate-district"
+        ),
+        membership: nil
+    )
+    private(set) var sessionCallCount = 0
+    private(set) var lastIdentity: AuthIdentity?
+
+    func session(for identity: AuthIdentity) async throws -> AuthSession {
+        sessionCallCount += 1
+        lastIdentity = identity
+        return session
     }
 }
 #endif
