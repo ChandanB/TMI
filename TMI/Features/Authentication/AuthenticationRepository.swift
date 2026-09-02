@@ -309,16 +309,29 @@ final class AuthenticationRepository: AuthenticationProviding {
             request: pendingRegistration.invitationAcceptanceRequest,
             identity: identity
         )
-        let refreshedIdentity = try await refreshedIdentity(
-            afterProvisioning: membership,
-            expectedIdentityID: pendingRegistration.identityID
-        )
+        let resolvedIdentity: AuthIdentity
+        if invitationProvisioner.requiresTrustedClaimRefresh(
+            request: pendingRegistration.invitationAcceptanceRequest,
+            identity: identity
+        ) {
+            resolvedIdentity = try await refreshedIdentity(
+                afterProvisioning: membership,
+                expectedIdentityID: pendingRegistration.identityID
+            )
+        } else {
+            resolvedIdentity = AuthIdentity(
+                userID: identity.userID,
+                email: identity.email,
+                isEmailVerified: identity.isEmailVerified,
+                districtID: membership.districtID
+            )
+        }
         do {
             try await pendingRegistrationStore.clear()
         } catch {
             try? await pendingRegistrationStore.save(pendingRegistration)
         }
-        return AuthSession(identity: refreshedIdentity, membership: membership)
+        return AuthSession(identity: resolvedIdentity, membership: membership)
     }
 
     private func refreshedIdentity(

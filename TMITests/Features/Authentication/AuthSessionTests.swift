@@ -483,6 +483,128 @@ struct AuthSessionTests {
         #expect(await pendingStore.pendingRegistration() == nil)
     }
 
+#if DEBUG
+    @Test("Debug registration authorizes locally without trusted claims")
+    func debugRegistrationAuthorizesLocallyWithoutTrustedClaims() async throws {
+        let backend = AuthenticationBackendSpy(
+            identityEmail: DebugStaffInvitationProvisioner.allowedEmail,
+            identityDistrictID: nil
+        )
+        let productionProvisioner = InvitationProvisionerStub(
+            result: .success(membership())
+        )
+        let pendingStore = InMemoryPendingStaffRegistrationStore()
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: DebugStaffInvitationProvisioner(
+                delegate: productionProvisioner
+            ),
+            pendingRegistrationStore: pendingStore,
+            requiresEmailVerification: false
+        )
+
+        let session = try await repository.register(debugRegistrationRequest())
+
+        #expect(backend.createUserCallCount == 1)
+        #expect(productionProvisioner.provisionCallCount == 0)
+        #expect(backend.refreshIdentityCallCount == 0)
+        #expect(backend.deleteCurrentUserCallCount == 0)
+        #expect(await pendingStore.pendingRegistration() == nil)
+        #expect(session.access(requiringEmailVerification: false) == .authorized)
+        #expect(session.identity?.userID == "staff-1")
+        #expect(session.identity?.districtID == "district-debug")
+        #expect(session.membership?.userID == "staff-1")
+        #expect(session.membership?.districtID == "district-debug")
+    }
+
+    @Test("Debug registration cleanup retries without claim refresh or deletion")
+    func debugRegistrationCleanupRetriesLocally() async throws {
+        let backend = AuthenticationBackendSpy(
+            identityEmail: DebugStaffInvitationProvisioner.allowedEmail,
+            identityDistrictID: nil
+        )
+        let productionProvisioner = InvitationProvisionerStub(
+            result: .success(membership())
+        )
+        let pendingStore = FailOnceClearingPendingRegistrationStore()
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: SessionLoaderStub(session: .signedOut),
+            invitationProvisioner: DebugStaffInvitationProvisioner(
+                delegate: productionProvisioner
+            ),
+            pendingRegistrationStore: pendingStore,
+            requiresEmailVerification: false
+        )
+
+        let registeredSession = try await repository.register(debugRegistrationRequest())
+
+        #expect(registeredSession.access(requiringEmailVerification: false) == .authorized)
+        #expect(productionProvisioner.provisionCallCount == 0)
+        #expect(backend.refreshIdentityCallCount == 0)
+        #expect(backend.deleteCurrentUserCallCount == 0)
+        #expect(await pendingStore.pendingRegistration() != nil)
+
+        let refreshedSession = try await repository.refresh()
+
+        #expect(refreshedSession.access(requiringEmailVerification: false) == .authorized)
+        #expect(productionProvisioner.provisionCallCount == 0)
+        #expect(backend.refreshIdentityCallCount == 1)
+        #expect(backend.deleteCurrentUserCallCount == 0)
+        #expect(await pendingStore.pendingRegistration() == nil)
+    }
+
+    @Test("Debug sign in bypasses the production session loader")
+    func debugSignInBypassesProductionSessionLoader() async throws {
+        let backend = AuthenticationBackendSpy(
+            identityEmail: DebugStaffInvitationProvisioner.allowedEmail,
+            identityDistrictID: nil
+        )
+        let productionLoader = SessionLoaderSpy(session: .signedOut)
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: DebugAuthenticationSessionLoader(delegate: productionLoader),
+            invitationProvisioner: InvitationProvisionerStub(
+                result: .success(membership())
+            ),
+            requiresEmailVerification: false
+        )
+
+        let session = try await repository.signIn(
+            email: DebugStaffInvitationProvisioner.allowedEmail,
+            password: "Correct-Horse-9"
+        )
+
+        #expect(backend.signInCallCount == 1)
+        #expect(productionLoader.sessionCallCount == 0)
+        #expect(session.access(requiringEmailVerification: false) == .authorized)
+    }
+
+    @Test("Restored Debug identity bypasses the production session loader")
+    func restoredDebugIdentityBypassesProductionSessionLoader() async throws {
+        let backend = AuthenticationBackendSpy(
+            identityEmail: DebugStaffInvitationProvisioner.allowedEmail,
+            identityDistrictID: nil
+        )
+        let productionLoader = SessionLoaderSpy(session: .signedOut)
+        let repository = AuthenticationRepository(
+            backend: backend,
+            sessionLoader: DebugAuthenticationSessionLoader(delegate: productionLoader),
+            invitationProvisioner: InvitationProvisionerStub(
+                result: .success(membership())
+            ),
+            requiresEmailVerification: false
+        )
+
+        let session = try await repository.refresh()
+
+        #expect(backend.refreshIdentityCallCount == 1)
+        #expect(productionLoader.sessionCallCount == 0)
+        #expect(session.access(requiringEmailVerification: false) == .authorized)
+    }
+#endif
+
     @Test("Ambiguous provisioning failure preserves Auth and pending registration")
     func ambiguousProvisioningFailureRemainsRepairable() async throws {
         let backend = AuthenticationBackendSpy()
@@ -594,6 +716,20 @@ struct AuthSessionTests {
             acceptableUsePolicyVersion: "2026-07-20"
         )
     }
+
+#if DEBUG
+    private func debugRegistrationRequest() -> StaffRegistrationRequest {
+        StaffRegistrationRequest(
+            displayName: "Debug Educator",
+            email: DebugStaffInvitationProvisioner.allowedEmail,
+            password: "Correct-Horse-9",
+            requestedRole: .teacher,
+            invitationCode: DebugStaffInvitationProvisioner.invitationAlias,
+            privacyPolicyVersion: StaffPolicyVersions.privacyPolicyVersion,
+            acceptableUsePolicyVersion: StaffPolicyVersions.acceptableUsePolicyVersion
+        )
+    }
+#endif
 }
 
 @MainActor
@@ -601,19 +737,29 @@ private final class AuthenticationBackendSpy: AuthenticationBackend {
     var createUserCallCount = 0
     var currentIdentityCallCount = 0
     var deleteCurrentUserCallCount = 0
+    var signInCallCount = 0
     var sendVerificationCallCount = 0
     var refreshIdentityCallCount = 0
     var refreshError: Error?
     var refreshedIdentity: AuthIdentity?
     var identityIsVerified = true
+    private let identityEmail: String
+    private let identityDistrictID: String?
     private let events: AuthenticationEventRecorder?
 
-    init(events: AuthenticationEventRecorder? = nil) {
+    init(
+        identityEmail: String = "staff@example.edu",
+        identityDistrictID: String? = "district-a",
+        events: AuthenticationEventRecorder? = nil
+    ) {
+        self.identityEmail = identityEmail
+        self.identityDistrictID = identityDistrictID
         self.events = events
     }
 
     func signIn(email: String, password: String) async throws -> AuthIdentity {
-        identity
+        signInCallCount += 1
+        return identity
     }
 
     func createUser(email: String, password: String) async throws -> AuthIdentity {
@@ -625,8 +771,9 @@ private final class AuthenticationBackendSpy: AuthenticationBackend {
         currentIdentityCallCount += 1
         return AuthIdentity(
             userID: "staff-1",
-            email: "staff@example.edu",
-            isEmailVerified: identityIsVerified
+            email: identityEmail,
+            isEmailVerified: identityIsVerified,
+            districtID: identityDistrictID
         )
     }
 
@@ -654,9 +801,9 @@ private final class AuthenticationBackendSpy: AuthenticationBackend {
     private var identity: AuthIdentity {
         AuthIdentity(
             userID: "staff-1",
-            email: "staff@example.edu",
+            email: identityEmail,
             isEmailVerified: identityIsVerified,
-            districtID: "district-a"
+            districtID: identityDistrictID
         )
     }
 }
@@ -666,6 +813,21 @@ private struct SessionLoaderStub: AuthenticationSessionLoading {
 
     func session(for identity: AuthIdentity) async throws -> AuthSession {
         session
+    }
+}
+
+@MainActor
+private final class SessionLoaderSpy: AuthenticationSessionLoading {
+    let session: AuthSession
+    private(set) var sessionCallCount = 0
+
+    init(session: AuthSession) {
+        self.session = session
+    }
+
+    func session(for identity: AuthIdentity) async throws -> AuthSession {
+        sessionCallCount += 1
+        return session
     }
 }
 
