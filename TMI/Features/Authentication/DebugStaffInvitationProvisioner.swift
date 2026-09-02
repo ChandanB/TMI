@@ -7,10 +7,10 @@ nonisolated enum DebugStaffInvitationError: Error, Equatable {
 
 @MainActor
 final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
-    static let invitationAlias = "TMI-DEBUG-ACCESS-2026"
-    static let allowedEmail = "tmi-debug@example.com"
-    static let districtID = "district-debug"
-    static let schoolID = "school-debug"
+    nonisolated static let invitationAlias = "TMI-DEBUG-ACCESS-2026"
+    nonisolated static let allowedEmail = "tmi-debug@example.com"
+    nonisolated static let districtID = "district-debug"
+    nonisolated static let schoolID = "school-debug"
 
     private let delegate: any StaffInvitationProvisioning
 
@@ -39,22 +39,26 @@ final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
         return Self.membership(for: identity)
     }
 
-    static func isAllowed(
+    nonisolated static func isAllowed(
         request: StaffInvitationAcceptanceRequest,
         identity: AuthIdentity
     ) -> Bool {
         request.invitationCode == invitationAlias && isAllowed(identity: identity)
     }
 
-    static func isAllowed(identity: AuthIdentity) -> Bool {
+    nonisolated static func isAllowed(identity: AuthIdentity) -> Bool {
         identity.email?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased() == allowedEmail
     }
 
-    static func membership(for identity: AuthIdentity) -> MembershipContext {
+    nonisolated static func membership(for identity: AuthIdentity) -> MembershipContext {
+        membership(userID: identity.userID)
+    }
+
+    nonisolated static func membership(userID: String) -> MembershipContext {
         MembershipContext(
-            userID: identity.userID,
+            userID: userID,
             districtID: districtID,
             schoolIDs: [schoolID],
             role: .teacher,
@@ -65,7 +69,7 @@ final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
         )
     }
 
-    static func session(for identity: AuthIdentity) -> AuthSession {
+    nonisolated static func session(for identity: AuthIdentity) -> AuthSession {
         AuthSession(
             identity: AuthIdentity(
                 userID: identity.userID,
@@ -75,6 +79,331 @@ final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
             ),
             membership: membership(for: identity)
         )
+    }
+}
+
+@MainActor
+final class DebugAuthenticationIdentityProvider: AuthenticationIdentityProviding {
+    private let delegate: any AuthenticationIdentityProviding
+    private let eligibilityStore: DebugIdentityEligibilityStore
+
+    init(
+        delegate: any AuthenticationIdentityProviding,
+        eligibilityStore: DebugIdentityEligibilityStore
+    ) {
+        self.delegate = delegate
+        self.eligibilityStore = eligibilityStore
+    }
+
+    var currentIdentity: AuthenticatedIdentity? {
+        delegate.currentIdentity
+    }
+
+    func trustedClaim(for identity: AuthenticatedIdentity) async throws -> TrustedTenantClaim {
+        let isAllowed = Self.isAllowed(identity)
+        await eligibilityStore.setEligible(isAllowed, userID: identity.userID)
+        guard isAllowed else {
+            return try await delegate.trustedClaim(for: identity)
+        }
+        return Self.claim(userID: identity.userID)
+    }
+
+    func addStateDidChangeListener(
+        _ listener: @escaping @MainActor (AuthenticatedIdentity?) -> Void
+    ) -> AuthStateListenerHandle {
+        delegate.addStateDidChangeListener(listener)
+    }
+
+    nonisolated static func isAllowed(_ identity: AuthenticatedIdentity) -> Bool {
+        identity.email?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() == DebugStaffInvitationProvisioner.allowedEmail
+    }
+
+    nonisolated static func claim(userID: String) -> TrustedTenantClaim {
+        TrustedTenantClaim(
+            userID: userID,
+            districtID: DebugStaffInvitationProvisioner.districtID,
+            accessClass: .staff,
+            membershipVersion: 1
+        )
+    }
+}
+
+actor DebugIdentityEligibilityStore {
+    private var eligibleUserIDs: Set<String> = []
+
+    func setEligible(_ isEligible: Bool, userID: String) {
+        if isEligible {
+            eligibleUserIDs.insert(userID)
+        } else {
+            eligibleUserIDs.remove(userID)
+        }
+    }
+
+    func isEligible(userID: String) -> Bool {
+        eligibleUserIDs.contains(userID)
+    }
+}
+
+struct DebugUserProfileProvider: UserProfileProviding {
+    private let delegate: any UserProfileProviding
+
+    init(delegate: any UserProfileProviding) {
+        self.delegate = delegate
+    }
+
+    func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
+        guard DebugAuthenticationIdentityProvider.isAllowed(identity) else {
+            return try await delegate.profile(for: identity)
+        }
+        return TMIUser(
+            id: identity.userID,
+            userID: identity.userID,
+            displayName: "Debug Staff",
+            email: DebugStaffInvitationProvisioner.allowedEmail,
+            isEmailVerified: identity.isEmailVerified,
+            requestedRole: .teacher
+        )
+    }
+}
+
+struct DebugMembershipProvider: MembershipProviding {
+    private let delegate: any MembershipProviding
+    private let eligibilityStore: DebugIdentityEligibilityStore
+
+    init(
+        delegate: any MembershipProviding,
+        eligibilityStore: DebugIdentityEligibilityStore
+    ) {
+        self.delegate = delegate
+        self.eligibilityStore = eligibilityStore
+    }
+
+    func membership(for claim: TrustedTenantClaim) async throws -> MembershipContext {
+        guard claim.districtID == DebugStaffInvitationProvisioner.districtID,
+              claim.accessClass == .staff,
+              await eligibilityStore.isEligible(userID: claim.userID) else {
+            return try await delegate.membership(for: claim)
+        }
+        return DebugStaffInvitationProvisioner.membership(userID: claim.userID)
+    }
+}
+
+actor DebugStudentRepository: StudentRepository {
+    private let delegate: any StudentRepository
+    private var recordsByID: [String: StudentRecord] = [:]
+
+    init(delegate: any StudentRepository) {
+        self.delegate = delegate
+    }
+
+    func page(
+        _ request: StudentPageRequest,
+        member: MembershipContext
+    ) async throws -> StudentPage {
+        guard isDebug(member) else {
+            return try await delegate.page(request, member: member)
+        }
+        guard request.limit > 0, request.limit <= StudentPageRequest.maximumPageSize else {
+            throw StudentRepositoryError.invalidRequest
+        }
+        var records = recordsByID.values.filter { record in
+            switch request.status {
+            case .active: !record.isArchived
+            case .archived: record.isArchived
+            case .all: true
+            }
+        }
+        if let schoolID = request.schoolID {
+            records = records.filter { $0.schoolID == schoolID }
+        }
+        if let grade = request.grade {
+            records = records.filter { $0.grade == grade }
+        }
+        if let assignedMemberID = request.assignedMemberID {
+            records = records.filter { $0.assignedMemberIDs.contains(assignedMemberID) }
+        }
+        if let search = request.search?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !search.isEmpty {
+            records = records.filter {
+                $0.displayName.localizedCaseInsensitiveContains(search)
+                    || ($0.studentIdentifier?.localizedCaseInsensitiveContains(search) ?? false)
+            }
+        }
+        records.sort {
+            switch request.sort {
+            case .alphabetical:
+                $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+            case .recentlyUpdated:
+                $0.metadata.updatedAt > $1.metadata.updatedAt
+            }
+        }
+        return StudentPage(
+            records: Array(records.prefix(request.limit)),
+            nextCursor: nil,
+            source: .cache
+        )
+    }
+
+    func student(id: String, member: MembershipContext) async throws -> StudentRecord {
+        guard isDebug(member) else {
+            return try await delegate.student(id: id, member: member)
+        }
+        guard let record = recordsByID[id] else {
+            throw StudentRepositoryError.notFound
+        }
+        return record
+    }
+
+    func create(
+        _ draft: StudentDraft,
+        operationID: UUID,
+        member: MembershipContext
+    ) async throws -> StudentRecord {
+        guard isDebug(member) else {
+            return try await delegate.create(draft, operationID: operationID, member: member)
+        }
+        let draft = draft.normalized
+        guard member.schoolIDs.contains(draft.schoolID),
+              draft.assignedMemberIDs.contains(member.userID),
+              StudentValidation.issues(
+                for: draft,
+                districtID: member.districtID,
+                policy: .standard
+              ).isEmpty else {
+            throw StudentRepositoryError.invalidDraft
+        }
+        let now = Date()
+        let record = StudentRecord(
+            id: operationID.uuidString.lowercased(),
+            districtID: member.districtID,
+            schoolID: draft.schoolID,
+            displayName: draft.displayName,
+            grade: draft.grade,
+            studentIdentifier: draft.studentIdentifier,
+            dateOfBirth: draft.dateOfBirth,
+            pronouns: draft.pronouns,
+            assignedMemberIDs: draft.assignedMemberIDs,
+            isArchived: false,
+            metadata: CanonicalRecordMetadata(
+                schemaVersion: 1,
+                recordVersion: 1,
+                createdAt: now,
+                createdBy: member.userID,
+                updatedAt: now,
+                updatedBy: member.userID
+            )
+        )
+        recordsByID[record.id] = record
+        return record
+    }
+
+    func reconcilePendingCreates(member: MembershipContext) async throws -> [StudentRecord] {
+        guard isDebug(member) else {
+            return try await delegate.reconcilePendingCreates(member: member)
+        }
+        return []
+    }
+
+    func update(
+        id: String,
+        draft: StudentDraft,
+        expectedVersion: Int,
+        operationID: UUID,
+        member: MembershipContext
+    ) async throws -> StudentRecord {
+        guard isDebug(member) else {
+            return try await delegate.update(
+                id: id,
+                draft: draft,
+                expectedVersion: expectedVersion,
+                operationID: operationID,
+                member: member
+            )
+        }
+        guard let existing = recordsByID[id] else {
+            throw StudentRepositoryError.notFound
+        }
+        guard existing.metadata.recordVersion == expectedVersion else {
+            throw StudentRepositoryError.versionConflict(
+                expected: expectedVersion,
+                actual: existing.metadata.recordVersion
+            )
+        }
+        let draft = draft.normalized
+        guard member.schoolIDs.contains(draft.schoolID),
+              draft.assignedMemberIDs.contains(member.userID),
+              StudentValidation.issues(
+                for: draft,
+                districtID: member.districtID,
+                policy: .standard
+              ).isEmpty else {
+            throw StudentRepositoryError.invalidDraft
+        }
+        let updated = StudentRecord(
+            id: existing.id,
+            districtID: existing.districtID,
+            schoolID: draft.schoolID,
+            displayName: draft.displayName,
+            grade: draft.grade,
+            studentIdentifier: draft.studentIdentifier,
+            dateOfBirth: draft.dateOfBirth,
+            pronouns: draft.pronouns,
+            assignedMemberIDs: draft.assignedMemberIDs,
+            isArchived: existing.isArchived,
+            metadata: CanonicalRecordMetadata(
+                schemaVersion: existing.metadata.schemaVersion,
+                recordVersion: expectedVersion + 1,
+                createdAt: existing.metadata.createdAt,
+                createdBy: existing.metadata.createdBy,
+                updatedAt: Date(),
+                updatedBy: member.userID
+            )
+        )
+        recordsByID[id] = updated
+        return updated
+    }
+
+    func archive(
+        id: String,
+        expectedVersion: Int,
+        operationID: UUID,
+        member: MembershipContext
+    ) async throws {
+        guard isDebug(member) else {
+            try await delegate.archive(
+                id: id,
+                expectedVersion: expectedVersion,
+                operationID: operationID,
+                member: member
+            )
+            return
+        }
+        guard var existing = recordsByID[id] else {
+            throw StudentRepositoryError.notFound
+        }
+        guard existing.metadata.recordVersion == expectedVersion else {
+            throw StudentRepositoryError.versionConflict(
+                expected: expectedVersion,
+                actual: existing.metadata.recordVersion
+            )
+        }
+        existing.isArchived = true
+        existing.metadata = CanonicalRecordMetadata(
+            schemaVersion: existing.metadata.schemaVersion,
+            recordVersion: expectedVersion + 1,
+            createdAt: existing.metadata.createdAt,
+            createdBy: existing.metadata.createdBy,
+            updatedAt: Date(),
+            updatedBy: member.userID
+        )
+        recordsByID[id] = existing
+    }
+
+    private func isDebug(_ member: MembershipContext) -> Bool {
+        member.districtID == DebugStaffInvitationProvisioner.districtID
+            && member.schoolIDs == [DebugStaffInvitationProvisioner.schoolID]
     }
 }
 

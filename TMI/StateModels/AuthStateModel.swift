@@ -378,7 +378,18 @@ nonisolated enum SuspensionReason: String, CaseIterable, Equatable {
 
 nonisolated struct AuthenticatedIdentity: Sendable, Equatable {
   let userID: String
+  let email: String?
   let isEmailVerified: Bool
+
+  init(
+    userID: String,
+    email: String? = nil,
+    isEmailVerified: Bool
+  ) {
+    self.userID = userID
+    self.email = email
+    self.isEmailVerified = isEmailVerified
+  }
 }
 
 @MainActor
@@ -427,6 +438,7 @@ final class FirebaseAuthenticationIdentityProvider: AuthenticationIdentityProvid
     }
     return AuthenticatedIdentity(
       userID: user.uid,
+      email: user.email,
       isEmailVerified: user.isEmailVerified
     )
   }
@@ -455,6 +467,7 @@ final class FirebaseAuthenticationIdentityProvider: AuthenticationIdentityProvid
       let identity = user.map {
         AuthenticatedIdentity(
           userID: $0.uid,
+          email: $0.email,
           isEmailVerified: $0.isEmailVerified
         )
       }

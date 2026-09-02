@@ -61,11 +61,35 @@ struct TMIApp: App {
 
             let firebaseManager = FirebaseManager.shared
             dependencies = .production(firestore: firebaseManager.firestore)
+#if DEBUG
+            let firebaseIdentityProvider = FirebaseAuthenticationIdentityProvider(
+                auth: firebaseManager.auth
+            )
+            let debugIdentityEligibilityStore = DebugIdentityEligibilityStore()
+            let identityProvider: any AuthenticationIdentityProviding =
+                DebugAuthenticationIdentityProvider(
+                    delegate: firebaseIdentityProvider,
+                    eligibilityStore: debugIdentityEligibilityStore
+                )
+            let profileProvider: any UserProfileProviding = DebugUserProfileProvider(
+                delegate: FirebaseUserProfileProvider(firestore: firebaseManager.firestore)
+            )
+            let membershipProvider: any MembershipProviding = DebugMembershipProvider(
+                delegate: dependencies.membership,
+                eligibilityStore: debugIdentityEligibilityStore
+            )
+#else
+            let identityProvider: (any AuthenticationIdentityProviding)? = nil
+            let profileProvider: (any UserProfileProviding)? = nil
+            let membershipProvider: any MembershipProviding = dependencies.membership
+#endif
             authStateModel = AuthStateModel(
                 firebaseManager: firebaseManager,
                 authentication: dependencies.authentication,
                 auditService: AuditService(),
-                membershipProvider: dependencies.membership,
+                identityProvider: identityProvider,
+                profileProvider: profileProvider,
+                membershipProvider: membershipProvider,
                 authorizationSessionStore: .shared,
                 featureFlags: dependencies.flags
             )
@@ -83,7 +107,9 @@ struct TMIApp: App {
             initialValue: usesInMemoryDependencies ? nil : ScheduleMeetingCoordinator()
         )
         _dashboardStateModel = State(
-            initialValue: usesInMemoryDependencies ? nil : DashboardStateModel()
+            initialValue: usesInMemoryDependencies
+                ? nil
+                : DashboardStateModel(studentRepository: dependencies.studentRepository)
         )
         _interestsStateModel = State(
             initialValue: usesInMemoryDependencies ? nil : InterestsAndHobbiesStateModel()

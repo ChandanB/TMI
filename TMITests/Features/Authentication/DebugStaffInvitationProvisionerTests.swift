@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import TMI
 
@@ -5,6 +6,113 @@ import Testing
 @Suite("Debug staff invitation provisioning")
 @MainActor
 struct DebugStaffInvitationProvisionerTests {
+    @Test("Debug Firebase identity authorizes without Firestore profile or membership documents")
+    func debugIdentityAuthorizesWithoutFirestoreDocuments() async {
+        let eligibilityStore = DebugIdentityEligibilityStore()
+        let identity = AuthenticatedIdentity(
+            userID: "debug-user",
+            email: DebugStaffInvitationProvisioner.allowedEmail,
+            isEmailVerified: false
+        )
+        let identityProvider = DebugAuthenticationIdentityProvider(
+            delegate: RecordingAuthenticationIdentityProvider(identity: identity),
+            eligibilityStore: eligibilityStore
+        )
+        let profileProvider = DebugUserProfileProvider(
+            delegate: MissingUserProfileProvider()
+        )
+        let membershipProvider = DebugMembershipProvider(
+            delegate: MissingMembershipProvider(),
+            eligibilityStore: eligibilityStore
+        )
+        let model = AuthStateModel(
+            identityProvider: identityProvider,
+            profileProvider: profileProvider,
+            membershipProvider: membershipProvider,
+            featureFlags: .production,
+            automaticallyStart: false
+        )
+
+        await model.fetch()
+
+        #expect(model.isLoggedIn)
+        #expect(model.authenticatedSession?.profile.userID == identity.userID)
+        #expect(
+            model.authenticatedSession?.membership
+                == DebugStaffInvitationProvisioner.membership(userID: identity.userID)
+        )
+    }
+
+    @Test("A non-Debug identity with Debug-shaped claims still delegates membership")
+    func nonDebugIdentityWithDebugClaimDelegatesMembership() async throws {
+        let eligibilityStore = DebugIdentityEligibilityStore()
+        let identityProvider = DebugAuthenticationIdentityProvider(
+            delegate: RecordingAuthenticationIdentityProvider(
+                identity: AuthenticatedIdentity(
+                    userID: "other-user",
+                    email: "other@example.com",
+                    isEmailVerified: true
+                )
+            ),
+            eligibilityStore: eligibilityStore
+        )
+        let delegate = RecordingMembershipProvider()
+        let membershipProvider = DebugMembershipProvider(
+            delegate: delegate,
+            eligibilityStore: eligibilityStore
+        )
+        let identity = AuthenticatedIdentity(
+            userID: "other-user",
+            email: "other@example.com",
+            isEmailVerified: true
+        )
+        _ = try? await identityProvider.trustedClaim(for: identity)
+        let claim = DebugAuthenticationIdentityProvider.claim(userID: identity.userID)
+
+        let membership = try await membershipProvider.membership(for: claim)
+
+        #expect(membership == delegate.membership)
+        #expect(await delegate.callCount == 1)
+    }
+
+    @Test("Debug staff roster is locally usable without trusted Firestore claims")
+    func debugStaffRosterUsesLocalStorage() async throws {
+        let membership = DebugStaffInvitationProvisioner.membership(userID: "debug-user")
+        let repository = DebugStudentRepository(delegate: UnavailableStudentRepository())
+        let draft = StudentDraft(
+            displayName: "Jordan Lee",
+            schoolID: DebugStaffInvitationProvisioner.schoolID,
+            grade: "8",
+            studentIdentifier: "S-100",
+            dateOfBirth: nil,
+            pronouns: nil,
+            assignedMemberIDs: [membership.userID]
+        )
+
+        let created = try await repository.create(
+            draft,
+            operationID: UUID(),
+            member: membership
+        )
+        let page = try await repository.page(.first, member: membership)
+
+        #expect(page.records == [created])
+        #expect(page.nextCursor == nil)
+        #expect(page.source == .cache)
+    }
+
+    @Test("Dashboard uses the injected Debug roster repository")
+    func dashboardUsesInjectedDebugRoster() async {
+        let membership = DebugStaffInvitationProvisioner.membership(userID: "debug-user")
+        let repository = DebugStudentRepository(delegate: UnavailableStudentRepository())
+        let model = DashboardStateModel(studentRepository: repository)
+
+        await model.fetchWithMembership(membership)
+
+        #expect(model.value?.totalStudents == 0)
+        #expect(model.hasError == false)
+    }
+
     @Test("The Debug alias and allowed email synthesize canonical membership")
     func aliasSynthesizesMembershipForAllowedEmail() async throws {
         let delegate = RecordingStaffInvitationProvisioner()
@@ -229,6 +337,56 @@ private final class RecordingAuthenticationSessionLoader: AuthenticationSessionL
         sessionCallCount += 1
         lastIdentity = identity
         return session
+    }
+}
+
+@MainActor
+private final class RecordingAuthenticationIdentityProvider: AuthenticationIdentityProviding {
+    let currentIdentity: AuthenticatedIdentity?
+
+    init(identity: AuthenticatedIdentity) {
+        currentIdentity = identity
+    }
+
+    func trustedClaim(for identity: AuthenticatedIdentity) async throws -> TrustedTenantClaim {
+        throw TrustedTenantClaimError.missing
+    }
+
+    func addStateDidChangeListener(
+        _ listener: @escaping @MainActor (AuthenticatedIdentity?) -> Void
+    ) -> AuthStateListenerHandle {
+        AuthStateListenerHandle(removalOperation: {})
+    }
+}
+
+private struct MissingUserProfileProvider: UserProfileProviding {
+    func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
+        nil
+    }
+}
+
+private struct MissingMembershipProvider: MembershipProviding {
+    func membership(for claim: TrustedTenantClaim) async throws -> MembershipContext {
+        throw MembershipRepositoryError.notFound
+    }
+}
+
+private actor RecordingMembershipProvider: MembershipProviding {
+    let membership = MembershipContext(
+        userID: "delegate-user",
+        districtID: "delegate-district",
+        schoolIDs: ["delegate-school"],
+        role: .teacher,
+        capabilities: [.studentReadDetail],
+        assignedStudentIDs: [],
+        isActive: true,
+        version: 1
+    )
+    private(set) var callCount = 0
+
+    func membership(for claim: TrustedTenantClaim) async throws -> MembershipContext {
+        callCount += 1
+        return membership
     }
 }
 #endif

@@ -66,7 +66,12 @@ nonisolated struct AppDependencies: Sendable {
             pendingRegistrationStore: SecurePendingStaffRegistrationStore(),
             requiresEmailVerification: flags.staffEmailVerificationRequired
         )
-        let students = CanonicalStudentRepository.firebase(firestore: firestore)
+        let firebaseStudents = CanonicalStudentRepository.firebase(firestore: firestore)
+#if DEBUG
+        let students: any StudentRepository = DebugStudentRepository(delegate: firebaseStudents)
+#else
+        let students: any StudentRepository = firebaseStudents
+#endif
 
         return AppDependencies(
             runtime: .production,

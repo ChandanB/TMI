@@ -130,13 +130,16 @@ extension EnvironmentValues {
 @Observable
 final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError> {
   // MARK: - Dependencies
-  private let studentRepository: any StudentRepository = CanonicalStudentRepository.firebase()
+  private let studentRepository: any StudentRepository
 
   // MARK: - Cancellables
   private var cancellables = Set<AnyCancellable>()
 
   // MARK: - Initialization
-  override init() {
+  init(
+    studentRepository: any StudentRepository = CanonicalStudentRepository.firebase()
+  ) {
+    self.studentRepository = studentRepository
     super.init()
 
     // Initialize UI state
