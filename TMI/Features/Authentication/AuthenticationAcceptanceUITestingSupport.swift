@@ -85,7 +85,7 @@ private final class AuthenticationAcceptanceUITestingRepository: AuthenticationP
         identityProvider.authenticate(
             userID: AuthenticationAcceptanceFixture.invitationUserID
         )
-        try await Task.sleep(for: .seconds(3))
+        try await Task.sleep(for: .seconds(5))
         return AuthenticationAcceptanceFixture.session(
             userID: AuthenticationAcceptanceFixture.invitationUserID,
             email: request.email
@@ -404,6 +404,16 @@ struct AuthenticationAcceptanceUITestingContent: View {
             )
             .tmiSheetStyle()
             .interactiveDismissDisabled(self.isRegistrationOperationActive)
+            .overlay(alignment: .topTrailing) {
+                if self.authStateModel.isLoggedIn {
+                    Text("Trusted authorization published")
+                        .frame(width: 1, height: 1)
+                        .clipped()
+                        .accessibilityIdentifier(
+                            "uiTesting.authentication.identityPublished"
+                        )
+                }
+            }
         }
         .environment(\.appDependencies, dependencies)
         .environment(\.authStateModel, authStateModel)

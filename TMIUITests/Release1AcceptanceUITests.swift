@@ -79,9 +79,18 @@ final class Release1AcceptanceUITests: XCTestCase {
             into: "authentication.registration.confirmPassword",
             in: app
         )
+#if os(macOS)
         app.secureTextFields["authentication.registration.confirmPassword"]
             .typeText("\n")
+#else
         app.buttons["authentication.registration.submit"].tap()
+#endif
+
+        XCTAssertTrue(
+            element("uiTesting.authentication.identityPublished", in: app)
+                .waitForExistence(timeout: 2),
+            "Trusted authorization must publish while registration remains presented."
+        )
 
         let cancel = app.descendants(matching: .any)
             .matching(
@@ -104,7 +113,18 @@ final class Release1AcceptanceUITests: XCTestCase {
             "Registration must remain presented after authentication publishes identity."
         )
 #if !os(macOS)
-        app.swipeDown()
+        let dismissalStart = registrationScreen.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)
+        )
+        let dismissalEnd = registrationScreen.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)
+        )
+        dismissalStart.press(
+            forDuration: 0.1,
+            thenDragTo: dismissalEnd,
+            withVelocity: 10_000,
+            thenHoldForDuration: 0
+        )
         XCTAssertTrue(
             registrationScreen.exists,
             "Interactive dismissal must be locked while registration is in flight."
