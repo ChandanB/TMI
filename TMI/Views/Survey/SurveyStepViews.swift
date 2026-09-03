@@ -30,9 +30,6 @@ struct SurveyQuestionView: View {
                 TextField("Type your answer here", text: textBinding, axis: .vertical)
                     .lineLimit(3...6)
                     .textFieldStyle(.roundedBorder)
-                    .onChange(of: textBinding.wrappedValue) { _, value in
-                        onAnswer(.text(String(value.prefix(maximumLength))))
-                    }
                     .accessibilityIdentifier("studentSurvey.textAnswer")
             }
         }
@@ -90,8 +87,13 @@ struct SurveyQuestionView: View {
                 guard case .text(let value) = answer else { return "" }
                 return value
             },
-            set: { onAnswer(.text($0)) }
+            set: { onAnswer(.text(String($0.prefix(maximumTextLength)))) }
         )
+    }
+
+    private var maximumTextLength: Int {
+        guard case .shortText(let maximumLength) = question.kind else { return 0 }
+        return maximumLength
     }
 
     private func isSelected(_ optionID: String) -> Bool {

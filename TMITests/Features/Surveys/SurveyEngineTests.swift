@@ -446,6 +446,141 @@ struct SurveyRepositoryTests {
         #expect(await harness.saveCount == 1)
     }
 
+    @Test("Concurrent autosaves retain every answer and persist in order")
+    func concurrentAutosavesRetainEveryAnswer() async throws {
+        let store = DelayedSurveyDraftStore()
+        let repository = SurveyRepository(
+            loadDraft: { key in await store.load(key) },
+            saveDraft: { response in try await store.save(response) },
+            quarantineDraft: { _ in },
+            synchronizeDraft: { $0.response },
+            submitResponse: { $0.response },
+            reviewResponse: { $0.response },
+            isOnline: { true }
+        )
+        let assignment = try surveyAssignment()
+        let definition = try surveyDefinition()
+        let grant = try studentModeGrant(assignment: assignment)
+
+        async let first = repository.autosave(
+            answer: .single("art"),
+            for: "single",
+            operationID: "concurrent-1",
+            assignment: assignment,
+            definition: definition,
+            grant: grant
+        )
+        async let second = repository.autosave(
+            answer: .text("Art club"),
+            for: "text",
+            operationID: "concurrent-2",
+            assignment: assignment,
+            definition: definition,
+            grant: grant
+        )
+        _ = try await (first, second)
+
+        let resumed = try await repository.resume(assignment: assignment, grant: grant)
+        let persisted = await store.response
+        #expect(resumed?.answers["single"] == .single("art"))
+        #expect(resumed?.answers["text"] == .text("Art club"))
+        #expect(persisted?.answers == resumed?.answers)
+        #expect(await store.saveCount == 2)
+    }
+
+    @Test("Autosave queue recovers after one local persistence failure")
+    func autosaveQueueRecoversAfterFailure() async throws {
+        let store = DelayedSurveyDraftStore(failFirstSave: true)
+        let repository = SurveyRepository(
+            loadDraft: { key in await store.load(key) },
+            saveDraft: { response in try await store.save(response) },
+            quarantineDraft: { _ in },
+            synchronizeDraft: { $0.response },
+            submitResponse: { $0.response },
+            reviewResponse: { $0.response },
+            isOnline: { true }
+        )
+        let assignment = try surveyAssignment()
+        let definition = try surveyDefinition()
+        let grant = try studentModeGrant(assignment: assignment)
+
+        await #expect(throws: SurveyRepositoryError.unavailable) {
+            _ = try await repository.autosave(
+                answer: .single("art"),
+                for: "single",
+                operationID: "fail-once-1",
+                assignment: assignment,
+                definition: definition,
+                grant: grant
+            )
+        }
+        _ = try await repository.autosave(
+            answer: .text("Art club"),
+            for: "text",
+            operationID: "fail-once-2",
+            assignment: assignment,
+            definition: definition,
+            grant: grant
+        )
+
+        #expect(await store.response?.answers["single"] == .single("art"))
+        #expect(await store.response?.answers["text"] == .text("Art club"))
+        #expect(await store.saveAttempts == 2)
+    }
+
+    @Test("Purge closes the attempt before a late autosave can recreate it")
+    func purgeBlocksOverlappingAutosave() async throws {
+        let store = DelayedSurveyDraftStore(saveDelay: .milliseconds(100))
+        let draftStore = SurveyDraftStore(
+            load: { key in
+                if let response = await store.load(key) { return .draft(response) }
+                return .missing
+            },
+            save: { response in try await store.save(response) },
+            quarantine: { response in try await store.save(response) },
+            purge: { _ in await store.purge() }
+        )
+        let repository = SurveyRepository(
+            draftStore: draftStore,
+            synchronizeDraft: { $0.response },
+            submitResponse: { $0.response },
+            reviewResponse: { $0.response },
+            isOnline: { true }
+        )
+        let assignment = try surveyAssignment()
+        let definition = try surveyDefinition()
+        let grant = try studentModeGrant(assignment: assignment)
+
+        let firstSave = Task {
+            try await repository.autosave(
+                answer: .single("art"),
+                for: "single",
+                operationID: "purge-race-1",
+                assignment: assignment,
+                definition: definition,
+                grant: grant
+            )
+        }
+        try await Task.sleep(for: .milliseconds(20))
+        let purge = Task { try await repository.purge(assignment: assignment) }
+        try await Task.sleep(for: .milliseconds(20))
+        await #expect(throws: SurveyRepositoryError.revoked) {
+            _ = try await repository.autosave(
+                answer: .text("late"),
+                for: "text",
+                operationID: "purge-race-2",
+                assignment: assignment,
+                definition: definition,
+                grant: grant
+            )
+        }
+        await #expect(throws: SurveyRepositoryError.revoked) {
+            _ = try await firstSave.value
+        }
+        try await purge.value
+        #expect(await store.response == nil)
+    }
+
     @Test("Multiple offline edits synchronize once against the last server version")
     func multipleOfflineEditsUseAuthoritativeServerVersion() async throws {
         let server = SurveyServerCounter()
@@ -517,6 +652,16 @@ struct SurveyRepositoryTests {
             definition: try surveyDefinition(),
             grant: activeGrant
         )
+        await #expect(throws: SurveyRepositoryError.validation) {
+            _ = try await repository.autosave(
+                answer: .rating(4),
+                for: "single",
+                operationID: "wrong-answer-type",
+                assignment: assignment,
+                definition: try surveyDefinition(),
+                grant: activeGrant
+            )
+        }
         let expiredGrant = try studentModeGrant(
             assignment: assignment,
             expiresAt: .distantPast
@@ -532,16 +677,6 @@ struct SurveyRepositoryTests {
                 .quarantined(.authorizationRejected)
         )
 
-        await #expect(throws: SurveyRepositoryError.validation) {
-            _ = try await repository.autosave(
-                answer: .rating(4),
-                for: "single",
-                operationID: "wrong-answer-type",
-                assignment: assignment,
-                definition: try surveyDefinition(),
-                grant: activeGrant
-            )
-        }
     }
 
     @Test("Reassignment creates a new immutable attempt identity")
@@ -1161,6 +1296,43 @@ struct SurveyRepositoryTests {
 private actor SurveyHelpSpy {
     private(set) var operationID: String?
     func record(_ request: SurveyHelpRequest) { operationID = request.operationID }
+}
+
+private actor DelayedSurveyDraftStore {
+    private(set) var response: SurveyResponse?
+    private(set) var saveCount = 0
+    private(set) var saveAttempts = 0
+    private var shouldFailNextSave: Bool
+    private let saveDelay: Duration
+
+    init(
+        failFirstSave: Bool = false,
+        saveDelay: Duration = .milliseconds(20)
+    ) {
+        shouldFailNextSave = failFirstSave
+        self.saveDelay = saveDelay
+    }
+
+    func load(_ key: SurveyAttemptKey) async -> SurveyResponse? {
+        try? await Task.sleep(for: .milliseconds(20))
+        guard response?.attemptKey == key else { return nil }
+        return response
+    }
+
+    func save(_ response: SurveyResponse) async throws {
+        try await Task.sleep(for: saveDelay)
+        saveAttempts += 1
+        if shouldFailNextSave {
+            shouldFailNextSave = false
+            throw SurveyRepositoryError.unavailable
+        }
+        self.response = response
+        saveCount += 1
+    }
+
+    func purge() {
+        response = nil
+    }
 }
 
 private func surveyDefinition(

@@ -1,30 +1,37 @@
-//
-//  StudentInterestService.swift
-//  TMI
-//
-//  Student Interest Edge Service
-//  Manages student-interest relationships (edges between students and global interests)
-//
-
-import Foundation
-import FirebaseFirestore
 import FirebaseAuth
+import FirebaseFirestore
+import FirebaseFunctions
+import Foundation
 import Observation
 
+/// A submitted survey waiting for a reviewer, with the proposals derived from it.
+///
+/// The analysis here is a preview: the approval callable re-derives it from the
+/// stored submission, so what the reviewer sees is what the server will write.
+nonisolated struct StudentInterestReview: Sendable, Identifiable {
+    var id: String { response.responseID }
+    let definition: SurveyDefinition
+    let response: SurveyResponse
+    let analysis: InterestAnalysisResult
+}
+
+nonisolated struct StudentInterestApproval: Sendable {
+    let districtID: String
+    let studentID: String
+    let response: SurveyResponse
+    let analysis: InterestAnalysisResult
+    let interestIDs: Set<String>
+    let operationID: String
+}
+
+@MainActor
 @Observable
 final class StudentInterestService {
     static let shared = StudentInterestService()
 
-    private let db = Firestore.firestore()
-
-    private init() {}
-
-    // MARK: - Error Types
-
     enum StudentInterestError: Error, LocalizedError {
         case fetchFailed(String)
         case saveFailed(String)
-        case deleteFailed(String)
         case userNotAuthenticated
         case invalidStudentId
         case invalidInterestId
@@ -32,264 +39,215 @@ final class StudentInterestService {
 
         var errorDescription: String? {
             switch self {
-            case .fetchFailed(let message):
-                return "Failed to fetch student interests: \(message)"
-            case .saveFailed(let message):
-                return "Failed to save student interest: \(message)"
-            case .deleteFailed(let message):
-                return "Failed to delete student interest: \(message)"
-            case .userNotAuthenticated:
-                return "User not authenticated"
-            case .invalidStudentId:
-                return "Invalid student ID"
-            case .invalidInterestId:
-                return "Invalid interest ID"
-            case .featureUnavailable:
-                return "Student interests will be available after the Release 2 data migration."
+            case .fetchFailed(let message): "Failed to fetch student interests: \(message)"
+            case .saveFailed(let message): "Failed to approve student interests: \(message)"
+            case .userNotAuthenticated: "User not authenticated"
+            case .invalidStudentId: "Invalid student ID"
+            case .invalidInterestId: "Invalid interest ID"
+            case .featureUnavailable: "A district-scoped student context is required."
             }
         }
     }
 
-    // MARK: - Collection Access
+    private let db: Firestore
+    private let functions: Functions
 
-    private func studentInterestsCollection(for studentId: String) throws -> CollectionReference {
+    private init(
+        db: Firestore = .firestore(),
+        functions: Functions = .functions(region: "us-central1")
+    ) {
+        self.db = db
+        self.functions = functions
+    }
+
+    func getStudentInterests(districtID: String, studentID: String) async throws -> [StudentInterest] {
+        guard !districtID.isEmpty, !studentID.isEmpty else {
+            throw StudentInterestError.invalidStudentId
+        }
+        guard Auth.auth().currentUser != nil else {
+            throw StudentInterestError.userNotAuthenticated
+        }
+        do {
+            let snapshot = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                try await self.db.collection("districts")
+                    .document(districtID)
+                    .collection("students")
+                    .document(studentID)
+                    .collection("interests")
+                    .getDocuments()
+            }
+            return snapshot.documents.compactMap {
+                StudentInterest.fromFirestore(id: $0.documentID, data: $0.data())
+            }.sorted {
+                $0.rank == $1.rank ? $0.interestId < $1.interestId : $0.rank < $1.rank
+            }
+        } catch let error as StudentInterestError {
+            throw error
+        } catch {
+            throw StudentInterestError.fetchFailed(error.localizedDescription)
+        }
+    }
+
+    /// Submissions that have been handed in but whose interests nobody has
+    /// approved yet.
+    func pendingInterestReviews(
+        districtID: String,
+        studentID: String
+    ) async throws -> [StudentInterestReview] {
+        guard !districtID.isEmpty, !studentID.isEmpty else {
+            throw StudentInterestError.invalidStudentId
+        }
+        guard Auth.auth().currentUser != nil else {
+            throw StudentInterestError.userNotAuthenticated
+        }
+        do {
+            let snapshot = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+                try await self.db.collection(
+                    FirestorePaths.studentResponses(districtID: districtID, studentID: studentID)
+                )
+                .whereField("state", in: [
+                    SurveyResponseState.submitted.rawValue,
+                    SurveyResponseState.reviewed.rawValue,
+                ])
+                .getDocuments()
+            }
+            let responses = snapshot.documents.compactMap { document in
+                try? document.data(as: SurveyResponse.self)
+            }
+            var reviews: [StudentInterestReview] = []
+            for response in responses {
+                guard let definition = try await definition(
+                    id: response.definitionID,
+                    version: response.definitionVersion
+                ), !definition.interestRules.isEmpty else {
+                    continue
+                }
+                guard let analysis = try? InterestAnalysis.analyze(
+                    response: response,
+                    catalog: definition.interestRules
+                ), !analysis.proposedInterests.isEmpty else {
+                    continue
+                }
+                reviews.append(
+                    StudentInterestReview(
+                        definition: definition,
+                        response: response,
+                        analysis: analysis
+                    )
+                )
+            }
+            return reviews.sorted { $0.response.responseID < $1.response.responseID }
+        } catch let error as StudentInterestError {
+            throw error
+        } catch {
+            throw StudentInterestError.fetchFailed(error.localizedDescription)
+        }
+    }
+
+    private func definition(id: String, version: Int) async throws -> SurveyDefinition? {
+        let snapshot = try await withTimeout(seconds: 10) { @MainActor @Sendable in
+            try await self.db.document(
+                FirestorePaths.catalogItem(.surveyDefinitions, itemID: "\(id)__v\(version)")
+            ).getDocument()
+        }
+        guard snapshot.exists else { return nil }
+        return try? snapshot.data(as: SurveyDefinition.self)
+    }
+
+    func approve(_ approval: StudentInterestApproval) async throws -> [StudentInterest] {
+        guard approval.response.state == .submitted || approval.response.state == .reviewed,
+              approval.response.responseID == approval.analysis.responseID,
+              approval.response.definitionID == approval.analysis.definitionID,
+              approval.response.definitionVersion == approval.analysis.definitionVersion else {
+            throw StudentInterestError.saveFailed("The immutable survey source does not match this analysis.")
+        }
+        let selected = approval.analysis.proposedInterests.filter {
+            approval.interestIDs.contains($0.interestID)
+        }
+        guard !selected.isEmpty else {
+            throw StudentInterestError.saveFailed("Select at least one proposed interest.")
+        }
+        do {
+            let result = try await self.functions.httpsCallable("approveSurveyInterests").call([
+                "districtID": approval.districtID,
+                "studentID": approval.studentID,
+                "responseID": approval.response.responseID,
+                "expectedRecordVersion": approval.response.recordVersion,
+                "idempotencyKey": approval.operationID,
+                "reasonCode": "educator-interest-approval",
+                "algorithmVersion": approval.analysis.algorithmVersion,
+                "definitionID": approval.analysis.definitionID,
+                "definitionVersion": approval.analysis.definitionVersion,
+                // Only the selection travels. The server derives each interest's
+                // name, category, strength and rank from the stored submission,
+                // so this client cannot author district data by hand.
+                "interestIDs": selected.map(\.interestID).sorted(),
+            ])
+            guard let payload = result.data as? [String: Any],
+                  payload["approvedCount"] as? Int == selected.count else {
+                throw StudentInterestError.saveFailed("The server returned an incomplete approval result.")
+            }
+            return try await getStudentInterests(
+                districtID: approval.districtID,
+                studentID: approval.studentID
+            )
+        } catch let error as StudentInterestError {
+            throw error
+        } catch {
+            throw StudentInterestError.saveFailed(error.localizedDescription)
+        }
+    }
+
+    // Legacy callers never fall back to user-scoped or client-write paths.
+    func getStudentInterests(studentId: String) async throws -> [StudentInterest] {
         _ = studentId
         throw StudentInterestError.featureUnavailable
     }
 
-    // MARK: - Fetch Operations
-
-    /// Get all interests for a specific student
-    func getStudentInterests(studentId: String) async throws -> [StudentInterest] {
-        guard !studentId.isEmpty else {
-            throw StudentInterestError.invalidStudentId
-        }
-
-        do {
-            let interests = try await withTimeout(seconds: 10) { @MainActor @Sendable in
-                let querySnapshot = try await self.studentInterestsCollection(for: studentId).getDocuments()
-                return querySnapshot.documents.compactMap { document -> StudentInterest? in
-                    StudentInterest.fromFirestore(id: document.documentID, data: document.data())
-                }
-            }
-
-            print("[StudentInterestService] Fetched \(interests.count) interests for student \(studentId)")
-            return interests
-        } catch {
-            print("[StudentInterestService] Error fetching student interests: \(error.localizedDescription)")
-            throw StudentInterestError.fetchFailed(error.localizedDescription)
-        }
-    }
-
-    /// Get a specific student interest edge
-    func getStudentInterest(studentId: String, interestId: String) async throws -> StudentInterest? {
-        guard !studentId.isEmpty else {
-            throw StudentInterestError.invalidStudentId
-        }
-
-        guard !interestId.isEmpty else {
-            throw StudentInterestError.invalidInterestId
-        }
-
-        do {
-            return try await withTimeout(seconds: 10) { @MainActor @Sendable in
-                let document = try await self.studentInterestsCollection(for: studentId)
-                    .document(interestId)
-                    .getDocument()
-
-                guard document.exists, let data = document.data() else {
-                    return nil
-                }
-
-                return StudentInterest.fromFirestore(id: document.documentID, data: data)
-            }
-        } catch {
-            print("[StudentInterestService] Error fetching student interest: \(error.localizedDescription)")
-            throw StudentInterestError.fetchFailed(error.localizedDescription)
-        }
-    }
-
-    /// Get high-affinity interests for a student (level 4-5)
     func getHighAffinityInterests(studentId: String) async throws -> [StudentInterest] {
-        let allInterests = try await getStudentInterests(studentId: studentId)
-        return allInterests.filter { $0.isHighAffinity }
+        let interests = try await getStudentInterests(studentId: studentId)
+        return interests.filter(\.isHighAffinity)
     }
 
-    /// Get all student IDs that have a specific interest (Collection Group Query)
     func getStudentIdsWithInterest(interestId: String) async throws -> [String] {
-        guard !interestId.isEmpty else {
-            throw StudentInterestError.invalidInterestId
-        }
+        _ = interestId
         throw StudentInterestError.featureUnavailable
     }
 
-    // MARK: - Write Operations
-
-    /// Save survey results for a student
-    /// Results format: [interestId: level]
     func saveSurveyResults(studentId: String, results: [String: Int]) async throws {
-        guard !studentId.isEmpty else {
-            throw StudentInterestError.invalidStudentId
-        }
-
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw StudentInterestError.userNotAuthenticated
-        }
-
-        print("[StudentInterestService] Saving survey results for student \(studentId): \(results.count) interests")
-
-        var successCount = 0
-        var failureCount = 0
-
-        for (interestId, level) in results {
-            do {
-                let studentInterest = StudentInterest(
-                    id: interestId,  // Use interestId as the document ID for easy lookup
-                    studentId: studentId,
-                    interestId: interestId,
-                    level: level,
-                    source: .survey,
-                    updatedAt: Date(),
-                    createdBy: uid
-                )
-
-                try await saveStudentInterest(studentInterest)
-                successCount += 1
-            } catch {
-                print("[StudentInterestService] Failed to save interest \(interestId): \(error.localizedDescription)")
-                failureCount += 1
-            }
-        }
-
-        print("[StudentInterestService] Survey save complete: \(successCount) successful, \(failureCount) failed")
-
-        if failureCount > 0 {
-            throw StudentInterestError.saveFailed("\(failureCount) interests failed to save")
-        }
+        _ = studentId
+        _ = results
+        throw StudentInterestError.featureUnavailable
     }
 
-    /// Add or update a single student interest
     func addInterest(
         studentId: String,
         interestId: String,
         level: Int,
         source: StudentInterest.StudentInterestSource
     ) async throws {
-        guard !studentId.isEmpty else {
-            throw StudentInterestError.invalidStudentId
-        }
-
-        guard !interestId.isEmpty else {
-            throw StudentInterestError.invalidInterestId
-        }
-
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw StudentInterestError.userNotAuthenticated
-        }
-
-        let studentInterest = StudentInterest(
-            id: interestId,
-            studentId: studentId,
-            interestId: interestId,
-            level: level,
-            source: source,
-            updatedAt: Date(),
-            createdBy: uid
-        )
-
-        try await saveStudentInterest(studentInterest)
+        _ = studentId
+        _ = interestId
+        _ = level
+        _ = source
+        throw StudentInterestError.featureUnavailable
     }
 
-    /// Update the level of a student interest
     func updateInterestLevel(studentId: String, interestId: String, level: Int) async throws {
-        guard !studentId.isEmpty else {
-            throw StudentInterestError.invalidStudentId
-        }
-
-        guard !interestId.isEmpty else {
-            throw StudentInterestError.invalidInterestId
-        }
-
-        do {
-            try await studentInterestsCollection(for: studentId)
-                .document(interestId)
-                .updateData([
-                    "level": max(1, min(5, level)),
-                    "updatedAt": Timestamp(date: Date())
-                ])
-
-            print("[StudentInterestService] Updated interest level for \(interestId)")
-        } catch {
-            print("[StudentInterestService] Error updating interest level: \(error.localizedDescription)")
-            throw StudentInterestError.saveFailed(error.localizedDescription)
-        }
+        _ = studentId
+        _ = interestId
+        _ = level
+        throw StudentInterestError.featureUnavailable
     }
 
-    /// Remove a student interest
     func removeInterest(studentId: String, interestId: String) async throws {
-        guard !studentId.isEmpty else {
-            throw StudentInterestError.invalidStudentId
-        }
-
-        guard !interestId.isEmpty else {
-            throw StudentInterestError.invalidInterestId
-        }
-
-        do {
-            try await studentInterestsCollection(for: studentId)
-                .document(interestId)
-                .delete()
-
-            print("[StudentInterestService] Removed interest \(interestId) from student \(studentId)")
-        } catch {
-            print("[StudentInterestService] Error removing interest: \(error.localizedDescription)")
-            throw StudentInterestError.deleteFailed(error.localizedDescription)
-        }
+        _ = studentId
+        _ = interestId
+        throw StudentInterestError.featureUnavailable
     }
 
-    /// Clear all survey-generated interests while preserving manually added ones
     func clearSurveyInterests(studentId: String) async throws {
-        guard !studentId.isEmpty else {
-            throw StudentInterestError.invalidStudentId
-        }
-
-        print("[StudentInterestService] Clearing survey interests for student \(studentId)")
-
-        do {
-            // Query for survey-generated interests only
-            let snapshot = try await studentInterestsCollection(for: studentId)
-                .whereField("source", isEqualTo: StudentInterest.StudentInterestSource.survey.rawValue)
-                .getDocuments()
-
-            // Delete each survey interest
-            for document in snapshot.documents {
-                try await document.reference.delete()
-            }
-
-            print("[StudentInterestService] Cleared \(snapshot.documents.count) survey-generated interests")
-        } catch {
-            print("[StudentInterestService] Error clearing survey interests: \(error.localizedDescription)")
-            throw StudentInterestError.deleteFailed(error.localizedDescription)
-        }
+        _ = studentId
+        throw StudentInterestError.featureUnavailable
     }
-
-    // MARK: - Helper Methods
-
-    /// Save or update a student interest edge
-    private func saveStudentInterest(_ studentInterest: StudentInterest) async throws {
-        do {
-            let data = studentInterest.toFirestoreData()
-            let docId = studentInterest.interestId  // Use interestId as document ID
-
-            try await studentInterestsCollection(for: studentInterest.studentId)
-                .document(docId)
-                .setData(data, merge: true)
-
-            print("[StudentInterestService] Saved student interest: \(studentInterest.interestId)")
-        } catch {
-            print("[StudentInterestService] Error saving student interest: \(error.localizedDescription)")
-            throw StudentInterestError.saveFailed(error.localizedDescription)
-        }
-    }
-
 }

@@ -599,19 +599,10 @@ service cloud.firestore {
               studentID,
               studentData(districtID, studentID)
             );
-          allow create: if canCollaborateOnStudent(districtID, studentID)
-            || respondentMayWriteRecord(
-              districtID,
-              studentID,
-              'updateInterests'
-            );
-          allow update: if canCollaborateOnStudent(districtID, studentID)
-            || respondentMayUpdateRecord(
-              districtID,
-              studentID,
-              'updateInterests'
-            );
-          allow delete: if false;
+          // A canonical interest edge is derived from an immutable submission by
+          // the approval callable. No client authors one directly — a staff
+          // client that could would be authoring district data by hand.
+          allow create, update, delete: if false;
         }
 
         match /careers/{careerID} {

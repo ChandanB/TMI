@@ -394,17 +394,23 @@ private struct StudentOperationalHubContent: View {
                 onStartPlan: { showingPlanEditor = true }
             )
         case .domain(let domain):
-            if domain == .meetingsAndNotes {
+            if domain == .interests, let student = state.student {
+                StudentInterestsSection(
+                    districtID: student.districtID,
+                    studentID: student.id
+                )
+            } else if domain == .meetingsAndNotes {
                 StudentTimelineView(
                     privateNotes: state.privateNotes,
                     studentReflections: state.studentReflections
                 )
+            } else {
+                StudentDomainSection(
+                    domain: domain,
+                    current: state.currentSections.first { $0.domain == domain },
+                    history: state.historySections.first { $0.domain == domain }
+                )
             }
-            StudentDomainSection(
-                domain: domain,
-                current: state.currentSections.first { $0.domain == domain },
-                history: state.historySections.first { $0.domain == domain }
-            )
         }
     }
 

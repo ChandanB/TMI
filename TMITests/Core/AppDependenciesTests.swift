@@ -336,14 +336,17 @@ struct AppDependenciesTests {
         )
 
         let submitBody = try #require(
-            flowSource.range(of: "response = try await repository.submit")
-                .map { flowSource[$0.lowerBound...] }
-                .map(String.init)
+            flowSource.range(of: "private func submit(").map { range in
+                String(flowSource[range.lowerBound...].prefix(600))
+            }
         )
+        #expect(submitBody.contains("response = try await repository.submit("))
+        // The advance is inside the do block, after the await and ahead of the catch.
+        let submitCall = try #require(submitBody.range(of: "repository.submit("))
         let advance = try #require(submitBody.range(of: "phase = .results"))
         let failure = try #require(submitBody.range(of: "catch { message = friendly(error) }"))
-        // The advance is inside the do block, ahead of the catch.
-        #expect(advance.lowerBound < failure.lowerBound)
+        #expect(submitCall.upperBound < advance.lowerBound)
+        #expect(advance.upperBound < failure.lowerBound)
         #expect(flowSource.contains("@State private var isSaving = false"))
         #expect(
             serviceSource.contains(

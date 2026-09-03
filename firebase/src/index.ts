@@ -207,6 +207,44 @@ export interface ReviewSurveyResponseRequest extends PrivilegedBaseRequest {
   readonly responseID: string;
 }
 
+interface ServerInterestAnalysisRule {
+  readonly questionID: string;
+  readonly optionID: string;
+  readonly interestID: string;
+  readonly interestName: string;
+  readonly category: string;
+  readonly clusterID: string;
+  readonly clusterName: string;
+  readonly weight: number;
+}
+
+interface ServerInterestProposal {
+  readonly interestID: string;
+  readonly name: string;
+  readonly category: string;
+  readonly score: number;
+  readonly strength: number;
+  readonly rank: number;
+  readonly sourceOptionIDs: readonly string[];
+}
+
+/** Bumped whenever the derivation below changes shape. */
+const interestAlgorithmVersion = 1;
+
+export interface ApproveSurveyInterestsRequest extends PrivilegedBaseRequest {
+  readonly studentID: string;
+  readonly responseID: string;
+  readonly algorithmVersion: number;
+  readonly definitionID: string;
+  readonly definitionVersion: number;
+  /**
+   * Which of the server-derived proposals the reviewer approved. The name,
+   * category, strength and rank of each interest are derived here from the
+   * immutable submission, never accepted from the caller.
+   */
+  readonly interestIDs: readonly string[];
+}
+
 type SurveyAssignmentMutationAction = "create" | "reassign" | "revoke";
 
 export interface MutateSurveyAssignmentRequest extends PrivilegedBaseRequest {
@@ -2691,6 +2729,7 @@ interface ParsedSurveyDefinition {
   readonly version: number;
   readonly questions: readonly ParsedSurveyQuestion[];
   readonly branchRules: readonly ParsedSurveyBranchRule[];
+  readonly interestRules: readonly ServerInterestAnalysisRule[];
 }
 
 interface RespondentSurveyIdentity {
@@ -2881,6 +2920,36 @@ const parseReviewSurveyResponseRequest = (
   };
 };
 
+const parseApproveSurveyInterestsRequest = (
+  value: unknown,
+): ApproveSurveyInterestsRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(
+    data,
+    withBaseFields(
+      "studentID",
+      "responseID",
+      "algorithmVersion",
+      "definitionID",
+      "definitionVersion",
+      "interestIDs",
+    ),
+  );
+  const base = parseBaseRequest(data);
+  return {
+    ...base,
+    studentID: requireIdentifier(data.studentID, "studentID"),
+    responseID: requireIdentifier(data.responseID, "responseID"),
+    algorithmVersion: requireInteger(data.algorithmVersion, "algorithmVersion", 1),
+    definitionID: requireIdentifier(data.definitionID, "definitionID"),
+    definitionVersion: requireInteger(data.definitionVersion, "definitionVersion", 1),
+    interestIDs: requireIdentifierArray(data.interestIDs, "interestIDs", {
+      allowEmpty: false,
+      maximumCount: 50,
+    }),
+  };
+};
+
 const parseMutateSurveyAssignmentRequest = (
   value: unknown,
 ): MutateSurveyAssignmentRequest => {
@@ -2969,6 +3038,7 @@ const surveyDefinitionLimits = {
   maximumPromptUTF8Bytes: 500,
   maximumLabelUTF8Bytes: 200,
   maximumImageReferenceUTF8Bytes: 500,
+  maximumInterestRuleCount: 500,
 } as const;
 
 const parseSurveyDefinition = (
@@ -3240,13 +3310,150 @@ const parseSurveyDefinition = (
   for (const question of questions) {
     visit(question.id);
   }
+  const rawInterestRules = data.interestRules ?? [];
+  if (
+    !Array.isArray(rawInterestRules) ||
+    rawInterestRules.length > surveyDefinitionLimits.maximumInterestRuleCount
+  ) {
+    return surveyDataLoss("The survey interest rules are malformed.");
+  }
+  const interestRuleKeys = new Set<string>();
+  const interestRules: ServerInterestAnalysisRule[] = rawInterestRules.map(
+    (rawRule: unknown) => {
+      const rule = requireRecord(rawRule, "survey interest rule");
+      const questionID = requireIdentifier(
+        rule.questionID,
+        "survey interest rule.questionID",
+      );
+      const optionID = requireIdentifier(
+        rule.optionID,
+        "survey interest rule.optionID",
+      );
+      const question = questionsByID.get(questionID);
+      if (question === undefined || !question.optionIDs.has(optionID)) {
+        return surveyDataLoss(
+          "A survey interest rule references an unknown option.",
+        );
+      }
+      const interestID = requireIdentifier(
+        rule.interestID,
+        "survey interest rule.interestID",
+      );
+      const clusterID = requireIdentifier(
+        rule.clusterID,
+        "survey interest rule.clusterID",
+      );
+      const key = [questionID, optionID, interestID, clusterID].join("\u0000");
+      if (interestRuleKeys.has(key)) {
+        return surveyDataLoss("The survey definition repeats an interest rule.");
+      }
+      interestRuleKeys.add(key);
+      return {
+        questionID,
+        optionID,
+        interestID,
+        interestName: requireString(
+          rule.interestName,
+          "survey interest rule.interestName",
+          200,
+        ),
+        category: requireIdentifier(
+          rule.category,
+          "survey interest rule.category",
+        ),
+        clusterID,
+        clusterName: requireString(
+          rule.clusterName,
+          "survey interest rule.clusterName",
+          200,
+        ),
+        weight: requireInteger(rule.weight, "survey interest rule.weight", 1, 100),
+      };
+    },
+  );
   return {
     data,
     definitionID: expectedID,
     version: expectedVersion,
     questions,
     branchRules,
+    interestRules,
   };
+};
+
+/**
+ * Derives interest proposals from a submission and the definition's rule table.
+ *
+ * This mirrors `InterestAnalysis` on the client exactly — same option matching,
+ * same weight sum, same competition ranking, same tie-breaks — so the reviewer
+ * approves what the server will actually write. The client's copy is a preview;
+ * this one is the authority.
+ */
+const deriveInterestProposals = (
+  answers: Readonly<Record<string, SurveyAnswerPayload>>,
+  rules: readonly ServerInterestAnalysisRule[],
+): readonly ServerInterestProposal[] => {
+  const selected = new Set<string>();
+  const optionKey = (questionID: string, optionID: string): string =>
+    [questionID, optionID].join("\u0000");
+  for (const [questionID, answer] of Object.entries(answers)) {
+    if (answer.type === "single" || answer.type === "image") {
+      if (typeof answer.value === "string") {
+        selected.add(optionKey(questionID, answer.value));
+      }
+    } else if (answer.type === "multiple" && Array.isArray(answer.value)) {
+      for (const optionID of answer.value) {
+        selected.add(optionKey(questionID, optionID));
+      }
+    }
+    // Free text and ratings do not score interests.
+  }
+
+  const matched = rules.filter((rule) =>
+    selected.has(optionKey(rule.questionID, rule.optionID))
+  );
+  const byInterest = new Map<string, ServerInterestAnalysisRule[]>();
+  for (const rule of matched) {
+    const group = byInterest.get(rule.interestID) ?? [];
+    group.push(rule);
+    byInterest.set(rule.interestID, group);
+  }
+
+  const preliminary = [...byInterest.entries()].map(([interestID, group]) => {
+    // The canonical naming for an interest is the lowest ordered rule, so a
+    // rule table that names it twice still derives one stable answer.
+    const canonical = [...group].sort((left, right) =>
+      left.interestName.localeCompare(right.interestName) ||
+      left.category.localeCompare(right.category) ||
+      left.clusterID.localeCompare(right.clusterID)
+    )[0]!;
+    return {
+      interestID,
+      name: canonical.interestName,
+      category: canonical.category,
+      score: group.reduce((total, rule) => total + rule.weight, 0),
+      sourceOptionIDs: group.map((rule) => rule.optionID).sort(),
+    };
+  }).sort((left, right) =>
+    right.score - left.score || left.interestID.localeCompare(right.interestID)
+  );
+
+  return preliminary.map((interest, index) => {
+    let rank = index + 1;
+    while (rank > 1 && preliminary[rank - 2]!.score === interest.score) {
+      rank -= 1;
+    }
+    return {
+      interestID: interest.interestID,
+      name: interest.name,
+      category: interest.category,
+      score: interest.score,
+      // The edge records affinity on a 1-5 scale; the raw score is kept beside it.
+      strength: Math.max(1, Math.min(5, interest.score)),
+      rank,
+      sourceOptionIDs: interest.sourceOptionIDs,
+    };
+  });
 };
 
 const validateAnswersAgainstDefinition = (
@@ -3487,6 +3694,94 @@ const requireSurveyScope = async (
   );
   validateAnswersAgainstDefinition(data.answers, parsedDefinition, false);
   return { identity, assignment, definition: parsedDefinition };
+};
+
+const requireLiveRespondentSurveyScope = async (
+  firestore: Firestore,
+  transaction: Transaction,
+  identity: RespondentSurveyIdentity,
+  operation: "readAssignment" | "requestHelp",
+): Promise<DocumentData> => {
+  if (!identity.operations.has(operation)) {
+    throw new HttpsError(
+      "permission-denied",
+      "The request is outside the respondent session scope.",
+    );
+  }
+  const sessionReference = firestore.doc(
+    `districts/${identity.districtID}/studentModeSessions/${identity.sessionID}`,
+  );
+  const assignmentReference = firestore.doc(
+    `districts/${identity.districtID}/formAssignments/${identity.assignmentID}`,
+  );
+  const studentReference = firestore.doc(
+    `districts/${identity.districtID}/students/${identity.studentID}`,
+  );
+  const [sessionSnapshot, assignmentSnapshot, studentSnapshot] = await Promise.all([
+    transaction.get(sessionReference),
+    transaction.get(assignmentReference),
+    transaction.get(studentReference),
+  ]);
+  const session = sessionSnapshot.data();
+  const assignment = assignmentSnapshot.data();
+  const student = studentSnapshot.data();
+  const expiresAt = session?.expiresAt;
+  const storedAssignments = session?.assignmentIDs;
+  const storedOperations = session?.allowedOperations;
+  if (expiresAt instanceof Timestamp && expiresAt.toMillis() <= Date.now()) {
+    throw new HttpsError(
+      "failed-precondition",
+      "The respondent session has expired.",
+      { kind: "survey-session-expired" },
+    );
+  }
+  if (
+    session === undefined ||
+    session.status !== "active" ||
+    !(expiresAt instanceof Timestamp) ||
+    session.districtID !== identity.districtID ||
+    session.studentID !== identity.studentID ||
+    session.respondentUserID !== identity.userID ||
+    !Array.isArray(storedAssignments) ||
+    storedAssignments.length !== 1 ||
+    storedAssignments[0] !== identity.assignmentID ||
+    !Array.isArray(storedOperations) ||
+    storedOperations.length !== identity.operations.size ||
+    !storedOperations.every((value: unknown) =>
+      typeof value === "string" && identity.operations.has(value))
+  ) {
+    throw new HttpsError(
+      "failed-precondition",
+      "The respondent session is no longer active.",
+      { kind: "survey-session-revoked" },
+    );
+  }
+  if (
+    assignment === undefined ||
+    assignment.districtId !== identity.districtID ||
+    assignment.assignmentType !== "survey" ||
+    assignment.isActive !== true ||
+    !Array.isArray(assignment.studentIDs) ||
+    assignment.studentIDs.length !== 1 ||
+    assignment.studentIDs[0] !== identity.studentID
+  ) {
+    throw new HttpsError(
+      "failed-precondition",
+      "The survey assignment is revoked or unavailable.",
+      { kind: "survey-assignment-revoked" },
+    );
+  }
+  if (
+    student === undefined ||
+    student.districtId !== identity.districtID ||
+    student.isArchived === true
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "The assigned student is unavailable.",
+    );
+  }
+  return assignment;
 };
 
 const maximumSurveyOperationCount = 128;
@@ -3735,55 +4030,52 @@ export const createSurveyHandlers = (
     ) {
       throw new HttpsError("permission-denied", "The activity is outside the respondent scope.");
     }
-    const assignmentSnapshot = await dependencies.firestore.doc(
-      `districts/${identity.districtID}/formAssignments/${assignmentID}`,
-    ).get();
-    const assignment = assignmentSnapshot.data();
-    if (
-      assignment === undefined ||
-      assignment.isActive !== true ||
-      assignment.assignmentType !== "survey" ||
-      assignment.districtId !== identity.districtID ||
-      !Array.isArray(assignment.studentIDs) ||
-      assignment.studentIDs.length !== 1 ||
-      assignment.studentIDs[0] !== identity.studentID
-    ) {
-      throw new HttpsError("failed-precondition", "The survey assignment is unavailable.");
-    }
-    const definitionID = requireIdentifier(assignment.definitionID, "definitionID");
-    const definitionVersion = requireInteger(assignment.definitionVersion, "definitionVersion", 1);
-    const attemptID = requireIdentifier(assignment.attemptID, "attemptID");
-    const assignedAt = assignment.assignedAt;
-    const definitionSnapshot = await dependencies.firestore.doc(
-      surveyDefinitionPath(definitionID, definitionVersion),
-    ).get();
-    const parsedDefinition = parseSurveyDefinition(
-      definitionSnapshot.data(),
-      definitionID,
-      definitionVersion,
-    );
-    if (!(assignedAt instanceof Timestamp)) {
-      return storedSurveyDataLoss("The survey assignment time is malformed.");
-    }
-    return {
-      assignment: {
-        schemaVersion: 1,
-        recordVersion: requireInteger(assignment.recordVersion, "recordVersion", 1),
-        assignmentID,
-        attemptID,
-        districtID: identity.districtID,
-        studentID: identity.studentID,
+    return dependencies.firestore.runTransaction(async (transaction) => {
+      const assignment = await requireLiveRespondentSurveyScope(
+        dependencies.firestore,
+        transaction,
+        identity,
+        "readAssignment",
+      );
+      const definitionID = requireIdentifier(assignment.definitionID, "definitionID");
+      const definitionVersion = requireInteger(
+        assignment.definitionVersion,
+        "definitionVersion",
+        1,
+      );
+      const attemptID = requireIdentifier(assignment.attemptID, "attemptID");
+      const assignedAt = assignment.assignedAt;
+      const definitionSnapshot = await transaction.get(dependencies.firestore.doc(
+        surveyDefinitionPath(definitionID, definitionVersion),
+      ));
+      const parsedDefinition = parseSurveyDefinition(
+        definitionSnapshot.data(),
         definitionID,
         definitionVersion,
-        state: "active",
-        assignedAt: assignedAt.toDate().toISOString(),
-        revokedAt: null,
-      },
-      definition: {
-        ...parsedDefinition.data,
-        publishedAt: (parsedDefinition.data.publishedAt as Timestamp).toDate().toISOString(),
-      },
-    };
+      );
+      if (!(assignedAt instanceof Timestamp)) {
+        return storedSurveyDataLoss("The survey assignment time is malformed.");
+      }
+      return {
+        assignment: {
+          schemaVersion: 1,
+          recordVersion: requireInteger(assignment.recordVersion, "recordVersion", 1),
+          assignmentID,
+          attemptID,
+          districtID: identity.districtID,
+          studentID: identity.studentID,
+          definitionID,
+          definitionVersion,
+          state: "active",
+          assignedAt: assignedAt.toDate().toISOString(),
+          revokedAt: null,
+        },
+        definition: {
+          ...parsedDefinition.data,
+          publishedAt: (parsedDefinition.data.publishedAt as Timestamp).toDate().toISOString(),
+        },
+      };
+    });
   },
 
   requestHelp: async (request: CallableRequest<unknown>) => {
@@ -3802,19 +4094,44 @@ export const createSurveyHandlers = (
     ) {
       throw new HttpsError("permission-denied", "The help request is outside the respondent scope.");
     }
-    const reference = dependencies.firestore.doc(
-      `districts/${identity.districtID}/studentHelpRequests/${operationID}`,
-    );
-    await reference.create({
-      schemaVersion: 1,
-      operationID,
-      studentID: identity.studentID,
-      assignmentID: identity.assignmentID,
-      sessionID: identity.sessionID,
-      status: "requested",
-      requestedAt: FieldValue.serverTimestamp(),
+    return dependencies.firestore.runTransaction(async (transaction) => {
+      await requireLiveRespondentSurveyScope(
+        dependencies.firestore,
+        transaction,
+        identity,
+        "requestHelp",
+      );
+      const reference = dependencies.firestore.doc(
+        `districts/${identity.districtID}/studentHelpRequests/${operationID}`,
+      );
+      const snapshot = await transaction.get(reference);
+      const existing = snapshot.data();
+      if (existing !== undefined) {
+        if (
+          existing.schemaVersion === 1 &&
+          existing.operationID === operationID &&
+          existing.studentID === identity.studentID &&
+          existing.assignmentID === identity.assignmentID &&
+          existing.sessionID === identity.sessionID
+        ) {
+          return { accepted: true, operationID };
+        }
+        throw new HttpsError(
+          "already-exists",
+          "The help request operation identifier is already in use.",
+        );
+      }
+      transaction.create(reference, {
+        schemaVersion: 1,
+        operationID,
+        studentID: identity.studentID,
+        assignmentID: identity.assignmentID,
+        sessionID: identity.sessionID,
+        status: "requested",
+        requestedAt: FieldValue.serverTimestamp(),
+      });
+      return { accepted: true, operationID };
     });
-    return { accepted: true, operationID };
   },
 
   mutateAssignment: async (
@@ -4459,6 +4776,145 @@ export const createSurveyHandlers = (
       reviewerUserID: reviewerIdentity.userID,
     };
   },
+
+  approveInterests: async (request: CallableRequest<unknown>): Promise<
+    PrivilegedOperationResult & { readonly approvedCount: number }
+  > => {
+    const data = parseApproveSurveyInterestsRequest(request.data);
+    const typedRequest = request as CallableRequest<ApproveSurveyInterestsRequest>;
+    if (data.algorithmVersion !== interestAlgorithmVersion) {
+      throw new HttpsError(
+        "failed-precondition",
+        "The reviewer analyzed this submission with a different algorithm version.",
+      );
+    }
+    const result = await executePrivilegedOperation(
+      dependencies.firestore,
+      typedRequest,
+      data,
+      {
+        action: "survey.interests.approve",
+        targetPath: () => `districts/${data.districtID}/students/${data.studentID}/interests`,
+        requiredCapability: "student.write.detail",
+        auditDetails: () => ({
+          studentID: data.studentID,
+          responseID: data.responseID,
+          approvedInterestIDs: [...data.interestIDs].sort(),
+          algorithmVersion: interestAlgorithmVersion,
+        }),
+        mutate: async ({ transaction, membership, identity }) => {
+          const studentReference = dependencies.firestore.doc(
+            `districts/${data.districtID}/students/${data.studentID}`,
+          );
+          const responseReference = dependencies.firestore.doc(
+            surveyResponsePath(data.districtID, data.studentID, data.responseID),
+          );
+          const definitionReference = dependencies.firestore.doc(
+            surveyDefinitionPath(data.definitionID, data.definitionVersion),
+          );
+          const [studentSnapshot, responseSnapshot, definitionSnapshot] =
+            await Promise.all([
+              transaction.get(studentReference),
+              transaction.get(responseReference),
+              transaction.get(definitionReference),
+            ]);
+          const student = requireExistingData(studentSnapshot, "Student");
+          const response = requireExistingData(responseSnapshot, "Survey response");
+          const schoolID = requireSchoolID(student, "Student");
+          if (
+            student.districtId !== data.districtID ||
+            student.isArchived === true ||
+            !canReadStudentDetail(membership, data.studentID, schoolID) ||
+            response.districtID !== data.districtID ||
+            response.studentID !== data.studentID ||
+            response.responseID !== data.responseID
+          ) {
+            throw new HttpsError("permission-denied", "The survey response is outside the member's scope.");
+          }
+          assertRecordVersion(response.recordVersion, data.expectedRecordVersion);
+          if (
+            (response.state !== "submitted" && response.state !== "reviewed") ||
+            response.definitionID !== data.definitionID ||
+            response.definitionVersion !== data.definitionVersion ||
+            !(response.submittedAt instanceof Timestamp)
+          ) {
+            throw new HttpsError("failed-precondition", "Only the matching immutable submission can be approved.");
+          }
+
+          // Everything written below is derived here from the stored submission
+          // and the published rule table. The caller chooses which proposals to
+          // approve; it does not get to say what they mean.
+          const definition = parseSurveyDefinition(
+            definitionSnapshot.data(),
+            data.definitionID,
+            data.definitionVersion,
+          );
+          const proposals = deriveInterestProposals(
+            parseSurveyAnswers(response.answers),
+            definition.interestRules,
+          );
+          const proposalsByID = new Map(
+            proposals.map((proposal) => [proposal.interestID, proposal]),
+          );
+          const approved = data.interestIDs.map((interestID) => {
+            const proposal = proposalsByID.get(interestID);
+            if (proposal === undefined) {
+              throw new HttpsError(
+                "failed-precondition",
+                "An approved interest is not derived from this submission.",
+              );
+            }
+            return proposal;
+          });
+
+          const approvedAt = Timestamp.now();
+          const edgeReferences = approved.map((interest) => dependencies.firestore.doc(
+            `districts/${data.districtID}/students/${data.studentID}/interests/${interest.interestID}`,
+          ));
+          const existingEdges = await Promise.all(edgeReferences.map((reference) => transaction.get(reference)));
+          approved.forEach((interest, index) => {
+            const existing = existingEdges[index]?.data();
+            const priorHistory = Array.isArray(existing?.mergeHistory)
+              ? existing.mergeHistory.slice(-19)
+              : [];
+            const mergeRecord = {
+              responseId: data.responseID,
+              definitionId: data.definitionID,
+              definitionVersion: data.definitionVersion,
+              algorithmVersion: interestAlgorithmVersion,
+              approvedBy: identity.userID,
+              approvedAt,
+              previousStrength: typeof existing?.strength === "number" ? existing.strength : null,
+            };
+            transaction.set(edgeReferences[index]!, {
+              schemaVersion: 1,
+              studentId: data.studentID,
+              interestId: interest.interestID,
+              name: interest.name,
+              category: interest.category,
+              strength: interest.strength,
+              level: interest.strength,
+              score: interest.score,
+              rank: interest.rank,
+              sourceOptionIds: interest.sourceOptionIDs,
+              source: "survey",
+              capturedAt: response.submittedAt,
+              updatedAt: approvedAt,
+              createdAt: existing?.createdAt ?? approvedAt,
+              createdBy: existing?.createdBy ?? identity.userID,
+              sourceResponseId: data.responseID,
+              sourceDefinitionId: data.definitionID,
+              sourceDefinitionVersion: data.definitionVersion,
+              algorithmVersion: interestAlgorithmVersion,
+              mergeHistory: [...priorHistory, mergeRecord],
+            });
+          });
+          return { recordVersion: data.expectedRecordVersion };
+        },
+      },
+    );
+    return { ...result, approvedCount: data.interestIDs.length };
+  },
 });
 
 const productionSurveyHandlers = createSurveyHandlers({
@@ -4651,6 +5107,10 @@ export const submitSurveyResponse = onCall(
 export const reviewSurveyResponse = onCall(
   callableOptions,
   productionSurveyHandlers.reviewResponse,
+);
+export const approveSurveyInterests = onCall(
+  callableOptions,
+  productionSurveyHandlers.approveInterests,
 );
 export const deletePersonalAccountData = onCall(
   { ...callableOptions, timeoutSeconds: 540 },
