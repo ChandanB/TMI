@@ -5,6 +5,16 @@ import Testing
 @Suite("Secure Student Mode session")
 @MainActor
 struct StudentModeSessionTests {
+    @Test("Foreground evaluation locks after inactivity")
+    @MainActor
+    func foregroundEvaluationLocksAfterInactivity() throws {
+        let start = Date(timeIntervalSince1970: 2_000_000_000)
+        let session = StudentModeSession()
+        session.activate(try grant(expiresAt: start.addingTimeInterval(3_600)), profile: profile(), at: start)
+        session.recordActivity(at: start.addingTimeInterval(10))
+        session.evaluate(at: start.addingTimeInterval(StudentModeSession.inactivityInterval + 11))
+        #expect(session.state == .locked(.inactivity))
+    }
     private let start = Date(timeIntervalSince1970: 2_000_000_000)
 
     @Test("Cold launch is contained before asynchronous restoration starts")

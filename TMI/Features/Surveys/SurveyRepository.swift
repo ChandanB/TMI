@@ -37,6 +37,19 @@ nonisolated struct SurveyReviewRequest: Sendable, Equatable {
     let staffIdentity: StudentModeStaffIdentity
 }
 
+nonisolated struct SurveyActivity: Sendable, Equatable {
+    let assignment: SurveyAssignment
+    let definition: SurveyDefinition
+}
+
+nonisolated struct SurveyHelpRequest: Sendable, Equatable {
+    let operationID: String
+    let districtID: String
+    let studentID: String
+    let assignmentID: String
+    let sessionID: String
+}
+
 nonisolated enum SurveyAssignmentMutationAction: String, Sendable {
     case create
     case reassign
@@ -253,6 +266,8 @@ private actor SurveyLocalDraftFiles {
 }
 
 actor SurveyRepository {
+    typealias LoadActivity = @Sendable (String, StudentModeGrant) async throws -> SurveyActivity
+    typealias SendHelpRequest = @Sendable (SurveyHelpRequest, StudentModeGrant) async throws -> Void
     typealias LegacyLoadDraft = @Sendable (SurveyAttemptKey) async -> SurveyResponse?
     typealias LoadDraft = @Sendable (SurveyAttemptKey) async -> SurveyDraftLoad
     typealias SaveDraft = @Sendable (SurveyResponse) async throws -> Void
@@ -273,6 +288,8 @@ actor SurveyRepository {
     typealias IsOnline = @Sendable () async -> Bool
 
     private let loadDraft: LoadDraft
+    private let loadSurveyActivity: LoadActivity
+    private let sendHelpRequest: SendHelpRequest
     private let saveDraft: SaveDraft
     private let quarantineDraft: SaveDraft
     private let purgeDraft: PurgeDraft
@@ -283,6 +300,8 @@ actor SurveyRepository {
     private let isOnline: IsOnline
 
     init(
+        loadActivity: @escaping LoadActivity = { _, _ in throw SurveyRepositoryError.unavailable },
+        requestHelp: @escaping SendHelpRequest = { _, _ in throw SurveyRepositoryError.unavailable },
         loadDraft: @escaping LegacyLoadDraft,
         saveDraft: @escaping SaveDraft,
         quarantineDraft: @escaping SaveDraft,
@@ -294,6 +313,8 @@ actor SurveyRepository {
         },
         isOnline: @escaping IsOnline
     ) {
+        self.loadSurveyActivity = loadActivity
+        self.sendHelpRequest = requestHelp
         self.loadDraft = { key in
             if let response = await loadDraft(key) {
                 return .draft(response)
@@ -311,6 +332,8 @@ actor SurveyRepository {
     }
 
     init(
+        loadActivity: @escaping LoadActivity = { _, _ in throw SurveyRepositoryError.unavailable },
+        requestHelp: @escaping SendHelpRequest = { _, _ in throw SurveyRepositoryError.unavailable },
         draftStore: SurveyDraftStore,
         synchronizeDraft: @escaping SynchronizeDraft,
         submitResponse: @escaping SubmitResponse,
@@ -320,6 +343,8 @@ actor SurveyRepository {
         },
         isOnline: @escaping IsOnline
     ) {
+        self.loadSurveyActivity = loadActivity
+        self.sendHelpRequest = requestHelp
         self.loadDraft = draftStore.load
         self.saveDraft = draftStore.save
         self.quarantineDraft = draftStore.quarantine
@@ -329,6 +354,43 @@ actor SurveyRepository {
         self.reviewResponse = reviewResponse
         self.performAssignmentMutation = mutateAssignment
         self.isOnline = isOnline
+    }
+
+    func activity(grant: StudentModeGrant) async throws -> SurveyActivity {
+        guard grant.scope.allowedOperations.contains(.readAssignment),
+              let assignmentID = grant.scope.assignmentIDs.first,
+              grant.expiresAt > Date() else {
+            throw SurveyRepositoryError.authorization
+        }
+        let activity = try await loadSurveyActivity(assignmentID, grant)
+        guard activity.assignment.assignmentID == assignmentID,
+              activity.assignment.districtID == grant.scope.districtID,
+              activity.assignment.studentID == grant.scope.studentID,
+              activity.assignment.state == .active,
+              activity.definition.id == activity.assignment.definitionID,
+              activity.definition.version == activity.assignment.definitionVersion else {
+            throw SurveyRepositoryError.malformedResponse
+        }
+        return activity
+    }
+
+    func requestHelp(operationID: String, grant: StudentModeGrant) async throws {
+        guard Self.isValidIdentifier(operationID),
+              grant.scope.allowedOperations.contains(.requestHelp),
+              let assignmentID = grant.scope.assignmentIDs.first,
+              grant.expiresAt > Date() else {
+            throw SurveyRepositoryError.authorization
+        }
+        try await sendHelpRequest(
+            SurveyHelpRequest(
+                operationID: operationID,
+                districtID: grant.scope.districtID,
+                studentID: grant.scope.studentID,
+                assignmentID: assignmentID,
+                sessionID: grant.sessionID
+            ),
+            grant
+        )
     }
 
     func autosave(
@@ -815,6 +877,12 @@ extension SurveyRepository {
         )
         let connectivity = SurveyConnectivity()
         return SurveyRepository(
+            loadActivity: { assignmentID, grant in
+                try await runtime.loadActivity(assignmentID: assignmentID, grant: grant)
+            },
+            requestHelp: { request, grant in
+                try await runtime.requestHelp(request, grant: grant)
+            },
             draftStore: draftStore,
             synchronizeDraft: { request in
                 try await runtime.synchronize(request)
@@ -1086,6 +1154,51 @@ private final class FirebaseSurveyRuntime: @unchecked Sendable {
     init(respondentFunctions: Functions, staffFunctions: Functions) {
         self.respondentFunctions = respondentFunctions
         self.staffFunctions = staffFunctions
+    }
+
+    func loadActivity(assignmentID: String, grant: StudentModeGrant) async throws -> SurveyActivity {
+        do {
+            let result = try await respondentFunctions
+                .httpsCallable("loadSurveyActivity")
+                .call(["assignmentID": assignmentID, "sessionID": grant.sessionID])
+            guard let object = result.data as? [String: Any],
+                  let assignmentObject = object["assignment"],
+                  let definitionObject = object["definition"] else {
+                throw SurveyRepositoryError.malformedResponse
+            }
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let assignment = try decoder.decode(
+                SurveyAssignment.self,
+                from: JSONSerialization.data(withJSONObject: assignmentObject)
+            )
+            let definition = try decoder.decode(
+                SurveyDefinition.self,
+                from: JSONSerialization.data(withJSONObject: definitionObject)
+            )
+            return SurveyActivity(assignment: assignment, definition: definition)
+        } catch {
+            throw SurveyFirebaseErrorMapper.map(error)
+        }
+    }
+
+    func requestHelp(_ request: SurveyHelpRequest, grant: StudentModeGrant) async throws {
+        do {
+            let result = try await respondentFunctions
+                .httpsCallable("requestStudentModeHelp")
+                .call([
+                    "districtID": request.districtID,
+                    "studentID": request.studentID,
+                    "assignmentID": request.assignmentID,
+                    "sessionID": request.sessionID,
+                    "operationID": request.operationID,
+                ])
+            guard let data = result.data as? [String: Any], data["accepted"] as? Bool == true else {
+                throw SurveyRepositoryError.malformedResponse
+            }
+        } catch {
+            throw SurveyFirebaseErrorMapper.map(error)
+        }
     }
 
     func synchronize(

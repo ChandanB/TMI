@@ -3,9 +3,10 @@ import SwiftUI
 struct SurveyResultsView: View {
     let definition: SurveyDefinition
     let response: SurveyResponse
-    let onAskForHelp: () -> Void
+    let onAskForHelp: () async -> Bool
     let onFinish: () -> Void
     @State private var helpRequested = false
+    @State private var helpError = false
 
     var body: some View {
         ScrollView {
@@ -32,8 +33,10 @@ struct SurveyResultsView: View {
                 }
                 .frame(maxWidth: 680)
                 Button("Ask for help", systemImage: "hand.raised.fill") {
-                    helpRequested = true
-                    onAskForHelp()
+                    Task { @MainActor in
+                        helpRequested = await onAskForHelp()
+                        helpError = !helpRequested
+                    }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
@@ -43,6 +46,11 @@ struct SurveyResultsView: View {
                     Text("Your educator will check in with you.")
                         .font(.headline)
                         .foregroundStyle(TMIColors.infoText)
+                }
+                if helpError {
+                    Text("We couldn’t send that yet. Please tell your educator directly.")
+                        .font(.headline)
+                        .foregroundStyle(TMIColors.errorText)
                 }
                 Button("Finish", action: onFinish)
                     .buttonStyle(.borderedProminent)

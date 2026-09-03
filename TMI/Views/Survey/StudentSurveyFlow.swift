@@ -7,8 +7,8 @@ struct StudentSurveyFlow: View {
     let definition: SurveyDefinition?
     let grant: StudentModeGrant?
     let repository: SurveyRepository?
+    var onActivity: () -> Void = {}
     var onSaveForLater: () -> Void = {}
-    var onAskForHelp: () -> Void = {}
     var onFinish: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -26,16 +26,16 @@ struct StudentSurveyFlow: View {
         definition: SurveyDefinition,
         grant: StudentModeGrant,
         repository: SurveyRepository,
+        onActivity: @escaping () -> Void = {},
         onSaveForLater: @escaping () -> Void = {},
-        onAskForHelp: @escaping () -> Void = {},
         onFinish: @escaping () -> Void = {}
     ) {
         self.assignment = assignment
         self.definition = definition
         self.grant = grant
         self.repository = repository
+        self.onActivity = onActivity
         self.onSaveForLater = onSaveForLater
-        self.onAskForHelp = onAskForHelp
         self.onFinish = onFinish
     }
 
@@ -65,7 +65,6 @@ struct StudentSurveyFlow: View {
             }
         }
         .task { await resumeDraft() }
-        .accessibilityIdentifier("studentSurvey.canonicalFlow")
     }
 
     @ViewBuilder
@@ -89,7 +88,18 @@ struct StudentSurveyFlow: View {
                 SurveyResultsView(
                     definition: definition,
                     response: response,
-                    onAskForHelp: onAskForHelp,
+                    onAskForHelp: {
+                        onActivity()
+                        do {
+                            try await repository.requestHelp(
+                                operationID: UUID().uuidString,
+                                grant: grant
+                            )
+                            return true
+                        } catch {
+                            return false
+                        }
+                    },
                     onFinish: onFinish
                 )
             }
@@ -112,7 +122,10 @@ struct StudentSurveyFlow: View {
             Text("Activity version \(definition.version)")
                 .font(.caption)
                 .foregroundStyle(TMIColors.textSecondary)
-            Button("Start", systemImage: "arrow.right") { phase = .questions }
+            Button("Start", systemImage: "arrow.right") {
+                onActivity()
+                phase = .questions
+            }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .accessibilityIdentifier("studentSurvey.begin")
@@ -237,6 +250,7 @@ struct StudentSurveyFlow: View {
 
     private func autosave(_ answer: SurveyAnswer, for questionID: String) {
         guard let assignment, let definition, let grant, let repository else { return }
+        onActivity()
         isSaving = true
         message = "Saving…"
         Task { @MainActor in
@@ -266,6 +280,7 @@ struct StudentSurveyFlow: View {
 
     private func saveForLater() async {
         guard let assignment, let definition, let grant, let repository else { return }
+        onActivity()
         isSaving = true
         do {
             response = try await repository.synchronize(assignment: assignment, definition: definition, grant: grant)
@@ -285,6 +300,7 @@ struct StudentSurveyFlow: View {
         grant: StudentModeGrant,
         repository: SurveyRepository
     ) async {
+        onActivity()
         isSaving = true
         do {
             response = try await repository.submit(
@@ -298,8 +314,12 @@ struct StudentSurveyFlow: View {
         isSaving = false
     }
 
-    private func moveBack() { transition { questionIndex -= 1 } }
+    private func moveBack() {
+        onActivity()
+        transition { questionIndex -= 1 }
+    }
     private func moveNext(definition: SurveyDefinition) {
+        onActivity()
         if questionIndex + 1 < visibleQuestionIDs.count {
             transition { questionIndex += 1 }
         } else { transition { phase = .review } }

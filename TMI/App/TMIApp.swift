@@ -190,6 +190,8 @@ struct TMIApp: App {
             if let fixture = uiTestingConfiguration.fixture {
                 studentDetailUITestingContent(fixture: fixture)
             }
+        case .studentModeSurvey:
+            StudentModeSurveyUITestingContent()
         case nil:
             ContentUnavailableView(
                 "UI Test Fixture Unavailable",

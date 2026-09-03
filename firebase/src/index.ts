@@ -3722,6 +3722,101 @@ const requireStoredSurveyAssignmentForMutation = (
 export const createSurveyHandlers = (
   dependencies: SurveyDependencies,
 ) => ({
+  loadActivity: async (request: CallableRequest<unknown>) => {
+    const identity = parseRespondentSurveyIdentity(request);
+    const data = requireRecord(request.data);
+    rejectUnexpectedFields(data, new Set(["assignmentID", "sessionID"]));
+    const assignmentID = requireIdentifier(data.assignmentID, "assignmentID");
+    const sessionID = requireIdentifier(data.sessionID, "sessionID");
+    if (
+      assignmentID !== identity.assignmentID ||
+      sessionID !== identity.sessionID ||
+      !identity.operations.has("readAssignment")
+    ) {
+      throw new HttpsError("permission-denied", "The activity is outside the respondent scope.");
+    }
+    const assignmentSnapshot = await dependencies.firestore.doc(
+      `districts/${identity.districtID}/formAssignments/${assignmentID}`,
+    ).get();
+    const assignment = assignmentSnapshot.data();
+    if (
+      assignment === undefined ||
+      assignment.isActive !== true ||
+      assignment.assignmentType !== "survey" ||
+      assignment.districtId !== identity.districtID ||
+      !Array.isArray(assignment.studentIDs) ||
+      assignment.studentIDs.length !== 1 ||
+      assignment.studentIDs[0] !== identity.studentID
+    ) {
+      throw new HttpsError("failed-precondition", "The survey assignment is unavailable.");
+    }
+    const definitionID = requireIdentifier(assignment.definitionID, "definitionID");
+    const definitionVersion = requireInteger(assignment.definitionVersion, "definitionVersion", 1);
+    const attemptID = requireIdentifier(assignment.attemptID, "attemptID");
+    const assignedAt = assignment.assignedAt;
+    const definitionSnapshot = await dependencies.firestore.doc(
+      surveyDefinitionPath(definitionID, definitionVersion),
+    ).get();
+    const parsedDefinition = parseSurveyDefinition(
+      definitionSnapshot.data(),
+      definitionID,
+      definitionVersion,
+    );
+    if (!(assignedAt instanceof Timestamp)) {
+      return storedSurveyDataLoss("The survey assignment time is malformed.");
+    }
+    return {
+      assignment: {
+        schemaVersion: 1,
+        recordVersion: requireInteger(assignment.recordVersion, "recordVersion", 1),
+        assignmentID,
+        attemptID,
+        districtID: identity.districtID,
+        studentID: identity.studentID,
+        definitionID,
+        definitionVersion,
+        state: "active",
+        assignedAt: assignedAt.toDate().toISOString(),
+        revokedAt: null,
+      },
+      definition: {
+        ...parsedDefinition.data,
+        publishedAt: (parsedDefinition.data.publishedAt as Timestamp).toDate().toISOString(),
+      },
+    };
+  },
+
+  requestHelp: async (request: CallableRequest<unknown>) => {
+    const identity = parseRespondentSurveyIdentity(request);
+    const data = requireRecord(request.data);
+    rejectUnexpectedFields(data, new Set([
+      "districtID", "studentID", "assignmentID", "sessionID", "operationID",
+    ]));
+    const operationID = requireIdentifier(data.operationID, "operationID");
+    if (
+      data.districtID !== identity.districtID ||
+      data.studentID !== identity.studentID ||
+      data.assignmentID !== identity.assignmentID ||
+      data.sessionID !== identity.sessionID ||
+      !identity.operations.has("requestHelp")
+    ) {
+      throw new HttpsError("permission-denied", "The help request is outside the respondent scope.");
+    }
+    const reference = dependencies.firestore.doc(
+      `districts/${identity.districtID}/studentHelpRequests/${operationID}`,
+    );
+    await reference.create({
+      schemaVersion: 1,
+      operationID,
+      studentID: identity.studentID,
+      assignmentID: identity.assignmentID,
+      sessionID: identity.sessionID,
+      status: "requested",
+      requestedAt: FieldValue.serverTimestamp(),
+    });
+    return { accepted: true, operationID };
+  },
+
   mutateAssignment: async (
     request: CallableRequest<MutateSurveyAssignmentRequest>,
   ): Promise<SurveyAssignmentMutationResult> => {
@@ -4536,6 +4631,14 @@ export const endStudentModeSession = onCall(
 export const saveSurveyDraft = onCall(
   callableOptions,
   productionSurveyHandlers.saveDraft,
+);
+export const loadSurveyActivity = onCall(
+  callableOptions,
+  productionSurveyHandlers.loadActivity,
+);
+export const requestStudentModeHelp = onCall(
+  callableOptions,
+  productionSurveyHandlers.requestHelp,
 );
 export const mutateSurveyAssignment = onCall(
   callableOptions,

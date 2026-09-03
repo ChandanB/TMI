@@ -10,6 +10,13 @@ struct StudentModeView: View {
     @State private var isExiting = false
     @State private var showingExitFailure = false
     @State private var surveyRepository: SurveyRepository?
+    @State private var surveyActivity: SurveyActivity?
+    @State private var activityError: String?
+
+    init(profile: StudentModeProfile, surveyRepository: SurveyRepository? = nil) {
+        self.profile = profile
+        _surveyRepository = State(initialValue: surveyRepository)
+    }
 
     var body: some View {
         ZStack {
@@ -63,6 +70,16 @@ struct StudentModeView: View {
                 surveyRepository = .firebase()
             }
         }
+        .task(id: session.currentGrant?.sessionID) {
+            await loadSurveyActivity()
+        }
+        .task(id: session.currentGrant?.sessionID) {
+            while !Task.isCancelled, session.isStudentModeActive {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                session.evaluate()
+            }
+        }
     }
 
     @ViewBuilder
@@ -103,20 +120,39 @@ struct StudentModeView: View {
             .accessibilityIdentifier("studentMode.restoring")
 
         case .active(let grant):
-            if let assignment = surveyAssignment(for: grant),
-               let definition = Self.interestSurveyDefinition,
-               let surveyRepository {
-                StudentSurveyFlow(
-                    assignment: assignment,
-                    definition: definition,
-                    grant: grant,
-                    repository: surveyRepository
+            if let surveyActivity, let surveyRepository {
+                VStack(spacing: 0) {
+#if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("student-mode-survey") {
+                        Button("Lock for test") {
+                            session.evaluate(
+                                at: Date().addingTimeInterval(
+                                    StudentModeSession.inactivityInterval + 1
+                                )
+                            )
+                        }
+                        .accessibilityIdentifier("studentMode.testLock")
+                    }
+#endif
+                    StudentSurveyFlow(
+                        assignment: surveyActivity.assignment,
+                        definition: surveyActivity.definition,
+                        grant: grant,
+                        repository: surveyRepository,
+                        onActivity: { session.recordActivity() }
+                    )
+                    .simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { _ in
+                        session.recordActivity()
+                    })
+                }
+            } else if let activityError {
+                ContentUnavailableView(
+                    "Activity unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(activityError)
                 )
             } else {
                 ProgressView("Getting your activity ready…")
-                    .task {
-                        if surveyRepository == nil { surveyRepository = .firebase() }
-                    }
             }
 
         case .locked(let reason):
@@ -246,87 +282,192 @@ struct StudentModeView: View {
         }
     }
 
-    private func surveyAssignment(for grant: StudentModeGrant) -> SurveyAssignment? {
-        guard let assignmentID = grant.scope.assignmentIDs.first else { return nil }
-        return try? SurveyAssignment(
-            assignmentID: assignmentID,
-            attemptID: grant.sessionID,
-            districtID: grant.scope.districtID,
-            studentID: grant.scope.studentID,
+    private func loadSurveyActivity() async {
+        guard let grant = session.currentGrant else { return }
+        if surveyRepository == nil { surveyRepository = .firebase() }
+        guard let surveyRepository else { return }
+        do {
+            surveyActivity = try await surveyRepository.activity(grant: grant)
+            activityError = nil
+        } catch {
+            activityError = "Please ask your educator to check this assignment."
+        }
+    }
+}
+
+#if DEBUG
+@MainActor
+struct StudentModeSurveyUITestingContent: View {
+    @State private var session: StudentModeSession
+    private let activity: SurveyActivity?
+    private let repository: SurveyRepository?
+    private let profile = StudentModeProfile(
+        studentID: "student-ui",
+        displayName: "Taylor Morgan",
+        grade: "8",
+        pronouns: nil
+    )
+    private let grant: StudentModeGrant?
+
+    init() {
+        let session = StudentModeSession(
+            authenticateStaff: { true },
+            securelyEndRespondentSession: { _ in },
+            securelyReleaseVerifiedTerminal: { _ in }
+        )
+        _session = State(initialValue: session)
+
+        guard let assignment = try? SurveyAssignment(
+            assignmentID: "assignment-ui",
+            attemptID: "attempt-ui",
+            districtID: "district-ui",
+            studentID: "student-ui",
             definitionID: "interest-discovery",
             definitionVersion: 1,
             state: .active,
-            assignedAt: grant.issuedAt
+            assignedAt: Date(timeIntervalSince1970: 1_735_689_600)
+        ), let definition = Self.makeDefinition(),
+        let scope = try? StudentModeScope(
+            districtID: "district-ui",
+            studentID: "student-ui",
+            assignmentIDs: ["assignment-ui"],
+            allowedOperations: StudentModeOperation.surveyAssignment
+        ) else {
+            activity = nil
+            repository = nil
+            grant = nil
+            return
+        }
+        let activity = SurveyActivity(assignment: assignment, definition: definition)
+        let grant = StudentModeGrant(
+            sessionID: "session-ui",
+            scope: scope,
+            recordVersion: 1,
+            issuedAt: Date(),
+            expiresAt: .distantFuture,
+            staffIdentity: StudentModeStaffIdentity(
+                userID: "staff-ui",
+                districtID: "district-ui",
+                membershipVersion: 1
+            )
+        )
+        self.activity = activity
+        self.grant = grant
+        repository = SurveyRepository(
+            loadActivity: { _, _ in activity },
+            requestHelp: { _, _ in },
+            draftStore: .memory,
+            synchronizeDraft: { request in
+                var response = request.response
+                response.markSynchronized(serverRecordVersion: response.recordVersion + 1)
+                return response
+            },
+            submitResponse: { request in
+                var response = request.response
+                try response.markSubmitted(
+                    operationID: request.operationID,
+                    submittedAt: Date(),
+                    serverRecordVersion: response.recordVersion + 1,
+                    definition: request.definition,
+                    sessionID: request.sessionID
+                )
+                return response
+            },
+            reviewResponse: { $0.response },
+            isOnline: { true }
         )
     }
 
-    private static let interestSurveyDefinition = try? SurveyDefinition(
-        id: "interest-discovery",
-        version: 1,
-        title: "Things I Like",
-        publishedAt: Date(timeIntervalSince1970: 1_735_689_600),
-        questions: [
-            SurveyQuestion(
-                id: "activities",
-                prompt: "What kinds of things do you enjoy?",
-                kind: .multiSelect(maxSelections: 2),
-                isRequired: true,
-                options: [
-                    SurveyOption(id: "create", label: "Making or creating things"),
-                    SurveyOption(id: "help", label: "Helping people"),
-                    SurveyOption(id: "explore", label: "Exploring how things work"),
-                ]
-            ),
-            SurveyQuestion(
-                id: "create-detail",
-                prompt: "What do you like to create?",
-                kind: .singleChoice,
-                isRequired: true,
-                options: [
-                    SurveyOption(id: "art", label: "Art or designs"),
-                    SurveyOption(id: "build", label: "Things I can build"),
-                    SurveyOption(id: "stories", label: "Stories or music"),
-                ]
-            ),
-            SurveyQuestion(
-                id: "helping",
-                prompt: "Do you like helping other people?",
-                kind: .singleChoice,
-                isRequired: true,
-                options: [
-                    SurveyOption(id: "yes", label: "Yes"),
-                    SurveyOption(id: "sometimes", label: "Sometimes"),
-                    SurveyOption(id: "not-now", label: "Not right now"),
-                ]
-            ),
-            SurveyQuestion(
-                id: "help-detail",
-                prompt: "When do you most enjoy helping?",
-                kind: .singleChoice,
-                isRequired: true,
-                options: [
-                    SurveyOption(id: "team", label: "When I am part of a team"),
-                    SurveyOption(id: "teach", label: "When I can explain something"),
-                    SurveyOption(id: "care", label: "When someone needs care"),
-                ]
-            ),
-        ],
-        branchRules: [
-            SurveyBranchRule(
-                id: "show-create-detail",
-                sourceQuestionID: "activities",
-                targetQuestionID: "create-detail",
-                predicate: .contains("create")
-            ),
-            SurveyBranchRule(
-                id: "show-help-detail",
-                sourceQuestionID: "helping",
-                targetQuestionID: "help-detail",
-                predicate: .equals("yes")
-            ),
-        ]
-    )
+    var body: some View {
+        Group {
+            if grant != nil, let repository {
+                if session.state == .inactive {
+                    Text("Staff workspace restored")
+                        .accessibilityIdentifier("studentMode.staffReturned")
+                } else {
+                    StudentModeView(profile: profile, surveyRepository: repository)
+                        .environment(\.studentModeSession, session)
+                }
+            } else {
+                ContentUnavailableView("Fixture unavailable", systemImage: "xmark.circle")
+            }
+        }
+        .task {
+            guard let grant, session.state != .active(grant) else { return }
+            session.activate(grant, profile: profile)
+        }
+    }
+
+    private static func makeDefinition() -> SurveyDefinition? {
+        try? SurveyDefinition(
+            id: "interest-discovery",
+            version: 1,
+            title: "Things I Like",
+            publishedAt: Date(timeIntervalSince1970: 1_735_689_600),
+            questions: [
+                SurveyQuestion(
+                    id: "activities",
+                    prompt: "What kinds of things do you enjoy?",
+                    kind: .multiSelect(maxSelections: 2),
+                    isRequired: true,
+                    options: [
+                        SurveyOption(id: "create", label: "Making or creating things"),
+                        SurveyOption(id: "help", label: "Helping people"),
+                        SurveyOption(id: "explore", label: "Exploring how things work"),
+                    ]
+                ),
+                SurveyQuestion(
+                    id: "create-detail",
+                    prompt: "What do you like to create?",
+                    kind: .singleChoice,
+                    isRequired: true,
+                    options: [
+                        SurveyOption(id: "art", label: "Art or designs"),
+                        SurveyOption(id: "build", label: "Things I can build"),
+                        SurveyOption(id: "stories", label: "Stories or music"),
+                    ]
+                ),
+                SurveyQuestion(
+                    id: "helping",
+                    prompt: "Do you like helping other people?",
+                    kind: .singleChoice,
+                    isRequired: true,
+                    options: [
+                        SurveyOption(id: "yes", label: "Yes"),
+                        SurveyOption(id: "sometimes", label: "Sometimes"),
+                        SurveyOption(id: "not-now", label: "Not right now"),
+                    ]
+                ),
+                SurveyQuestion(
+                    id: "help-detail",
+                    prompt: "When do you most enjoy helping?",
+                    kind: .singleChoice,
+                    isRequired: true,
+                    options: [
+                        SurveyOption(id: "team", label: "When I am part of a team"),
+                        SurveyOption(id: "teach", label: "When I can explain something"),
+                        SurveyOption(id: "care", label: "When someone needs care"),
+                    ]
+                ),
+            ],
+            branchRules: [
+                SurveyBranchRule(
+                    id: "show-create-detail",
+                    sourceQuestionID: "activities",
+                    targetQuestionID: "create-detail",
+                    predicate: .contains("create")
+                ),
+                SurveyBranchRule(
+                    id: "show-help-detail",
+                    sourceQuestionID: "helping",
+                    targetQuestionID: "help-detail",
+                    predicate: .equals("yes")
+                ),
+            ]
+        )
+    }
 }
+#endif
 
 #Preview {
     StudentModeView(

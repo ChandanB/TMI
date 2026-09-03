@@ -54,6 +54,13 @@ struct SurveyQuestionView: View {
                             .font(.body.weight(.semibold))
                             .multilineTextAlignment(.leading)
                         Spacer(minLength: 0)
+                        if selected {
+                            Text("Selected")
+                                .font(.caption.weight(.bold))
+                                .accessibilityIdentifier(
+                                    "studentSurvey.selected.\(option.id)"
+                                )
+                        }
                     }
                     .foregroundStyle(selected ? TMIColors.infoText : TMIColors.textPrimary)
                     .padding(TMISpacing.md)
@@ -68,6 +75,10 @@ struct SurveyQuestionView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityValue(selected ? "Selected" : "Not selected")
+                .accessibilityLabel(
+                    selected ? "\(option.label), Selected" : option.label
+                )
                 .accessibilityIdentifier("studentSurvey.option.\(option.id)")
             }
         }

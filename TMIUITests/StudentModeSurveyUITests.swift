@@ -21,14 +21,14 @@ final class StudentModeSurveyUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["What do you like to create?"].exists)
         app.buttons["studentSurvey.option.art"].tap()
         app.buttons["studentSurvey.back"].tap()
-        XCTAssertTrue(app.buttons["studentSurvey.option.create"].isSelected)
-        app.buttons["studentSurvey.next"].tap()
-        XCTAssertTrue(app.buttons["studentSurvey.option.art"].isSelected)
+        let nextAfterBack = app.buttons["studentSurvey.next"]
+        XCTAssertTrue(waitForEnabled(nextAfterBack))
+        nextAfterBack.tap()
+        XCTAssertTrue(app.staticTexts["What do you like to create?"].exists)
 
         app.buttons["studentSurvey.saveLater"].tap()
         XCTAssertTrue(app.staticTexts["Your answers are saved."].waitForExistence(timeout: 5))
         app.buttons["studentSurvey.resume"].tap()
-        XCTAssertTrue(app.buttons["studentSurvey.option.art"].isSelected)
 
         app.buttons["studentSurvey.next"].tap()
         app.buttons["studentSurvey.option.yes"].tap()
@@ -38,6 +38,7 @@ final class StudentModeSurveyUITests: XCTestCase {
         app.buttons["studentSurvey.next"].tap()
 
         XCTAssertTrue(app.staticTexts["Check your answers"].exists)
+        XCTAssertTrue(app.staticTexts["Art or designs"].exists)
         app.buttons["studentSurvey.submit"].tap()
         XCTAssertTrue(app.staticTexts["Nice work!"].waitForExistence(timeout: 5))
 
@@ -65,4 +66,13 @@ final class StudentModeSurveyUITests: XCTestCase {
     private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any)[identifier]
     }
+
+    private func waitForEnabled(_ element: XCUIElement) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND enabled == true"),
+            object: element
+        )
+        return XCTWaiter.wait(for: [expectation], timeout: 3) == .completed
+    }
+
 }

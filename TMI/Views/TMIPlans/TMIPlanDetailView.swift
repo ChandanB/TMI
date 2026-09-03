@@ -26,7 +26,6 @@ struct TMIPlanDetailView: View {
     @State private var showingDeleteAlert = false
     @State private var showingAddInterest = false
     @State private var showingAddGoal = false
-    @State private var showingCompleteSurvey = false
     @State private var selectedGoal: Goal?
     @State private var interestsStateModel = InterestsAndHobbiesStateModel()
 
@@ -252,21 +251,6 @@ struct TMIPlanDetailView: View {
                         await updateGoal(updatedGoal)
                     }
                 }
-            }
-            .tmiSheetStyle()
-        }
-        .sheet(isPresented: $showingCompleteSurvey, onDismiss: {
-            // Refresh plan and interests after survey completion
-            Task {
-                await refreshPlan()
-                await loadSnapshotInterests()
-            }
-        }) {
-            NavigationStack {
-                StudentSurveyFlow(
-                    studentId: plan.primaryStudent?.id ?? "",
-                    context: .planDetail(planId: plan.id ?? "")
-                )
             }
             .tmiSheetStyle()
         }
@@ -916,10 +900,10 @@ struct TMIPlanDetailView: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.tmiTextSecondary)
 
-                    Button(action: { showingCompleteSurvey = true }) {
+                    Button(action: openStudentModeLaunchForPlanStudent) {
                         HStack(spacing: 6) {
                             Image(systemName: "doc.text.fill")
-                            Text("Complete Interest Survey")
+                            Text("Open Student Mode")
                         }
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.tmiPrimary)
@@ -1658,10 +1642,10 @@ struct TMIPlanDetailView: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Button(action: { showingCompleteSurvey = true }) {
+                    Button(action: openStudentModeLaunchForPlanStudent) {
                         HStack(spacing: 8) {
                             Image(systemName: "doc.text.fill")
-                            Text("Complete Interest Survey")
+                            Text("Open Student Mode")
                         }
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(Color.tmiTextPrimary)
@@ -2715,10 +2699,14 @@ struct TMIPlanDetailView: View {
 
             let savedPlan = try await service.updatePlan(planWithNewInterests)
             plan = savedPlan // Update local state immediately
-            showingCompleteSurvey = false
         } catch {
             print("[TMIPlanDetail] Error adding interests from survey: \(error)")
         }
+    }
+
+    private func openStudentModeLaunchForPlanStudent() {
+        guard let student = plan.primaryStudent else { return }
+        try? router.open(student)
     }
 
     @MainActor
