@@ -4,19 +4,25 @@ nonisolated struct FeatureFlags: Sendable, Equatable {
     let aiSuggestions: Bool
     let institutionalSSO: Bool
     let staffEmailVerificationRequired: Bool
+    /// Whether trusted mutations go through the Cloud Functions callables.
+    /// Requires the Functions to be deployed; when false the client writes
+    /// canonical records directly and Firestore rules carry authorization.
+    let usesTrustedMutationCallables: Bool
 
     init(
         independentStudentAccounts: Bool,
         guardianAccounts: Bool,
         aiSuggestions: Bool,
         institutionalSSO: Bool,
-        staffEmailVerificationRequired: Bool
+        staffEmailVerificationRequired: Bool,
+        usesTrustedMutationCallables: Bool = false
     ) {
         self.independentStudentAccounts = independentStudentAccounts
         self.guardianAccounts = guardianAccounts
         self.aiSuggestions = aiSuggestions
         self.institutionalSSO = institutionalSSO
         self.staffEmailVerificationRequired = staffEmailVerificationRequired
+        self.usesTrustedMutationCallables = usesTrustedMutationCallables
     }
 
     static let production = FeatureFlags(
@@ -24,7 +30,8 @@ nonisolated struct FeatureFlags: Sendable, Equatable {
         guardianAccounts: false,
         aiSuggestions: false,
         institutionalSSO: false,
-        staffEmailVerificationRequired: false
+        staffEmailVerificationRequired: false,
+        usesTrustedMutationCallables: false
     )
 }
 

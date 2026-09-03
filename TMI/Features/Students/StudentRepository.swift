@@ -2146,15 +2146,29 @@ extension CanonicalStudentRepository {
         auth: Auth = Auth.auth(),
         sessionStore: TrustedAuthorizationSessionStore = .shared
     ) -> CanonicalStudentRepository {
-        CanonicalStudentRepository(
+        // Cloud Functions are not deployed for this project, so the trusted
+        // callables are unreachable. Firestore rules enforce the same
+        // authorization boundary for direct writes. Flip
+        // `FeatureFlags.usesTrustedMutationCallables` back on once Functions
+        // are deployed and this returns to the callable path.
+        if FeatureFlags.production.usesTrustedMutationCallables {
+            return CanonicalStudentRepository(
+                store: FirebaseStudentRecordStore(firestore: firestore),
+                mutationBackend: FirebaseStudentTrustedMutationBackend(functions: functions),
+                cache: SecureStudentPageCache(),
+                outbox: SecureStudentCreateOutbox(),
+                authorityRefresher: FirebaseStudentMutationAuthorityRefresher(
+                    auth: auth,
+                    sessionStore: sessionStore
+                )
+            )
+        }
+        return CanonicalStudentRepository(
             store: FirebaseStudentRecordStore(firestore: firestore),
-            mutationBackend: FirebaseStudentTrustedMutationBackend(functions: functions),
+            mutationBackend: FirestoreDirectStudentMutationBackend(firestore: firestore),
             cache: SecureStudentPageCache(),
             outbox: SecureStudentCreateOutbox(),
-            authorityRefresher: FirebaseStudentMutationAuthorityRefresher(
-                auth: auth,
-                sessionStore: sessionStore
-            )
+            authorityRefresher: DirectStudentMutationAuthorityRefresher()
         )
     }
 }
