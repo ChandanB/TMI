@@ -204,10 +204,29 @@ final class AuthenticationRepository: AuthenticationProviding {
             throw AuthenticationRepositoryError.invitationRequired
         }
 
-        let identity = try await backend.createUser(
-            email: request.email,
-            password: request.password
-        )
+        let identity: AuthIdentity
+        do {
+            identity = try await backend.createUser(
+                email: request.email,
+                password: request.password
+            )
+        } catch {
+#if DEBUG
+            // A previous Debug attempt can leave a Firebase Auth identity behind with
+            // no canonical records, which would otherwise make that address permanently
+            // unusable. Adopt the existing account instead of failing.
+            guard request.invitationCode == DebugStaffInvitationProvisioner.invitationAlias,
+                  (error as NSError).code == AuthErrorCode.emailAlreadyInUse.rawValue else {
+                throw error
+            }
+            identity = try await backend.signIn(
+                email: request.email,
+                password: request.password
+            )
+#else
+            throw error
+#endif
+        }
         let pendingRegistration = PendingStaffRegistration(
             identity: identity,
             request: request

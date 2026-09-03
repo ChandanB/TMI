@@ -221,22 +221,47 @@ struct DebugStaffInvitationProvisionerTests {
         #expect(delegate.lastIdentity == identity)
     }
 
-    @Test("The Debug alias rejects the wrong email without delegation")
-    func aliasRejectsWrongEmail() async {
+    @Test("The Debug alias provisions any email and remembers it for later sessions")
+    func aliasProvisionsAnyEmail() async throws {
+        DebugStaffAccessRegistry.reset()
+        defer { DebugStaffAccessRegistry.reset() }
         let delegate = RecordingStaffInvitationProvisioner()
         let provisioner = DebugStaffInvitationProvisioner(delegate: delegate)
+        let identity = AuthIdentity(
+            userID: "staff-2",
+            email: "Other@Example.com",
+            isEmailVerified: true
+        )
 
-        await #expect(throws: DebugStaffInvitationError.emailNotAllowed) {
-            _ = try await provisioner.provision(
-                request: self.aliasRequest,
+        #expect(DebugStaffAccessRegistry.contains("other@example.com") == false)
+
+        let membership = try await provisioner.provision(
+            request: self.aliasRequest,
+            identity: identity
+        )
+
+        #expect(membership.districtID == DebugStaffInvitationProvisioner.districtID)
+        #expect(membership.userID == "staff-2")
+        #expect(delegate.provisionCallCount == 0)
+        // Recorded so relaunch and sign-in resolve the same synthetic membership.
+        #expect(DebugStaffAccessRegistry.contains("other@example.com"))
+        #expect(DebugStaffInvitationProvisioner.isAllowed(identity: identity))
+    }
+
+    @Test("An account that never redeemed the Debug alias is not treated as Debug staff")
+    func unregisteredEmailIsNotDebugStaff() {
+        DebugStaffAccessRegistry.reset()
+        defer { DebugStaffAccessRegistry.reset() }
+
+        #expect(
+            DebugStaffInvitationProvisioner.isAllowed(
                 identity: AuthIdentity(
-                    userID: "staff-2",
-                    email: "other@example.com",
+                    userID: "staff-9",
+                    email: "real.staff@district.example",
                     isEmailVerified: true
                 )
-            )
-        }
-        #expect(delegate.provisionCallCount == 0)
+            ) == false
+        )
     }
 
     @Test("The Debug alias rejects a missing email without delegation")

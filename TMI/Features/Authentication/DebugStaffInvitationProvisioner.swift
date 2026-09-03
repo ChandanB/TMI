@@ -5,6 +5,52 @@ nonisolated enum DebugStaffInvitationError: Error, Equatable {
     case emailNotAllowed
 }
 
+/// Debug-only record of which accounts redeemed the universal Debug invitation.
+/// Persisted so that relaunch, sign-out, and sign-in resolve the same synthetic
+/// membership without contacting Cloud Functions.
+nonisolated enum DebugStaffAccessRegistry {
+    private static let defaultsKey = "debug.staff-access.emails"
+
+    static func normalized(_ email: String?) -> String? {
+        guard let email = email?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+            !email.isEmpty else {
+            return nil
+        }
+        return email
+    }
+
+    static func contains(_ email: String?) -> Bool {
+        guard let email = normalized(email) else {
+            return false
+        }
+        if email == DebugStaffInvitationProvisioner.allowedEmail {
+            return true
+        }
+        return storedEmails().contains(email)
+    }
+
+    static func register(_ email: String?) {
+        guard let email = normalized(email) else {
+            return
+        }
+        var emails = storedEmails()
+        guard emails.insert(email).inserted else {
+            return
+        }
+        UserDefaults.standard.set(Array(emails), forKey: defaultsKey)
+    }
+
+    static func reset() {
+        UserDefaults.standard.removeObject(forKey: defaultsKey)
+    }
+
+    private static func storedEmails() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: defaultsKey) ?? [])
+    }
+}
+
 @MainActor
 final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
     nonisolated static let invitationAlias = "TMI-DEBUG-ACCESS-2026"
@@ -32,9 +78,10 @@ final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
         guard request.invitationCode == Self.invitationAlias else {
             return try await delegate.provision(request: request, identity: identity)
         }
-        guard Self.isAllowed(identity: identity) else {
+        guard let email = DebugStaffAccessRegistry.normalized(identity.email) else {
             throw DebugStaffInvitationError.emailNotAllowed
         }
+        DebugStaffAccessRegistry.register(email)
 
         return Self.membership(for: identity)
     }
@@ -47,9 +94,7 @@ final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
     }
 
     nonisolated static func isAllowed(identity: AuthIdentity) -> Bool {
-        identity.email?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased() == allowedEmail
+        DebugStaffAccessRegistry.contains(identity.email)
     }
 
     nonisolated static func membership(for identity: AuthIdentity) -> MembershipContext {
@@ -115,9 +160,7 @@ final class DebugAuthenticationIdentityProvider: AuthenticationIdentityProviding
     }
 
     nonisolated static func isAllowed(_ identity: AuthenticatedIdentity) -> Bool {
-        identity.email?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased() == DebugStaffInvitationProvisioner.allowedEmail
+        DebugStaffAccessRegistry.contains(identity.email)
     }
 
     nonisolated static func claim(userID: String) -> TrustedTenantClaim {
@@ -161,7 +204,8 @@ struct DebugUserProfileProvider: UserProfileProviding {
             id: identity.userID,
             userID: identity.userID,
             displayName: "Debug Staff",
-            email: DebugStaffInvitationProvisioner.allowedEmail,
+            email: DebugStaffAccessRegistry.normalized(identity.email)
+                ?? DebugStaffInvitationProvisioner.allowedEmail,
             isEmailVerified: identity.isEmailVerified,
             requestedRole: .teacher
         )
