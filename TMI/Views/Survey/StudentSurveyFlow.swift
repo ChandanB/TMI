@@ -18,6 +18,7 @@ struct StudentSurveyFlow: View {
     @State private var phase: Phase = .welcome
     @State private var isSaving = false
     @State private var message: String?
+    @State private var helpOperationID = UUID().uuidString
 
     private enum Phase { case welcome, questions, review, paused, results }
 
@@ -92,7 +93,7 @@ struct StudentSurveyFlow: View {
                         onActivity()
                         do {
                             try await repository.requestHelp(
-                                operationID: UUID().uuidString,
+                                operationID: helpOperationID,
                                 grant: grant
                             )
                             return true

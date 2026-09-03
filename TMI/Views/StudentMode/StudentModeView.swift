@@ -11,6 +11,7 @@ struct StudentModeView: View {
     @State private var showingExitFailure = false
     @State private var surveyRepository: SurveyRepository?
     @State private var surveyActivity: SurveyActivity?
+    @State private var surveyActivitySessionID: String?
     @State private var activityError: String?
 
     init(profile: StudentModeProfile, surveyRepository: SurveyRepository? = nil) {
@@ -70,7 +71,7 @@ struct StudentModeView: View {
                 surveyRepository = .firebase()
             }
         }
-        .task(id: session.currentGrant?.sessionID) {
+        .task(id: activityRequestKey) {
             await loadSurveyActivity()
         }
         .task(id: session.currentGrant?.sessionID) {
@@ -120,7 +121,10 @@ struct StudentModeView: View {
             .accessibilityIdentifier("studentMode.restoring")
 
         case .active(let grant):
-            if let surveyActivity, let surveyRepository {
+            if let surveyActivity,
+               let surveyRepository,
+               surveyActivitySessionID == grant.sessionID,
+               surveyActivity.assignment.assignmentID == grant.scope.assignmentIDs.first {
                 VStack(spacing: 0) {
 #if DEBUG
                     if ProcessInfo.processInfo.arguments.contains("student-mode-survey") {
@@ -283,15 +287,36 @@ struct StudentModeView: View {
     }
 
     private func loadSurveyActivity() async {
-        guard let grant = session.currentGrant else { return }
+        guard let grant = session.currentGrant,
+              let assignmentID = grant.scope.assignmentIDs.first else {
+            surveyActivity = nil
+            surveyActivitySessionID = nil
+            activityError = nil
+            return
+        }
+        surveyActivity = nil
+        surveyActivitySessionID = nil
+        activityError = nil
         if surveyRepository == nil { surveyRepository = .firebase() }
         guard let surveyRepository else { return }
         do {
-            surveyActivity = try await surveyRepository.activity(grant: grant)
+            let activity = try await surveyRepository.activity(grant: grant)
+            guard session.currentGrant?.sessionID == grant.sessionID,
+                  session.currentGrant?.scope.assignmentIDs.first == assignmentID,
+                  activity.assignment.assignmentID == assignmentID else { return }
+            surveyActivity = activity
+            surveyActivitySessionID = grant.sessionID
             activityError = nil
         } catch {
+            guard session.currentGrant?.sessionID == grant.sessionID,
+                  session.currentGrant?.scope.assignmentIDs.first == assignmentID else { return }
             activityError = "Please ask your educator to check this assignment."
         }
+    }
+
+    private var activityRequestKey: String {
+        guard let grant = session.currentGrant else { return "inactive" }
+        return "\(grant.sessionID):\(grant.scope.assignmentIDs.first ?? "missing")"
     }
 }
 

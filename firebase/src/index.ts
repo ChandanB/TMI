@@ -3489,6 +3489,94 @@ const requireSurveyScope = async (
   return { identity, assignment, definition: parsedDefinition };
 };
 
+const requireLiveRespondentSurveyScope = async (
+  firestore: Firestore,
+  transaction: Transaction,
+  identity: RespondentSurveyIdentity,
+  operation: "readAssignment" | "requestHelp",
+): Promise<DocumentData> => {
+  if (!identity.operations.has(operation)) {
+    throw new HttpsError(
+      "permission-denied",
+      "The request is outside the respondent session scope.",
+    );
+  }
+  const sessionReference = firestore.doc(
+    `districts/${identity.districtID}/studentModeSessions/${identity.sessionID}`,
+  );
+  const assignmentReference = firestore.doc(
+    `districts/${identity.districtID}/formAssignments/${identity.assignmentID}`,
+  );
+  const studentReference = firestore.doc(
+    `districts/${identity.districtID}/students/${identity.studentID}`,
+  );
+  const [sessionSnapshot, assignmentSnapshot, studentSnapshot] = await Promise.all([
+    transaction.get(sessionReference),
+    transaction.get(assignmentReference),
+    transaction.get(studentReference),
+  ]);
+  const session = sessionSnapshot.data();
+  const assignment = assignmentSnapshot.data();
+  const student = studentSnapshot.data();
+  const expiresAt = session?.expiresAt;
+  const storedAssignments = session?.assignmentIDs;
+  const storedOperations = session?.allowedOperations;
+  if (expiresAt instanceof Timestamp && expiresAt.toMillis() <= Date.now()) {
+    throw new HttpsError(
+      "failed-precondition",
+      "The respondent session has expired.",
+      { kind: "survey-session-expired" },
+    );
+  }
+  if (
+    session === undefined ||
+    session.status !== "active" ||
+    !(expiresAt instanceof Timestamp) ||
+    session.districtID !== identity.districtID ||
+    session.studentID !== identity.studentID ||
+    session.respondentUserID !== identity.userID ||
+    !Array.isArray(storedAssignments) ||
+    storedAssignments.length !== 1 ||
+    storedAssignments[0] !== identity.assignmentID ||
+    !Array.isArray(storedOperations) ||
+    storedOperations.length !== identity.operations.size ||
+    !storedOperations.every((value: unknown) =>
+      typeof value === "string" && identity.operations.has(value))
+  ) {
+    throw new HttpsError(
+      "failed-precondition",
+      "The respondent session is no longer active.",
+      { kind: "survey-session-revoked" },
+    );
+  }
+  if (
+    assignment === undefined ||
+    assignment.districtId !== identity.districtID ||
+    assignment.assignmentType !== "survey" ||
+    assignment.isActive !== true ||
+    !Array.isArray(assignment.studentIDs) ||
+    assignment.studentIDs.length !== 1 ||
+    assignment.studentIDs[0] !== identity.studentID
+  ) {
+    throw new HttpsError(
+      "failed-precondition",
+      "The survey assignment is revoked or unavailable.",
+      { kind: "survey-assignment-revoked" },
+    );
+  }
+  if (
+    student === undefined ||
+    student.districtId !== identity.districtID ||
+    student.isArchived === true
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "The assigned student is unavailable.",
+    );
+  }
+  return assignment;
+};
+
 const maximumSurveyOperationCount = 128;
 
 interface StoredSurveyOperationResult {
@@ -3735,55 +3823,52 @@ export const createSurveyHandlers = (
     ) {
       throw new HttpsError("permission-denied", "The activity is outside the respondent scope.");
     }
-    const assignmentSnapshot = await dependencies.firestore.doc(
-      `districts/${identity.districtID}/formAssignments/${assignmentID}`,
-    ).get();
-    const assignment = assignmentSnapshot.data();
-    if (
-      assignment === undefined ||
-      assignment.isActive !== true ||
-      assignment.assignmentType !== "survey" ||
-      assignment.districtId !== identity.districtID ||
-      !Array.isArray(assignment.studentIDs) ||
-      assignment.studentIDs.length !== 1 ||
-      assignment.studentIDs[0] !== identity.studentID
-    ) {
-      throw new HttpsError("failed-precondition", "The survey assignment is unavailable.");
-    }
-    const definitionID = requireIdentifier(assignment.definitionID, "definitionID");
-    const definitionVersion = requireInteger(assignment.definitionVersion, "definitionVersion", 1);
-    const attemptID = requireIdentifier(assignment.attemptID, "attemptID");
-    const assignedAt = assignment.assignedAt;
-    const definitionSnapshot = await dependencies.firestore.doc(
-      surveyDefinitionPath(definitionID, definitionVersion),
-    ).get();
-    const parsedDefinition = parseSurveyDefinition(
-      definitionSnapshot.data(),
-      definitionID,
-      definitionVersion,
-    );
-    if (!(assignedAt instanceof Timestamp)) {
-      return storedSurveyDataLoss("The survey assignment time is malformed.");
-    }
-    return {
-      assignment: {
-        schemaVersion: 1,
-        recordVersion: requireInteger(assignment.recordVersion, "recordVersion", 1),
-        assignmentID,
-        attemptID,
-        districtID: identity.districtID,
-        studentID: identity.studentID,
+    return dependencies.firestore.runTransaction(async (transaction) => {
+      const assignment = await requireLiveRespondentSurveyScope(
+        dependencies.firestore,
+        transaction,
+        identity,
+        "readAssignment",
+      );
+      const definitionID = requireIdentifier(assignment.definitionID, "definitionID");
+      const definitionVersion = requireInteger(
+        assignment.definitionVersion,
+        "definitionVersion",
+        1,
+      );
+      const attemptID = requireIdentifier(assignment.attemptID, "attemptID");
+      const assignedAt = assignment.assignedAt;
+      const definitionSnapshot = await transaction.get(dependencies.firestore.doc(
+        surveyDefinitionPath(definitionID, definitionVersion),
+      ));
+      const parsedDefinition = parseSurveyDefinition(
+        definitionSnapshot.data(),
         definitionID,
         definitionVersion,
-        state: "active",
-        assignedAt: assignedAt.toDate().toISOString(),
-        revokedAt: null,
-      },
-      definition: {
-        ...parsedDefinition.data,
-        publishedAt: (parsedDefinition.data.publishedAt as Timestamp).toDate().toISOString(),
-      },
-    };
+      );
+      if (!(assignedAt instanceof Timestamp)) {
+        return storedSurveyDataLoss("The survey assignment time is malformed.");
+      }
+      return {
+        assignment: {
+          schemaVersion: 1,
+          recordVersion: requireInteger(assignment.recordVersion, "recordVersion", 1),
+          assignmentID,
+          attemptID,
+          districtID: identity.districtID,
+          studentID: identity.studentID,
+          definitionID,
+          definitionVersion,
+          state: "active",
+          assignedAt: assignedAt.toDate().toISOString(),
+          revokedAt: null,
+        },
+        definition: {
+          ...parsedDefinition.data,
+          publishedAt: (parsedDefinition.data.publishedAt as Timestamp).toDate().toISOString(),
+        },
+      };
+    });
   },
 
   requestHelp: async (request: CallableRequest<unknown>) => {
@@ -3802,19 +3887,44 @@ export const createSurveyHandlers = (
     ) {
       throw new HttpsError("permission-denied", "The help request is outside the respondent scope.");
     }
-    const reference = dependencies.firestore.doc(
-      `districts/${identity.districtID}/studentHelpRequests/${operationID}`,
-    );
-    await reference.create({
-      schemaVersion: 1,
-      operationID,
-      studentID: identity.studentID,
-      assignmentID: identity.assignmentID,
-      sessionID: identity.sessionID,
-      status: "requested",
-      requestedAt: FieldValue.serverTimestamp(),
+    return dependencies.firestore.runTransaction(async (transaction) => {
+      await requireLiveRespondentSurveyScope(
+        dependencies.firestore,
+        transaction,
+        identity,
+        "requestHelp",
+      );
+      const reference = dependencies.firestore.doc(
+        `districts/${identity.districtID}/studentHelpRequests/${operationID}`,
+      );
+      const snapshot = await transaction.get(reference);
+      const existing = snapshot.data();
+      if (existing !== undefined) {
+        if (
+          existing.schemaVersion === 1 &&
+          existing.operationID === operationID &&
+          existing.studentID === identity.studentID &&
+          existing.assignmentID === identity.assignmentID &&
+          existing.sessionID === identity.sessionID
+        ) {
+          return { accepted: true, operationID };
+        }
+        throw new HttpsError(
+          "already-exists",
+          "The help request operation identifier is already in use.",
+        );
+      }
+      transaction.create(reference, {
+        schemaVersion: 1,
+        operationID,
+        studentID: identity.studentID,
+        assignmentID: identity.assignmentID,
+        sessionID: identity.sessionID,
+        status: "requested",
+        requestedAt: FieldValue.serverTimestamp(),
+      });
+      return { accepted: true, operationID };
     });
-    return { accepted: true, operationID };
   },
 
   mutateAssignment: async (

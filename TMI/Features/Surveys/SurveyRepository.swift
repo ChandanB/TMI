@@ -298,6 +298,10 @@ actor SurveyRepository {
     private let reviewResponse: ReviewResponse
     private let performAssignmentMutation: MutateAssignment
     private let isOnline: IsOnline
+    private var activeDraftCache: [SurveyAttemptKey: SurveyResponse] = [:]
+    private var loadedDraftKeys: Set<SurveyAttemptKey> = []
+    private var pendingDraftSaves: [SurveyAttemptKey: Task<Void, Error>] = [:]
+    private var terminalDraftErrors: [SurveyAttemptKey: SurveyRepositoryError] = [:]
 
     init(
         loadActivity: @escaping LoadActivity = { _, _ in throw SurveyRepositoryError.unavailable },
@@ -420,6 +424,7 @@ actor SurveyRepository {
             throw SurveyRepositoryError.validation
         }
         let key = attemptKey(for: assignment)
+        try ensureAttemptIsMutable(key)
         var response = try await activeDraft(for: key) ?? SurveyResponse(
             assignment: assignment,
             definition: definition
@@ -435,9 +440,9 @@ actor SurveyRepository {
                 operationID: operationID
             )
             if changed {
-                try await saveDraft(response)
+                try await persistDraftInOrder(response)
             }
-            return response
+            return activeDraftCache[key] ?? response
         } catch SurveyResponseMutationError.immutable {
             throw SurveyRepositoryError.immutableResponse
         } catch is SurveyDefinitionError {
@@ -509,7 +514,7 @@ actor SurveyRepository {
                 prior: draft,
                 allowsState: .draft
             )
-            try await saveDraft(synchronized)
+            try await persistDraftInOrder(synchronized)
             return synchronized
         } catch {
             let mapped = map(error)
@@ -520,7 +525,7 @@ actor SurveyRepository {
                         ? .assignmentRevoked
                         : .authorizationRejected
                 )
-                try await quarantineDraft(quarantined)
+                try await persistQuarantineInOrder(quarantined)
             }
             throw mapped
         }
@@ -594,7 +599,7 @@ actor SurveyRepository {
                   submitted.submittedAt != nil else {
                 throw SurveyRepositoryError.malformedResponse
             }
-            try await saveDraft(submitted)
+            try await persistDraftInOrder(submitted)
             return submitted
         } catch is SurveyDefinitionError {
             throw SurveyRepositoryError.validation
@@ -607,7 +612,7 @@ actor SurveyRepository {
                         ? .assignmentRevoked
                         : .authorizationRejected
                 )
-                try await quarantineDraft(quarantined)
+                try await persistQuarantineInOrder(quarantined)
             }
             throw mapped
         }
@@ -656,7 +661,7 @@ actor SurveyRepository {
                   reviewed.frozenDefinition == response.frozenDefinition else {
                 throw SurveyRepositoryError.malformedResponse
             }
-            try await saveDraft(reviewed)
+            try await persistDraftInOrder(reviewed)
             return reviewed
         } catch {
             throw map(error)
@@ -754,13 +759,22 @@ actor SurveyRepository {
         assignment: SurveyAssignment,
         reason: SurveyQuarantineReason = .assignmentRevoked
     ) async throws {
-        let load = await loadDraft(assignment.attemptKey)
-        guard case .draft(var existing) = load else {
+        let key = assignment.attemptKey
+        terminalDraftErrors[key] = reason == .assignmentRevoked ? .revoked : .expired
+        let existingResponse: SurveyResponse?
+        if let cached = activeDraftCache[key] {
+            existingResponse = cached
+        } else if case .draft(let loaded) = await loadDraft(key) {
+            existingResponse = loaded
+        } else {
+            existingResponse = nil
+        }
+        guard var existing = existingResponse else {
             return
         }
         existing.quarantine(reason)
         do {
-            try await quarantineDraft(existing)
+            try await persistQuarantineInOrder(existing)
         } catch {
             throw map(error)
         }
@@ -784,7 +798,13 @@ actor SurveyRepository {
 
     func purge(assignment: SurveyAssignment) async throws {
         do {
-            try await purgeDraft(assignment.attemptKey)
+            let key = assignment.attemptKey
+            terminalDraftErrors[key] = .revoked
+            _ = try? await pendingDraftSaves[key]?.value
+            try await purgeDraft(key)
+            activeDraftCache[key] = nil
+            loadedDraftKeys.remove(key)
+            pendingDraftSaves[key] = nil
         } catch {
             throw map(error)
         }
@@ -793,10 +813,27 @@ actor SurveyRepository {
     private func activeDraft(
         for key: SurveyAttemptKey
     ) async throws -> SurveyResponse? {
-        switch await loadDraft(key) {
+        try ensureAttemptIsMutable(key)
+        if let cached = activeDraftCache[key] {
+            return cached
+        }
+        if loadedDraftKeys.contains(key) {
+            return nil
+        }
+        let loaded = await loadDraft(key)
+        try ensureAttemptIsMutable(key)
+        if let cached = activeDraftCache[key] {
+            return cached
+        }
+        if loadedDraftKeys.contains(key) {
+            return nil
+        }
+        loadedDraftKeys.insert(key)
+        switch loaded {
         case .missing:
             return nil
         case .draft(let response):
+            activeDraftCache[key] = response
             return response
         case .quarantined(let reason):
             switch reason {
@@ -811,6 +848,47 @@ actor SurveyRepository {
             throw SurveyRepositoryError.authorization
         case .corrupt:
             throw SurveyRepositoryError.malformedResponse
+        }
+    }
+
+    private func persistDraftInOrder(_ response: SurveyResponse) async throws {
+        let key = response.attemptKey
+        try ensureAttemptIsMutable(key)
+        activeDraftCache[key] = response
+        let previousSave = pendingDraftSaves[key]
+        let saveDraft = self.saveDraft
+        let task = Task {
+            if let previousSave {
+                _ = try? await previousSave.value
+            }
+            try await saveDraft(response)
+        }
+        pendingDraftSaves[key] = task
+        try await task.value
+        try ensureAttemptIsMutable(key)
+    }
+
+    private func persistQuarantineInOrder(_ response: SurveyResponse) async throws {
+        let key = response.attemptKey
+        let reason: SurveyQuarantineReason
+        if case .quarantined(let storedReason) = response.syncState {
+            reason = storedReason
+        } else {
+            reason = .assignmentRevoked
+        }
+        terminalDraftErrors[key] = reason == .assignmentRevoked ? .revoked : .expired
+        _ = try? await pendingDraftSaves[key]?.value
+        var terminalResponse = activeDraftCache[key] ?? response
+        terminalResponse.quarantine(reason)
+        try await quarantineDraft(terminalResponse)
+        activeDraftCache[key] = nil
+        loadedDraftKeys.remove(key)
+        pendingDraftSaves[key] = nil
+    }
+
+    private func ensureAttemptIsMutable(_ key: SurveyAttemptKey) throws {
+        if let terminalError = terminalDraftErrors[key] {
+            throw terminalError
         }
     }
 

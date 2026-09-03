@@ -324,6 +324,52 @@ describe("Canonical survey transactions", () => {
 
   const handlers = () => createSurveyHandlers({ firestore: getFirestore() });
 
+  it("rejects activity and help after the persisted respondent session ends", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(
+        doc(context.firestore(), `districts/${districtID}/studentModeSessions/${sessionID}`),
+        { status: "ended" },
+      );
+    });
+    await expectHttpsErrorKind(
+      handlers().loadActivity(callableRequest(
+        { assignmentID, sessionID },
+        { respondent: true },
+      )),
+      "failed-precondition",
+      "survey-session-revoked",
+    );
+    await expectHttpsErrorKind(
+      handlers().requestHelp(callableRequest({
+        districtID,
+        studentID,
+        assignmentID,
+        sessionID,
+        operationID: "help-ended",
+      }, { respondent: true })),
+      "failed-precondition",
+      "survey-session-revoked",
+    );
+  });
+
+  it("accepts an exact help-request replay without creating a duplicate", async () => {
+    const request = callableRequest({
+      districtID,
+      studentID,
+      assignmentID,
+      sessionID,
+      operationID: "help-replay",
+    }, { respondent: true });
+    await expect(handlers().requestHelp(request)).resolves.toEqual({
+      accepted: true,
+      operationID: "help-replay",
+    });
+    await expect(handlers().requestHelp(request)).resolves.toEqual({
+      accepted: true,
+      operationID: "help-replay",
+    });
+  });
+
   it("saves one idempotent scoped draft without advancing twice", async () => {
     const first = await handlers().saveDraft(
       callableRequest(saveRequest(), { respondent: true }),

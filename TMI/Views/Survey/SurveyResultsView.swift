@@ -7,6 +7,7 @@ struct SurveyResultsView: View {
     let onFinish: () -> Void
     @State private var helpRequested = false
     @State private var helpError = false
+    @State private var isRequestingHelp = false
 
     var body: some View {
         ScrollView {
@@ -34,12 +35,16 @@ struct SurveyResultsView: View {
                 .frame(maxWidth: 680)
                 Button("Ask for help", systemImage: "hand.raised.fill") {
                     Task { @MainActor in
+                        guard !isRequestingHelp, !helpRequested else { return }
+                        isRequestingHelp = true
+                        defer { isRequestingHelp = false }
                         helpRequested = await onAskForHelp()
                         helpError = !helpRequested
                     }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+                .disabled(isRequestingHelp || helpRequested)
                 .accessibilityHint("Lets your educator know you would like a non-emergency check-in.")
                 .accessibilityIdentifier("studentSurvey.help")
                 if helpRequested {
