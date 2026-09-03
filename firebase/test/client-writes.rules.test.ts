@@ -313,4 +313,44 @@ describe("client-side canonical writes", () => {
       );
     });
   });
+
+  describe("account deletion", () => {
+    it("lets an account erase its own personal data", async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await setDoc(doc(db, "users/teacher-1"), { displayName: "Teacher One" });
+        await setDoc(doc(db, "users/teacher-1/private/profile"), { email: "t1@example.com" });
+        await setDoc(doc(db, "users/teacher-1/preferences/settings"), { theme: "light" });
+      });
+
+      const db = teacherDb("teacher-1");
+      const { deleteDoc } = await import("firebase/firestore");
+      await assertSucceeds(deleteDoc(doc(db, "users/teacher-1/private/profile")));
+      await assertSucceeds(deleteDoc(doc(db, "users/teacher-1/preferences/settings")));
+      await assertSucceeds(deleteDoc(doc(db, "users/teacher-1")));
+    });
+
+    it("does not let an account erase someone else's personal data", async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), "users/teacher-2"), { displayName: "Teacher Two" });
+      });
+
+      const db = teacherDb("teacher-1");
+      const { deleteDoc } = await import("firebase/firestore");
+      await assertFails(deleteDoc(doc(db, "users/teacher-2")));
+      await assertFails(deleteDoc(doc(db, "users/teacher-2/private/profile")));
+    });
+
+    it("cannot reach institution-owned records through account deletion", async () => {
+      const db = teacherDb("teacher-1");
+      const { deleteDoc } = await import("firebase/firestore");
+      // Students and plans are district property and survive the account.
+      await assertFails(
+        deleteDoc(doc(db, `districts/${districtID}/students/other-student`)),
+      );
+      await assertFails(
+        deleteDoc(doc(db, `districts/${districtID}/members/teacher-1`)),
+      );
+    });
+  });
 });

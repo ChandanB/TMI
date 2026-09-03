@@ -400,6 +400,43 @@ struct AccountDeletionUIWiringTests {
         #expect(!source.contains("case deletionFailed"))
     }
 
+    @Test("Account deletion works without the trusted callable")
+    func deletionHasClientAuthorizedPath() throws {
+        let source = try source(at: "TMI/Services/AccountDeletionService.swift")
+
+        // The App Store requires in-app deletion, so it cannot depend on a
+        // callable that is not deployed.
+        #expect(source.contains("final class FirestoreDirectAccountDeletionBackend"))
+        #expect(
+            source.contains(
+                "FeatureFlags.production.usesTrustedMutationCallables\n            ? FirebaseAccountDeletionBackend()\n            : FirestoreDirectAccountDeletionBackend()"
+            )
+        )
+
+        let direct = try #require(
+            source.range(of: "final class FirestoreDirectAccountDeletionBackend")
+                .map { String(source[$0.lowerBound...]) }
+        )
+        // Personal data must be erased while the client still holds a
+        // credential; deleting the identity first would strand it forever.
+        let personal = try #require(direct.range(of: "root.delete()"))
+        let identity = try #require(direct.range(of: "user.delete()"))
+        #expect(personal.lowerBound < identity.lowerBound)
+    }
+
+    @Test("Institution-owned records survive account deletion")
+    func deletionLeavesInstitutionalRecords() throws {
+        let source = try source(at: "TMI/Services/AccountDeletionService.swift")
+        let direct = try #require(
+            source.range(of: "final class FirestoreDirectAccountDeletionBackend")
+                .map { String(source[$0.lowerBound...]) }
+        )
+        // Nothing under districts/ may be touched by a personal deletion.
+        #expect(!direct.contains("\"districts\""))
+        #expect(!direct.contains("students"))
+        #expect(!direct.contains("plans"))
+    }
+
     private func source(at relativePath: String) throws -> String {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

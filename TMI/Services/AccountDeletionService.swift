@@ -131,7 +131,9 @@ final class AccountDeletionService {
     }
 
     static let shared = AccountDeletionService(
-        backend: FirebaseAccountDeletionBackend(),
+        backend: FeatureFlags.production.usesTrustedMutationCallables
+            ? FirebaseAccountDeletionBackend()
+            : FirestoreDirectAccountDeletionBackend(),
         policy: .production,
         localDataPurger: SecureAccountDeletionLocalDataPurger()
     )
@@ -290,5 +292,87 @@ private final class FirebaseAccountDeletionBackend: AccountDeletionBackend {
             return max(value.intValue, 0)
         }
         return 0
+    }
+}
+
+
+/// Deletes the account without the `deletePersonalAccountData` callable.
+///
+/// The callable erases personal data, deactivates the membership, and
+/// reassigns authored institutional records to an opaque former-author
+/// identifier, all in one trusted transaction. Only the first and last steps of
+/// that have a client-authorized equivalent.
+///
+/// What this does: purge the personal documents under `users/{uid}`, then
+/// delete the Firebase Auth identity. Educational records under `districts/`
+/// are institution property and are deliberately left intact, which matches the
+/// deployed policy.
+///
+/// What it cannot do: the membership document is `allow write: if false`, so it
+/// is left in place rather than deactivated. The account it names no longer
+/// exists and cannot authenticate, so this is a stale record rather than
+/// lingering access, but an operator should clear it. Authored records keep the
+/// deleted user's identifier instead of an opaque one.
+@MainActor
+final class FirestoreDirectAccountDeletionBackend: AccountDeletionBackend {
+    private let auth: Auth
+    private let firestore: Firestore
+
+    init(
+        auth: Auth = Auth.auth(),
+        firestore: Firestore = Firestore.firestore()
+    ) {
+        self.auth = auth
+        self.firestore = firestore
+    }
+
+    func currentIdentity() throws -> AccountDeletionIdentity {
+        guard let user = auth.currentUser else {
+            throw AccountDeletionError.noAuthenticatedUser
+        }
+        guard let email = user.email, !email.isEmpty else {
+            throw AccountDeletionError.missingEmail
+        }
+        return AccountDeletionIdentity(userID: user.uid, email: email)
+    }
+
+    func reauthenticate(email: String, password: String) async throws {
+        guard let user = auth.currentUser else {
+            throw AccountDeletionError.noAuthenticatedUser
+        }
+        let credential = EmailAuthProvider.credential(
+            withEmail: email,
+            password: password
+        )
+        do {
+            _ = try await user.reauthenticate(with: credential)
+        } catch {
+            let code = AuthErrorCode(rawValue: (error as NSError).code)
+            if code == .wrongPassword || code == .invalidCredential {
+                throw AccountDeletionError.incorrectPassword
+            }
+            throw error
+        }
+    }
+
+    func deletePersonalAccount(
+        identity: AccountDeletionIdentity,
+        operationID: String
+    ) async throws {
+        guard let user = auth.currentUser, user.uid == identity.userID else {
+            throw AccountDeletionError.noAuthenticatedUser
+        }
+
+        do {
+            // Personal data first: once the identity is gone the client has no
+            // credential left to delete anything with.
+            let root = firestore.collection("users").document(identity.userID)
+            try await root.collection("private").document("profile").delete()
+            try await root.collection("preferences").document("settings").delete()
+            try await root.delete()
+            try await user.delete()
+        } catch {
+            throw AccountDeletionError.cleanupFailed
+        }
     }
 }

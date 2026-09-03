@@ -405,6 +405,10 @@ service cloud.firestore {
       ]);
     }
 
+    // Everything under users/{userID} is personal data owned by that account.
+    // The owner may erase it, which is what account deletion means and what the
+    // App Store requires. Institution-owned educational records live under
+    // districts/ and are unreachable from here, so this cannot destroy them.
     match /users/{userID} {
       allow read: if isAuthenticatedNonRespondent()
         && request.auth.uid == userID;
@@ -414,7 +418,8 @@ service cloud.firestore {
       allow update: if isAuthenticatedNonRespondent()
         && request.auth.uid == userID
         && profileUpdateKeysAreAllowed();
-      allow delete: if false;
+      allow delete: if isAuthenticatedNonRespondent()
+        && request.auth.uid == userID;
 
       match /private/profile {
         allow read: if isAuthenticatedNonRespondent()
@@ -425,13 +430,15 @@ service cloud.firestore {
         allow update: if isAuthenticatedNonRespondent()
           && request.auth.uid == userID
           && profileUpdateKeysAreAllowed();
-        allow delete: if false;
+        allow delete: if isAuthenticatedNonRespondent()
+          && request.auth.uid == userID;
       }
 
       match /preferences/settings {
         allow read, create, update: if isAuthenticatedNonRespondent()
           && request.auth.uid == userID;
-        allow delete: if false;
+        allow delete: if isAuthenticatedNonRespondent()
+          && request.auth.uid == userID;
       }
 
       match /{legacyPath=**} {

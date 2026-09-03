@@ -186,7 +186,10 @@ describe("canonical Firestore authorization", () => {
     await assertFails(
       deleteDoc(doc(db, "districts/d1/students/student-1")),
     );
-    await assertFails(deleteDoc(doc(db, "users/admin-1")));
+    // Institution-owned records are never client-deletable. Personal data under
+    // users/{uid} is the deliberate exception: the owner erases it during
+    // account deletion, which no longer has a trusted callable to run.
+    await assertFails(deleteDoc(doc(db, "users/someone-else")));
   });
 
   it("allows authenticated catalog reads but no client catalog writes", async () => {
