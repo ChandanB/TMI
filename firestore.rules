@@ -223,6 +223,16 @@ service cloud.firestore {
     // Lean predicate for direct client writes. Deliberately cheaper than
     // canWriteStudent so an update can evaluate it on both the old and new
     // document without exhausting the rules expression budget.
+    // A survey attempt may be written by a member who can write the student it
+    // belongs to. Student Mode runs inside that member's session while the
+    // respondent token cannot be minted.
+    function canWriteSurveyResponse(districtID, studentID) {
+      return canClientWriteStudent(
+        districtID,
+        studentData(districtID, studentID)
+      );
+    }
+
     function canClientWriteStudent(districtID, studentData) {
       return hasActiveMembership(districtID)
         && studentData.get('districtId', '') == districtID
@@ -520,9 +530,37 @@ service cloud.firestore {
                 == respondentAssignmentID(districtID)
               && resource.data.get('attemptID', '') == responseID
             );
-          // Draft synchronization, submission, and review are trusted
-          // transactions. No client may directly mutate canonical history.
-          allow create, update, delete: if false;
+          // Draft synchronization and submission run client-side while Cloud
+          // Functions are undeployed. These rules restate the invariants the
+          // callable enforced: identity fields match the path, the attempt
+          // starts as a draft at version 1, versions advance by exactly one,
+          // and canonical history is append-forward only. Review and any
+          // mutation of a submitted attempt remain server-only.
+          allow create: if canWriteSurveyResponse(districtID, studentID)
+            && request.resource.data.get('districtID', '') == districtID
+            && request.resource.data.get('studentID', '') == studentID
+            && request.resource.data.get('attemptID', '') == responseID
+            && request.resource.data.get('responseID', '') == responseID
+            && request.resource.data.get('state', '') == 'draft'
+            && request.resource.data.get('recordVersion', 0) == 1
+            && request.resource.data.get('respondentUserID', '') == request.auth.uid;
+          allow update: if canWriteSurveyResponse(districtID, studentID)
+            && resource.data.get('state', '') == 'draft'
+            && request.resource.data.get('state', '') in ['draft', 'submitted']
+            && request.resource.data.get('recordVersion', 0)
+              == resource.data.get('recordVersion', 0) + 1
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'districtID',
+              'studentID',
+              'assignmentID',
+              'attemptID',
+              'responseID',
+              'definitionID',
+              'definitionVersion',
+              'respondentUserID',
+              'createdAt'
+            ]);
+          allow delete: if false;
         }
 
         match /progress/{entryID} {

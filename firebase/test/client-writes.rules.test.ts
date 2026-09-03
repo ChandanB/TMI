@@ -198,4 +198,119 @@ describe("client-side canonical writes", () => {
       getDoc(doc(db, `districts/${districtID}/plans/plan-other`)),
     );
   });
+
+  describe("survey responses", () => {
+    const attemptID = "attempt-1";
+
+    const responseDoc = (overrides: Record<string, unknown> = {}) => ({
+      schemaVersion: 1,
+      responseID: attemptID,
+      districtID,
+      studentID: "student-new",
+      assignmentID: "assignment-1",
+      attemptID,
+      definitionID: "interests",
+      definitionVersion: 1,
+      state: "draft",
+      recordVersion: 1,
+      answers: {},
+      respondentUserID: "teacher-1",
+      syncState: "synced",
+      hasPendingChanges: false,
+      ...overrides,
+    });
+
+    const seedStudent = async (db: ReturnType<typeof teacherDb>) => {
+      await assertSucceeds(
+        setDoc(doc(db, `districts/${districtID}/students/student-new`), studentDoc()),
+      );
+    };
+
+    const responseRef = (db: ReturnType<typeof teacherDb>) =>
+      doc(
+        db,
+        `districts/${districtID}/students/student-new/responses/${attemptID}`,
+      );
+
+    it("lets the assigned member start and advance a draft attempt", async () => {
+      const db = teacherDb("teacher-1");
+      await seedStudent(db);
+
+      await assertSucceeds(setDoc(responseRef(db), responseDoc()));
+      await assertSucceeds(
+        updateDoc(responseRef(db), { answers: { q1: "a" }, recordVersion: 2 }),
+      );
+    });
+
+    it("lets a draft be submitted but not resurrected afterwards", async () => {
+      const db = teacherDb("teacher-1");
+      await seedStudent(db);
+      await assertSucceeds(setDoc(responseRef(db), responseDoc()));
+
+      await assertSucceeds(
+        updateDoc(responseRef(db), { state: "submitted", recordVersion: 2 }),
+      );
+      // Canonical history is append-forward only; a submitted attempt is closed
+      // to the client.
+      await assertFails(
+        updateDoc(responseRef(db), { state: "draft", recordVersion: 3 }),
+      );
+      await assertFails(
+        updateDoc(responseRef(db), { answers: { q1: "b" }, recordVersion: 3 }),
+      );
+    });
+
+    it("rejects an attempt that does not start as a version 1 draft", async () => {
+      const db = teacherDb("teacher-1");
+      await seedStudent(db);
+
+      await assertFails(
+        setDoc(responseRef(db), responseDoc({ state: "submitted" })),
+      );
+      await assertFails(
+        setDoc(responseRef(db), responseDoc({ recordVersion: 2 })),
+      );
+    });
+
+    it("rejects an attempt whose identity does not match its path", async () => {
+      const db = teacherDb("teacher-1");
+      await seedStudent(db);
+
+      await assertFails(
+        setDoc(responseRef(db), responseDoc({ attemptID: "somewhere-else" })),
+      );
+      await assertFails(
+        setDoc(responseRef(db), responseDoc({ studentID: "other-student" })),
+      );
+      await assertFails(
+        setDoc(responseRef(db), responseDoc({ respondentUserID: "teacher-2" })),
+      );
+    });
+
+    it("keeps attempt identity immutable across updates", async () => {
+      const db = teacherDb("teacher-1");
+      await seedStudent(db);
+      await assertSucceeds(setDoc(responseRef(db), responseDoc()));
+
+      await assertFails(
+        updateDoc(responseRef(db), { definitionVersion: 2, recordVersion: 2 }),
+      );
+      await assertFails(
+        updateDoc(responseRef(db), { respondentUserID: "teacher-2", recordVersion: 2 }),
+      );
+    });
+
+    it("does not let a member write an attempt for a student they cannot write", async () => {
+      const db = teacherDb("teacher-1");
+      await assertFails(
+        setDoc(
+          doc(
+            db,
+            `districts/${districtID}/students/other-student/responses/${attemptID}`,
+          ),
+          responseDoc({ studentID: "other-student" }),
+        ),
+      );
+    });
+  });
 });
