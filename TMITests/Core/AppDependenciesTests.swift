@@ -316,8 +316,11 @@ struct AppDependenciesTests {
 
     @Test("Survey results never report success when persistence fails")
     func surveyResultsRenderPersistenceFailure() throws {
-        let resultsSource = try self.source(
-            "TMI/Views/Survey/SurveyResultsView.swift",
+        // Saving moved out of the results screen and into the flow: results are
+        // reachable only after `submit` returns, and a failure keeps the student
+        // on the review step with the reason shown.
+        let flowSource = try self.source(
+            "TMI/Views/Survey/StudentSurveyFlow.swift",
             root: self.repositoryRoot
         )
         let serviceSource = try self.source(
@@ -325,9 +328,20 @@ struct AppDependenciesTests {
             root: self.repositoryRoot
         )
 
-        #expect(resultsSource.contains("if let saveError"))
-        #expect(resultsSource.contains("surveyFailureHeader(saveError)"))
-        #expect(resultsSource.contains("@State private var isSaving = true"))
+        let submitBody = try #require(
+            flowSource.range(of: "private func submit(").map { range in
+                String(flowSource[range.lowerBound...].prefix(600))
+            }
+        )
+        #expect(submitBody.contains("response = try await repository.submit("))
+        #expect(submitBody.contains("phase = .results"))
+        #expect(submitBody.contains("catch { message = friendly(error) }"))
+        // The success transition must sit inside the do-block, after the await.
+        let assignmentIndex = try #require(submitBody.range(of: "repository.submit("))
+        let resultsIndex = try #require(submitBody.range(of: "phase = .results"))
+        let failureIndex = try #require(submitBody.range(of: "catch { message ="))
+        #expect(assignmentIndex.upperBound < resultsIndex.lowerBound)
+        #expect(resultsIndex.upperBound < failureIndex.lowerBound)
         #expect(
             serviceSource.contains(
                 "case studentSurveyPersistenceUnavailable"

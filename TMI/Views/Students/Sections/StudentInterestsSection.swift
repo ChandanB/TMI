@@ -1,250 +1,122 @@
-// StudentInterestsSection.swift
-// TMI
-//
-// Accordion section for managing a student's interests within the student profile view.
-
 import SwiftUI
-import FirebaseFirestore
 
-// MARK: - StudentInterestsSection
-
-/// Accordion-style section for viewing and editing a student's interests.
-/// Displays selected interests as removable pink chips and loads available
-/// interests from Firebase for the authenticated user.
 struct StudentInterestsSection: View {
-    @Binding var selectedInterests: [Interest]
+    let districtID: String
+    let studentID: String
 
-    // MARK: State
-
-    @State private var searchText: String = ""
-    @State private var availableInterests: [Interest] = []
-    @State private var isLoadingAvailable: Bool = false
-    @State private var loadError: String? = nil
-    @State private var newInterestName: String = ""
-    @State private var isCreating: Bool = false
-
-    // MARK: Computed
-
-    private var filteredSelected: [Interest] {
-        guard !searchText.isEmpty else { return selectedInterests }
-        return selectedInterests.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-    }
-
-    private var filteredAvailable: [Interest] {
-        let selectedIDs = Set(selectedInterests.compactMap { $0.id })
-        let selectedNames = Set(selectedInterests.map { $0.name.lowercased() })
-        let unselected = availableInterests.filter { interest in
-            guard let id = interest.id else {
-                return !selectedNames.contains(interest.name.lowercased())
-            }
-            return !selectedIDs.contains(id)
-        }
-        guard !searchText.isEmpty else { return unselected }
-        return unselected.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-    }
-
-    // MARK: Body
+    @State private var interests: [StudentInterest] = []
+    @State private var pendingReviews: [StudentInterestReview] = []
+    @State private var reviewInProgress: StudentInterestReview?
+    @State private var isLoading = false
+    @State private var errorMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Search bar
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search interests…", text: $searchText)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .submitLabel(.search)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-
-            // Selected interests
-            if !filteredSelected.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Selected")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                        .tracking(0.5)
-
-                    FlowLayout(spacing: 8) {
-                        ForEach(filteredSelected, id: \.id) { interest in
-                            InterestChip(interest: interest, isSelected: true) {
-                                removeInterest(interest)
-                            }
-                        }
-                    }
+                Text("Approved interests")
+                    .font(.headline)
+                Spacer()
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.small)
                 }
             }
 
-            // Available interests
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Suggested")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                        .tracking(0.5)
-                    Spacer()
-                    if isLoadingAvailable {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    }
-                }
-
-                if let error = loadError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 4)
-                } else if filteredAvailable.isEmpty && !isLoadingAvailable {
-                    Text(searchText.isEmpty ? "No additional interests found." : "No matches for \"\(searchText)\".")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 4)
-                } else {
-                    FlowLayout(spacing: 8) {
-                        ForEach(filteredAvailable, id: \.id) { interest in
-                            InterestChip(interest: interest, isSelected: false) {
-                                addInterest(interest)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Inline new interest entry
-            HStack(spacing: 8) {
-                TextField("Add an interest…", text: $newInterestName)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled()
-                    .submitLabel(.done)
-                    .onSubmit {
-                        Task { await createAndAddInterest() }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(Color.tmiInputBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.tmiBorder, lineWidth: 1)
-                    )
-
+            // A submission only becomes interests once a reviewer approves it,
+            // so the review lives where the interests it produces are read.
+            ForEach(pendingReviews) { review in
                 Button {
-                    Task { await createAndAddInterest() }
+                    reviewInProgress = review
                 } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
-                        .background(Color.tmiSecondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    HStack {
+                        Label(
+                            "\(review.analysis.proposedInterests.count) proposed from \(review.definition.title)",
+                            systemImage: "checklist"
+                        )
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .disabled(newInterestName.trimmingCharacters(in: .whitespaces).isEmpty || isCreating)
-                .opacity(newInterestName.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1.0)
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("studentInterests.review")
+            }
+
+            if let errorMessage {
+                ContentUnavailableView(
+                    "Interests unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(errorMessage)
+                )
+                Button("Try Again") {
+                    Task { await load() }
+                }
+                .buttonStyle(.bordered)
+            } else if interests.isEmpty, !isLoading {
+                ContentUnavailableView(
+                    "No approved interests",
+                    systemImage: "star",
+                    description: Text("Survey proposals appear here after staff approval.")
+                )
+            } else {
+                ForEach(interests) { interest in
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: TMISpacing.xxs) {
+                            Text(interest.name ?? interest.interestId)
+                                .font(.headline)
+                            Text(interest.category.capitalized)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text("Strength \(interest.strength) of 5")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(TMISpacing.md)
+                    .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+                    .accessibilityElement(children: .combine)
+                }
             }
         }
-        .task {
-            await loadAvailableInterests()
+        .task(id: "\(districtID)/\(studentID)") {
+            await load()
         }
-    }
-
-    // MARK: - Actions
-
-    private func addInterest(_ interest: Interest) {
-        guard !selectedInterests.contains(interest) else { return }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            selectedInterests.append(interest)
-        }
-    }
-
-    private func removeInterest(_ interest: Interest) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            selectedInterests.removeAll { $0 == interest }
-        }
-    }
-
-    // MARK: - Firebase
-
-    @MainActor
-    private func loadAvailableInterests() async {
-        guard let uid = FirebaseManager.shared.auth.currentUser?.uid else {
-            loadError = "Not signed in."
-            return
-        }
-
-        isLoadingAvailable = true
-        loadError = nil
-        defer { isLoadingAvailable = false }
-
-        do {
-            let db = FirebaseManager.shared.firestore
-            let snapshot = try await db
-                .collection("users")
-                .document(uid)
-                .collection("interests")
-                .getDocuments()
-
-            let fetched: [Interest] = snapshot.documents.compactMap { doc in
-                try? doc.decodedModel(as: Interest.self, assigningDocumentIDTo: \.id)
+        .sheet(item: $reviewInProgress) { review in
+            StaffSurveyInterestReviewView(
+                definition: review.definition,
+                response: review.response,
+                analysis: review.analysis
+            ) {
+                reviewInProgress = nil
+                Task { await load() }
             }
-            availableInterests = fetched
-        } catch {
-            loadError = "Could not load interests: \(error.localizedDescription)"
         }
     }
 
     @MainActor
-    private func createAndAddInterest() async {
-        let trimmed = newInterestName.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        guard let uid = FirebaseManager.shared.auth.currentUser?.uid else { return }
-
-        isCreating = true
-        defer { isCreating = false }
-
-        var newInterest = Interest(
-            name: trimmed,
-            category: [.other]
-        )
-
+    private func load() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
         do {
-            let db = FirebaseManager.shared.firestore
-            let ref = db
-                .collection("users")
-                .document(uid)
-                .collection("interests")
-                .document()
-
-            try await ref.setModel(newInterest)
-
-            // Assign the Firestore-generated ID back so chips are stable
-            newInterest.id = ref.documentID
-            availableInterests.append(newInterest)
-            addInterest(newInterest)
+            interests = try await StudentInterestService.shared.getStudentInterests(
+                districtID: districtID,
+                studentID: studentID
+            )
+            pendingReviews = try await StudentInterestService.shared.pendingInterestReviews(
+                districtID: districtID,
+                studentID: studentID
+            )
         } catch {
-            // Fallback: add locally without persisting
-            addInterest(newInterest)
+            interests = []
+            pendingReviews = []
+            errorMessage = error.localizedDescription
         }
-
-        newInterestName = ""
     }
 }
 
-// MARK: - Preview
-
 #Preview {
-    @Previewable @State var selected: [Interest] = [
-        Interest(name: "Robotics", category: [.technology]),
-        Interest(name: "Soccer", category: [.sports])
-    ]
-
-    return ScrollView {
-        StudentInterestsSection(selectedInterests: $selected)
-            .padding()
-    }
+    StudentInterestsSection(districtID: "district-preview", studentID: "student-preview")
+        .padding()
 }

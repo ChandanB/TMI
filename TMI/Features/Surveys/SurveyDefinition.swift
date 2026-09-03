@@ -309,6 +309,10 @@ nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
     let publishedAt: Date
     let questions: [SurveyQuestion]
     let branchRules: [SurveyBranchRule]
+    /// Scores answers into proposed interests. The approval callable derives
+    /// from this same published table, so the reviewer previews what the server
+    /// will actually write.
+    let interestRules: [InterestAnalysisRule]
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion
@@ -319,6 +323,7 @@ nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
         case publishedAt
         case questions
         case branchRules
+        case interestRules
     }
 
     init(
@@ -328,7 +333,8 @@ nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
         title: String,
         publishedAt: Date,
         questions: [SurveyQuestion],
-        branchRules: [SurveyBranchRule] = []
+        branchRules: [SurveyBranchRule] = [],
+        interestRules: [InterestAnalysisRule] = []
     ) throws {
         self.schemaVersion = schemaVersion
         state = .published
@@ -338,6 +344,7 @@ nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
         self.publishedAt = publishedAt
         self.questions = questions
         self.branchRules = branchRules
+        self.interestRules = interestRules
         try validateDefinition()
     }
 
@@ -356,7 +363,12 @@ nonisolated struct SurveyDefinition: Codable, Equatable, Sendable {
             branchRules: container.decode(
                 [SurveyBranchRule].self,
                 forKey: .branchRules
-            )
+            ),
+            // A definition published before interest scoring simply scores nothing.
+            interestRules: container.decodeIfPresent(
+                [InterestAnalysisRule].self,
+                forKey: .interestRules
+            ) ?? []
         )
         guard try container.decode(
             SurveyDefinitionState.self,

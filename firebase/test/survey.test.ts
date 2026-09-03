@@ -72,6 +72,29 @@ const completeAnswers = {
   image: { type: "image", value: "city" },
 } as const;
 
+const interestRules = [
+  {
+    questionID: "single",
+    optionID: "science",
+    interestID: "science",
+    interestName: "Science",
+    category: "academic",
+    clusterID: "stem",
+    clusterName: "STEM",
+    weight: 5,
+  },
+  {
+    questionID: "single",
+    optionID: "art",
+    interestID: "art",
+    interestName: "Art",
+    category: "creative",
+    clusterID: "arts",
+    clusterName: "Arts",
+    weight: 3,
+  },
+];
+
 const definition = {
   schemaVersion: 1,
   definitionID,
@@ -79,6 +102,7 @@ const definition = {
   state: "published",
   title: "Interest discovery",
   publishedAt: Timestamp.fromMillis(1_000),
+  interestRules,
   questions: [
     {
       id: "single",
@@ -221,6 +245,20 @@ const reviewRequest = (
   ...overrides,
 });
 
+const approvalRequest = (overrides: Record<string, unknown> = {}) => ({
+  districtID,
+  studentID,
+  responseID: attemptID,
+  expectedRecordVersion: 2,
+  idempotencyKey: "approve-interests-1",
+  reasonCode: "educator-interest-approval",
+  algorithmVersion: 1,
+  definitionID,
+  definitionVersion,
+  interestIDs: ["science"],
+  ...overrides,
+});
+
 const assignmentRequest = (
   overrides: Partial<MutateSurveyAssignmentRequest> = {},
 ): MutateSurveyAssignmentRequest => ({
@@ -323,6 +361,100 @@ describe("Canonical survey transactions", () => {
   });
 
   const handlers = () => createSurveyHandlers({ firestore: getFirestore() });
+
+  it("refuses an interest the submission does not support", async () => {
+    const submittedResponsePath =
+      `districts/${districtID}/students/${studentID}/responses/${attemptID}`;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), submittedResponsePath), {
+        ...sharedFixture.response,
+        state: "submitted",
+        recordVersion: 2,
+        createdAt: Timestamp.fromMillis(2_000),
+        updatedAt: Timestamp.fromMillis(3_000),
+        submittedAt: Timestamp.fromMillis(4_000),
+      });
+    });
+
+    // "art" is a real rule, but this student never picked it.
+    await expect(
+      handlers().approveInterests(
+        callableRequest(approvalRequest({
+          interestIDs: ["art"],
+          idempotencyKey: "approve-undebrived-1",
+        })),
+      ),
+    ).rejects.toThrow(/not derived from this submission/);
+
+    const interest = await getFirestore().doc(
+      `districts/${districtID}/students/${studentID}/interests/art`,
+    ).get();
+    expect(interest.exists).toBe(false);
+  });
+
+  it("never lets the caller author what an interest means", async () => {
+    // The strength, name and category of an edge come from the rule table, so
+    // a caller that tries to supply them is rejected outright.
+    await expect(
+      handlers().approveInterests(
+        callableRequest(approvalRequest({
+          interests: [
+            { interestID: "science", name: "Bogus", category: "academic", strength: 5, rank: 1 },
+          ],
+        })),
+      ),
+    ).rejects.toThrow(/Unexpected field/);
+  });
+
+  it("refuses an analysis produced by a different algorithm version", async () => {
+    await expect(
+      handlers().approveInterests(
+        callableRequest(approvalRequest({ algorithmVersion: 99 })),
+      ),
+    ).rejects.toThrow(/different algorithm version/);
+  });
+
+  it("approves canonical interests without mutating the submitted response", async () => {
+    const submittedResponsePath =
+      `districts/${districtID}/students/${studentID}/responses/${attemptID}`;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), submittedResponsePath), {
+        ...sharedFixture.response,
+        state: "submitted",
+        recordVersion: 2,
+        createdAt: Timestamp.fromMillis(2_000),
+        updatedAt: Timestamp.fromMillis(3_000),
+        submittedAt: Timestamp.fromMillis(4_000),
+      });
+    });
+    const before = await getFirestore().doc(submittedResponsePath).get();
+
+    const approved = await handlers().approveInterests(
+      callableRequest(approvalRequest()),
+    );
+    expect(approved).toMatchObject({ replayed: false, approvedCount: 1 });
+    const interest = await getFirestore().doc(
+      `districts/${districtID}/students/${studentID}/interests/science`,
+    ).get();
+    expect(interest.data()).toMatchObject({
+      studentId: studentID,
+      interestId: "science",
+      category: "academic",
+      strength: 5,
+      rank: 1,
+      source: "survey",
+      sourceResponseId: attemptID,
+      sourceDefinitionId: definitionID,
+      sourceDefinitionVersion: definitionVersion,
+    });
+    const after = await getFirestore().doc(submittedResponsePath).get();
+    expect(after.data()).toEqual(before.data());
+
+    const replayed = await handlers().approveInterests(
+      callableRequest(approvalRequest()),
+    );
+    expect(replayed).toMatchObject({ replayed: true, approvedCount: 1 });
+  });
 
   it("rejects activity and help after the persisted respondent session ends", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {

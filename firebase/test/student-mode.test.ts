@@ -811,10 +811,6 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
     };
     const writes: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
       [
-        `districts/${districtID}/students/${studentID}/interests/interest-1`,
-        { ...scopedFields, interestID: "career-tech" },
-      ],
-      [
         `districts/${districtID}/students/${studentID}/reflections/reflection-1`,
         { ...scopedFields, text: "I learned something." },
       ],
@@ -917,6 +913,22 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
         },
       ),
     );
+    // An interest edge is derived from an approved submission by the callable,
+    // so no respondent write reaches it under any shape.
+    await assertFails(
+      setDoc(
+        doc(
+          db,
+          `districts/${districtID}/students/${studentID}/interests/interest-1`,
+        ),
+        {
+          districtID,
+          studentID,
+          respondentSessionID: sessionID,
+          interestID: "career-tech",
+        },
+      ),
+    );
   });
 
   it("denies every direct survey response lifecycle mutation", async () => {
@@ -974,12 +986,12 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
       `districts/${districtID}/plans/plan-1/goals/goal-1`,
     ];
     const writePath =
-      `districts/${districtID}/students/${studentID}/interests/post-lock-interest`;
+      `districts/${districtID}/students/${studentID}/reflections/post-lock-reflection`;
     const writeData = {
       districtID,
       studentID,
       respondentSessionID: sessionID,
-      interestID: "career-tech",
+      text: "Written after the assignment was locked.",
     };
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
