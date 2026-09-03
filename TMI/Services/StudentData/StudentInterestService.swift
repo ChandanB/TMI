@@ -36,6 +36,10 @@ final class StudentInterestService {
         case invalidStudentId
         case invalidInterestId
         case featureUnavailable
+        /// Approval has no client-authorized path: an interest edge is derived
+        /// from the immutable submission by the Admin SDK, and Firestore rules
+        /// refuse a direct write. Raised when that callable is not deployed.
+        case approvalUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -45,6 +49,10 @@ final class StudentInterestService {
             case .invalidStudentId: "Invalid student ID"
             case .invalidInterestId: "Invalid interest ID"
             case .featureUnavailable: "A district-scoped student context is required."
+            case .approvalUnavailable:
+                "This build cannot approve interests on its own. Ask your "
+                    + "administrator to deploy the approval function, then try again."
+
             }
         }
     }
@@ -194,6 +202,14 @@ final class StudentInterestService {
         } catch let error as StudentInterestError {
             throw error
         } catch {
+            // An undeployed callable answers NOT_FOUND. Say so plainly: the
+            // reviewer cannot act on a generic save failure, and there is no
+            // client-authorized path to fall back to.
+            let functionsError = error as NSError
+            if functionsError.domain == FunctionsErrorDomain,
+               functionsError.code == FunctionsErrorCode.notFound.rawValue {
+                throw StudentInterestError.approvalUnavailable
+            }
             throw StudentInterestError.saveFailed(error.localizedDescription)
         }
     }

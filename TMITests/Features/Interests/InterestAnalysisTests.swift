@@ -2,6 +2,24 @@ import Foundation
 import Testing
 @testable import TMI
 
+@Suite("Interest approval availability")
+struct InterestApprovalAvailabilityTests {
+    @Test("An undeployed approval function explains itself")
+    @MainActor
+    func approvalUnavailableIsActionable() throws {
+        // Approving derives district data about a child from an immutable
+        // submission, which only the Admin SDK may write — so there is no
+        // client fallback to offer, and the message has to say what to do.
+        let message = try #require(
+            StudentInterestService.StudentInterestError.approvalUnavailable.errorDescription
+        )
+        #expect(message.contains("administrator"))
+        #expect(message.contains("deploy"))
+        // It must not read like a transient failure the reviewer should retry.
+        #expect(!message.contains("try again later"))
+    }
+}
+
 @Suite("Deterministic interest analysis")
 struct InterestAnalysisTests {
     @Test("Fixed answers produce exact ranked clusters and proposals")
