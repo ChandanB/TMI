@@ -53,6 +53,13 @@ final class FirebaseStaffInvitationProvisioner: StaffInvitationProvisioning {
             ])
         } catch {
             let functionsError = error as NSError
+            // An undeployed callable answers NOT_FOUND. Say so plainly instead
+            // of reporting a generic registration failure the user cannot act
+            // on; provisioning needs the Admin SDK either way.
+            if functionsError.domain == FunctionsErrorDomain,
+               functionsError.code == FunctionsErrorCode.notFound.rawValue {
+                throw AuthenticationRepositoryError.provisioningUnavailable
+            }
             if functionsError.domain == FunctionsErrorDomain,
                Self.terminalFunctionErrorCodes.contains(functionsError.code) {
                 throw error

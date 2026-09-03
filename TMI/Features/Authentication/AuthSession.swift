@@ -110,11 +110,21 @@ nonisolated enum AuthenticationPresentationPolicy {
     static let passwordResetConfirmation =
         "If an account matches that email, a password reset link will be sent."
 
+    static let registrationProvisioningUnavailableMessage =
+        "This build cannot create staff accounts on its own. Ask your "
+            + "administrator to provision the account, then sign in."
+
     static func registrationMessage(for error: Error) -> String {
-        if let repositoryError = error as? AuthenticationRepositoryError,
-           repositoryError == .invitationRequired {
-            return "Enter the staff invitation code provided by your institution."
+        guard let repositoryError = error as? AuthenticationRepositoryError else {
+            return registrationFailureMessage
         }
-        return registrationFailureMessage
+        switch repositoryError {
+        case .invitationRequired:
+            return "Enter the staff invitation code provided by your institution."
+        case .provisioningUnavailable:
+            return registrationProvisioningUnavailableMessage
+        case .registrationRollbackFailed:
+            return registrationFailureMessage
+        }
     }
 }

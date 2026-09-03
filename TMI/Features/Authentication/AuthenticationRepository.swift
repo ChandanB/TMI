@@ -145,6 +145,10 @@ nonisolated enum StaffInvitationProvisioningError: Error, Equatable {
 nonisolated enum AuthenticationRepositoryError: Error, Equatable {
     case invitationRequired
     case registrationRollbackFailed
+    /// Staff provisioning has no client-authorized path: the membership
+    /// document and its trusted claims can only be written by the Admin SDK.
+    /// Raised when the callable that would do it is not deployed.
+    case provisioningUnavailable
 }
 
 @MainActor
