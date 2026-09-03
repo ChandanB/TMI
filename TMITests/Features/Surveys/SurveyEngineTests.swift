@@ -370,6 +370,43 @@ struct SurveyDefinitionTests {
 
 @Suite("Survey repository")
 struct SurveyRepositoryTests {
+    @Test("The active grant loads its stored assignment and exact published definition")
+    func loadsCanonicalActivity() async throws {
+        let assignment = try surveyAssignment()
+        let definition = try surveyDefinition()
+        let repository = SurveyRepository(
+            loadActivity: { _, _ in SurveyActivity(assignment: assignment, definition: definition) },
+            requestHelp: { _, _ in },
+            draftStore: .memory,
+            synchronizeDraft: { $0.response },
+            submitResponse: { $0.response },
+            reviewResponse: { $0.response },
+            isOnline: { true }
+        )
+        let activity = try await repository.activity(grant: studentModeGrant(assignment: assignment))
+        #expect(activity.assignment.attemptID == assignment.attemptID)
+        #expect(activity.definition.id == assignment.definitionID)
+        #expect(activity.definition.version == assignment.definitionVersion)
+    }
+
+    @Test("Help requests require scoped authorization and report backend success")
+    func scopedHelpRequest() async throws {
+        let assignment = try surveyAssignment()
+        let called = SurveyHelpSpy()
+        let repository = SurveyRepository(
+            loadActivity: { _, _ in throw SurveyRepositoryError.unavailable },
+            requestHelp: { request, _ in await called.record(request) },
+            draftStore: .memory,
+            synchronizeDraft: { $0.response },
+            submitResponse: { $0.response },
+            reviewResponse: { $0.response },
+            isOnline: { true }
+        )
+        let grant = try studentModeGrant(assignment: assignment)
+        try await repository.requestHelp(operationID: "help-1", grant: grant)
+        #expect(await called.operationID == "help-1")
+    }
+
     @Test("Autosave is idempotent and resumes the exact scoped attempt")
     func autosaveAndResume() async throws {
         let harness = SurveyRepositoryHarness()
@@ -1119,6 +1156,11 @@ struct SurveyRepositoryTests {
             }
         }
     }
+}
+
+private actor SurveyHelpSpy {
+    private(set) var operationID: String?
+    func record(_ request: SurveyHelpRequest) { operationID = request.operationID }
 }
 
 private func surveyDefinition(
