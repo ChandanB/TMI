@@ -161,3 +161,51 @@ nonisolated enum PlanValidation {
         return issues
     }
 }
+
+/// The rules that shape a plan as it is started, kept out of the view so they
+/// can be exercised directly.
+nonisolated enum PlanCreation {
+    /// Creating a plan writes to the district, so it needs the same authority
+    /// the roster write requires.
+    static func isAvailable(to member: MembershipContext) -> Bool {
+        member.isActive && member.capabilities.contains(.studentWriteDetail)
+    }
+
+    /// The title tracks the chosen model until the educator makes it their own.
+    /// A title still matching the model it came from is untouched; anything
+    /// else is theirs to keep.
+    static func title(
+        movingFrom oldModel: TMIPlanModel,
+        to newModel: TMIPlanModel,
+        currentTitle: String
+    ) -> String {
+        let trimmed = currentTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty || trimmed == oldModel.rawValue else { return currentTitle }
+        return newModel.rawValue
+    }
+
+    /// A plan's scope comes from the student's roster record, which is what the
+    /// rules authorize the write against.
+    static func draft(
+        studentID: String,
+        schoolID: String,
+        member: MembershipContext,
+        model: TMIPlanModel,
+        title: String,
+        summary: String,
+        startDate: Date,
+        targetDate: Date?
+    ) -> PlanDraft {
+        PlanDraft(
+            studentIDs: [studentID],
+            schoolIDs: [schoolID],
+            assignedMemberIDs: [member.userID],
+            model: model,
+            title: title,
+            summary: summary,
+            startDate: startDate,
+            targetDate: targetDate
+        )
+        .normalized
+    }
+}

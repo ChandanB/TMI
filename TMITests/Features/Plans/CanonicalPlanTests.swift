@@ -14,6 +14,22 @@ struct CanonicalPlanTests {
         version: 1
     )
 
+    private func variant(
+        capabilities: Set<Capability> = [.studentReadDetail, .studentWriteDetail],
+        isActive: Bool = true
+    ) -> MembershipContext {
+        MembershipContext(
+            userID: member.userID,
+            districtID: member.districtID,
+            schoolIDs: member.schoolIDs,
+            role: member.role,
+            capabilities: capabilities,
+            assignedStudentIDs: member.assignedStudentIDs,
+            isActive: isActive,
+            version: member.version
+        )
+    }
+
     private func draft(
         studentIDs: Set<String> = ["student-1"],
         schoolIDs: Set<String> = ["school-1"],
@@ -178,6 +194,107 @@ struct CanonicalPlanTests {
                 id: "plan-1",
                 data: ["districtId": "d1"]
             ) == nil
+        )
+    }
+
+    // MARK: - Creation
+
+    @Test("Creating a plan needs the authority a roster write needs")
+    func creationRequiresRosterWriteAuthority() {
+        #expect(PlanCreation.isAvailable(to: member))
+
+        #expect(!PlanCreation.isAvailable(to: variant(capabilities: [.studentReadDetail])))
+        #expect(!PlanCreation.isAvailable(to: variant(isActive: false)))
+    }
+
+    @Test("The title follows the chosen model until the educator claims it")
+    func titleFollowsModelUntilEdited() {
+        // Untouched: still the title the previous model supplied.
+        #expect(
+            PlanCreation.title(
+                movingFrom: .chaseYourSpace,
+                to: .acknowledgeInterests,
+                currentTitle: TMIPlanModel.chaseYourSpace.rawValue
+            ) == TMIPlanModel.acknowledgeInterests.rawValue
+        )
+
+        // An empty title is nobody's, so the model still fills it.
+        #expect(
+            PlanCreation.title(
+                movingFrom: .chaseYourSpace,
+                to: .acknowledgeInterests,
+                currentTitle: "   "
+            ) == TMIPlanModel.acknowledgeInterests.rawValue
+        )
+
+        // Once it is theirs, switching models leaves it alone.
+        #expect(
+            PlanCreation.title(
+                movingFrom: .chaseYourSpace,
+                to: .acknowledgeInterests,
+                currentTitle: "Marcus, third period"
+            ) == "Marcus, third period"
+        )
+    }
+
+    @Test("A plan takes its scope from the student's roster record")
+    func draftTakesScopeFromTheStudent() {
+        let draft = PlanCreation.draft(
+            studentID: "student-1",
+            schoolID: "school-1",
+            member: member,
+            model: .chaseYourSpace,
+            title: "  Chase   Your Space  ",
+            summary: "   ",
+            startDate: Date(timeIntervalSince1970: 1_000_000),
+            targetDate: nil
+        )
+
+        #expect(draft.studentIDs == ["student-1"])
+        #expect(draft.schoolIDs == ["school-1"])
+        // The creator is assigned, which the rules require.
+        #expect(draft.assignedMemberIDs == [member.userID])
+        #expect(draft.title == "Chase Your Space")
+        #expect(draft.summary == nil)
+        #expect(PlanValidation.issues(for: draft, member: member).isEmpty)
+    }
+
+    @Test("A plan started outside your schools is refused")
+    func draftCannotReachOutsideYourSchools() {
+        let draft = PlanCreation.draft(
+            studentID: "student-1",
+            schoolID: "school-9",
+            member: member,
+            model: .chaseYourSpace,
+            title: "Chase Your Space",
+            summary: "",
+            startDate: Date(timeIntervalSince1970: 1_000_000),
+            targetDate: nil
+        )
+
+        #expect(
+            PlanValidation.issues(for: draft, member: member)
+                .contains("A plan cannot reach outside your schools.")
+        )
+    }
+
+    @Test("A target date before the start is refused")
+    func draftRefusesATargetBeforeTheStart() {
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        let draft = PlanCreation.draft(
+            studentID: "student-1",
+            schoolID: "school-1",
+            member: member,
+            model: .chaseYourSpace,
+            title: "Chase Your Space",
+            summary: "",
+            startDate: start,
+            targetDate: start.addingTimeInterval(-60)
+        )
+
+        #expect(
+            PlanValidation.issues(for: draft, member: member)
+                .contains("The target date cannot precede the start date.")
         )
     }
 }

@@ -41,7 +41,8 @@ struct StudentDetailView: View {
                     },
                     launchStudentMode: {
                         showingStudentModeLaunch = true
-                    }
+                    },
+                    member: member
                 )
             } else {
                 ProgressView("Loading student access…")
@@ -185,6 +186,10 @@ private struct StudentOperationalHubContent: View {
     let edit: () -> Void
     let archive: () -> Void
     let launchStudentMode: () -> Void
+    let member: MembershipContext?
+
+    @State private var showingPlanEditor = false
+    @State private var planCreatedMessage: String?
 
     var body: some View {
         ZStack {
@@ -193,6 +198,20 @@ private struct StudentOperationalHubContent: View {
             phaseContent
         }
         .accessibilityIdentifier("studentDetail.screen")
+        .sheet(isPresented: $showingPlanEditor) {
+            if let member, let header = state.header {
+                CanonicalPlanEditorView(
+                    studentID: header.studentID,
+                    studentName: header.displayName,
+                    schoolID: header.schoolID,
+                    member: member,
+                    onCreated: { record in
+                        planCreatedMessage =
+                            "Created \(record.title) as a \(record.status.displayName.lowercased())."
+                    }
+                )
+            }
+        }
         .refreshable {
             await state.refresh()
         }
@@ -369,7 +388,10 @@ private struct StudentOperationalHubContent: View {
         case .overview:
             StudentOverviewSection(
                 header: state.header,
-                currentSections: state.currentSections
+                currentSections: state.currentSections,
+                member: member,
+                planCreatedMessage: planCreatedMessage,
+                onStartPlan: { showingPlanEditor = true }
             )
         case .domain(let domain):
             if domain == .meetingsAndNotes {
@@ -442,6 +464,9 @@ private enum StudentHubDestination: Hashable, Identifiable, CaseIterable {
 private struct StudentOverviewSection: View {
     let header: StudentHeaderProjection?
     let currentSections: [StudentDetailSectionProjection]
+    var member: MembershipContext?
+    var planCreatedMessage: String?
+    var onStartPlan: () -> Void = {}
 
     var body: some View {
         LazyVGrid(
@@ -467,9 +492,21 @@ private struct StudentOverviewSection: View {
                     Label("Plan status", systemImage: "checklist")
                         .font(.headline)
                         .foregroundStyle(TMIColors.aubergine)
-                    Text(planStatus)
+                    Text(planCreatedMessage ?? planStatus)
                         .font(.body)
-                        .foregroundStyle(TMIColors.textSecondary)
+                        .foregroundStyle(
+                            planCreatedMessage == nil
+                                ? TMIColors.textSecondary
+                                : TMIColors.successText
+                        )
+                    if canStartPlan {
+                        Button("Start a TMI plan", systemImage: "plus.circle") {
+                            onStartPlan()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(TMIColors.aubergine)
+                        .accessibilityIdentifier("studentDetail.startPlan")
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -499,6 +536,13 @@ private struct StudentOverviewSection: View {
             }
         }
         .accessibilityIdentifier("studentDetail.overview")
+    }
+
+    /// Creating a plan writes to the district, so it needs the same authority
+    /// the roster write requires.
+    private var canStartPlan: Bool {
+        guard let member, header != nil else { return false }
+        return PlanCreation.isAvailable(to: member)
     }
 
     private var planStatus: String {
