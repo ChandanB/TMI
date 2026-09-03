@@ -268,8 +268,13 @@ struct AppDependenciesTests {
 
         #expect(!dashboardSource.contains("tmiPlanService.fetchPlans()"))
         #expect(!dashboardSource.contains("private let tmiPlanService"))
+        // The legacy plan list writes to users/{uid}/tmiPlans, which the rules
+        // deny, so it must never back the tab.
         #expect(!shellSource.contains("case .plans:\n            TMIPlanListView()"))
-        #expect(shellSource.contains("TMI Plans Arrive in Release 3"))
+        // The tab is now served by the canonical repository instead of a
+        // placeholder.
+        #expect(shellSource.contains("case .plans:\n            CanonicalPlanListView()"))
+        #expect(!shellSource.contains("TMI Plans Arrive in Release 3"))
     }
 
     @Test("Plan snapshots derive only from canonical roster records")

@@ -353,4 +353,98 @@ describe("client-side canonical writes", () => {
       );
     });
   });
+
+  describe("plan lifecycle", () => {
+    const planRef = (db: ReturnType<typeof teacherDb>, id = "plan-1") =>
+      doc(db, `districts/${districtID}/plans/${id}`);
+
+    const planDoc = (overrides: Record<string, unknown> = {}) => ({
+      districtId: districtID,
+      studentIDs: ["student-new"],
+      schoolIDs: [schoolID],
+      assignedMemberIDs: ["teacher-1"],
+      status: "draft",
+      modelID: "chaseYourSpace",
+      title: "Chase Your Space",
+      createdBy: "teacher-1",
+      recordVersion: 1,
+      ...overrides,
+    });
+
+    const seed = async (db: ReturnType<typeof teacherDb>) => {
+      await assertSucceeds(
+        setDoc(doc(db, `districts/${districtID}/students/student-new`), studentDoc()),
+      );
+      await assertSucceeds(setDoc(planRef(db), planDoc()));
+    };
+
+    it("walks a plan through its lifecycle", async () => {
+      const db = teacherDb("teacher-1");
+      await seed(db);
+
+      await assertSucceeds(updateDoc(planRef(db), { status: "active" }));
+      await assertSucceeds(updateDoc(planRef(db), { status: "paused" }));
+      await assertSucceeds(updateDoc(planRef(db), { status: "active" }));
+      await assertSucceeds(updateDoc(planRef(db), { status: "completed" }));
+      await assertSucceeds(updateDoc(planRef(db), { status: "archived" }));
+    });
+
+    it("refuses transitions that skip or reverse the lifecycle", async () => {
+      const db = teacherDb("teacher-1");
+      await seed(db);
+
+      // draft cannot jump straight to completed
+      await assertFails(updateDoc(planRef(db), { status: "completed" }));
+      await assertSucceeds(updateDoc(planRef(db), { status: "active" }));
+      // active cannot go back to draft
+      await assertFails(updateDoc(planRef(db), { status: "draft" }));
+      await assertSucceeds(updateDoc(planRef(db), { status: "completed" }));
+      // a completed plan is duplicated into a new cycle, never reopened
+      await assertFails(updateDoc(planRef(db), { status: "active" }));
+      await assertFails(updateDoc(planRef(db), { status: "draft" }));
+    });
+
+    it("keeps plan scope and creation metadata immutable", async () => {
+      const db = teacherDb("teacher-1");
+      await seed(db);
+
+      await assertFails(updateDoc(planRef(db), { studentIDs: ["other-student"] }));
+      await assertFails(updateDoc(planRef(db), { districtId: "d2" }));
+      await assertFails(updateDoc(planRef(db), { createdBy: "teacher-2" }));
+      await assertFails(updateDoc(planRef(db), { schoolIDs: ["school-elsewhere"] }));
+    });
+
+    it("gates approval fields on the plan.approve capability", async () => {
+      const db = teacherDb("teacher-1");
+      await seed(db);
+
+      // teacher-1 has no plan.approve capability
+      await assertFails(
+        updateDoc(planRef(db), { approvalStatus: "approved", approvedBy: "teacher-1" }),
+      );
+
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(
+          doc(context.firestore(), `districts/${districtID}/members/teacher-1`),
+          activeMembership({ assignedStudentIDs: [], capabilities: ["plan.approve"] }),
+        );
+      });
+      await assertSucceeds(
+        updateDoc(planRef(db), { approvalStatus: "approved", approvedBy: "teacher-1" }),
+      );
+    });
+
+    it("refuses a plan created outside the member's reach", async () => {
+      const db = teacherDb("teacher-1");
+      await assertFails(
+        setDoc(planRef(db, "plan-2"), planDoc({ assignedMemberIDs: ["teacher-2"] })),
+      );
+      await assertFails(
+        setDoc(planRef(db, "plan-3"), planDoc({ schoolIDs: ["school-elsewhere"] })),
+      );
+      await assertFails(
+        setDoc(planRef(db, "plan-4"), planDoc({ status: "active" })),
+      );
+    });
+  });
 });

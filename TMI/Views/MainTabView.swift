@@ -340,14 +340,7 @@ struct MainTabView: View {
         case .students:
             StudentListView()
         case .plans:
-            ContentUnavailableView(
-                "TMI Plans Arrive in Release 3",
-                systemImage: "doc.text.fill",
-                description: Text(
-                    "Release 1 keeps the roster secure and available. "
-                        + "Canonical plan creation, review, and approval ship with the intervention workflow."
-                )
-            )
+            CanonicalPlanListView()
         case .district:
             DistrictDashboardView()
         }
