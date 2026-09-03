@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 @preconcurrency import FirebaseCore
+@preconcurrency import FirebaseFirestore
 @preconcurrency import FirebaseFunctions
 @preconcurrency import Network
 
@@ -860,6 +861,9 @@ extension SurveyRepository {
         draftStore: SurveyDraftStore = .localFiles(),
         staffFunctions: Functions = Functions.functions(region: "us-central1")
     ) -> SurveyRepository {
+        guard FeatureFlags.production.usesTrustedMutationCallables else {
+            return .firestoreDirect(draftStore: draftStore)
+        }
         guard let respondentApp = FirebaseApp.app(
             name: "TMIStudentModeRespondent"
         ) else {
@@ -898,6 +902,39 @@ extension SurveyRepository {
                     request,
                     districtID: districtID
                 )
+            },
+            isOnline: {
+                connectivity.isOnline
+            }
+        )
+    }
+}
+
+extension SurveyRepository {
+    /// Survey persistence without the Cloud Functions callables. Draft sync and
+    /// submission go straight to Firestore under the acting educator's session;
+    /// staff review and assignment mutation stay unavailable because they have
+    /// no client-authorized path.
+    @MainActor
+    static func firestoreDirect(
+        draftStore: SurveyDraftStore = .localFiles(),
+        firestore: Firestore = Firestore.firestore()
+    ) -> SurveyRepository {
+        let runtime = FirestoreDirectSurveyRuntime(firestore: firestore)
+        let connectivity = SurveyConnectivity()
+        return SurveyRepository(
+            requestHelp: { request, grant in
+                try await runtime.requestHelp(request, grant: grant)
+            },
+            draftStore: draftStore,
+            synchronizeDraft: { request in
+                try await runtime.synchronize(request)
+            },
+            submitResponse: { request in
+                try await runtime.submit(request)
+            },
+            reviewResponse: { _ in
+                throw SurveyRepositoryError.unavailable
             },
             isOnline: {
                 connectivity.isOnline

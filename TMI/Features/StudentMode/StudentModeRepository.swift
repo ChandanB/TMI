@@ -497,6 +497,9 @@ extension StudentModeRepository {
     static func firebase(
         functions: Functions = Functions.functions(region: "us-central1")
     ) -> StudentModeRepository {
+        guard FeatureFlags.production.usesTrustedMutationCallables else {
+            return .local()
+        }
         let runtime = FirebaseStudentModeRuntime(functions: functions)
         return StudentModeRepository(
             issueSession: { request in
@@ -504,6 +507,37 @@ extension StudentModeRepository {
             },
             restoreSession: { request in
                 try await runtime.restoreSession(request)
+            },
+            endSession: { request in
+                try await runtime.endSession(request)
+            },
+            containmentStore: .keychain(),
+            persistedRespondentRecord: {
+                try await runtime.persistedRespondentRecord()
+            },
+            signInRespondent: { token in
+                try await runtime.signInRespondent(withCustomToken: token)
+            },
+            signOutRespondent: {
+                try await runtime.signOutRespondent()
+            }
+        )
+    }
+}
+
+extension StudentModeRepository {
+    /// Student Mode without the respondent identity. See
+    /// `LocalStudentModeRuntime` for what this trades away.
+    @MainActor
+    static func local(
+        runtime: LocalStudentModeRuntime = LocalStudentModeRuntime()
+    ) -> StudentModeRepository {
+        StudentModeRepository(
+            issueSession: { request in
+                try await runtime.issueSession(request)
+            },
+            restoreSession: { _ in
+                throw StudentModeRepositoryError.invalidResponse
             },
             endSession: { request in
                 try await runtime.endSession(request)
