@@ -316,8 +316,13 @@ struct AppDependenciesTests {
 
     @Test("Survey results never report success when persistence fails")
     func surveyResultsRenderPersistenceFailure() throws {
-        let resultsSource = try self.source(
-            "TMI/Views/Survey/SurveyResultsView.swift",
+        // Persistence moved out of SurveyResultsView and into StudentSurveyFlow,
+        // which now owns submission. The guarantee is unchanged: results are
+        // only reachable after a submit that actually persisted, and a failure
+        // keeps the student on review with a message instead of reporting
+        // success.
+        let flowSource = try self.source(
+            "TMI/Views/Survey/StudentSurveyFlow.swift",
             root: self.repositoryRoot
         )
         let serviceSource = try self.source(
@@ -325,9 +330,16 @@ struct AppDependenciesTests {
             root: self.repositoryRoot
         )
 
-        #expect(resultsSource.contains("if let saveError"))
-        #expect(resultsSource.contains("surveyFailureHeader(saveError)"))
-        #expect(resultsSource.contains("@State private var isSaving = true"))
+        let submitBody = try #require(
+            flowSource.range(of: "response = try await repository.submit")
+                .map { flowSource[$0.lowerBound...] }
+                .map(String.init)
+        )
+        let advance = try #require(submitBody.range(of: "phase = .results"))
+        let failure = try #require(submitBody.range(of: "catch { message = friendly(error) }"))
+        // The advance is inside the do block, ahead of the catch.
+        #expect(advance.lowerBound < failure.lowerBound)
+        #expect(flowSource.contains("@State private var isSaving = false"))
         #expect(
             serviceSource.contains(
                 "case studentSurveyPersistenceUnavailable"
