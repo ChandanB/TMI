@@ -12,6 +12,8 @@ struct CanonicalPlanDetailView: View {
     @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) private var authStateModel
     @State private var state: CanonicalPlanDetailState?
+    @State private var editingGoal: GoalRecord?
+    @State private var isAddingGoal = false
 
     private let memberOverride: MembershipContext?
 
@@ -32,6 +34,31 @@ struct CanonicalPlanDetailView: View {
         .navigationTitle("Plan")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("planDetail.screen")
+        .sheet(isPresented: $isAddingGoal) {
+            if let plan = state?.plan, let member {
+                GoalEditorView(
+                    planID: plan.id,
+                    studentID: plan.studentIDs.sorted().first ?? "",
+                    member: member,
+                    planStartDate: plan.startDate
+                ) { _ in
+                    Task { await state?.reloadChildren(member: member) }
+                }
+            }
+        }
+        .sheet(item: $editingGoal) { goal in
+            if let plan = state?.plan, let member {
+                GoalEditorView(
+                    planID: plan.id,
+                    studentID: goal.studentID,
+                    member: member,
+                    planStartDate: plan.startDate,
+                    existing: goal
+                ) { _ in
+                    Task { await state?.reloadChildren(member: member) }
+                }
+            }
+        }
         .task(id: planID) {
             guard let repository = dependencies.planRepository, let member else { return }
             let created = CanonicalPlanDetailState(
@@ -103,6 +130,31 @@ struct CanonicalPlanDetailView: View {
                         )
                     }
                 }
+                goalsSection(plan: plan, state: state, member: member)
+
+                section("Progress") {
+                    if state.progress.isEmpty {
+                        Text("No progress recorded yet.")
+                            .font(.subheadline)
+                            .foregroundStyle(TMIColors.textSecondary)
+                    } else {
+                        Text("\(state.completionPercentage)% of due actions done")
+                            .font(.subheadline.weight(.semibold))
+                            .accessibilityIdentifier("planDetail.completion")
+                        ForEach(state.progress) { entry in
+                            VStack(alignment: .leading, spacing: TMISpacing.xxs) {
+                                Text(entry.note ?? entry.measuredValue ?? "Recorded")
+                                    .font(.subheadline)
+                                Text(entry.visibility == .sharedWithStudent
+                                    ? "Shared with the student"
+                                    : "Staff only")
+                                    .font(.caption)
+                                    .foregroundStyle(TMIColors.textSecondary)
+                            }
+                        }
+                    }
+                }
+
                 section("History") {
                     // Revisions freeze at approval, changes requested and
                     // completion. Until those are persisted there is nothing
@@ -176,6 +228,50 @@ struct CanonicalPlanDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(TMIColors.textSecondary)
                     .accessibilityIdentifier("planDetail.actionMessage")
+            }
+        }
+    }
+
+    private func goalsSection(
+        plan: PlanRecord,
+        state: CanonicalPlanDetailState,
+        member: MembershipContext
+    ) -> some View {
+        section("Goals") {
+            if state.goals.isEmpty {
+                Text("No goals yet. A plan without a goal has nothing to measure.")
+                    .font(.subheadline)
+                    .foregroundStyle(TMIColors.textSecondary)
+            } else {
+                ForEach(state.goals) { goal in
+                    Button {
+                        editingGoal = goal
+                    } label: {
+                        VStack(alignment: .leading, spacing: TMISpacing.xxs) {
+                            Text(goal.title).font(.subheadline.weight(.semibold))
+                            Text("From: \(goal.baseline)")
+                                .font(.caption)
+                                .foregroundStyle(TMIColors.textSecondary)
+                            Text("To: \(goal.target)")
+                                .font(.caption)
+                                .foregroundStyle(TMIColors.textSecondary)
+                            Text("\(goal.status.displayName) · due \(goal.dueDate.formatted(date: .abbreviated, time: .omitted))")
+                                .font(.caption)
+                                .foregroundStyle(TMIColors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("planDetail.goal.\(goal.id)")
+                }
+            }
+            // Writing a goal is editing the plan, so it needs write access.
+            if member.capabilities.contains(.studentWriteDetail), plan.status.isOpen {
+                Button("Add a goal", systemImage: "plus.circle") {
+                    isAddingGoal = true
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("planDetail.addGoal")
             }
         }
     }

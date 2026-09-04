@@ -12,6 +12,9 @@ final class CanonicalPlanDetailState {
 
     private(set) var phase: Phase = .loading
     private(set) var revisions: [PlanRevision] = []
+    private(set) var goals: [GoalRecord] = []
+    private(set) var actions: [ActionRecord] = []
+    private(set) var progress: [ProgressRecord] = []
     private(set) var actionMessage: String?
     private(set) var isMutating = false
 
@@ -29,6 +32,16 @@ final class CanonicalPlanDetailState {
         self.children = children
     }
 
+    /// The share of due actions actually done, which an educator can recount
+    /// by hand.
+    var completionPercentage: Int { PlanCompletion.percentage(of: actions) }
+
+    func reloadChildren(member: MembershipContext) async {
+        goals = (try? await children?.goals(planID: planID, member: member)) ?? goals
+        actions = (try? await children?.actions(planID: planID, member: member)) ?? actions
+        progress = (try? await children?.progress(planID: planID, member: member)) ?? progress
+    }
+
     var plan: PlanRecord? {
         if case .loaded(let plan) = phase { return plan }
         return nil
@@ -40,6 +53,9 @@ final class CanonicalPlanDetailState {
             // A history that fails to load must not read as a plan with no
             // history, so an empty list here is only ever the real answer.
             revisions = (try? await children?.revisions(planID: planID, member: member)) ?? []
+            goals = (try? await children?.goals(planID: planID, member: member)) ?? []
+            actions = (try? await children?.actions(planID: planID, member: member)) ?? []
+            progress = (try? await children?.progress(planID: planID, member: member)) ?? []
         } catch PlanRecordRepositoryError.permissionDenied {
             phase = .permissionDenied
         } catch PlanRecordRepositoryError.unavailable {
