@@ -87,7 +87,8 @@ struct CanonicalPlanDetailView: View {
             let created = CanonicalPlanDetailState(
                 planID: planID,
                 repository: repository,
-                children: dependencies.planChildRepository
+                children: dependencies.planChildRepository,
+                auditing: dependencies.planExportAuditing
             )
             state = created
             await created.load(member: member)
@@ -174,6 +175,27 @@ struct CanonicalPlanDetailView: View {
                                     .font(.caption)
                                     .foregroundStyle(TMIColors.textSecondary)
                             }
+                        }
+                    }
+                }
+
+                if state.canExport(member) {
+                    section("Export") {
+                        // Exporting is a separate permission from reading, and
+                        // it is recorded before anything is produced.
+                        ForEach(PlanExportKind.allCases, id: \.self) { kind in
+                            Button("Export \(kind.title.lowercased())") {
+                                Task { await state.export(kind: kind, member: member) }
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(state.isMutating)
+                            .accessibilityIdentifier("planDetail.export.\(kind.rawValue)")
+                        }
+                        if let message = state.exportMessage {
+                            Text(message)
+                                .font(.footnote)
+                                .foregroundStyle(TMIColors.textSecondary)
+                                .accessibilityIdentifier("planDetail.exportMessage")
                         }
                     }
                 }

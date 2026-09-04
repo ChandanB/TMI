@@ -18,6 +18,7 @@ nonisolated struct AppDependencies: Sendable {
     let studentModeRepository: StudentModeRepository?
     let planRepository: (any PlanRecordRepository)?
     let planChildRepository: (any PlanChildRepositoryProtocol)?
+    let planExportAuditing: (any PlanExportAuditing)?
     let careerRelationshipRepository: (any CareerRelationshipProviding)?
     let logger: TMILogger
 
@@ -31,6 +32,7 @@ nonisolated struct AppDependencies: Sendable {
         studentModeRepository: StudentModeRepository? = nil,
         planRepository: (any PlanRecordRepository)? = nil,
         planChildRepository: (any PlanChildRepositoryProtocol)? = nil,
+        planExportAuditing: (any PlanExportAuditing)? = nil,
         careerRelationshipRepository: (any CareerRelationshipProviding)? = nil,
         logger: TMILogger
     ) {
@@ -43,6 +45,7 @@ nonisolated struct AppDependencies: Sendable {
         self.studentModeRepository = studentModeRepository
         self.planRepository = planRepository
         self.planChildRepository = planChildRepository
+        self.planExportAuditing = planExportAuditing
         self.careerRelationshipRepository = careerRelationshipRepository
         self.logger = logger
     }
@@ -92,6 +95,7 @@ nonisolated struct AppDependencies: Sendable {
             studentModeRepository: .firebase(),
             planRepository: CanonicalPlanRepository(firestore: firestore),
             planChildRepository: PlanChildRepository(firestore: firestore),
+            planExportAuditing: FirebasePlanExportAuditing(),
             careerRelationshipRepository: CareerRelationshipRepository(
                 firestore: firestore
             ),

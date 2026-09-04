@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 
 @MainActor
@@ -21,15 +22,18 @@ final class CanonicalPlanDetailState {
     private let planID: String
     private let repository: any PlanRecordRepository
     private let children: (any PlanChildRepositoryProtocol)?
+    private let auditing: (any PlanExportAuditing)?
 
     init(
         planID: String,
         repository: any PlanRecordRepository,
-        children: (any PlanChildRepositoryProtocol)? = nil
+        children: (any PlanChildRepositoryProtocol)? = nil,
+        auditing: (any PlanExportAuditing)? = nil
     ) {
         self.planID = planID
         self.repository = repository
         self.children = children
+        self.auditing = auditing
     }
 
     /// The share of due actions actually done, which an educator can recount
@@ -41,6 +45,77 @@ final class CanonicalPlanDetailState {
         actions = (try? await children?.actions(planID: planID, member: member)) ?? actions
         progress = (try? await children?.progress(planID: planID, member: member)) ?? progress
     }
+
+    private(set) var exportedPDF: Data?
+    private(set) var exportMessage: String?
+
+    /// Exporting is its own permission, separate from reading the plan.
+    func canExport(_ member: MembershipContext) -> Bool {
+        member.capabilities.contains(.reportExport)
+            && member.capabilities.contains(.studentReadDetail)
+    }
+
+    /// Records the export, then builds and renders it.
+    ///
+    /// The audit identifier is requested first and the export is abandoned if
+    /// it cannot be obtained. A child's record does not leave the building
+    /// without something, somewhere, recording that it did.
+    func export(kind: PlanExportKind, member: MembershipContext) async {
+        guard let plan, !isMutating else { return }
+        guard let auditing else {
+            exportMessage = PlanExportAuditError.unavailable.errorDescription
+            return
+        }
+        isMutating = true
+        exportMessage = nil
+        exportedPDF = nil
+        defer { isMutating = false }
+
+        let auditID: String
+        do {
+            auditID = try await auditing.recordExport(
+                planID: plan.id,
+                studentID: plan.studentIDs.sorted().first ?? "",
+                kind: kind,
+                districtID: plan.districtID
+            )
+        } catch let error as PlanExportAuditError {
+            exportMessage = error.errorDescription
+            return
+        } catch {
+            exportMessage = PlanExportAuditError.unavailable.errorDescription
+            return
+        }
+
+        let material = PlanExportMaterial(
+            planID: plan.id,
+            studentID: plan.studentIDs.sorted().first ?? "",
+            studentDisplayName: studentDisplayName ?? "This student",
+            model: plan.model,
+            rationale: [],
+            goals: goals,
+            actions: actions,
+            progress: progress,
+            restrictedNotes: []
+        )
+
+        do {
+            let document = try PlanExportProjection.document(
+                kind: kind,
+                material: material,
+                capabilities: member.capabilities,
+                auditID: auditID
+            )
+            exportedPDF = PlanExportRenderer.pdfData(for: document)
+            exportMessage = exportedPDF == nil
+                ? "The export could not be rendered."
+                : "Exported \(kind.title.lowercased()), audit \(auditID)."
+        } catch {
+            exportMessage = "You do not have access to export this plan."
+        }
+    }
+
+    var studentDisplayName: String?
 
     var plan: PlanRecord? {
         if case .loaded(let plan) = phase { return plan }
