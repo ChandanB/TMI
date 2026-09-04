@@ -1,3 +1,4 @@
+import FirebaseFunctions
 import Foundation
 import Testing
 @testable import TMI
@@ -17,6 +18,127 @@ struct InterestApprovalAvailabilityTests {
         #expect(message.contains("deploy"))
         // It must not read like a transient failure the reviewer should retry.
         #expect(!message.contains("try again later"))
+    }
+
+    @Test("An undeployed function is reported as unavailable, not as a save failure")
+    @MainActor
+    func notFoundBecomesApprovalUnavailable() async throws {
+        let approval = try approval()
+        let service = StudentInterestService(
+            approvalBackend: StubApprovalBackend(
+                failure: NSError(
+                    domain: FunctionsErrorDomain,
+                    code: FunctionsErrorCode.notFound.rawValue
+                )
+            )
+        )
+
+        let error = await #expect(throws: StudentInterestService.StudentInterestError.self) {
+            _ = try await service.approve(approval)
+        }
+        guard case .approvalUnavailable = try #require(error) else {
+            Issue.record("Expected approvalUnavailable, got \(String(describing: error)).")
+            return
+        }
+    }
+
+    @Test("Other callable failures still report as save failures")
+    @MainActor
+    func otherFailuresRemainSaveFailures() async throws {
+        let approval = try approval()
+        // Only NOT_FOUND means the function is missing. An internal error is a
+        // genuine failure and must not be excused as a deployment gap.
+        let service = StudentInterestService(
+            approvalBackend: StubApprovalBackend(
+                failure: NSError(
+                    domain: FunctionsErrorDomain,
+                    code: FunctionsErrorCode.internal.rawValue
+                )
+            )
+        )
+
+        let error = await #expect(throws: StudentInterestService.StudentInterestError.self) {
+            _ = try await service.approve(approval)
+        }
+        guard case .saveFailed = try #require(error) else {
+            Issue.record("Expected a save failure, got \(String(describing: error)).")
+            return
+        }
+    }
+
+    /// A submitted response with one scored answer, plus the analysis derived
+    /// from it — the state a reviewer actually approves from.
+    private func approval() throws -> StudentInterestApproval {
+        let definition = try SurveyDefinition(
+            id: "interest-discovery",
+            version: 3,
+            title: "Interest discovery",
+            publishedAt: Date(timeIntervalSince1970: 1_000),
+            questions: [
+                .init(
+                    id: "single",
+                    prompt: "Pick one",
+                    kind: .singleChoice,
+                    isRequired: false,
+                    options: [.init(id: "science", label: "Science")]
+                ),
+            ],
+            interestRules: [
+                .init(
+                    questionID: "single",
+                    optionID: "science",
+                    interestID: "science",
+                    interestName: "Science",
+                    category: "academic",
+                    clusterID: "stem",
+                    clusterName: "Science and Technology",
+                    weight: 3
+                ),
+            ]
+        )
+        let assignment = try SurveyAssignment(
+            assignmentID: "assignment-1",
+            attemptID: "attempt-1",
+            districtID: "district-1",
+            studentID: "student-1",
+            definitionID: definition.id,
+            definitionVersion: definition.version,
+            state: .active,
+            assignedAt: Date(timeIntervalSince1970: 2_000)
+        )
+        var response = SurveyResponse(assignment: assignment, definition: definition)
+        _ = try response.apply(
+            answer: .single("science"),
+            questionID: "single",
+            operationID: "answer-single"
+        )
+        try response.markSubmitted(
+            operationID: "submit-1",
+            submittedAt: Date(timeIntervalSince1970: 4_000),
+            serverRecordVersion: response.recordVersion + 1,
+            definition: definition,
+            sessionID: "session-1"
+        )
+
+        return StudentInterestApproval(
+            districtID: "district-1",
+            studentID: "student-1",
+            response: response,
+            analysis: try InterestAnalysis.analyze(
+                response: response,
+                catalog: definition.interestRules
+            ),
+            interestIDs: ["science"],
+            operationID: "approve-1"
+        )
+    }
+}
+
+private struct StubApprovalBackend: InterestApprovalBackend {
+    let failure: Error
+
+    func approve(_ request: InterestApprovalRequest) async throws -> Int {
+        throw failure
     }
 }
 

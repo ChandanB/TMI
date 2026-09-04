@@ -15,6 +15,58 @@ nonisolated struct StudentInterestReview: Sendable, Identifiable {
     let analysis: InterestAnalysisResult
 }
 
+/// Invokes the trusted approval callable.
+///
+/// Exists so the mapping of an undeployed function onto an actionable error
+/// can be exercised without a network or an emulator.
+nonisolated struct InterestApprovalRequest: Sendable, Equatable {
+    let districtID: String
+    let studentID: String
+    let responseID: String
+    let expectedRecordVersion: Int
+    let operationID: String
+    let algorithmVersion: Int
+    let definitionID: String
+    let definitionVersion: Int
+    /// Only the selection travels. The server derives each interest's name,
+    /// category, strength and rank from the stored submission, so no client
+    /// authors district data by hand.
+    let interestIDs: [String]
+}
+
+nonisolated protocol InterestApprovalBackend: Sendable {
+    /// Returns how many interests the server actually approved.
+    func approve(_ request: InterestApprovalRequest) async throws -> Int
+}
+
+nonisolated struct FirebaseInterestApprovalBackend: InterestApprovalBackend {
+    private let functions: Functions
+
+    init(functions: Functions = .functions(region: "us-central1")) {
+        self.functions = functions
+    }
+
+    func approve(_ request: InterestApprovalRequest) async throws -> Int {
+        let result = try await functions.httpsCallable("approveSurveyInterests").call([
+            "districtID": request.districtID,
+            "studentID": request.studentID,
+            "responseID": request.responseID,
+            "expectedRecordVersion": request.expectedRecordVersion,
+            "idempotencyKey": request.operationID,
+            "reasonCode": "educator-interest-approval",
+            "algorithmVersion": request.algorithmVersion,
+            "definitionID": request.definitionID,
+            "definitionVersion": request.definitionVersion,
+            "interestIDs": request.interestIDs,
+        ])
+        guard let payload = result.data as? [String: Any],
+              let approvedCount = payload["approvedCount"] as? Int else {
+            return 0
+        }
+        return approvedCount
+    }
+}
+
 nonisolated struct StudentInterestApproval: Sendable {
     let districtID: String
     let studentID: String
@@ -57,15 +109,18 @@ final class StudentInterestService {
         }
     }
 
-    private let db: Firestore
-    private let functions: Functions
+    // Resolved on first use, not at construction: `.firestore()` traps when no
+    // FirebaseApp is configured, and the approval failure paths never read it.
+    private let makeDB: @MainActor () -> Firestore
+    private var db: Firestore { makeDB() }
+    private let approvalBackend: InterestApprovalBackend
 
-    private init(
-        db: Firestore = .firestore(),
-        functions: Functions = .functions(region: "us-central1")
+    init(
+        db: @autoclosure @escaping @MainActor () -> Firestore = .firestore(),
+        approvalBackend: InterestApprovalBackend = FirebaseInterestApprovalBackend()
     ) {
-        self.db = db
-        self.functions = functions
+        self.makeDB = db
+        self.approvalBackend = approvalBackend
     }
 
     func getStudentInterests(districtID: String, studentID: String) async throws -> [StudentInterest] {
@@ -176,23 +231,20 @@ final class StudentInterestService {
             throw StudentInterestError.saveFailed("Select at least one proposed interest.")
         }
         do {
-            let result = try await self.functions.httpsCallable("approveSurveyInterests").call([
-                "districtID": approval.districtID,
-                "studentID": approval.studentID,
-                "responseID": approval.response.responseID,
-                "expectedRecordVersion": approval.response.recordVersion,
-                "idempotencyKey": approval.operationID,
-                "reasonCode": "educator-interest-approval",
-                "algorithmVersion": approval.analysis.algorithmVersion,
-                "definitionID": approval.analysis.definitionID,
-                "definitionVersion": approval.analysis.definitionVersion,
-                // Only the selection travels. The server derives each interest's
-                // name, category, strength and rank from the stored submission,
-                // so this client cannot author district data by hand.
-                "interestIDs": selected.map(\.interestID).sorted(),
-            ])
-            guard let payload = result.data as? [String: Any],
-                  payload["approvedCount"] as? Int == selected.count else {
+            let approvedCount = try await approvalBackend.approve(
+                InterestApprovalRequest(
+                    districtID: approval.districtID,
+                    studentID: approval.studentID,
+                    responseID: approval.response.responseID,
+                    expectedRecordVersion: approval.response.recordVersion,
+                    operationID: approval.operationID,
+                    algorithmVersion: approval.analysis.algorithmVersion,
+                    definitionID: approval.analysis.definitionID,
+                    definitionVersion: approval.analysis.definitionVersion,
+                    interestIDs: selected.map(\.interestID).sorted()
+                )
+            )
+            guard approvedCount == selected.count else {
                 throw StudentInterestError.saveFailed("The server returned an incomplete approval result.")
             }
             return try await getStudentInterests(
