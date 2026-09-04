@@ -5,6 +5,7 @@
 //  Career data models and pathway definitions
 //
 
+import CryptoKit
 import Foundation
 
 // MARK: - Career Path
@@ -23,7 +24,7 @@ struct CareerPath: Codable, Identifiable, Hashable {
     let color: String // Hex color
 
     init(
-        id: UUID = UUID(),
+        id: UUID? = nil,
         title: String,
         category: String,
         subcategory: String = "",
@@ -35,7 +36,10 @@ struct CareerPath: Codable, Identifiable, Hashable {
         icon: String,
         color: String
     ) {
-        self.id = id
+        // A random id would be new on every launch, so a saved or plan-linked
+        // career would stop resolving as soon as the app restarted. Derive it
+        // from the career's identity instead.
+        self.id = id ?? CareerPath.stableID(category: category, title: title)
         self.title = title
         self.category = category
         self.subcategory = subcategory
@@ -198,6 +202,51 @@ enum EducationLevel: String, Codable, Hashable {
     case vocational = "Vocational Training"
     case certification = "Professional Certification"
     case varies = "Varies"
+}
+
+extension CareerPath {
+    /// A stable identifier for a catalog entry.
+    ///
+    /// Derived from the career's own identity — category and title, compared
+    /// the way a person would read them — so the same career keeps the same id
+    /// across launches, catalog rebuilds, and devices. Two entries that
+    /// normalize alike are the same career and collide deliberately; that is
+    /// what makes the collision visible instead of silently duplicating.
+    static func stableID(category: String, title: String) -> UUID {
+        let key = "\(normalizedIdentityComponent(category))/\(normalizedIdentityComponent(title))"
+        var digest = Array(SHA256.hash(data: Data(key.utf8)).prefix(16))
+        // Name-based UUID, RFC 4122 version 5 layout.
+        digest[6] = (digest[6] & 0x0F) | 0x50
+        digest[8] = (digest[8] & 0x3F) | 0x80
+        return UUID(uuid: (
+            digest[0], digest[1], digest[2], digest[3],
+            digest[4], digest[5], digest[6], digest[7],
+            digest[8], digest[9], digest[10], digest[11],
+            digest[12], digest[13], digest[14], digest[15]
+        ))
+    }
+
+    /// Case, spacing and punctuation are presentation, not identity.
+    static func normalizedIdentityComponent(_ value: String) -> String {
+        let folded = value.folding(
+            options: [.diacriticInsensitive, .caseInsensitive],
+            locale: nil
+        )
+        var words: [String] = []
+        var current = ""
+        for scalar in folded.unicodeScalars {
+            if CharacterSet.alphanumerics.contains(scalar) {
+                current.unicodeScalars.append(scalar)
+            } else if !current.isEmpty {
+                words.append(current)
+                current = ""
+            }
+        }
+        if !current.isEmpty {
+            words.append(current)
+        }
+        return words.joined(separator: "-")
+    }
 }
 
 struct SalaryRange: Codable, Hashable {
