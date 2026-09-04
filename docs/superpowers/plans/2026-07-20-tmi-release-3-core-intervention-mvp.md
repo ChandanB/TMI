@@ -305,7 +305,9 @@ git commit -m "feat: complete plan lifecycle experience"
 
 **Status: partly done** (`9a4afa2`). `PlanExportProjection` decides what an export may contain before anything renders; redaction is never left to the view.
 
-Not done: `PlanExportRenderer`, and the trusted function issuing audit identifiers. The projection accepts an audit ID it does not yet mint.
+Steps 2 and 3 are now done. `PlanExportRenderer` (`ee9f9f1`) turns the authorized document into stable pages and a PDF, repeating the classification and audit identifier on every page. Export is reachable from plan detail (`5b98bca`), and `recordPlanExport` (`571f1c6`) writes the audit event and returns its id.
+
+The client refuses to export without a server-minted identifier, because a client-generated one would read as an assurance that the export was traceable while nothing recorded it. `districts/{id}/auditEvents` is write-denied to clients by design, so this cannot be worked around locally — it needs the function deployed.
 
 **Files:**
 - Create: `TMI/Features/Plans/PlanExportProjection.swift`
