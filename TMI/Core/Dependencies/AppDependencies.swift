@@ -17,6 +17,7 @@ nonisolated struct AppDependencies: Sendable {
     let studentDetailRepository: any StudentDetailRepository
     let studentModeRepository: StudentModeRepository?
     let planRepository: (any PlanRecordRepository)?
+    let planChildRepository: (any PlanChildRepositoryProtocol)?
     let logger: TMILogger
 
     init(
@@ -28,6 +29,7 @@ nonisolated struct AppDependencies: Sendable {
         studentDetailRepository: any StudentDetailRepository,
         studentModeRepository: StudentModeRepository? = nil,
         planRepository: (any PlanRecordRepository)? = nil,
+        planChildRepository: (any PlanChildRepositoryProtocol)? = nil,
         logger: TMILogger
     ) {
         self.runtime = runtime
@@ -38,6 +40,7 @@ nonisolated struct AppDependencies: Sendable {
         self.studentDetailRepository = studentDetailRepository
         self.studentModeRepository = studentModeRepository
         self.planRepository = planRepository
+        self.planChildRepository = planChildRepository
         self.logger = logger
     }
 
@@ -85,6 +88,7 @@ nonisolated struct AppDependencies: Sendable {
             studentDetailRepository: Release1StudentDetailRepository(students: students),
             studentModeRepository: .firebase(),
             planRepository: CanonicalPlanRepository(firestore: firestore),
+            planChildRepository: PlanChildRepository(firestore: firestore),
             logger: .production
         )
     }

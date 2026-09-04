@@ -767,7 +767,21 @@ service cloud.firestore {
             planID,
             planData(districtID, planID)
           );
-          allow write: if false;
+          // Revisions froze through a callable. With Functions undeployed the
+          // freeze happens on the client, so the guarantees that made a
+          // revision worth trusting are enforced here: it belongs to this
+          // plan, it names its author honestly, and once written nothing can
+          // change it. A rewritable history is not evidence of anything.
+          allow create: if canWritePlan(
+              districtID,
+              planID,
+              planData(districtID, planID)
+            )
+            && request.resource.data.get('planID', '') == planID
+            && request.resource.data.get('frozenBy', '') == request.auth.uid
+            && request.resource.data.get('sequence', 0) is int
+            && request.resource.data.get('sequence', 0) > 0;
+          allow update, delete: if false;
         }
 
         match /progress/{entryID} {

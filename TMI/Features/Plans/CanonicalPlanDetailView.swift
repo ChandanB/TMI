@@ -34,7 +34,11 @@ struct CanonicalPlanDetailView: View {
         .accessibilityIdentifier("planDetail.screen")
         .task(id: planID) {
             guard let repository = dependencies.planRepository, let member else { return }
-            let created = CanonicalPlanDetailState(planID: planID, repository: repository)
+            let created = CanonicalPlanDetailState(
+                planID: planID,
+                repository: repository,
+                children: dependencies.planChildRepository
+            )
             state = created
             await created.load(member: member)
         }

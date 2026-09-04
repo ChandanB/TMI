@@ -177,6 +177,94 @@ describe("client-side canonical writes", () => {
     await assertSucceeds(getDoc(planRef));
   });
 
+  const seedPlan = async (planID: string) => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `districts/${districtID}/plans/${planID}`), {
+        districtId: districtID,
+        studentIDs: ["student-new"],
+        schoolIDs: [schoolID],
+        assignedMemberIDs: ["teacher-1"],
+        status: "pendingApproval",
+        title: "Chase Your Space",
+        createdBy: "teacher-1",
+      });
+      await setDoc(doc(context.firestore(), `districts/${districtID}/students/student-new`), {
+        districtId: districtID,
+        schoolId: schoolID,
+        displayName: "New Student",
+        normalizedDisplayName: "new student",
+        grade: "7",
+        assignedMemberIDs: ["teacher-1"],
+        isArchived: false,
+        schemaVersion: 1,
+        recordVersion: 1,
+      });
+    });
+  };
+
+  const revision = (overrides: Record<string, unknown> = {}) => ({
+    planID: "plan-rev",
+    sequence: 1,
+    reason: "approved",
+    status: "active",
+    title: "Chase Your Space",
+    frozenBy: "teacher-1",
+    ...overrides,
+  });
+
+  it("lets a plan writer freeze a revision", async () => {
+    await seedPlan("plan-rev");
+    const db = teacherDb("teacher-1");
+    await assertSucceeds(
+      setDoc(doc(db, `districts/${districtID}/plans/plan-rev/revisions/r1`), revision()),
+    );
+  });
+
+  it("never lets a frozen revision be rewritten or removed", async () => {
+    await seedPlan("plan-rev");
+    const db = teacherDb("teacher-1");
+    const ref = doc(db, `districts/${districtID}/plans/plan-rev/revisions/r1`);
+    await assertSucceeds(setDoc(ref, revision()));
+
+    // A history that can be rewritten is not evidence of anything.
+    await assertFails(updateDoc(ref, { title: "Something else" }));
+    const { deleteDoc } = await import("firebase/firestore");
+    await assertFails(deleteDoc(ref));
+  });
+
+  it("refuses a revision that misattributes its author", async () => {
+    await seedPlan("plan-rev");
+    const db = teacherDb("teacher-1");
+    await assertFails(
+      setDoc(
+        doc(db, `districts/${districtID}/plans/plan-rev/revisions/r2`),
+        revision({ frozenBy: "teacher-2" }),
+      ),
+    );
+  });
+
+  it("refuses a revision claiming to belong to another plan", async () => {
+    await seedPlan("plan-rev");
+    const db = teacherDb("teacher-1");
+    await assertFails(
+      setDoc(
+        doc(db, `districts/${districtID}/plans/plan-rev/revisions/r3`),
+        revision({ planID: "plan-other" }),
+      ),
+    );
+  });
+
+  it("does not let a non-writer freeze a revision", async () => {
+    await seedPlan("plan-rev");
+    const db = teacherDb("teacher-2");
+    await assertFails(
+      setDoc(
+        doc(db, `districts/${districtID}/plans/plan-rev/revisions/r4`),
+        revision({ frozenBy: "teacher-2" }),
+      ),
+    );
+  });
+
   it("does not let a teacher read a plan that does not list them", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(

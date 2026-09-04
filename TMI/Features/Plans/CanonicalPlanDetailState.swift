@@ -17,10 +17,16 @@ final class CanonicalPlanDetailState {
 
     private let planID: String
     private let repository: any PlanRecordRepository
+    private let children: (any PlanChildRepositoryProtocol)?
 
-    init(planID: String, repository: any PlanRecordRepository) {
+    init(
+        planID: String,
+        repository: any PlanRecordRepository,
+        children: (any PlanChildRepositoryProtocol)? = nil
+    ) {
         self.planID = planID
         self.repository = repository
+        self.children = children
     }
 
     var plan: PlanRecord? {
@@ -31,6 +37,9 @@ final class CanonicalPlanDetailState {
     func load(member: MembershipContext) async {
         do {
             phase = .loaded(try await repository.plan(id: planID, member: member))
+            // A history that fails to load must not read as a plan with no
+            // history, so an empty list here is only ever the real answer.
+            revisions = (try? await children?.revisions(planID: planID, member: member)) ?? []
         } catch PlanRecordRepositoryError.permissionDenied {
             phase = .permissionDenied
         } catch PlanRecordRepositoryError.unavailable {
