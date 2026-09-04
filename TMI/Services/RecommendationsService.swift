@@ -132,19 +132,6 @@ final class RecommendationsService {
         try await collection.document(id).delete()
     }
     
-    /// Get personalized dashboard for a student
-    func getPersonalizedDashboard(for student: Student) async throws -> PersonalizedDashboard {
-        // In production, this would aggregate student data and generate personalized content
-        // For now, return stub dashboard
-        return PersonalizedDashboard(
-            studentId: student.id ?? "",
-            trendingCareers: [],
-            trendingInterests: [],
-            recommendedResources: [],
-            upcomingMilestones: [],
-            recentAchievements: []
-        )
-    }
     
     /// Get TMI plan suggestions for a student
     func getTMIPlanSuggestions(for student: Student) async throws -> [TMIPlanSuggestion] {
@@ -252,33 +239,6 @@ extension Recommendation {
         }
         
         return data
-    }
-}
-
-// MARK: - Personalized Dashboard
-
-struct PersonalizedDashboard: Codable, Sendable {
-    let studentId: String
-    let trendingCareers: [Career]
-    let trendingInterests: [Interest]
-    let recommendedResources: [Resource]
-    let upcomingMilestones: [Milestone]
-    let recentAchievements: [Achievement]
-    
-    struct Milestone: Codable, Identifiable, Sendable {
-        let id: String
-        let title: String
-        let description: String
-        let targetDate: Date
-        let progress: Double
-    }
-    
-    struct Achievement: Codable, Identifiable, Sendable {
-        let id: String
-        let title: String
-        let description: String
-        let achievedAt: Date
-        let icon: String
     }
 }
 

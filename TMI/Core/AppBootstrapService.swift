@@ -30,15 +30,12 @@ final class AppBootstrapService {
     /// Cached interest library (global)
     private(set) var cachedInterests: [Interest] = []
     
-    /// Cached career library (global)
-    private(set) var cachedCareers: [Career] = []
-    
     /// Cached resource library (global + district)
     private(set) var cachedResources: [Resource] = []
     
     /// Whether caches are warm and ready
     var isCacheReady: Bool {
-        !cachedInterests.isEmpty || !cachedCareers.isEmpty
+        !cachedInterests.isEmpty
     }
     
     // MARK: - Bootstrap Operations
@@ -70,10 +67,6 @@ final class AppBootstrapService {
             // Always load global libraries
             group.addTask {
                 await self.loadInterestLibrary()
-            }
-            
-            group.addTask {
-                await self.loadCareerLibrary()
             }
             
             group.addTask {
@@ -119,7 +112,6 @@ final class AppBootstrapService {
     /// Invalidate all caches (e.g., on sign out)
     func invalidateCaches() {
         cachedInterests = []
-        cachedCareers = []
         cachedResources = []
         lastBootstrapTime = nil
         bootstrapErrors.removeAll()
@@ -137,17 +129,6 @@ final class AppBootstrapService {
         } catch {
             bootstrapErrors["interests"] = error
             print("[AppBootstrap] Failed to load interests: \(error.localizedDescription)")
-        }
-    }
-    
-    private func loadCareerLibrary() async {
-        do {
-            let careers = try await CareerLibraryService.shared.fetchAllCareers()
-            cachedCareers = careers
-            print("[AppBootstrap] Loaded \(careers.count) careers")
-        } catch {
-            bootstrapErrors["careers"] = error
-            print("[AppBootstrap] Failed to load careers: \(error.localizedDescription)")
         }
     }
     
@@ -197,9 +178,6 @@ final class AppBootstrapService {
     }
     
     /// Get cached careers (returns empty if not loaded)
-    func getCachedCareers() -> [Career] {
-        cachedCareers
-    }
     
     /// Get cached resources (returns empty if not loaded)
     func getCachedResources() -> [Resource] {

@@ -275,37 +275,3 @@ struct SalaryRange: Codable, Hashable {
 
 // MARK: - Career Match Result
 
-struct CareerMatchResult: Identifiable, Hashable {
-    let id: UUID
-    let career: CareerPath
-    let score: Double // 0.0 - 1.0
-    let matchingInterests: [String]
-    let suggestedTMIModules: [TMIPlanModel]
-
-    init(
-        id: UUID = UUID(),
-        career: CareerPath,
-        score: Double,
-        matchingInterests: [String],
-        suggestedTMIModules: [TMIPlanModel],
-    ) {
-        self.id = id
-        self.career = career
-        self.score = score
-        self.matchingInterests = matchingInterests
-        self.suggestedTMIModules = suggestedTMIModules
-    }
-
-    var matchPercentage: Int {
-        Int(score * 100)
-    }
-
-    // Hashable conformance
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-
-    static func == (lhs: CareerMatchResult, rhs: CareerMatchResult) -> Bool {
-        lhs.id == rhs.id
-    }
-}

@@ -11,7 +11,6 @@ struct TimeoutGuardTests {
     }
 
     private static let sourceContracts: [SourceContract] = [
-        .init(path: "TMI/Services/Library/CareerLibraryService.swift", tenSecondGuards: 2, fifteenSecondGuards: 0),
         .init(path: "TMI/Services/Library/InterestLibraryService.swift", tenSecondGuards: 2, fifteenSecondGuards: 0),
         .init(path: "TMI/Services/Library/ResourceLibraryService.swift", tenSecondGuards: 2, fifteenSecondGuards: 0),
         .init(path: "TMI/Services/StudentData/PlanResourceLinkService.swift", tenSecondGuards: 2, fifteenSecondGuards: 0),
@@ -84,7 +83,7 @@ struct TimeoutGuardTests {
         #expect(helperSource.contains("operation: @escaping @MainActor @Sendable"))
         #expect(interestsStateSource.contains("catch ConcurrencyError.timeout"))
         #expect(interestsStateSource.contains("IdentifiableError(message: \"Fetch timed out\")"))
-        #expect(totalGuards == 26)
+        #expect(totalGuards == 24)
     }
 }
 
