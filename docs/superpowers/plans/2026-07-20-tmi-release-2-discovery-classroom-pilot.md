@@ -216,7 +216,7 @@ git commit -m "feat: approve canonical student interests"
 
 ## Task 5: Consolidate the career catalog and deterministic matcher
 
-**Status: mostly done.** Stable career identity (`07116fa`), the matcher and relationship state (`05a50ac`), and the canonical catalog reader (`8506bbb`).
+**Status: mostly done.** Stable career identity (`07116fa`, corrected to a Firestore-safe separator in `7b2f0b5`), the matcher and relationship state (`05a50ac`), and the canonical catalog reader (`8506bbb`, made Firestore-backed by default in `7b2f0b5`).
 
 Step 3 is now **done** (`a98cabf`). The duplicate types went once the legacy views were retired in `68be25a`. `CareerPath`, `SalaryRange` and `EducationLevel` remain as the shape of the bundled catalog data and retire with Task 7's migration.
 
@@ -261,11 +261,11 @@ git commit -m "feat: add explainable career matching"
 
 ## Task 6: Build career discovery, detail, and comparison
 
-**Status: steps 1-2 done** (`2f98925`). Canonical discovery, detail and comparison are built on `CareerRecord` and reached from the student's Careers tab. Discovery, filter and comparison rules live in `CareerDiscoveryState` with tests.
+**Status: core workflow done** (`2f98925`, `5b74b11`). Canonical discovery, detail and comparison are built on `CareerRecord` and reached from the student's Careers tab. Save, dismiss, recently viewed, compare selection, and share now use the canonical student-career relationship path; plan attachment remains visibly disabled. Discovery, filter and comparison rules live in `CareerDiscoveryState` with tests.
 
 Step 3 is now **done** (`68be25a`). The legacy career views were retired together with the legacy plan stack, which is what they were entangled with.
 
-Not yet done: `TMIUITests/CareerExplorerUITests.swift`. It needs a career fixture in `UITestingLaunchConfiguration` alongside the existing student-detail fixtures.
+Not yet done: `TMIUITests/CareerExplorerUITests.swift`. It needs a career fixture in `UITestingLaunchConfiguration` alongside the existing student-detail fixtures. The richer detail fields named below also need sourced catalog fields before they can render anything beyond the current summary, education, interests, and sourced pay/outlook seam.
 
 **Files:**
 - Replace: `TMI/Views/Career Explorer/CareerExplorerView.swift`
@@ -295,7 +295,9 @@ git commit -m "feat: deliver career discovery workflow"
 
 ## Task 7: Migrate discovery data and remove duplicate engines
 
-**Status: not started.** The 537-entry catalog is still compiled into the app and mapped by `BundledCareerCatalog`. Moving it to `catalogs/careers/items/{id}` needs a seeding script and a Firestore-backed `CareerCatalogProviding`.
+**Status: mostly done** (`7b2f0b5`, `5b74b11`). The checked-in fixture contains 537 Firestore-safe catalog records, Release 2 has a specialized idempotent migration/reconciliation path, and production reads approved records from `catalogs/careers/items/{id}`. Saved legacy aliases now migrate into the same canonical relationship shape the app writes. `SurveyService` is retired.
+
+Still open: apply and reconcile the migration against the intended staging/project data, remove the compiled `BundledCareerCatalog`/`CareerPath` source after its generator provenance is preserved, retire the inert `StudentCareerService`/`StudentCareerState` prefetch island, and complete acceptance testing.
 
 Worth knowing before starting: `CareerLibraryService` used to read a root-level `careers` collection that no rule matches, so every read was refused by the deny-all fallback. It was retired in `a98cabf`. Any new reader must use the canonical `catalogs/` path.
 
