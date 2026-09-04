@@ -13,11 +13,12 @@ nonisolated struct CareerDiscoveryState: Equatable, Sendable {
     var query: String = ""
     var educationLevels: Set<CareerEducationLevel> = []
     var clusterIDs: Set<String> = []
+    var showRecentlyViewed = false
     /// Careers the student picked to compare, in the order they picked them.
     private(set) var comparisonIDs: [String] = []
 
     var hasActiveFilters: Bool {
-        !educationLevels.isEmpty || !clusterIDs.isEmpty
+        !educationLevels.isEmpty || !clusterIDs.isEmpty || showRecentlyViewed
     }
 
     var canCompare: Bool { comparisonIDs.count >= 2 }
@@ -43,9 +44,18 @@ nonisolated struct CareerDiscoveryState: Equatable, Sendable {
         comparisonIDs.removeAll()
     }
 
+    mutating func restoreComparisonIDs(_ careerIDs: [String]) {
+        var seen: Set<String> = []
+        comparisonIDs = careerIDs.filter { seen.insert($0).inserted }
+        if comparisonIDs.count > Self.maximumComparisons {
+            comparisonIDs.removeLast(comparisonIDs.count - Self.maximumComparisons)
+        }
+    }
+
     mutating func clearFilters() {
         educationLevels.removeAll()
         clusterIDs.removeAll()
+        showRecentlyViewed = false
     }
 
     /// Careers to show, ordered by match strength where a match exists.
@@ -55,7 +65,8 @@ nonisolated struct CareerDiscoveryState: Equatable, Sendable {
     func results(
         careers: [CareerRecord],
         matches: [CareerMatch],
-        dismissedIDs: Set<String> = []
+        dismissedIDs: Set<String> = [],
+        recentlyViewedIDs: Set<String> = []
     ) -> [CareerRecord] {
         let rankByID = Dictionary(
             matches.map { ($0.careerID, $0.rank) },
@@ -66,6 +77,9 @@ nonisolated struct CareerDiscoveryState: Equatable, Sendable {
         return careers
             .filter { career in
                 guard !dismissedIDs.contains(career.id) else { return false }
+                guard !showRecentlyViewed || recentlyViewedIDs.contains(career.id) else {
+                    return false
+                }
                 guard educationLevels.isEmpty || educationLevels.contains(career.educationLevel)
                 else { return false }
                 guard clusterIDs.isEmpty || !clusterIDs.isDisjoint(with: Set(career.clusterIDs))

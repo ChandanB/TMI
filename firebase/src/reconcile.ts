@@ -150,7 +150,13 @@ function reconcileTenantOwnership(
   }
   if (/^districts\/[^/]+\/students\/[^/]+\/careers\/[^/]+$/u.test(write.manifest.destinationPath)) {
     const segments = write.manifest.destinationPath.split("/");
-    if (actual.careerId !== segments[5] || actual.state !== "saved") {
+    if (
+      actual.districtID !== segments[1] ||
+      actual.studentID !== segments[3] ||
+      actual.careerID !== segments[5] ||
+      actual.isSaved !== true ||
+      actual.isDismissed !== false
+    ) {
       mismatches.push(`career relationship mismatch: ${write.manifest.destinationPath}`);
     }
     return;

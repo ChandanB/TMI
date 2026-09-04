@@ -7,6 +7,7 @@ import SwiftUI
 struct CanonicalCareerDetailView: View {
     let career: CareerRecord
     let match: CareerMatch?
+    var onViewed: @MainActor () async -> Void = {}
 
     var body: some View {
         ScrollView {
@@ -63,9 +64,15 @@ struct CanonicalCareerDetailView: View {
                         .font(.body)
                 }
 
-                Label("Attaching a career to a plan arrives in Release 3.", systemImage: "clock")
-                    .font(.footnote)
-                    .foregroundStyle(TMIColors.textSecondary)
+                ShareLink(item: shareText) {
+                    Label("Share career", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("careerDetail.share")
+
+                Button("Attach to a plan", systemImage: "link") {}
+                    .buttonStyle(.bordered)
+                    .disabled(true)
                     .accessibilityIdentifier("careerDetail.planAttachmentUnavailable")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -74,6 +81,11 @@ struct CanonicalCareerDetailView: View {
         .navigationTitle(career.title)
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("careerDetail.screen")
+        .task { await onViewed() }
+    }
+
+    private var shareText: String {
+        "\(career.title)\n\n\(career.summary)\n\nEducation: \(career.educationLevel.displayName)"
     }
 
     private var header: some View {

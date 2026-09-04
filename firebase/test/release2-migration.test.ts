@@ -50,6 +50,12 @@ describe("Release 2 discovery migration", () => {
     const plan = buildMigrationPlan(fixture());
     const relationships = plan.writes.filter((write) => write.manifest.destinationPath.includes("/students/student-1/careers/"));
     expect(relationships).toHaveLength(1);
-    expect(relationships[0]?.data.careerId).toBe(relationships[0]?.manifest.destinationPath.split("/").at(-1));
+    expect(relationships[0]?.data.careerID).toBe(relationships[0]?.manifest.destinationPath.split("/").at(-1));
+    expect(relationships[0]?.data.districtID).toBe("district-a");
+    expect(relationships[0]?.data.studentID).toBe("student-1");
+    expect(relationships[0]?.data.isSaved).toBe(true);
+    expect(relationships[0]?.data.isDismissed).toBe(false);
+    expect(relationships[0]?.data.isCompared).toBe(false);
+    expect(relationships[0]?.data.linkedPlanIDs).toEqual([]);
   });
 });

@@ -10,6 +10,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  serverTimestamp,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
@@ -685,6 +686,28 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
           title: "Engineer",
           isApproved: true,
         }),
+        setDoc(
+          doc(
+            db,
+            `districts/${districtID}/students/${studentID}/careers/career-staff`,
+          ),
+          {
+            districtID,
+            studentID,
+            careerID: "career-staff",
+            isSaved: true,
+            isDismissed: false,
+            isCompared: false,
+            linkedPlanIDs: [],
+            lastViewedAt: Timestamp.now(),
+            schemaVersion: 1,
+            recordVersion: 1,
+            createdAt: Timestamp.now(),
+            createdBy: staffUserID,
+            updatedAt: Timestamp.now(),
+            updatedBy: staffUserID,
+          },
+        ),
         setDoc(doc(db, `districts/${districtID}/plans/plan-1`), {
           districtId: districtID,
           studentIDs: [studentID],
@@ -820,7 +843,21 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
       ],
       [
         `districts/${districtID}/students/${studentID}/careers/career-1`,
-        { ...scopedFields, careerID: "career-1", state: "saved" },
+        {
+          ...scopedFields,
+          careerID: "career-1",
+          isSaved: true,
+          isDismissed: false,
+          isCompared: false,
+          linkedPlanIDs: [],
+          lastViewedAt: serverTimestamp(),
+          schemaVersion: 1,
+          recordVersion: 1,
+          createdAt: serverTimestamp(),
+          createdBy: respondentUserID,
+          updatedAt: serverTimestamp(),
+          updatedBy: respondentUserID,
+        },
       ],
       [
         `districts/${districtID}/students/${studentID}/helpRequests/help-1`,
@@ -830,6 +867,21 @@ describe("Student Mode respondent Firestore and Storage boundary", () => {
     for (const [path, data] of writes) {
       await assertSucceeds(setDoc(doc(db, path), data));
     }
+    await assertSucceeds(
+      updateDoc(
+        doc(
+          db,
+          `districts/${districtID}/students/${studentID}/careers/career-staff`,
+        ),
+        {
+          isSaved: false,
+          isDismissed: true,
+          recordVersion: 2,
+          updatedAt: serverTimestamp(),
+          updatedBy: respondentUserID,
+        },
+      ),
+    );
     await assertFails(
       setDoc(
         doc(

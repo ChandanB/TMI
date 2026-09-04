@@ -4,7 +4,14 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import {
+  deleteDoc,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
 import {
   activeMembership,
   makeTestEnvironment,
@@ -105,6 +112,95 @@ describe("canonical Firestore authorization", () => {
     await assertSucceeds(getDoc(doc(db, "districts/d1/students/student-1")));
     await assertFails(getDoc(doc(db, "districts/d1/students/student-2")));
     await assertFails(getDoc(doc(db, "districts/d2/students/student-3")));
+  });
+
+  it("persists only scoped, versioned career relationships", async () => {
+    const db = testEnv
+      .authenticatedContext("teacher-1", trustedClaims("d1"))
+      .firestore();
+    const relationship = doc(
+      db,
+      "districts/d1/students/student-1/careers/technology--frontend-developer",
+    );
+
+    await assertSucceeds(
+      setDoc(relationship, {
+        districtID: "d1",
+        studentID: "student-1",
+        careerID: "technology--frontend-developer",
+        isSaved: true,
+        isDismissed: false,
+        isCompared: false,
+        linkedPlanIDs: [],
+        lastViewedAt: serverTimestamp(),
+        schemaVersion: 1,
+        recordVersion: 1,
+        createdAt: serverTimestamp(),
+        createdBy: "teacher-1",
+        updatedAt: serverTimestamp(),
+        updatedBy: "teacher-1",
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(relationship, {
+        isSaved: false,
+        isDismissed: true,
+        recordVersion: 2,
+        updatedAt: serverTimestamp(),
+        updatedBy: "teacher-1",
+      }),
+    );
+    await assertFails(
+      updateDoc(relationship, {
+        studentID: "student-2",
+        recordVersion: 3,
+        updatedAt: serverTimestamp(),
+        updatedBy: "teacher-1",
+      }),
+    );
+    await assertFails(
+      updateDoc(relationship, {
+        isSaved: true,
+        isDismissed: true,
+        recordVersion: 3,
+        updatedAt: serverTimestamp(),
+        updatedBy: "teacher-1",
+      }),
+    );
+    await assertFails(
+      updateDoc(relationship, {
+        isSaved: true,
+        isDismissed: false,
+        recordVersion: 2,
+        updatedAt: serverTimestamp(),
+        updatedBy: "teacher-1",
+      }),
+    );
+    await assertFails(
+      setDoc(
+        doc(
+          db,
+          "districts/d1/students/student-2/careers/technology--frontend-developer",
+        ),
+        {
+          districtID: "d1",
+          studentID: "student-2",
+          careerID: "technology--frontend-developer",
+          isSaved: true,
+          isDismissed: false,
+          isCompared: false,
+          linkedPlanIDs: [],
+          lastViewedAt: serverTimestamp(),
+          schemaVersion: 1,
+          recordVersion: 1,
+          createdAt: serverTimestamp(),
+          createdBy: "teacher-1",
+          updatedAt: serverTimestamp(),
+          updatedBy: "teacher-1",
+        },
+      ),
+    );
+    await assertFails(deleteDoc(relationship));
   });
 
   it("denies inactive and membership-version-mismatched sessions", async () => {

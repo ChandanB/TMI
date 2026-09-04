@@ -329,7 +329,14 @@ export function buildDiscoveryMigrationPlan(
         return {
           manifest: buildManifest(fixture, syntheticDocument, destinationPath, "mapped"),
           data: {
-            careerId: careerID, state: "saved", savedAt: timestamp,
+            districtID: owner,
+            studentID,
+            careerID,
+            isSaved: true,
+            isDismissed: false,
+            isCompared: false,
+            linkedPlanIDs: [],
+            lastViewedAt: timestamp,
             schemaVersion: fixture.schemaVersion, recordVersion: 1,
             createdAt: timestamp, createdBy: actor, updatedAt: timestamp, updatedBy: actor,
             migrationId: fixture.migrationId, legacyPath: syntheticDocument.path,

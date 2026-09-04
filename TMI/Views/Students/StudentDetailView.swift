@@ -180,6 +180,7 @@ struct StudentDetailView: View {
 }
 
 private struct StudentOperationalHubContent: View {
+    @Environment(\.appDependencies) private var dependencies
     @Bindable var state: StudentDetailState
     @Binding var selectedDestination: StudentHubDestination
 
@@ -413,9 +414,12 @@ private struct StudentOperationalHubContent: View {
                 // Matching is a claim about this student, so it is read where
                 // the student is, not from a global explorer.
                 StudentCareerDiscoveryView(
+                    studentID: student.id,
                     studentName: student.displayName,
                     approvedInterests: careerInterests,
-                    clusters: []
+                    clusters: [],
+                    member: member,
+                    relationshipRepository: dependencies.careerRelationshipRepository
                 )
             } else if domain == .meetingsAndNotes {
                 StudentTimelineView(

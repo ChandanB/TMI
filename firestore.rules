@@ -293,6 +293,139 @@ service cloud.firestore {
         );
     }
 
+    function isValidCareerRelationship(
+      districtID,
+      studentID,
+      careerID,
+      data
+    ) {
+      return data.keys().hasOnly([
+          'districtID',
+          'studentID',
+          'careerID',
+          'isSaved',
+          'isDismissed',
+          'isCompared',
+          'linkedPlanIDs',
+          'lastViewedAt',
+          'respondentSessionID',
+          'schemaVersion',
+          'recordVersion',
+          'createdAt',
+          'createdBy',
+          'updatedAt',
+          'updatedBy'
+        ])
+        && data.keys().hasAll([
+          'districtID',
+          'studentID',
+          'careerID',
+          'isSaved',
+          'isDismissed',
+          'isCompared',
+          'linkedPlanIDs',
+          'schemaVersion',
+          'recordVersion',
+          'createdAt',
+          'createdBy',
+          'updatedAt',
+          'updatedBy'
+        ])
+        && data.get('districtID', '') == districtID
+        && data.get('studentID', '') == studentID
+        && data.get('careerID', '') == careerID
+        && data.get('isSaved', false) is bool
+        && data.get('isDismissed', false) is bool
+        && data.get('isCompared', false) is bool
+        && !(data.get('isSaved', false) && data.get('isDismissed', false))
+        && data.get('linkedPlanIDs', []) is list
+        && data.get('schemaVersion', 0) == 1
+        && data.get('recordVersion', 0) is int
+        && data.get('recordVersion', 0) > 0
+        && data.get('createdAt', null) is timestamp
+        && data.get('createdBy', '') is string
+        && data.get('updatedAt', null) is timestamp
+        && data.get('updatedBy', '') is string
+        && (
+          data.get('lastViewedAt', null) == null
+          || data.get('lastViewedAt', null) is timestamp
+        );
+    }
+
+    function canCreateCareerRelationship(districtID, studentID, careerID) {
+      return (
+          canCollaborateOnStudent(districtID, studentID)
+          || respondentMayWriteCareerRelationship(
+            districtID,
+            studentID,
+            request.resource.data
+          )
+        )
+        && isValidCareerRelationship(
+          districtID,
+          studentID,
+          careerID,
+          request.resource.data
+        )
+        && request.resource.data.get('recordVersion', 0) == 1
+        && request.resource.data.get('createdAt', null) == request.time
+        && request.resource.data.get('updatedAt', null) == request.time
+        && request.resource.data.get('createdBy', '') == request.auth.uid
+        && request.resource.data.get('updatedBy', '') == request.auth.uid;
+    }
+
+    function canUpdateCareerRelationship(districtID, studentID, careerID) {
+      return (
+          canCollaborateOnStudent(districtID, studentID)
+          || respondentMayWriteCareerRelationship(
+            districtID,
+            studentID,
+            request.resource.data
+          )
+        )
+        && isValidCareerRelationship(
+          districtID,
+          studentID,
+          careerID,
+          request.resource.data
+        )
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'districtID',
+          'studentID',
+          'careerID',
+          'linkedPlanIDs',
+          'schemaVersion',
+          'createdAt',
+          'createdBy'
+        ])
+        && request.resource.data.get('recordVersion', 0)
+          == resource.data.get('recordVersion', 0) + 1
+        && request.resource.data.get('updatedAt', null) == request.time
+        && request.resource.data.get('updatedBy', '') == request.auth.uid;
+    }
+
+    // Career choices are shared state: an educator may seed a relationship
+    // and the student may later change it in a different supervised session.
+    // The active respondent claim scopes every write; an optional session ID
+    // records provenance but never becomes permanent ownership of the edge.
+    function respondentMayWriteCareerRelationship(
+      districtID,
+      studentID,
+      data
+    ) {
+      return respondentMay(
+          districtID,
+          studentID,
+          'updateCareerState'
+        )
+        && data.get('districtID', '') == districtID
+        && data.get('studentID', '') == studentID
+        && data.get(
+          'respondentSessionID',
+          request.auth.token.get('tmiSessionID', '')
+        ) == request.auth.token.get('tmiSessionID', '');
+    }
+
     // Draft -> Pending approval -> Active, with pause/complete/archive from
     // there. A completed plan is duplicated into a new cycle rather than
     // reopened, so nothing transitions backwards out of completed.
@@ -611,15 +744,15 @@ service cloud.firestore {
               studentID,
               studentData(districtID, studentID)
             );
-          allow create: if respondentMayWriteRecord(
+          allow create: if canCreateCareerRelationship(
             districtID,
             studentID,
-            'updateCareerState'
+            careerID
           );
-          allow update: if respondentMayUpdateRecord(
+          allow update: if canUpdateCareerRelationship(
             districtID,
             studentID,
-            'updateCareerState'
+            careerID
           );
           allow delete: if false;
         }

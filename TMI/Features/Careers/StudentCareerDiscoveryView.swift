@@ -6,9 +6,12 @@ import SwiftUI
 /// stays visible, because every match on this screen is a claim about them
 /// specifically and it must never be ambiguous whose screen this is.
 struct StudentCareerDiscoveryView: View {
+    let studentID: String
     let studentName: String
     let approvedInterests: [StudentInterest]
     let clusters: [InterestClusterScore]
+    let member: MembershipContext?
+    let relationshipRepository: (any CareerRelationshipProviding)?
     var repository: CareerRepository = CareerRepository()
 
     @State private var state = CareerDiscoveryState()
@@ -18,13 +21,27 @@ struct StudentCareerDiscoveryView: View {
     @State private var matches: [CareerMatch] = []
     @State private var isLoading = true
     @State private var loadError: String?
+    @State private var relationshipError: String?
+    @State private var relationships: [String: CareerRelationship] = [:]
+    @State private var mutatingCareerIDs: Set<String> = []
 
     private var matchesByID: [String: CareerMatch] {
         Dictionary(matches.map { ($0.careerID, $0) }, uniquingKeysWith: { left, _ in left })
     }
 
     private var results: [CareerRecord] {
-        state.results(careers: careers, matches: matches)
+        state.results(
+            careers: careers,
+            matches: matches,
+            dismissedIDs: Set(
+                relationships.values.filter(\.isDismissed).map(\.careerID)
+            ),
+            recentlyViewedIDs: Set(
+                relationships.values.compactMap { relationship in
+                    relationship.lastViewedAt == nil ? nil : relationship.careerID
+                }
+            )
+        )
     }
 
     var body: some View {
@@ -37,6 +54,13 @@ struct StudentCareerDiscoveryView: View {
                     .font(.footnote)
                     .foregroundStyle(TMIColors.errorText)
                     .accessibilityIdentifier("careerDiscovery.limit")
+            }
+
+            if let relationshipError {
+                Text(relationshipError)
+                    .font(.footnote)
+                    .foregroundStyle(TMIColors.errorText)
+                    .accessibilityIdentifier("careerDiscovery.relationshipError")
             }
 
             if approvedInterests.isEmpty {
@@ -77,7 +101,7 @@ struct StudentCareerDiscoveryView: View {
         .padding(.vertical, TMISpacing.xs)
         .searchable(text: $state.query, prompt: "Search careers")
         .accessibilityIdentifier("careerDiscovery.screen")
-        .task { await loadCatalog() }
+        .task(id: studentID) { await loadCatalog() }
         .sheet(isPresented: $comparisonShown) {
             CareerComparisonView(
                 careers: state.comparisonIDs.compactMap { id in careers.first { $0.id == id } },
@@ -94,10 +118,24 @@ struct StudentCareerDiscoveryView: View {
         loadError = nil
         do {
             careers = try await repository.careers()
-            matches = try await repository.matches(
+            matches = CareerMatcher.match(
+                careers: careers,
                 approvedInterests: approvedInterests,
                 clusters: clusters
             )
+            if let member, let relationshipRepository {
+                let loaded = try await relationshipRepository.relationships(
+                    studentID: studentID,
+                    member: member
+                )
+                relationships = Dictionary(
+                    loaded.map { ($0.careerID, $0) },
+                    uniquingKeysWith: { newest, _ in newest }
+                )
+                state.restoreComparisonIDs(
+                    loaded.filter(\.isCompared).map(\.careerID)
+                )
+            }
         } catch {
             careers = []
             matches = []
@@ -129,7 +167,10 @@ struct StudentCareerDiscoveryView: View {
 
     private var filters: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: TMISpacing.xs) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 100), spacing: TMISpacing.xs)],
+                spacing: TMISpacing.xs
+            ) {
                 ForEach(CareerEducationLevel.allCases, id: \.self) { level in
                     let isOn = state.educationLevels.contains(level)
                     Button(level.displayName) {
@@ -143,6 +184,13 @@ struct StudentCareerDiscoveryView: View {
                     .tint(isOn ? TMIColors.aubergine : nil)
                     .accessibilityIdentifier("careerDiscovery.filter.\(level.rawValue)")
                 }
+                Button("Recently viewed") {
+                    state.showRecentlyViewed.toggle()
+                }
+                .buttonStyle(.bordered)
+                .tint(state.showRecentlyViewed ? TMIColors.aubergine : nil)
+                .accessibilityAddTraits(state.showRecentlyViewed ? .isSelected : [])
+                .accessibilityIdentifier("careerDiscovery.filter.recent")
                 if state.hasActiveFilters {
                     Button("Clear") { state.clearFilters() }
                         .buttonStyle(.borderless)
@@ -155,7 +203,13 @@ struct StudentCareerDiscoveryView: View {
     private func careerRow(_ career: CareerRecord) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.xs) {
             NavigationLink {
-                CanonicalCareerDetailView(career: career, match: matchesByID[career.id])
+                CanonicalCareerDetailView(
+                    career: career,
+                    match: matchesByID[career.id],
+                    onViewed: {
+                        await persist(careerID: career.id, action: .view)
+                    }
+                )
             } label: {
                 VStack(alignment: .leading, spacing: TMISpacing.xxs) {
                     Text(career.title)
@@ -174,18 +228,102 @@ struct StudentCareerDiscoveryView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("careerDiscovery.career.\(career.id)")
 
-            Button(state.isSelectedForComparison(career.id) ? "Selected to compare" : "Compare") {
-                if !state.toggleComparison(career.id) {
-                    limitMessage = "You can compare up to \(CareerDiscoveryState.maximumComparisons) careers at once."
-                } else {
-                    limitMessage = nil
+            HStack(spacing: TMISpacing.xs) {
+                Button(relationships[career.id]?.isSaved == true ? "Remove saved" : "Save") {
+                    Task { @MainActor in
+                        await persist(careerID: career.id, action: .save)
+                    }
                 }
+                .disabled(mutatingCareerIDs.contains(career.id))
+                .accessibilityIdentifier("careerDiscovery.save.\(career.id)")
+
+                Button("Dismiss") {
+                    Task { @MainActor in
+                        await persist(careerID: career.id, action: .dismiss)
+                    }
+                }
+                .disabled(mutatingCareerIDs.contains(career.id))
+                .accessibilityIdentifier("careerDiscovery.dismiss.\(career.id)")
+
+                Button(state.isSelectedForComparison(career.id) ? "Selected" : "Compare") {
+                    Task { @MainActor in
+                        if !state.isSelectedForComparison(career.id),
+                           state.comparisonIDs.count >= CareerDiscoveryState.maximumComparisons {
+                            limitMessage = "You can compare up to \(CareerDiscoveryState.maximumComparisons) careers at once."
+                            return
+                        }
+                        await persist(careerID: career.id, action: .compare)
+                    }
+                }
+                .disabled(mutatingCareerIDs.contains(career.id))
+                .accessibilityIdentifier("careerDiscovery.compareToggle.\(career.id)")
             }
             .font(.caption)
             .buttonStyle(.bordered)
-            .accessibilityIdentifier("careerDiscovery.compareToggle.\(career.id)")
         }
         .padding(TMISpacing.md)
         .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+    }
+
+    private enum RelationshipAction {
+        case save
+        case dismiss
+        case compare
+        case view
+    }
+
+    @MainActor
+    private func persist(careerID: String, action: RelationshipAction) async {
+        guard let member, let relationshipRepository else {
+            relationshipError = "Career choices are unavailable until staff access is verified."
+            return
+        }
+        mutatingCareerIDs.insert(careerID)
+        defer { mutatingCareerIDs.remove(careerID) }
+        relationshipError = nil
+
+        let timestamp = Date.now
+        let existing = relationships[careerID]
+        let base = existing ?? CareerRelationship(
+            studentID: studentID,
+            careerID: careerID,
+            updatedAt: timestamp,
+            updatedBy: member.userID
+        )
+        let updated: CareerRelationship
+        if existing == nil {
+            updated = CareerRelationship(
+                studentID: studentID,
+                careerID: careerID,
+                isSaved: action == .save,
+                isDismissed: action == .dismiss,
+                isCompared: action == .compare,
+                lastViewedAt: action == .view ? timestamp : nil,
+                updatedAt: timestamp,
+                updatedBy: member.userID
+            )
+        } else {
+            updated = switch action {
+            case .save:
+                base.settingSaved(!base.isSaved, at: timestamp, by: member.userID)
+            case .dismiss:
+                base.settingDismissed(true, at: timestamp, by: member.userID)
+            case .compare:
+                base.settingCompared(!base.isCompared, at: timestamp, by: member.userID)
+            case .view:
+                base.markingViewed(at: timestamp, by: member.userID)
+            }
+        }
+
+        do {
+            try await relationshipRepository.save(updated, member: member)
+            relationships[careerID] = updated
+            if action == .compare {
+                _ = state.toggleComparison(careerID)
+                limitMessage = nil
+            }
+        } catch {
+            relationshipError = "That career choice was not confirmed. Try again."
+        }
     }
 }

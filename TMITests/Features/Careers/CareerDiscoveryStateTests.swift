@@ -117,6 +117,31 @@ struct CareerDiscoveryStateTests {
         #expect(!state.isSelectedForComparison("a"))
     }
 
+    @Test("Persisted comparison state restores deterministically and stays capped")
+    func persistedComparisonRestoresWithinLimit() {
+        var state = CareerDiscoveryState()
+
+        state.restoreComparisonIDs(["c", "a", "c", "b", "d"])
+
+        #expect(state.comparisonIDs == ["c", "a", "b"])
+    }
+
+    @Test("Recently viewed is an explicit filter, not a ranking guess")
+    func recentlyViewedFilterUsesPersistedRelationships() {
+        var state = CareerDiscoveryState()
+        state.showRecentlyViewed = true
+
+        let results = state.results(
+            careers: catalog,
+            matches: [],
+            recentlyViewedIDs: ["health/nurse"]
+        )
+
+        #expect(results.map(\.id) == ["health/nurse"])
+        state.clearFilters()
+        #expect(!state.showRecentlyViewed)
+    }
+
     // MARK: - Fixtures
 
     private func match(id: String, rank: Int) -> CareerMatch {

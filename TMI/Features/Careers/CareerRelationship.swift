@@ -17,6 +17,9 @@ nonisolated struct CareerRelationship: Identifiable, Codable, Sendable, Equatabl
     let isCompared: Bool
     let linkedPlanIDs: [String]
     let lastViewedAt: Date?
+    let recordVersion: Int
+    let createdAt: Date
+    let createdBy: String
     let updatedAt: Date
     let updatedBy: String
 
@@ -29,7 +32,10 @@ nonisolated struct CareerRelationship: Identifiable, Codable, Sendable, Equatabl
         linkedPlanIDs: [String] = [],
         lastViewedAt: Date? = nil,
         updatedAt: Date,
-        updatedBy: String
+        updatedBy: String,
+        recordVersion: Int = 1,
+        createdAt: Date? = nil,
+        createdBy: String? = nil
     ) {
         self.studentID = studentID
         self.careerID = careerID
@@ -40,10 +46,63 @@ nonisolated struct CareerRelationship: Identifiable, Codable, Sendable, Equatabl
         self.isCompared = isCompared
         self.linkedPlanIDs = Array(Set(linkedPlanIDs)).sorted()
         self.lastViewedAt = lastViewedAt
+        self.recordVersion = max(1, recordVersion)
+        self.createdAt = createdAt ?? updatedAt
+        self.createdBy = createdBy ?? updatedBy
         self.updatedAt = updatedAt
         self.updatedBy = updatedBy
     }
 
     /// Viewing a career is not an opinion about it.
     var hasStudentOpinion: Bool { isSaved || isDismissed }
+
+    func settingSaved(_ value: Bool, at date: Date, by userID: String) -> Self {
+        copy(
+            isSaved: value,
+            isDismissed: value ? false : isDismissed,
+            at: date,
+            by: userID
+        )
+    }
+
+    func settingDismissed(_ value: Bool, at date: Date, by userID: String) -> Self {
+        copy(
+            isSaved: value ? false : isSaved,
+            isDismissed: value,
+            at: date,
+            by: userID
+        )
+    }
+
+    func settingCompared(_ value: Bool, at date: Date, by userID: String) -> Self {
+        copy(isCompared: value, at: date, by: userID)
+    }
+
+    func markingViewed(at date: Date, by userID: String) -> Self {
+        copy(lastViewedAt: date, at: date, by: userID)
+    }
+
+    private func copy(
+        isSaved: Bool? = nil,
+        isDismissed: Bool? = nil,
+        isCompared: Bool? = nil,
+        lastViewedAt: Date? = nil,
+        at date: Date,
+        by userID: String
+    ) -> Self {
+        Self(
+            studentID: studentID,
+            careerID: careerID,
+            isSaved: isSaved ?? self.isSaved,
+            isDismissed: isDismissed ?? self.isDismissed,
+            isCompared: isCompared ?? self.isCompared,
+            linkedPlanIDs: linkedPlanIDs,
+            lastViewedAt: lastViewedAt ?? self.lastViewedAt,
+            updatedAt: date,
+            updatedBy: userID,
+            recordVersion: recordVersion + 1,
+            createdAt: createdAt,
+            createdBy: createdBy
+        )
+    }
 }
