@@ -16,7 +16,8 @@
     "debug-invitation:seed": "npm run build --silent && node scripts/manage-debug-invitation.mjs seed",
     "debug-invitation:revoke": "npm run build --silent && node scripts/manage-debug-invitation.mjs revoke",
     "migrate:dry-run": "npm run build && node lib/src/migrate.js --dry-run",
-    "reconcile": "npm run build && node lib/src/reconcile.js"
+    "reconcile": "npm run build && node lib/src/reconcile.js",
+    "fixture:release2": "node scripts/generate-release2-fixture.mjs"
   },
   "dependencies": {
     "firebase-admin": "14.2.0",

@@ -26,21 +26,5 @@ struct SurveyIdentityTests {
         #expect(decoded.id == nil)
     }
 
-    @Test("Every Firestore survey read uses the document identity decoder")
-    func allReadPathsUseCanonicalDecoder() throws {
-        let source = try String(
-            contentsOf: repositoryRoot.appending(path: "TMI/Services/SurveyService.swift"),
-            encoding: .utf8
-        )
 
-        #expect(source.components(separatedBy: "data(as: Survey.self)").count - 1 == 1)
-        #expect(source.contains("let surveys = try documents.map(self.decodeSurvey)"))
-    }
-
-    private var repositoryRoot: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-    }
 }

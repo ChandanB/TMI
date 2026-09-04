@@ -16,7 +16,6 @@ struct TimeoutGuardTests {
         .init(path: "TMI/Services/StudentData/PlanResourceLinkService.swift", tenSecondGuards: 2, fifteenSecondGuards: 0),
         .init(path: "TMI/Services/StudentData/StudentCareerService.swift", tenSecondGuards: 2, fifteenSecondGuards: 0),
         .init(path: "TMI/Services/StudentData/StudentInterestService.swift", tenSecondGuards: 3, fifteenSecondGuards: 0),
-        .init(path: "TMI/Services/SurveyService.swift", tenSecondGuards: 11, fifteenSecondGuards: 0),
         .init(path: "TMI/Services/TMIAuthService.swift", tenSecondGuards: 1, fifteenSecondGuards: 0),
         .init(path: "TMI/StateModels/InterestsAndHobbiesStateModel.swift", tenSecondGuards: 1, fifteenSecondGuards: 0),
     ]
@@ -83,7 +82,7 @@ struct TimeoutGuardTests {
         #expect(helperSource.contains("operation: @escaping @MainActor @Sendable"))
         #expect(interestsStateSource.contains("catch ConcurrencyError.timeout"))
         #expect(interestsStateSource.contains("IdentifiableError(message: \"Fetch timed out\")"))
-        #expect(totalGuards == 24)
+        #expect(totalGuards == 13)
     }
 }
 

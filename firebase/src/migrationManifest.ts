@@ -48,7 +48,8 @@ type QuarantineReason =
   | "tenant-ownership-conflict"
   | "unresolved-school-ownership"
   | "malformed-student-record"
-  | "duplicate-canonical-destination";
+  | "duplicate-canonical-destination"
+  | "unverifiable-completed-survey-provenance";
 
 interface ParsedLegacyPath {
   readonly kind: LegacyRecordKind;
@@ -159,6 +160,9 @@ export function parseMigrationFixture(value: unknown): MigrationFixture {
 export function buildMigrationPlan(
   fixture: MigrationFixture,
 ): MigrationPlan {
+  if (fixture.migrationId === "release2-discovery-v1") {
+    return buildDiscoveryMigrationPlan(fixture);
+  }
   const candidates = fixture.documents.map((document) => ({
     document,
     write: buildMigrationWrite(fixture, document),
@@ -262,6 +266,95 @@ export function buildMigrationPlan(
     mappedCount,
     quarantinedCount,
     planChecksum,
+    writes,
+  };
+}
+
+/** Release 2 is intentionally specialized: its global catalog and archival
+ * survey records do not satisfy the district-owned one-document-in/one-out
+ * assumptions of the Gate 0/Release 1 transformer. */
+export function buildDiscoveryMigrationPlan(
+  fixture: MigrationFixture,
+): MigrationPlan {
+  const timestamp = Timestamp.fromDate(new Date(fixture.migrationTimestamp));
+  const actor = `migration:${fixture.migrationId}`;
+  const careerDocuments = fixture.documents.filter((document) => document.path.startsWith("catalogSeed/"));
+  const aliasToID = new Map<string, string>();
+  for (const document of careerDocuments) {
+    const id = document.path.slice("catalogSeed/".length);
+    aliasToID.set(id.toLowerCase(), id);
+    const aliases = document.data.aliases;
+    if (Array.isArray(aliases)) {
+      for (const alias of aliases) if (typeof alias === "string") aliasToID.set(alias.trim().toLowerCase(), id);
+    }
+  }
+  const writes = fixture.documents.flatMap((document): MigrationWrite[] => {
+    if (document.path.startsWith("catalogSeed/")) {
+      const id = document.path.slice("catalogSeed/".length);
+      if (!isValidIdentifier(id) || id.includes("/") || document.data.id !== id) {
+        throw new TypeError(`Invalid canonical career fixture: ${document.path}.`);
+      }
+      const destinationPath = `catalogs/careers/items/${id}`;
+      const data = {
+        ...document.data,
+        createdAt: timestamp,
+        createdBy: actor,
+        updatedAt: timestamp,
+        updatedBy: actor,
+        migrationId: fixture.migrationId,
+        legacyPath: document.path,
+        legacyId: id,
+        checksum: checksumValue(document.data),
+      };
+      return [{
+        manifest: buildManifest(fixture, document, destinationPath, "mapped"),
+        data,
+      }];
+    }
+    if (document.path.endsWith("/careerBookmarks/state")) {
+      const parts = document.path.split("/");
+      const owner = fixture.ownership[`users/${parts[1] ?? ""}`];
+      const studentID = parts[3];
+      const saved = document.data.savedCareerIDs;
+      if (owner === undefined || studentID === undefined || !Array.isArray(saved)) {
+        return [buildQuarantineWrite(fixture, document, null, "unresolved-tenant-ownership")];
+      }
+      const canonicalIDs = [...new Set(saved.map((value) => typeof value === "string" ? aliasToID.get(value.trim().toLowerCase()) : undefined))];
+      if (canonicalIDs.some((value) => value === undefined)) {
+        return [buildQuarantineWrite(fixture, document, null, "unsupported-legacy-path")];
+      }
+      return (canonicalIDs as string[]).map((careerID) => {
+        const destinationPath = `districts/${owner}/students/${studentID}/careers/${careerID}`;
+        const syntheticDocument = { path: `${document.path}/${careerID}`, data: document.data };
+        return {
+          manifest: buildManifest(fixture, syntheticDocument, destinationPath, "mapped"),
+          data: {
+            careerId: careerID, state: "saved", savedAt: timestamp,
+            schemaVersion: fixture.schemaVersion, recordVersion: 1,
+            createdAt: timestamp, createdBy: actor, updatedAt: timestamp, updatedBy: actor,
+            migrationId: fixture.migrationId, legacyPath: syntheticDocument.path,
+            legacyId: careerID, sourceArrayPath: document.path,
+            checksum: checksumValue(document.data),
+          },
+        };
+      });
+    }
+    return [buildQuarantineWrite(
+      fixture,
+      document,
+      null,
+      "unverifiable-completed-survey-provenance",
+    )];
+  }).sort((left, right) => left.manifest.sourcePath.localeCompare(right.manifest.sourcePath));
+  assertUniqueDestinations(writes);
+  const mappedCount = writes.filter((write) => write.manifest.ownerResolution === "mapped").length;
+  return {
+    migrationId: fixture.migrationId,
+    schemaVersion: fixture.schemaVersion,
+    sourceCount: fixture.documents.length,
+    mappedCount,
+    quarantinedCount: writes.length - mappedCount,
+    planChecksum: checksumValue(writes.map((write) => ({ ...write.manifest, data: write.data }))),
     writes,
   };
 }

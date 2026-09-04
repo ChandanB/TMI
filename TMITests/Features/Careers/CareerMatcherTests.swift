@@ -84,7 +84,10 @@ struct CareerMatcherTests {
 
         #expect(CareerRecord.canonicalID(category: "Technology", title: "frontend developer") == canonical)
         #expect(CareerRecord.canonicalID(category: "technology", title: "  Frontend   Developer ") == canonical)
-        #expect(canonical == "technology/frontend-developer")
+        // A slash cannot appear in a Firestore document ID, so the separator
+        // is "--". The old form survives in `aliases` for anything already
+        // written against it.
+        #expect(canonical == "technology--frontend-developer")
     }
 
     // MARK: - Relationship state

@@ -330,11 +330,6 @@ struct AppDependenciesTests {
             "TMI/Views/Survey/StudentSurveyFlow.swift",
             root: self.repositoryRoot
         )
-        let serviceSource = try self.source(
-            "TMI/Services/SurveyService.swift",
-            root: self.repositoryRoot
-        )
-
         let submitBody = try #require(
             flowSource.range(of: "private func submit(").map { range in
                 String(flowSource[range.lowerBound...].prefix(600))
@@ -348,16 +343,8 @@ struct AppDependenciesTests {
         #expect(submitCall.upperBound < advance.lowerBound)
         #expect(advance.upperBound < failure.lowerBound)
         #expect(flowSource.contains("@State private var isSaving = false"))
-        #expect(
-            serviceSource.contains(
-                "case studentSurveyPersistenceUnavailable"
-            )
-        )
-        #expect(
-            serviceSource.contains(
-                "throw SurveyServiceError.studentSurveyPersistenceUnavailable"
-            )
-        )
+        // The guarantee lives entirely in the flow now: SurveyService is
+        // retired, and the survey path runs through SurveyRepository.
     }
 
     @Test("Gate 0 paths contain no raw console logging")

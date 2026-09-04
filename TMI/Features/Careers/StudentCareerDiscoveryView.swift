@@ -14,17 +14,17 @@ struct StudentCareerDiscoveryView: View {
     @State private var state = CareerDiscoveryState()
     @State private var comparisonShown = false
     @State private var limitMessage: String?
-
-    private var matches: [CareerMatch] {
-        repository.matches(approvedInterests: approvedInterests, clusters: clusters)
-    }
+    @State private var careers: [CareerRecord] = []
+    @State private var matches: [CareerMatch] = []
+    @State private var isLoading = true
+    @State private var loadError: String?
 
     private var matchesByID: [String: CareerMatch] {
         Dictionary(matches.map { ($0.careerID, $0) }, uniquingKeysWith: { left, _ in left })
     }
 
     private var results: [CareerRecord] {
-        state.results(careers: repository.careers(), matches: matches)
+        state.results(careers: careers, matches: matches)
     }
 
     var body: some View {
@@ -50,7 +50,18 @@ struct StudentCareerDiscoveryView: View {
                 .accessibilityIdentifier("careerDiscovery.noInterests")
             }
 
-            if results.isEmpty {
+            if isLoading {
+                ProgressView("Loading careers…")
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("careerDiscovery.loading")
+            } else if let loadError {
+                ContentUnavailableView(
+                    "Career catalog unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(loadError)
+                )
+                .accessibilityIdentifier("careerDiscovery.error")
+            } else if results.isEmpty {
                 ContentUnavailableView(
                     "No careers match",
                     systemImage: "magnifyingglass",
@@ -66,14 +77,33 @@ struct StudentCareerDiscoveryView: View {
         .padding(.vertical, TMISpacing.xs)
         .searchable(text: $state.query, prompt: "Search careers")
         .accessibilityIdentifier("careerDiscovery.screen")
+        .task { await loadCatalog() }
         .sheet(isPresented: $comparisonShown) {
             CareerComparisonView(
-                careers: state.comparisonIDs.compactMap { repository.career(id: $0) },
+                careers: state.comparisonIDs.compactMap { id in careers.first { $0.id == id } },
                 matches: matchesByID
             ) {
                 comparisonShown = false
             }
         }
+    }
+
+    @MainActor
+    private func loadCatalog() async {
+        isLoading = true
+        loadError = nil
+        do {
+            careers = try await repository.careers()
+            matches = try await repository.matches(
+                approvedInterests: approvedInterests,
+                clusters: clusters
+            )
+        } catch {
+            careers = []
+            matches = []
+            loadError = "Check your connection and try again."
+        }
+        isLoading = false
     }
 
     private var header: some View {

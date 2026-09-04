@@ -22,10 +22,31 @@ nonisolated struct CareerRecord: Identifiable, Codable, Sendable, Equatable {
     /// strength of an unattributed number.
     let salary: CareerSalary?
     let outlook: CareerOutlook?
+    /// Historical identifiers accepted only while migrating saved links.
+    let aliases: [String]
+
+    init(
+        id: String, title: String, category: String, subcategory: String?,
+        summary: String, interestIDs: [String], clusterIDs: [String],
+        educationLevel: CareerEducationLevel, salary: CareerSalary?,
+        outlook: CareerOutlook?, aliases: [String] = []
+    ) {
+        self.id = id
+        self.title = title
+        self.category = category
+        self.subcategory = subcategory
+        self.summary = summary
+        self.interestIDs = interestIDs
+        self.clusterIDs = clusterIDs
+        self.educationLevel = educationLevel
+        self.salary = salary
+        self.outlook = outlook
+        self.aliases = aliases
+    }
 
     /// Case, spacing and punctuation are presentation, not identity.
     static func canonicalID(category: String, title: String) -> String {
-        "\(normalized(category))/\(normalized(title))"
+        "\(normalized(category))--\(normalized(title))"
     }
 
     static func normalized(_ value: String) -> String {

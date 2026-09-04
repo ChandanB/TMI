@@ -116,6 +116,9 @@ function reconcileStableID(
   if (write.manifest.ownerResolution !== "mapped") {
     return;
   }
+  if (write.manifest.destinationPath.startsWith("catalogs/careers/items/")) {
+    return;
+  }
   const legacyID = write.manifest.sourcePath.split("/").at(-1);
   const destinationID = write.manifest.destinationPath.split("/").at(-1);
   if (legacyID !== destinationID) {
@@ -135,6 +138,20 @@ function reconcileTenantOwnership(
       mismatches.push(
         `quarantine path mismatch: ${write.manifest.destinationPath}`,
       );
+    }
+    return;
+  }
+  if (write.manifest.destinationPath.startsWith("catalogs/careers/items/")) {
+    const segments = write.manifest.destinationPath.split("/");
+    if (segments.length !== 4 || actual.id !== segments[3] || actual.isApproved !== true) {
+      mismatches.push(`catalog identity mismatch: ${write.manifest.destinationPath}`);
+    }
+    return;
+  }
+  if (/^districts\/[^/]+\/students\/[^/]+\/careers\/[^/]+$/u.test(write.manifest.destinationPath)) {
+    const segments = write.manifest.destinationPath.split("/");
+    if (actual.careerId !== segments[5] || actual.state !== "saved") {
+      mismatches.push(`career relationship mismatch: ${write.manifest.destinationPath}`);
     }
     return;
   }
@@ -204,6 +221,7 @@ async function reconcileStudentAssignments(
     const segments = write.manifest.destinationPath.split("/");
     if (
       write.manifest.ownerResolution !== "mapped" ||
+      segments.length !== 4 ||
       segments[2] !== "students"
     ) {
       continue;
@@ -245,6 +263,7 @@ async function reconcileStudentAssignments(
     const segments = write.manifest.destinationPath.split("/");
     if (
       write.manifest.ownerResolution !== "mapped" ||
+      segments.length !== 4 ||
       segments[2] !== "members"
     ) {
       continue;

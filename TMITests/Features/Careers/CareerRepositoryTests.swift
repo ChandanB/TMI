@@ -6,8 +6,8 @@ import Testing
 @MainActor
 struct CareerRepositoryTests {
     @Test("The shipped catalog maps onto canonical records without loss of entries")
-    func shippedCatalogMapsCompletely() {
-        let records = BundledCareerCatalog().careers()
+    func shippedCatalogMapsCompletely() async throws {
+        let records = try await BundledCareerCatalog().careers()
 
         // All 537 shipped careers are distinct, so mapping drops none of them.
         #expect(records.count == CareerCatalog.allCareers.count)
@@ -15,9 +15,9 @@ struct CareerRepositoryTests {
     }
 
     @Test("The canonical catalog is deduplicated and stably ordered")
-    func catalogIsDeterministic() {
-        let first = BundledCareerCatalog().careers()
-        let fromReversedSource = BundledCareerCatalog(
+    func catalogIsDeterministic() async throws {
+        let first = try await BundledCareerCatalog().careers()
+        let fromReversedSource = try await BundledCareerCatalog(
             source: CareerCatalog.allCareers.reversed()
         ).careers()
 
@@ -27,23 +27,35 @@ struct CareerRepositoryTests {
     }
 
     @Test("A duplicated entry collapses to one career")
-    func duplicatesCollapse() {
+    func duplicatesCollapse() async throws {
         let duplicated = [
             careerPath(title: "Frontend Developer", category: "technology"),
             careerPath(title: "  frontend   developer ", category: "Technology"),
         ]
 
-        let records = BundledCareerCatalog(source: duplicated).careers()
+        let records = try await BundledCareerCatalog(source: duplicated).careers()
 
         #expect(records.count == 1)
-        #expect(records[0].id == "technology/frontend-developer")
+        #expect(records[0].id == "technology--frontend-developer")
+    }
+
+    @Test("Canonical identifiers are Firestore-safe and legacy identifiers resolve")
+    func firestoreSafeIdentityAndAliases() async throws {
+        let record = try await BundledCareerCatalog(source: [
+            careerPath(title: "Frontend Developer", category: "technology")
+        ]).careers()[0]
+
+        #expect(!record.id.contains("/"))
+        #expect(record.id == "technology--frontend-developer")
+        #expect(record.aliases.contains("technology/frontend-developer"))
+        #expect(record.aliases.contains("Frontend Developer"))
     }
 
     @Test("No canonical career states a salary the catalog cannot source")
-    func noUnsourcedFigures() {
+    func noUnsourcedFigures() async throws {
         // The bundled data carries ranges with no source and no date. Carrying
         // them over would present an unattributed number to a student as fact.
-        let records = BundledCareerCatalog().careers()
+        let records = try await BundledCareerCatalog().careers()
 
         #expect(records.allSatisfy { $0.salary == nil })
         #expect(records.allSatisfy { $0.outlook == nil })
@@ -63,8 +75,8 @@ struct CareerRepositoryTests {
     }
 
     @Test("Every canonical career keeps something to match on")
-    func everyCareerRemainsMatchable() {
-        let records = BundledCareerCatalog().careers()
+    func everyCareerRemainsMatchable() async throws {
+        let records = try await BundledCareerCatalog().careers()
         let unmatchable = records.filter { $0.interestIDs.isEmpty && $0.clusterIDs.isEmpty }
 
         #expect(
@@ -74,7 +86,7 @@ struct CareerRepositoryTests {
     }
 
     @Test("The repository matches against the canonical catalog")
-    func repositoryMatchesFromCatalog() {
+    func repositoryMatchesFromCatalog() async throws {
         let repository = CareerRepository(
             catalog: BundledCareerCatalog(source: [
                 careerPath(title: "Frontend Developer", category: "technology"),
@@ -82,13 +94,13 @@ struct CareerRepositoryTests {
             ])
         )
 
-        let matches = repository.matches(
+        let matches = try await repository.matches(
             approvedInterests: [approvedTechnologyInterest],
             clusters: []
         )
 
-        #expect(matches.map(\.careerID) == ["technology/frontend-developer"])
-        #expect(repository.career(id: "health/nurse")?.title == "Nurse")
+        #expect(matches.map(\.careerID) == ["technology--frontend-developer"])
+        #expect(try await repository.career(id: "health--nurse")?.title == "Nurse")
     }
 
     // MARK: - Fixtures
