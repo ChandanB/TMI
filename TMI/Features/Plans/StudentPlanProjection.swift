@@ -48,9 +48,10 @@ nonisolated enum StudentPlanProjectionBuilder {
         plan: PlanRecord,
         goals: [GoalRecord],
         actions: [ActionRecord],
-        progress: [ProgressRecord]
+        progress: [ProgressRecord],
+        now: Date = Date()
     ) -> StudentPlanProjection? {
-        guard plan.status == .active else { return nil }
+        guard plan.status == .active, plan.approvalStatus == .approved else { return nil }
 
         let studentGoals = goals
             .filter { $0.status != .discontinued }
@@ -63,7 +64,12 @@ nonisolated enum StudentPlanProjectionBuilder {
                     wording: goal.studentWording,
                     dueDate: goal.dueDate,
                     actions: actions
-                        .filter { $0.goalID == goal.id && $0.audience == .student }
+                        .filter {
+                            $0.goalID == goal.id
+                                && $0.audience == .student
+                                && $0.status != .skipped
+                                && $0.dueDate <= now
+                        }
                         .sorted { $0.dueDate == $1.dueDate ? $0.id < $1.id : $0.dueDate < $1.dueDate }
                         .map {
                             StudentPlanAction(
@@ -87,7 +93,10 @@ nonisolated enum StudentPlanProjectionBuilder {
             }
 
         return StudentPlanProjection(
-            planTitle: plan.title,
+            // Plan titles are staff-authored and may contain professional
+            // framing. The brand-fixed model name is the only plan heading
+            // currently guaranteed to be student-safe.
+            planTitle: plan.model.rawValue,
             goals: studentGoals,
             progress: notes,
             // The same count staff see, so nobody is working from a different

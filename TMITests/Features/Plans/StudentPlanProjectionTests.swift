@@ -23,6 +23,18 @@ struct StudentPlanProjectionTests {
         )
     }
 
+    @Test("An active plan is hidden until it is approved")
+    func activeUnapprovedPlanDoesNotProject() {
+        var candidate = plan(status: .active)
+        candidate.approvalStatus = .pending
+
+        #expect(
+            StudentPlanProjectionBuilder.projection(
+                plan: candidate, goals: [goal()], actions: [], progress: [], now: now
+            ) == nil
+        )
+    }
+
     @Test("A student reads wording written for them, never the clinical title")
     func studentReadsTheirOwnWording() throws {
         let projection = try #require(
@@ -53,6 +65,53 @@ struct StudentPlanProjectionTests {
         let titles = projection.goals.flatMap(\.actions).map(\.title)
         #expect(titles == ["Invite someone to sit with you"])
         #expect(!titles.contains("Log lunchroom observation"))
+    }
+
+    @Test("Staff-authored plan titles never reach the student")
+    func staffPlanTitleIsAbsent() throws {
+        let projection = try #require(
+            StudentPlanProjectionBuilder.projection(
+                plan: plan(status: .active), goals: [goal()], actions: [], progress: [], now: now
+            )
+        )
+
+        #expect(projection.planTitle == TMIPlanModel.chaseYourSpace.rawValue)
+        #expect(projection.planTitle != "Clinical lunch intervention")
+    }
+
+    @Test("Only due, student-visible, non-skipped actions are projected")
+    func onlyDueStudentActionsProject() throws {
+        let projection = try #require(
+            StudentPlanProjectionBuilder.projection(
+                plan: plan(status: .active),
+                goals: [goal()],
+                actions: [
+                    action(
+                        id: "due",
+                        audience: .student,
+                        title: "Try today's step",
+                        dueDate: now
+                    ),
+                    action(
+                        id: "future",
+                        audience: .student,
+                        title: "Next month's step",
+                        dueDate: now.addingTimeInterval(30 * 24 * 60 * 60)
+                    ),
+                    action(
+                        id: "skipped",
+                        audience: .student,
+                        title: "Withdrawn step",
+                        dueDate: now,
+                        status: .skipped
+                    ),
+                ],
+                progress: [],
+                now: now
+            )
+        )
+
+        #expect(projection.goals.flatMap(\.actions).map(\.id) == ["due"])
     }
 
     @Test("Staff-only observations never reach the student")
@@ -109,7 +168,7 @@ struct StudentPlanProjectionTests {
         PlanRecord(
             id: "plan-1", districtID: "d1", studentIDs: ["student-1"],
             schoolIDs: ["school-1"], assignedMemberIDs: ["teacher-1"],
-            status: status, model: .chaseYourSpace, title: "Chase Your Space",
+            status: status, model: .chaseYourSpace, title: "Clinical lunch intervention",
             summary: nil, startDate: now, targetDate: nil, approvalStatus: .approved,
             metadata: CanonicalRecordMetadata(
                 schemaVersion: 1, recordVersion: 1, createdAt: now,
@@ -135,12 +194,13 @@ struct StudentPlanProjectionTests {
         id: String,
         audience: ActionAudience,
         title: String,
+        dueDate: Date? = nil,
         status: ActionStatus = .open
     ) -> ActionRecord {
         ActionRecord(
             id: id, planID: "plan-1", goalID: "goal-1", title: title,
             ownerMemberID: "teacher-1", audience: audience, cadence: .weekly,
-            dueDate: now, status: status
+            dueDate: dueDate ?? now, status: status
         )
     }
 

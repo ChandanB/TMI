@@ -5,6 +5,7 @@ struct StudentModeView: View {
 
     @Environment(\.studentModeSession) private var session
     @Environment(\.studentContext) private var studentContext
+    @Environment(\.appDependencies) private var dependencies
 
     @State private var showingExitConfirmation = false
     @State private var isExiting = false
@@ -13,10 +14,17 @@ struct StudentModeView: View {
     @State private var surveyActivity: SurveyActivity?
     @State private var surveyActivitySessionID: String?
     @State private var activityError: String?
+    @State private var studentPlanRepository: StudentPlanProjectionRepository?
+    @State private var studentPlanState: StudentPlanProjectionState?
 
-    init(profile: StudentModeProfile, surveyRepository: SurveyRepository? = nil) {
+    init(
+        profile: StudentModeProfile,
+        surveyRepository: SurveyRepository? = nil,
+        studentPlanRepository: StudentPlanProjectionRepository? = nil
+    ) {
         self.profile = profile
         _surveyRepository = State(initialValue: surveyRepository)
+        _studentPlanRepository = State(initialValue: studentPlanRepository)
     }
 
     var body: some View {
@@ -74,6 +82,9 @@ struct StudentModeView: View {
         .task(id: activityRequestKey) {
             await loadSurveyActivity()
         }
+        .task(id: planRequestKey) {
+            await loadStudentPlans()
+        }
         .task(id: session.currentGrant?.sessionID) {
             while !Task.isCancelled, session.isStudentModeActive {
                 try? await Task.sleep(for: .seconds(1))
@@ -121,42 +132,33 @@ struct StudentModeView: View {
             .accessibilityIdentifier("studentMode.restoring")
 
         case .active(let grant):
-            if let surveyActivity,
-               let surveyRepository,
-               surveyActivitySessionID == grant.sessionID,
-               surveyActivity.assignment.assignmentID == grant.scope.assignmentIDs.first {
-                VStack(spacing: 0) {
+            VStack(spacing: TMISpacing.lg) {
 #if DEBUG
-                    if ProcessInfo.processInfo.arguments.contains("student-mode-survey") {
-                        Button("Lock for test") {
-                            session.evaluate(
-                                at: Date().addingTimeInterval(
-                                    StudentModeSession.inactivityInterval + 1
-                                )
+                if ProcessInfo.processInfo.arguments.contains("student-mode-survey") {
+                    Button("Lock for test") {
+                        session.evaluate(
+                            at: Date().addingTimeInterval(
+                                StudentModeSession.inactivityInterval + 1
                             )
-                        }
-                        .accessibilityIdentifier("studentMode.testLock")
+                        )
                     }
-#endif
-                    StudentSurveyFlow(
-                        assignment: surveyActivity.assignment,
-                        definition: surveyActivity.definition,
-                        grant: grant,
-                        repository: surveyRepository,
-                        onActivity: { session.recordActivity() }
-                    )
-                    .simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { _ in
-                        session.recordActivity()
-                    })
+                    .accessibilityIdentifier("studentMode.testLock")
                 }
-            } else if let activityError {
-                ContentUnavailableView(
-                    "Activity unavailable",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text(activityError)
-                )
-            } else {
-                ProgressView("Getting your activity ready…")
+#endif
+                if grant.scope.allowedOperations.contains(.readAssignment) {
+                    surveyContent(grant: grant)
+                }
+                if grant.scope.allowedOperations.contains(.readStudentVisiblePlan) {
+                    studentPlanContent
+                }
+                if !grant.scope.allowedOperations.contains(.readAssignment),
+                   !grant.scope.allowedOperations.contains(.readStudentVisiblePlan) {
+                    ContentUnavailableView(
+                        "No activity available",
+                        systemImage: "lock.shield",
+                        description: Text("Ask your educator to start an activity for you.")
+                    )
+                }
             }
 
         case .locked(let reason):
@@ -179,6 +181,55 @@ struct StudentModeView: View {
 
         case .inactive:
             EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func surveyContent(grant: StudentModeGrant) -> some View {
+        if let surveyActivity,
+           let surveyRepository,
+           surveyActivitySessionID == grant.sessionID,
+           surveyActivity.assignment.assignmentID == grant.scope.assignmentIDs.first {
+            StudentSurveyFlow(
+                assignment: surveyActivity.assignment,
+                definition: surveyActivity.definition,
+                grant: grant,
+                repository: surveyRepository,
+                onActivity: { session.recordActivity() }
+            )
+            .simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { _ in
+                session.recordActivity()
+            })
+        } else if let activityError {
+            ContentUnavailableView(
+                "Activity unavailable",
+                systemImage: "exclamationmark.triangle",
+                description: Text(activityError)
+            )
+        } else {
+            ProgressView("Getting your activity ready…")
+        }
+    }
+
+    @ViewBuilder
+    private var studentPlanContent: some View {
+        if let studentPlanState {
+            switch studentPlanState.phase {
+            case .loaded(let projections):
+                StudentPlanProjectionView(projections: projections)
+            case .failed:
+                ContentUnavailableView(
+                    "Plan unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text("Your plan steps could not be loaded safely.")
+                )
+            case .idle, .loading:
+                ProgressView("Getting your plan ready…")
+            case .unavailable:
+                EmptyView()
+            }
+        } else {
+            ProgressView("Getting your plan ready…")
         }
     }
 
@@ -288,6 +339,7 @@ struct StudentModeView: View {
 
     private func loadSurveyActivity() async {
         guard let grant = session.currentGrant,
+              grant.scope.allowedOperations.contains(.readAssignment),
               let assignmentID = grant.scope.assignmentIDs.first else {
             surveyActivity = nil
             surveyActivitySessionID = nil
@@ -314,9 +366,33 @@ struct StudentModeView: View {
         }
     }
 
+    private func loadStudentPlans() async {
+        guard let grant = session.currentGrant,
+              grant.scope.allowedOperations.contains(.readStudentVisiblePlan) else {
+            studentPlanState?.clear()
+            return
+        }
+        if studentPlanRepository == nil {
+            studentPlanRepository = .canonical(dependencies: dependencies)
+        }
+        guard let studentPlanRepository else { return }
+        if studentPlanState == nil {
+            studentPlanState = StudentPlanProjectionState(repository: studentPlanRepository)
+        }
+        await studentPlanState?.load(grant: grant)
+    }
+
     private var activityRequestKey: String {
         guard let grant = session.currentGrant else { return "inactive" }
         return "\(grant.sessionID):\(grant.scope.assignmentIDs.first ?? "missing")"
+    }
+
+    private var planRequestKey: String {
+        guard let grant = session.currentGrant,
+              grant.scope.allowedOperations.contains(.readStudentVisiblePlan) else {
+            return "inactive"
+        }
+        return "\(grant.sessionID):\(grant.scope.studentID):\(grant.recordVersion)"
     }
 }
 
