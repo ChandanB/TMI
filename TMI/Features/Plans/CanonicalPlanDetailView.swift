@@ -15,6 +15,7 @@ struct CanonicalPlanDetailView: View {
     @State private var editingGoal: GoalRecord?
     @State private var isAddingGoal = false
     @State private var recordingAgainst: GoalRecord?
+    @State private var addingActionTo: GoalRecord?
 
     private let memberOverride: MembershipContext?
 
@@ -43,6 +44,13 @@ struct CanonicalPlanDetailView: View {
                     member: member,
                     planStartDate: plan.startDate
                 ) { _ in
+                    Task { await state?.reloadChildren(member: member) }
+                }
+            }
+        }
+        .sheet(item: $addingActionTo) { goal in
+            if let plan = state?.plan, let member {
+                ActionEditorView(planID: plan.id, goal: goal, member: member) {
                     Task { await state?.reloadChildren(member: member) }
                 }
             }
@@ -279,11 +287,21 @@ struct CanonicalPlanDetailView: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("planDetail.goal.\(goal.id)")
 
-                    if member.capabilities.contains(.studentWriteDetail), plan.status.isOpen {
-                        Button("Record progress") { recordingAgainst = goal }
+                    ForEach(state.actions.filter { $0.goalID == goal.id }) { action in
+                        Text("· \(action.title) — \(action.audience.displayName.lowercased()), \(action.cadence.displayName.lowercased())")
                             .font(.caption)
-                            .buttonStyle(.bordered)
-                            .accessibilityIdentifier("planDetail.recordProgress.\(goal.id)")
+                            .foregroundStyle(TMIColors.textSecondary)
+                    }
+
+                    if member.capabilities.contains(.studentWriteDetail), plan.status.isOpen {
+                        HStack {
+                            Button("Add action") { addingActionTo = goal }
+                                .accessibilityIdentifier("planDetail.addAction.\(goal.id)")
+                            Button("Record progress") { recordingAgainst = goal }
+                                .accessibilityIdentifier("planDetail.recordProgress.\(goal.id)")
+                        }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
                     }
                 }
             }
