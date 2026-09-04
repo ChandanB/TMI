@@ -218,7 +218,7 @@ git commit -m "feat: approve canonical student interests"
 
 **Status: mostly done.** Stable career identity (`07116fa`), the matcher and relationship state (`05a50ac`), and the canonical catalog reader (`8506bbb`).
 
-Step 3's "remove duplicate `CareerModels` types" is **blocked on Task 6** and sequenced a task too early here. The legacy `Career`, `CareerPath` and `CareerMatchExplanation` types are still live in `AppBootstrapService`, `ResourceDetailView`, `CareerService`, `CareerMatchingService` and the three career views. Those callers cannot compile against `CareerRecord` until Task 6 rebuilds the views, so the deletion belongs there.
+Step 3 is now **done** (`a98cabf`). The duplicate types went once the legacy views were retired in `68be25a`. `CareerPath`, `SalaryRange` and `EducationLevel` remain as the shape of the bundled catalog data and retire with Task 7's migration.
 
 Open decision: the bundled catalog states salary for all 537 careers with no source and no date. Canonical records carry no figure until someone sources them, so salary is absent from `CareerRecord` today.
 
@@ -263,9 +263,7 @@ git commit -m "feat: add explainable career matching"
 
 **Status: steps 1-2 done** (`2f98925`). Canonical discovery, detail and comparison are built on `CareerRecord` and reached from the student's Careers tab. Discovery, filter and comparison rules live in `CareerDiscoveryState` with tests.
 
-Step 3's "split legacy giant views" and "remove nested duplicate career types" is **entangled with Release 3 Task 9** and is not safe to do here. `CareerExplorerView` and `CareerDetailView` (4,347 lines together) are still reachable in production through the legacy plan stack: Dashboard -> `TMIPlanListView` / `TMIPlanDetailView` -> `TMIPlanEditorView` -> `PlanCareersSection` -> `CareerExplorerView`. Deleting the career views means retiring the legacy plan views in the same change, which is what Release 3 Task 9 exists to do. The canonical views sit beside the legacy ones until then.
-
-This is also what blocks Task 5 Step 3: the duplicate `Career`, `CareerPath` and `CareerMatchExplanation` types cannot be removed while those legacy views compile against them.
+Step 3 is now **done** (`68be25a`). The legacy career views were retired together with the legacy plan stack, which is what they were entangled with.
 
 Not yet done: `TMIUITests/CareerExplorerUITests.swift`. It needs a career fixture in `UITestingLaunchConfiguration` alongside the existing student-detail fixtures.
 
@@ -296,6 +294,10 @@ git commit -m "feat: deliver career discovery workflow"
 ```
 
 ## Task 7: Migrate discovery data and remove duplicate engines
+
+**Status: not started.** The 537-entry catalog is still compiled into the app and mapped by `BundledCareerCatalog`. Moving it to `catalogs/careers/items/{id}` needs a seeding script and a Firestore-backed `CareerCatalogProviding`.
+
+Worth knowing before starting: `CareerLibraryService` used to read a root-level `careers` collection that no rule matches, so every read was refused by the deny-all fallback. It was retired in `a98cabf`. Any new reader must use the canonical `catalogs/` path.
 
 **Files:**
 - Modify: `firebase/src/migrationManifest.ts`
@@ -328,6 +330,8 @@ git commit -m "refactor: retire duplicate discovery engines"
 ```
 
 ## Task 8: Release 2 acceptance
+
+**Status: not started.** Depends on Task 7, and on the unsourced-salary decision below.
 
 **Files:**
 - Create: `docs/release-evidence/release-2.md`

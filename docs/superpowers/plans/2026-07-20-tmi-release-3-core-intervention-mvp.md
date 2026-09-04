@@ -39,6 +39,8 @@
 
 ## Task 1: Lock the six branded intervention models
 
+**Status: done.** `TMIPlanModel` carries the six models; `PlanNeedTag` maps each need to exactly one, with a test that the mapping is total and distinct.
+
 **Files:**
 - Create: `TMI/Features/Plans/TMIModel.swift`
 - Create: `TMI/Resources/TMIModels.json`
@@ -83,6 +85,8 @@ git commit -m "feat: lock approved TMI intervention models"
 
 ## Task 2: Define the canonical plan aggregate and lifecycle
 
+**Status: done.** `PlanRecord`, `PlanLifecycle` and `PlanRevision` (`c560d9e`). The lifecycle table mirrors `isLegalPlanTransition` in the rules, which remain the authority.
+
 **Files:**
 - Create: `TMI/Features/Plans/PlanRecord.swift`
 - Create: `TMI/Features/Plans/PlanRevision.swift`
@@ -120,6 +124,8 @@ git commit -m "feat: define plan lifecycle state machine"
 
 ## Task 3: Implement deterministic plan recommendations
 
+**Status: done** (`3a8e3a2`). Ranking comes only from needs a staff member selected; nothing infers a need from student data, and a test asserts the rationale never characterizes the student.
+
 **Files:**
 - Create: `TMI/Features/Plans/PlanRecommendation.swift`
 - Create: `TMI/Features/Plans/PlanRecommendationEngine.swift`
@@ -151,6 +157,10 @@ git commit -m "feat: explain plan model recommendations"
 ```
 
 ## Task 4: Implement transactional plan persistence
+
+**Status: mostly done** (`0f3ecee`). `PlanChildRepository` reads and writes goals, actions, progress and revisions. Progress and revisions are append-only and immutable in the rules, with five emulator tests.
+
+Not done: the writes are per-document rather than transactional, because the callables are undeployed. Batched multi-record commits need either Functions or a Firestore batch path.
 
 **Files:**
 - Create: `TMI/Features/Plans/PlanRepository.swift`
@@ -189,6 +199,10 @@ git commit -m "feat: persist plans with trusted transitions"
 
 ## Task 5: Build goals, actions, and progress
 
+**Status: mostly done** (`bbc4308`, `831d9eb`, `413bced`). Records, validation, the goal editor and progress recording all exist and are reachable from plan detail.
+
+Not done: an action editor. Actions are modelled, persisted and counted toward completion, but there is no UI to write one.
+
 **Files:**
 - Create: `TMI/Features/Plans/GoalRecord.swift`
 - Create: `TMI/Features/Plans/ActionRecord.swift`
@@ -219,6 +233,10 @@ git commit -m "feat: track plan goals actions and progress"
 
 ## Task 6: Build the plan editor and list
 
+**Status: done.** `CanonicalPlanEditorView` and `CanonicalPlanListView`. List rows now open plan detail; they were not tappable before `c560d9e`.
+
+Not done: `PlanEditorState` as a separate draft owner, and `TMIUITests/PlanCreationUITests.swift`.
+
 **Files:**
 - Replace: `TMI/Views/TMIPlans/TMIPlanListView.swift`
 - Replace: `TMI/Views/TMIPlans/TMIPlanEditorView.swift`
@@ -246,6 +264,10 @@ git commit -m "feat: deliver intervention plan creation"
 ```
 
 ## Task 7: Build approval, detail, history, and Student Mode follow-through
+
+**Status: partly done** (`c560d9e`). Canonical plan detail shows lifecycle, permission-backed transitions, goals, progress and the revision timeline. Activating a pending plan and requesting changes require `plan.approve`.
+
+Not done: dedicated approval views, Student Mode projections of approved goals and actions, and `PlanLifecycleUITests`. Step 4's split of the legacy detail file is moot — that file was retired in `68be25a`.
 
 **Files:**
 - Replace: `TMI/Views/TMIPlans/TMIPlanDetailView.swift`
@@ -279,6 +301,10 @@ git commit -m "feat: complete plan lifecycle experience"
 
 ## Task 8: Implement permission-safe plan exports
 
+**Status: partly done** (`9a4afa2`). `PlanExportProjection` decides what an export may contain before anything renders; redaction is never left to the view.
+
+Not done: `PlanExportRenderer`, and the trusted function issuing audit identifiers. The projection accepts an audit ID it does not yet mint.
+
 **Files:**
 - Create: `TMI/Features/Plans/PlanExportProjection.swift`
 - Create: `TMI/Features/Plans/PlanExportRenderer.swift`
@@ -301,6 +327,10 @@ git commit -m "feat: export authorized plan reports"
 ```
 
 ## Task 9: Migrate plans and retire legacy implementations
+
+**Status: retirement done** (`68be25a`, `a98cabf`). The legacy plan and career stacks are gone — 14,751 lines — decided by reachability from `MainTabView` rather than guesswork.
+
+Not done: migrating any existing legacy plan data. Legacy plans were written to `users/{uid}/tmiPlans`, which the rules deny, so there may be nothing to migrate; that needs checking against real data before it is assumed.
 
 **Files:**
 - Modify: `firebase/src/migrationManifest.ts`
@@ -334,6 +364,8 @@ git commit -m "refactor: retire legacy plan persistence"
 ```
 
 ## Task 10: Release 3 acceptance
+
+**Status: not started.** Needs the emulator and staging data, and depends on Release 2 Task 7 for a career to choose.
 
 **Files:**
 - Create: `docs/release-evidence/release-3.md`
