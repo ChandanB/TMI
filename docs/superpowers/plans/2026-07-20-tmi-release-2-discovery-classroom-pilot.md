@@ -261,6 +261,14 @@ git commit -m "feat: add explainable career matching"
 
 ## Task 6: Build career discovery, detail, and comparison
 
+**Status: steps 1-2 done** (`2f98925`). Canonical discovery, detail and comparison are built on `CareerRecord` and reached from the student's Careers tab. Discovery, filter and comparison rules live in `CareerDiscoveryState` with tests.
+
+Step 3's "split legacy giant views" and "remove nested duplicate career types" is **entangled with Release 3 Task 9** and is not safe to do here. `CareerExplorerView` and `CareerDetailView` (4,347 lines together) are still reachable in production through the legacy plan stack: Dashboard -> `TMIPlanListView` / `TMIPlanDetailView` -> `TMIPlanEditorView` -> `PlanCareersSection` -> `CareerExplorerView`. Deleting the career views means retiring the legacy plan views in the same change, which is what Release 3 Task 9 exists to do. The canonical views sit beside the legacy ones until then.
+
+This is also what blocks Task 5 Step 3: the duplicate `Career`, `CareerPath` and `CareerMatchExplanation` types cannot be removed while those legacy views compile against them.
+
+Not yet done: `TMIUITests/CareerExplorerUITests.swift`. It needs a career fixture in `UITestingLaunchConfiguration` alongside the existing student-detail fixtures.
+
 **Files:**
 - Replace: `TMI/Views/Career Explorer/CareerExplorerView.swift`
 - Replace: `TMI/Views/Career Explorer/CareerDetailView.swift`
