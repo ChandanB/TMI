@@ -686,8 +686,8 @@ struct WorkspacePanelView: View {
                 
                 QuickStatCard(
                     icon: "briefcase.fill",
-                    value: context.prefetchedCareerState != nil ? "Active" : "None",
-                    label: "Career State"
+                    value: "\(context.prefetchedPlans.count)",
+                    label: "Plans"
                 )
             }
         }

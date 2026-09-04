@@ -52,7 +52,7 @@ final class StudentContextStateModel {
     
     // MARK: - Prefetch State
     
-    /// Whether student edges (interests, career state) are being prefetched
+    /// Whether student edges (interests and plans) are being prefetched
     private(set) var isPrefetchingEdges: Bool = false
     
     /// Student ID currently being prefetched.
@@ -60,9 +60,6 @@ final class StudentContextStateModel {
     
     /// Prefetched student interests (from edge collection)
     private(set) var prefetchedInterests: [Interest] = []
-    
-    /// Prefetched student career state
-    private(set) var prefetchedCareerState: StudentCareerState?
     
     /// Prefetched student plans
     private(set) var prefetchedPlans: [TMIPlan] = []
@@ -135,7 +132,6 @@ final class StudentContextStateModel {
             selectedPlanId = nil
             cachedPlan = nil
             prefetchedInterests = []
-            prefetchedCareerState = nil
             prefetchedPlans = []
         }
         
@@ -184,7 +180,6 @@ final class StudentContextStateModel {
         cachedStudent = nil
         cachedPlan = nil
         prefetchedInterests = []
-        prefetchedCareerState = nil
         prefetchedPlans = []
         isPrefetchingEdges = false
         prefetchingStudentId = nil
@@ -236,7 +231,6 @@ final class StudentContextStateModel {
         cachedStudent = nil
         cachedPlan = nil
         prefetchedInterests = []
-        prefetchedCareerState = nil
         prefetchedPlans = []
         isPrefetchingEdges = false
         prefetchingStudentId = nil
@@ -244,7 +238,7 @@ final class StudentContextStateModel {
     }
     
     var hasPrefetchedEdges: Bool {
-        !prefetchedInterests.isEmpty || prefetchedCareerState != nil || !prefetchedPlans.isEmpty
+        !prefetchedInterests.isEmpty || !prefetchedPlans.isEmpty
     }
     
     nonisolated static func shouldPrefetchEdges(
@@ -287,12 +281,10 @@ final class StudentContextStateModel {
             Log.student.debug("student_context_prefetch_started")
 
             async let interests = Self.loadPrefetchedInterests(for: studentId)
-            async let careerStates = Self.loadPrefetchedCareerStates(for: studentId)
             async let plans = Self.loadPrefetchedPlans(for: studentId)
 
-            let (loadedInterests, loadedCareerStates, loadedPlans) = await (
+            let (loadedInterests, loadedPlans) = await (
                 interests,
-                careerStates,
                 plans
             )
 
@@ -301,7 +293,6 @@ final class StudentContextStateModel {
             }
 
             self.prefetchedInterests = loadedInterests
-            self.prefetchedCareerState = loadedCareerStates.first
             self.prefetchedPlans = loadedPlans
 
         }
@@ -319,19 +310,6 @@ final class StudentContextStateModel {
             let interestIds = Set(edges.map(\.interestId))
             let allInterests = try await InterestLibraryService.shared.fetchAllInterests()
             return allInterests.filter { interestIds.contains($0.id ?? "") }
-        } catch is CancellationError {
-            return []
-        } catch {
-            return []
-        }
-    }
-
-    @MainActor
-    private static func loadPrefetchedCareerStates(
-        for studentId: String
-    ) async -> [StudentCareerState] {
-        do {
-            return try await StudentCareerService.shared.getStudentCareers(studentId: studentId)
         } catch is CancellationError {
             return []
         } catch {
