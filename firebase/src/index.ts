@@ -665,6 +665,32 @@ const parseRequestSensitiveExportRequest = (
   };
 };
 
+const planExportKindValues = [
+  "professionalPlan",
+  "mtssSummary",
+  "progressReport",
+  "meetingSummary",
+] as const;
+
+export interface RecordPlanExportRequest extends PrivilegedBaseRequest {
+  readonly planID: string;
+  readonly studentID: string;
+  readonly kind: (typeof planExportKindValues)[number];
+}
+
+const parseRecordPlanExportRequest = (
+  value: unknown,
+): RecordPlanExportRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(data, withBaseFields("planID", "studentID", "kind"));
+  return {
+    ...parseBaseRequest(data),
+    planID: requireIdentifier(data.planID, "planID"),
+    studentID: requireIdentifier(data.studentID, "studentID"),
+    kind: requireEnum(data.kind, "kind", planExportKindValues),
+  };
+};
+
 const parseRecordPrivilegedAuditEventRequest = (
   value: unknown,
 ): RecordPrivilegedAuditEventRequest => {
@@ -4926,6 +4952,78 @@ const deletePersonalAccountDataHandler =
 const provisionStaffMembershipHandler =
   createProductionProvisionStaffMembershipHandler();
 
+/**
+ * Records that one plan was exported, and returns the identifier printed on
+ * every page of it.
+ *
+ * The identifier is the audit event's own id, so a page can be traced back to
+ * the record of who took it and when. The client cannot mint one: audit events
+ * are write-denied to clients precisely so an export cannot claim to be
+ * traceable without being traceable.
+ */
+const recordPlanExportHandler = async (
+  request: CallableRequest<unknown>,
+): Promise<PrivilegedOperationResult & { readonly auditID: string }> => {
+  const data = parseRecordPlanExportRequest(request.data);
+  const firestore = getFirestore();
+  const typedRequest = request as CallableRequest<RecordPlanExportRequest>;
+  const result = await executePrivilegedOperation(
+    firestore,
+    typedRequest,
+    data,
+    {
+      action: "plan.export.record",
+      targetPath: () => `districts/${data.districtID}/plans/${data.planID}`,
+      requiredCapability: "report.export",
+      auditDetails: (input) => ({
+        planID: input.planID,
+        studentID: input.studentID,
+        kind: input.kind,
+      }),
+      mutate: async ({ transaction, membership }) => {
+        const [planSnapshot, studentSnapshot] = await Promise.all([
+          transaction.get(
+            firestore.doc(`districts/${data.districtID}/plans/${data.planID}`),
+          ),
+          transaction.get(
+            firestore.doc(
+              `districts/${data.districtID}/students/${data.studentID}`,
+            ),
+          ),
+        ]);
+        const plan = requireExistingData(planSnapshot, "Plan");
+        const student = requireExistingData(studentSnapshot, "Student");
+        const schoolID = requireSchoolID(student, "Student");
+
+        // Exporting reaches the student's full record, so it needs the same
+        // scope reading their detail does, on top of report.export.
+        if (
+          plan.districtId !== data.districtID ||
+          !canReadStudentDetail(membership, data.studentID, schoolID)
+        ) {
+          throw new HttpsError(
+            "permission-denied",
+            "The plan is outside the member's scope.",
+          );
+        }
+        const planStudents = plan.studentIDs;
+        if (
+          !Array.isArray(planStudents) ||
+          !planStudents.includes(data.studentID)
+        ) {
+          throw new HttpsError(
+            "failed-precondition",
+            "The plan does not belong to that student.",
+          );
+        }
+        // Nothing is mutated. The audit event is the record.
+        return { recordVersion: data.expectedRecordVersion };
+      },
+    },
+  );
+  return { ...result, auditID: data.idempotencyKey };
+};
+
 const requestSensitiveExportHandler = async (
   request: CallableRequest<RequestSensitiveExportRequest>,
 ): Promise<PrivilegedOperationResult> => {
@@ -5115,6 +5213,10 @@ export const approveSurveyInterests = onCall(
 export const deletePersonalAccountData = onCall(
   { ...callableOptions, timeoutSeconds: 540 },
   deletePersonalAccountDataHandler,
+);
+export const recordPlanExport = onCall(
+  callableOptions,
+  recordPlanExportHandler,
 );
 export const requestSensitiveExport = onCall(
   callableOptions,

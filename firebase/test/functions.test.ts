@@ -7,6 +7,7 @@ import {
   grantStudentDetailAccess,
   issueStudentModeSession,
   mutateMembership,
+  recordPlanExport,
   recordPrivilegedAuditEvent,
   restoreStudentModeSession,
   requestSensitiveExport,
@@ -91,6 +92,24 @@ describe("privileged callable boundary", () => {
         status: "submitted",
         recordVersion: 2,
       });
+      await setDoc(
+        doc(db, "districts/d1/members/exporter-1"),
+        activeMembership({
+          role: "schoolAdministrator",
+          capabilities: ["report.export", "student.read.detail"],
+        }),
+      );
+      await setDoc(doc(db, "districts/d1/students/student-1"), {
+        districtId: "d1",
+        schoolId: "school-1",
+        displayName: "Ava Stone",
+        normalizedDisplayName: "ava stone",
+        grade: "7",
+        assignedMemberIDs: ["exporter-1"],
+        isArchived: false,
+        schemaVersion: 1,
+        recordVersion: 1,
+      });
     });
   });
 
@@ -108,9 +127,78 @@ describe("privileged callable boundary", () => {
       deletePersonalAccountData,
       requestSensitiveExport,
       recordPrivilegedAuditEvent,
+      recordPlanExport,
     ]) {
       expect(callable.run).toBeTypeOf("function");
     }
+  });
+
+  const exportRequest = (overrides: Record<string, unknown> = {}) => ({
+    districtID: "d1",
+    planID: "plan-1",
+    studentID: "student-1",
+    kind: "professionalPlan",
+    reasonCode: "educator-plan-export",
+    expectedRecordVersion: 2,
+    idempotencyKey: "export-plan-1",
+    ...overrides,
+  });
+
+  it("records a plan export and returns the audit event's identifier", async () => {
+    const result = await recordPlanExport.run(
+      callableRequest(exportRequest(), { uid: "exporter-1" }),
+    );
+
+    // The identifier printed on the export is the audit event's own id, so a
+    // page can be traced back to who took it.
+    expect(result.auditID).toBe("export-plan-1");
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const audit = await getDoc(
+        doc(context.firestore(), "districts/d1/auditEvents/export-plan-1"),
+      );
+      expect(audit.exists()).toBe(true);
+      expect(audit.data()?.action).toBe("plan.export.record");
+      expect(audit.data()?.actorUserID).toBe("exporter-1");
+    });
+  });
+
+  it("refuses an export from a member without report.export", async () => {
+    // approver-1 can approve plans and still may not take a record out.
+    await expectHttpsError(
+      recordPlanExport.run(
+        callableRequest(exportRequest({ idempotencyKey: "export-plan-2" }), {
+          uid: "approver-1",
+        }),
+      ),
+      "permission-denied",
+    );
+  });
+
+  it("refuses an export naming a student the plan does not cover", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "districts/d1/students/student-2"), {
+        districtId: "d1",
+        schoolId: "school-1",
+        displayName: "Other Student",
+        normalizedDisplayName: "other student",
+        grade: "7",
+        assignedMemberIDs: ["exporter-1"],
+        isArchived: false,
+        schemaVersion: 1,
+        recordVersion: 1,
+      });
+    });
+
+    await expectHttpsError(
+      recordPlanExport.run(
+        callableRequest(
+          exportRequest({ studentID: "student-2", idempotencyKey: "export-plan-3" }),
+          { uid: "exporter-1" },
+        ),
+      ),
+      "failed-precondition",
+    );
   });
 
   it("requires verified Auth and App Check context", async () => {

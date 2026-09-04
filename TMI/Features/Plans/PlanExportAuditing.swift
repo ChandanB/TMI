@@ -49,12 +49,18 @@ nonisolated struct FirebasePlanExportAuditing: PlanExportAuditing {
         kind: PlanExportKind,
         districtID: String
     ) async throws -> String {
+        // The key is the audit event's document id, so retrying a failed
+        // export records one event rather than a second copy.
+        let idempotencyKey = "export_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())"
         do {
             let result = try await functions.httpsCallable("recordPlanExport").call([
                 "districtID": districtID,
                 "planID": planID,
                 "studentID": studentID,
                 "kind": kind.rawValue,
+                "idempotencyKey": idempotencyKey,
+                "reasonCode": "educator-plan-export",
+                "expectedRecordVersion": 0,
             ])
             guard let payload = result.data as? [String: Any],
                   let auditID = payload["auditID"] as? String,
