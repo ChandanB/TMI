@@ -261,11 +261,11 @@ git commit -m "feat: add explainable career matching"
 
 ## Task 6: Build career discovery, detail, and comparison
 
-**Status: core workflow done** (`2f98925`, `5b74b11`). Canonical discovery, detail and comparison are built on `CareerRecord` and reached from the student's Careers tab. Save, dismiss, recently viewed, compare selection, and share now use the canonical student-career relationship path; plan attachment remains visibly disabled. Discovery, filter and comparison rules live in `CareerDiscoveryState` with tests.
+**Status: core workflow and acceptance fixture done** (`2f98925`, `5b74b11`, `299acb2`). Canonical discovery, detail and comparison are built on `CareerRecord` and reached from the student's Careers tab. Save, dismiss, recently viewed, compare selection, and share now use the canonical student-career relationship path; plan attachment remains visibly disabled. Discovery, filter and comparison rules live in `CareerDiscoveryState` with tests. Deterministic discovery and detail fixtures now exercise the active-student label, persisted save state, comparison, sharing, and the disabled plan-attachment boundary on macOS.
 
 Step 3 is now **done** (`68be25a`). The legacy career views were retired together with the legacy plan stack, which is what they were entangled with.
 
-Not yet done: `TMIUITests/CareerExplorerUITests.swift`. It needs a career fixture in `UITestingLaunchConfiguration` alongside the existing student-detail fixtures. The richer detail fields named below also need sourced catalog fields before they can render anything beyond the current summary, education, interests, and sourced pay/outlook seam.
+Still open: expand UI coverage to every filter/dismiss/recently-viewed edge and run the release-device matrix at the release checkpoint. The richer detail fields named below also need sourced catalog fields before they can render anything beyond the current summary, education, interests, and sourced pay/outlook seam.
 
 **Files:**
 - Replace: `TMI/Views/Career Explorer/CareerExplorerView.swift`
