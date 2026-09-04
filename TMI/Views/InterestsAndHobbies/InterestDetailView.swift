@@ -353,12 +353,7 @@ struct InterestDetailView: View {
     private func plansContent(_ plans: [TMIPlan]) -> some View {
         VStack(spacing: 10) {
             ForEach(Array(plans.prefix(3))) { plan in
-                NavigationLink {
-                    TMIPlanDetailView(plan: plan)
-                } label: {
-                    PlanRowView(plan: plan, color: interest.color)
-                }
-                .buttonStyle(PlainButtonStyle())
+                PlanRowView(plan: plan, color: interest.color)
             }
 
             if plans.count > 3 {

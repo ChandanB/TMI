@@ -281,7 +281,6 @@ struct CareerMatchResult: Identifiable, Hashable {
     let score: Double // 0.0 - 1.0
     let matchingInterests: [String]
     let suggestedTMIModules: [TMIPlanModel]
-    var explanation: CareerMatchExplanation? // Detailed match explanation
 
     init(
         id: UUID = UUID(),
@@ -289,14 +288,12 @@ struct CareerMatchResult: Identifiable, Hashable {
         score: Double,
         matchingInterests: [String],
         suggestedTMIModules: [TMIPlanModel],
-        explanation: CareerMatchExplanation? = nil
     ) {
         self.id = id
         self.career = career
         self.score = score
         self.matchingInterests = matchingInterests
         self.suggestedTMIModules = suggestedTMIModules
-        self.explanation = explanation
     }
 
     var matchPercentage: Int {

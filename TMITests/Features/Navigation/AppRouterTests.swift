@@ -341,9 +341,6 @@ struct AppRouterTests {
         let notificationSource = try sourceFile(
             at: "TMI/Services/NotificationService.swift"
         )
-        let planDetailSource = try sourceFile(
-            at: "TMI/Views/TMIPlans/TMIPlanDetailView.swift"
-        )
         let interestDetailSource = try sourceFile(
             at: "TMI/Views/InterestsAndHobbies/InterestDetailView.swift"
         )
@@ -363,7 +360,7 @@ struct AppRouterTests {
         #expect(mainTabSource.contains("if contextMatchesRouter {\n                    HStack(spacing:"))
         #expect(!planApprovalSource.contains("tmi://plans/"))
         #expect(!notificationSource.contains("tmi://plans/"))
-        #expect(!planDetailSource.contains("StudentDetailView(studentId:"))
+        // The legacy plan detail view that this guarded is retired.
         #expect(!interestDetailSource.contains("StudentDetailView(studentId:"))
     }
 

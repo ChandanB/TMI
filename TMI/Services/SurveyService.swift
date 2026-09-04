@@ -333,26 +333,6 @@ final class SurveyService {
     throw SurveyServiceError.studentSurveyPersistenceUnavailable
   }
 
-  /// Get career matches for student based on latest survey
-  func getCareerMatches(for studentId: String) async throws -> [CareerMatchResult] {
-    guard let survey = try await fetchLatestStudentSurvey(for: studentId) else {
-      throw SurveyServiceError.surveyNotFound
-    }
-
-    // Extract dream job if exists
-    var dreamJob: String?
-    if case .text(let text) = survey.responses["dream_job"] {
-      dreamJob = text
-    }
-
-    // Use CareerMatchingService
-    let matches = CareerMatchingService.shared.matchCareers(
-      from: survey.interestClusters,
-      dreamJob: dreamJob
-    )
-
-    return matches
-  }
 
   // MARK: - Analysis Helpers
 

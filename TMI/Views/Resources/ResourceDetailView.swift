@@ -10,7 +10,7 @@ import SwiftUI
 import SafariServices
 #endif
 
-// Resource detail view with career connections and improved metadata
+// Resource detail view with improved metadata
 struct ResourceDetailView: View {
     let resource: Resource
     var onDelete: (() -> Void)? = nil
@@ -20,14 +20,12 @@ struct ResourceDetailView: View {
     @State private var isBookmarked = false
     @State private var isLoading = false
     @State private var relatedResources: [Resource] = []
-    @State private var careerRecommendations: [Career] = []
     @State private var showWebView = false
     @State private var showBookmarkConfirmation = false
     @State private var showDeleteConfirmation = false
     @Environment(\.dismiss) private var dismiss
 
     private let resourceService = ResourceService.shared
-    private let careerService = CareerService.shared
 
     var body: some View {
         ZStack {
@@ -63,11 +61,6 @@ struct ResourceDetailView: View {
                             
                             // Action buttons
                             actionButtonsSection
-                            
-                            // Career connections section
-                            if !careerRecommendations.isEmpty {
-                                careerConnectionsSection
-                            }
                             
                             // Related resources
                             if !relatedResources.isEmpty {
@@ -347,43 +340,6 @@ struct ResourceDetailView: View {
         .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.25), value: animateContent)
     }
     
-    // MARK: - Career Connections Section
-    
-    private var careerConnectionsSection: some View {
-        TMICard(style: .elevated) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Text("Related Careers")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(Color.tmiTextPrimary)
-                    
-                    Spacer()
-                    
-                    Button("View All") {
-                        // Navigate to career explorer filtered by this resource's tags
-                    }
-                    .font(.system(size: 14))
-                    .foregroundColor(.tmiSecondary)
-                }
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(careerRecommendations.prefix(3), id: \.id) { career in
-                            NavigationLink(destination: CareerDetailView(career: career, student: nil)) {
-                                CompactCareerCard(career: career)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 4)
-                }
-            }
-            .padding(20)
-        }
-        .padding(.horizontal)
-        .opacity(animateContent ? 1 : 0)
-        .offset(y: animateContent ? 0 : 20)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3), value: animateContent)
-    }
     
     // MARK: - Related Resources Section
     
@@ -419,26 +375,11 @@ struct ResourceDetailView: View {
             // Load related resources
             relatedResources = try await resourceService.fetchResources(withTags: resource.tags)
             
-            // Load career recommendations based on resource content
-            let allCareers = careerService.allCareers
-            careerRecommendations = findRelatedCareers(from: allCareers)
-            
         } catch {
             print("Failed to load resource data: \(error)")
         }
         
         isLoading = false
-    }
-    
-    private func findRelatedCareers(from careers: [Career]) -> [Career] {
-        let resourceKeywords = Set(resource.tags.map { $0.lowercased() } + 
-                                 [resource.title.lowercased(), resource.category.rawValue.lowercased()])
-        
-        return careers.filter { career in
-            let careerKeywords = Set([career.field.lowercased(), career.title.lowercased()] + 
-                                   career.skills.map { $0.lowercased() })
-            return !careerKeywords.intersection(resourceKeywords).isEmpty
-        }.prefix(5).map { $0 }
     }
     
     // MARK: - Helper Methods
@@ -492,63 +433,6 @@ struct MetadataRow: View {
     }
 }
 
-struct CompactCareerCard: View {
-    let career: Career
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: getCareerIcon(field: career.field))
-                    .font(.system(size: 16))
-                    .foregroundColor(.tmiSecondary)
-                
-                Spacer()
-                
-                Text(career.field)
-                    .font(.system(size: 10))
-                    .foregroundColor(Color.tmiTextSecondary)
-            }
-            
-            Text(career.title)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color.tmiTextPrimary)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-            
-            Text("$\(Int(career.salaryRange.lowerBound/1000))k+")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.tmiSecondary)
-        }
-        .padding(12)
-        .frame(width: 140, height: 100)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.05))
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.tmiSurface)
-                        .opacity(0.8)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
-        )
-    }
-    
-    private func getCareerIcon(field: String) -> String {
-        switch field {
-        case "Technology": return "desktopcomputer"
-        case "Healthcare": return "heart.text.square"
-        case "Education": return "book"
-        case "Business": return "briefcase"
-        case "Engineering": return "gearshape.2"
-        case "Arts": return "paintpalette"
-        case "Science": return "atom"
-        default: return "star"
-        }
-    }
-}
 
 struct CompactResourceRow: View {
     let resource: Resource

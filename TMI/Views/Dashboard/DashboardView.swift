@@ -701,7 +701,7 @@ struct DashboardView: View {
             StudentListView()
         }
         .navigationDestination(isPresented: $navigateToPlans) {
-            TMIPlanListView()
+            CanonicalPlanListView()
         }
     }
 

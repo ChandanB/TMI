@@ -362,16 +362,15 @@ struct MainTabView: View {
                     description: Text("Return to the student record and try again.")
                 )
             }
-        case .plan(let planID):
-            if let plan = router.activePlan, plan.id == planID {
-                TMIPlanDetailView(plan: plan)
-            } else {
-                ContentUnavailableView(
-                    "Plan Unavailable",
-                    systemImage: "doc.text.magnifyingglass",
-                    description: Text("Return to the TMI Plans list and try again.")
-                )
-            }
+        case .plan:
+            // Canonical plan detail arrives with Release 3 Task 7. Nothing
+            // pushes this route today; the legacy detail view it used to
+            // render has been retired.
+            ContentUnavailableView(
+                "Plan Unavailable",
+                systemImage: "doc.text.magnifyingglass",
+                description: Text("Return to the TMI Plans list and try again.")
+            )
         case .profile:
             UserProfileView()
         case .settings:
