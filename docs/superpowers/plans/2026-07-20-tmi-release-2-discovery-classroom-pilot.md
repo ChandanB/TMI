@@ -39,6 +39,8 @@
 
 ## Task 1: Implement secure Student Mode sessions
 
+**Status: done.** Landed across the Student Mode survey commits through `30886cc`.
+
 **Files:**
 - Create: `TMI/Features/StudentMode/StudentModeSession.swift`
 - Create: `TMI/Features/StudentMode/StudentModeRepository.swift`
@@ -102,6 +104,8 @@ git commit -m "feat: secure educator-launched Student Mode"
 
 ## Task 2: Build the single versioned survey engine
 
+**Status: done.** `SurveyDefinition`, `SurveyResponse` and the survey engine tests.
+
 **Files:**
 - Create: `TMI/Features/Surveys/SurveyDefinition.swift`
 - Create: `TMI/Features/Surveys/SurveyAssignment.swift`
@@ -143,6 +147,8 @@ git commit -m "feat: add canonical survey engine"
 
 ## Task 3: Build the Student Mode survey experience
 
+**Status: done.** `StudentSurveyFlow` and the survey step views; persistence lives in the flow, not the results screen.
+
 **Files:**
 - Replace: `TMI/Views/StudentMode/StudentModeView.swift`
 - Replace: `TMI/Views/Survey/StudentSurveyFlow.swift`
@@ -170,6 +176,8 @@ git commit -m "feat: deliver Student Mode interest survey"
 ```
 
 ## Task 4: Implement deterministic interest analysis and staff approval
+
+**Status: done** (`ad3e7a6`). Approval derives every interest server-side from the immutable submission; direct writes to interest edges are denied. It cannot complete until the callable is deployed, which `eedbc5c` reports to the reviewer rather than failing opaquely.
 
 **Files:**
 - Create: `TMI/Features/Interests/StudentInterest.swift`
@@ -207,6 +215,12 @@ git commit -m "feat: approve canonical student interests"
 ```
 
 ## Task 5: Consolidate the career catalog and deterministic matcher
+
+**Status: mostly done.** Stable career identity (`07116fa`), the matcher and relationship state (`05a50ac`), and the canonical catalog reader (`8506bbb`).
+
+Step 3's "remove duplicate `CareerModels` types" is **blocked on Task 6** and sequenced a task too early here. The legacy `Career`, `CareerPath` and `CareerMatchExplanation` types are still live in `AppBootstrapService`, `ResourceDetailView`, `CareerService`, `CareerMatchingService` and the three career views. Those callers cannot compile against `CareerRecord` until Task 6 rebuilds the views, so the deletion belongs there.
+
+Open decision: the bundled catalog states salary for all 537 careers with no source and no date. Canonical records carry no figure until someone sources them, so salary is absent from `CareerRecord` today.
 
 **Files:**
 - Create: `TMI/Features/Careers/Career.swift`
