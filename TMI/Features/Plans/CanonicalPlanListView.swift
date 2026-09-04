@@ -114,8 +114,11 @@ struct CanonicalPlanListView: View {
                     .accessibilityIdentifier("plans.openOnly")
             }
             ForEach(state.visiblePlans) { plan in
-                CanonicalPlanRow(plan: plan)
-                    .listRowBackground(TMIColors.surface)
+                NavigationLink(value: AppRoute.plan(plan.id)) {
+                    CanonicalPlanRow(plan: plan)
+                }
+                .listRowBackground(TMIColors.surface)
+                .accessibilityIdentifier("plans.row.\(plan.id)")
             }
         }
         .scrollContentBackground(.hidden)
