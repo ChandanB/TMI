@@ -55,7 +55,8 @@ nonisolated enum CareerEducationLevel: String, Codable, Sendable, CaseIterable {
     case certificate
     case associates
     case bachelors
-    case graduate
+    case masters
+    case doctorate
     case varies
 }
 
