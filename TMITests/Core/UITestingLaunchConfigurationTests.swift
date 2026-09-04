@@ -61,6 +61,8 @@ struct UITestingLaunchConfigurationTests {
             ("student-detail-release1", .studentDetailRelease1),
             ("student-detail-offline", .studentDetailOffline),
             ("student-detail-permission-denied", .studentDetailPermissionDenied),
+            ("career-discovery", .careerDiscovery),
+            ("career-detail", .careerDetail),
         ]
 
         for (rawValue, expected) in fixtures {

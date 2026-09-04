@@ -22,6 +22,8 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
         case studentDetailOffline = "student-detail-offline"
         case studentDetailPermissionDenied = "student-detail-permission-denied"
         case studentModeSurvey = "student-mode-survey"
+        case careerDiscovery = "career-discovery"
+        case careerDetail = "career-detail"
     }
 
     nonisolated enum ContentSize: String, Sendable, Equatable {

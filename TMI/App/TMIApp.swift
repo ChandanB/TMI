@@ -192,6 +192,10 @@ struct TMIApp: App {
             }
         case .studentModeSurvey:
             StudentModeSurveyUITestingContent()
+        case .careerDiscovery:
+            CareerDiscoveryUITestingContent()
+        case .careerDetail:
+            CareerDetailUITestingContent()
         case nil:
             ContentUnavailableView(
                 "UI Test Fixture Unavailable",
