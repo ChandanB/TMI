@@ -14,6 +14,7 @@ struct CanonicalPlanDetailView: View {
     @State private var state: CanonicalPlanDetailState?
     @State private var editingGoal: GoalRecord?
     @State private var isAddingGoal = false
+    @State private var recordingAgainst: GoalRecord?
 
     private let memberOverride: MembershipContext?
 
@@ -42,6 +43,20 @@ struct CanonicalPlanDetailView: View {
                     member: member,
                     planStartDate: plan.startDate
                 ) { _ in
+                    Task { await state?.reloadChildren(member: member) }
+                }
+            }
+        }
+        .sheet(item: $recordingAgainst) { goal in
+            if let plan = state?.plan, let member {
+                ProgressEntryView(
+                    planID: plan.id,
+                    studentID: goal.studentID,
+                    member: member,
+                    source: .goal,
+                    sourceID: goal.id,
+                    sourceTitle: goal.title
+                ) {
                     Task { await state?.reloadChildren(member: member) }
                 }
             }
@@ -263,6 +278,13 @@ struct CanonicalPlanDetailView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("planDetail.goal.\(goal.id)")
+
+                    if member.capabilities.contains(.studentWriteDetail), plan.status.isOpen {
+                        Button("Record progress") { recordingAgainst = goal }
+                            .font(.caption)
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("planDetail.recordProgress.\(goal.id)")
+                    }
                 }
             }
             // Writing a goal is editing the plan, so it needs write access.
