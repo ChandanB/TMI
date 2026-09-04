@@ -201,7 +201,7 @@ git commit -m "feat: persist plans with trusted transitions"
 
 **Status: mostly done** (`bbc4308`, `831d9eb`, `413bced`). Records, validation, the goal editor and progress recording all exist and are reachable from plan detail.
 
-Not done: an action editor. Actions are modelled, persisted and counted toward completion, but there is no UI to write one.
+Step 3 is now done too (`408c6d2`): the action editor exists and is reachable from plan detail.
 
 **Files:**
 - Create: `TMI/Features/Plans/GoalRecord.swift`
@@ -267,7 +267,9 @@ git commit -m "feat: deliver intervention plan creation"
 
 **Status: partly done** (`c560d9e`). Canonical plan detail shows lifecycle, permission-backed transitions, goals, progress and the revision timeline. Activating a pending plan and requesting changes require `plan.approve`.
 
-Not done: dedicated approval views, Student Mode projections of approved goals and actions, and `PlanLifecycleUITests`. Step 4's split of the legacy detail file is moot — that file was retired in `68be25a`.
+Step 3 is done (`408c6d2`): `StudentPlanProjection` decides what a child sees, with redaction in the projection rather than the view, and only an active plan projects at all.
+
+Not done: dedicated approval views (approval currently happens through plan detail's transitions, which do enforce `plan.approve`), wiring the projection into `StudentModeView`, and `PlanLifecycleUITests`. Step 4's split of the legacy detail file is moot — that file was retired in `68be25a`.
 
 **Files:**
 - Replace: `TMI/Views/TMIPlans/TMIPlanDetailView.swift`
