@@ -190,6 +190,9 @@ private struct StudentOperationalHubContent: View {
 
     @State private var showingPlanEditor = false
     @State private var planCreatedMessage: String?
+    /// Approved interests drive career matching; an empty list means nothing
+    /// has been approved yet, which the discovery view says plainly.
+    @State private var careerInterests: [StudentInterest] = []
 
     var body: some View {
         ZStack {
@@ -214,6 +217,13 @@ private struct StudentOperationalHubContent: View {
         }
         .refreshable {
             await state.refresh()
+        }
+        .task(id: state.header?.studentID) {
+            guard let student = state.student else { return }
+            careerInterests = (try? await StudentInterestService.shared.getStudentInterests(
+                districtID: student.districtID,
+                studentID: student.id
+            )) ?? []
         }
     }
 
@@ -398,6 +408,14 @@ private struct StudentOperationalHubContent: View {
                 StudentInterestsSection(
                     districtID: student.districtID,
                     studentID: student.id
+                )
+            } else if domain == .careers, let student = state.student {
+                // Matching is a claim about this student, so it is read where
+                // the student is, not from a global explorer.
+                StudentCareerDiscoveryView(
+                    studentName: student.displayName,
+                    approvedInterests: careerInterests,
+                    clusters: []
                 )
             } else if domain == .meetingsAndNotes {
                 StudentTimelineView(
