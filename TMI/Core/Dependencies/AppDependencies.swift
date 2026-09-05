@@ -79,10 +79,23 @@ nonisolated struct AppDependencies: Sendable {
             requiresEmailVerification: flags.staffEmailVerificationRequired
         )
         let firebaseStudents = CanonicalStudentRepository.firebase(firestore: firestore)
+        let firebasePlans = CanonicalPlanRepository(firestore: firestore)
+        let firebasePlanChildren = PlanChildRepository(firestore: firestore)
 #if DEBUG
         let students: any StudentRepository = DebugStudentRepository(delegate: firebaseStudents)
+        let debugPlanStore = DebugPlanStore()
+        let plans: any PlanRecordRepository = DebugPlanRepository(
+            delegate: firebasePlans,
+            store: debugPlanStore
+        )
+        let planChildren: any PlanChildRepositoryProtocol = DebugPlanChildRepository(
+            delegate: firebasePlanChildren,
+            store: debugPlanStore
+        )
 #else
         let students: any StudentRepository = firebaseStudents
+        let plans: any PlanRecordRepository = firebasePlans
+        let planChildren: any PlanChildRepositoryProtocol = firebasePlanChildren
 #endif
 
         return AppDependencies(
@@ -93,8 +106,8 @@ nonisolated struct AppDependencies: Sendable {
             studentRepository: students,
             studentDetailRepository: Release1StudentDetailRepository(students: students),
             studentModeRepository: .firebase(),
-            planRepository: CanonicalPlanRepository(firestore: firestore),
-            planChildRepository: PlanChildRepository(firestore: firestore),
+            planRepository: plans,
+            planChildRepository: planChildren,
             planExportAuditing: FirebasePlanExportAuditing(),
             careerRelationshipRepository: CareerRelationshipRepository(
                 firestore: firestore

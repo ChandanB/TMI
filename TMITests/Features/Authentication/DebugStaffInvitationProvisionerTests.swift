@@ -113,6 +113,65 @@ struct DebugStaffInvitationProvisionerTests {
         #expect(model.hasError == false)
     }
 
+    @Test("Debug staff plans are locally usable without Firestore membership documents")
+    func debugStaffPlansUseLocalStorage() async throws {
+        let membership = DebugStaffInvitationProvisioner.membership(userID: "debug-user")
+        let store = DebugPlanStore()
+        let plans = DebugPlanRepository(
+            delegate: UnavailableDebugPlanRepository(),
+            store: store
+        )
+        let children = DebugPlanChildRepository(
+            delegate: UnavailableDebugPlanChildRepository(),
+            store: store
+        )
+        let draft = PlanCreation.draft(
+            studentID: "student-debug",
+            schoolID: DebugStaffInvitationProvisioner.schoolID,
+            member: membership,
+            model: .chaseYourSpace,
+            title: "Chase Your Space",
+            summary: "Build a reliable routine.",
+            startDate: Date(timeIntervalSince1970: 1_700_000_000),
+            targetDate: nil
+        )
+
+        #expect(try await plans.plans(member: membership).isEmpty)
+
+        let created = try await plans.create(
+            draft,
+            operationID: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
+            member: membership
+        )
+        let loaded = try await plans.plan(id: created.id, member: membership)
+        let listed = try await plans.plans(member: membership)
+
+        #expect(loaded == created)
+        #expect(listed == [created])
+        #expect(try await children.goals(planID: created.id, member: membership).isEmpty)
+        #expect(try await children.actions(planID: created.id, member: membership).isEmpty)
+        #expect(try await children.progress(planID: created.id, member: membership).isEmpty)
+        #expect(try await children.revisions(planID: created.id, member: membership).isEmpty)
+    }
+
+    @Test("Debug plan wrappers still delegate ordinary memberships")
+    func debugPlanWrappersDelegateOrdinaryMemberships() async throws {
+        let store = DebugPlanStore()
+        let planDelegate = RecordingDebugPlanRepository()
+        let childDelegate = RecordingDebugPlanChildRepository()
+        let plans = DebugPlanRepository(delegate: planDelegate, store: store)
+        let children = DebugPlanChildRepository(delegate: childDelegate, store: store)
+        let membership = planDelegate.membership
+
+        let listed = try await plans.plans(member: membership)
+        let goals = try await children.goals(planID: planDelegate.record.id, member: membership)
+
+        #expect(listed == [planDelegate.record])
+        #expect(goals.isEmpty)
+        #expect(planDelegate.planListCallCount == 1)
+        #expect(childDelegate.goalReadCallCount == 1)
+    }
+
     @Test("The Debug alias and allowed email synthesize canonical membership")
     func aliasSynthesizesMembershipForAllowedEmail() async throws {
         let delegate = RecordingStaffInvitationProvisioner()
@@ -413,5 +472,159 @@ private actor RecordingMembershipProvider: MembershipProviding {
         callCount += 1
         return membership
     }
+}
+
+@MainActor
+private final class UnavailableDebugPlanRepository: PlanRecordRepository {
+    func plans(member: MembershipContext) async throws -> [PlanRecord] {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func plan(id: String, member: MembershipContext) async throws -> PlanRecord {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func create(
+        _ draft: PlanDraft,
+        operationID: UUID,
+        member: MembershipContext
+    ) async throws -> PlanRecord {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func update(
+        id: String,
+        draft: PlanDraft,
+        expectedVersion: Int,
+        member: MembershipContext
+    ) async throws -> PlanRecord {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func transition(
+        id: String,
+        to status: PlanRecordStatus,
+        expectedVersion: Int,
+        member: MembershipContext
+    ) async throws -> PlanRecord {
+        throw PlanRecordRepositoryError.unavailable
+    }
+}
+
+@MainActor
+private final class UnavailableDebugPlanChildRepository: PlanChildRepositoryProtocol {
+    func goals(planID: String, member: MembershipContext) async throws -> [GoalRecord] {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func actions(planID: String, member: MembershipContext) async throws -> [ActionRecord] {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func progress(planID: String, member: MembershipContext) async throws -> [ProgressRecord] {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func revisions(planID: String, member: MembershipContext) async throws -> [PlanRevision] {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func save(goal: GoalRecord, member: MembershipContext) async throws {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func save(action: ActionRecord, member: MembershipContext) async throws {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func append(progress: ProgressRecord, member: MembershipContext) async throws {
+        throw PlanRecordRepositoryError.unavailable
+    }
+
+    func freeze(revision: PlanRevision, member: MembershipContext) async throws {
+        throw PlanRecordRepositoryError.unavailable
+    }
+}
+
+@MainActor
+private final class RecordingDebugPlanRepository: PlanRecordRepository {
+    let membership = MembershipContext(
+        userID: "ordinary-user",
+        districtID: "ordinary-district",
+        schoolIDs: ["ordinary-school"],
+        role: .teacher,
+        capabilities: [.studentReadDetail, .studentWriteDetail],
+        assignedStudentIDs: [],
+        isActive: true,
+        version: 1
+    )
+    let record = PlanRecord(
+        id: "ordinary-plan",
+        districtID: "ordinary-district",
+        studentIDs: ["ordinary-student"],
+        schoolIDs: ["ordinary-school"],
+        assignedMemberIDs: ["ordinary-user"],
+        status: .draft,
+        model: .chaseYourSpace,
+        title: "Ordinary Plan",
+        summary: nil,
+        startDate: Date(timeIntervalSince1970: 1_700_000_000),
+        targetDate: nil,
+        approvalStatus: .notRequested,
+        metadata: CanonicalRecordMetadata(
+            schemaVersion: 1,
+            recordVersion: 1,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            createdBy: "ordinary-user",
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            updatedBy: "ordinary-user"
+        )
+    )
+    private(set) var planListCallCount = 0
+
+    func plans(member: MembershipContext) async throws -> [PlanRecord] {
+        planListCallCount += 1
+        return [record]
+    }
+
+    func plan(id: String, member: MembershipContext) async throws -> PlanRecord { record }
+
+    func create(
+        _ draft: PlanDraft,
+        operationID: UUID,
+        member: MembershipContext
+    ) async throws -> PlanRecord { record }
+
+    func update(
+        id: String,
+        draft: PlanDraft,
+        expectedVersion: Int,
+        member: MembershipContext
+    ) async throws -> PlanRecord { record }
+
+    func transition(
+        id: String,
+        to status: PlanRecordStatus,
+        expectedVersion: Int,
+        member: MembershipContext
+    ) async throws -> PlanRecord { record }
+}
+
+@MainActor
+private final class RecordingDebugPlanChildRepository: PlanChildRepositoryProtocol {
+    private(set) var goalReadCallCount = 0
+
+    func goals(planID: String, member: MembershipContext) async throws -> [GoalRecord] {
+        goalReadCallCount += 1
+        return []
+    }
+
+    func actions(planID: String, member: MembershipContext) async throws -> [ActionRecord] { [] }
+    func progress(planID: String, member: MembershipContext) async throws -> [ProgressRecord] { [] }
+    func revisions(planID: String, member: MembershipContext) async throws -> [PlanRevision] { [] }
+    func save(goal: GoalRecord, member: MembershipContext) async throws {}
+    func save(action: ActionRecord, member: MembershipContext) async throws {}
+    func append(progress: ProgressRecord, member: MembershipContext) async throws {}
+    func freeze(revision: PlanRevision, member: MembershipContext) async throws {}
 }
 #endif
