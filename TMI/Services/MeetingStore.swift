@@ -19,6 +19,12 @@ nonisolated protocol MeetingStore: Sendable {
         equals value: String
     ) async throws -> [(id: String, data: [String: Any])]
 
+    func documents(
+        atCollectionPath path: String,
+        whereField field: String,
+        arrayContains value: String
+    ) async throws -> [(id: String, data: [String: Any])]
+
     @discardableResult
     func addDocument(atCollectionPath path: String, data: sending [String: Any]) async throws -> String
 
@@ -50,6 +56,17 @@ nonisolated final class FirebaseMeetingStore: MeetingStore, Sendable {
     ) async throws -> [(id: String, data: [String: Any])] {
         let snapshot = try await db.collection(path)
             .whereField(field, isEqualTo: value)
+            .getDocuments()
+        return snapshot.documents.map { ($0.documentID, $0.data()) }
+    }
+
+    func documents(
+        atCollectionPath path: String,
+        whereField field: String,
+        arrayContains value: String
+    ) async throws -> [(id: String, data: [String: Any])] {
+        let snapshot = try await db.collection(path)
+            .whereField(field, arrayContains: value)
             .getDocuments()
         return snapshot.documents.map { ($0.documentID, $0.data()) }
     }

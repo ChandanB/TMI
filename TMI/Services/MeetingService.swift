@@ -39,6 +39,11 @@ nonisolated final class MeetingService: Sendable {
 
         var data = try encode(newMeeting)
         data["organizer"] = session.membership.userID
+        data["participantUserIDs"] = Self.participantUserIDs(
+            organizerID: session.membership.userID,
+            actingUserID: session.membership.userID,
+            participants: meeting.participants
+        )
 
         let documentID = try await store.addDocument(
             atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
@@ -62,12 +67,20 @@ nonisolated final class MeetingService: Sendable {
 
     // MARK: - Fetch Meetings
 
-    /// Fetch all meetings for the caller's district
+    /// Fetch all meetings for the caller's district that the caller participates in.
+    ///
+    /// The `meetings` collection's read rule requires
+    /// `request.auth.uid in resource.data.participantUserIDs`, so an
+    /// unconstrained list query would be denied by Firestore for docs the
+    /// caller cannot read. Scoping with `arrayContains` keeps the query
+    /// provably limited to readable documents.
     func fetchMeetings() async throws -> [Meeting] {
         let session = try authorizedSession()
 
         let documents = try await store.documents(
-            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID)
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            whereField: "participantUserIDs",
+            arrayContains: session.membership.userID
         )
 
         let meetings = documents.compactMap(decodeMeeting)
@@ -77,17 +90,22 @@ nonisolated final class MeetingService: Sendable {
         return meetings
     }
 
-    /// Fetch meetings for a specific TMI Plan
+    /// Fetch meetings for a specific TMI Plan.
+    ///
+    /// Filters client-side on `relatedPlanId` after the participant-scoped
+    /// `arrayContains` query so this doesn't require a composite index
+    /// (array-contains + equality would need one).
     func fetchMeetings(for planId: String) async throws -> [Meeting] {
         let session = try authorizedSession()
 
         let documents = try await store.documents(
             atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
-            whereField: "relatedPlanId",
-            equals: planId
+            whereField: "participantUserIDs",
+            arrayContains: session.membership.userID
         )
 
         let meetings = documents.compactMap(decodeMeeting)
+            .filter { $0.relatedPlanId == planId }
 
         print("[MeetingService] 📖 Fetched \(meetings.count) meetings for plan: \(planId)")
         return meetings
@@ -113,10 +131,17 @@ nonisolated final class MeetingService: Sendable {
         var updatedMeeting = meeting
         updatedMeeting.lastUpdated = Date()
 
+        var data = updatedMeeting.toFirestoreData()
+        data["participantUserIDs"] = Self.participantUserIDs(
+            organizerID: updatedMeeting.organizer,
+            actingUserID: session.membership.userID,
+            participants: updatedMeeting.participants
+        )
+
         try await store.setDocument(
             atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
             id: meetingId,
-            data: updatedMeeting.toFirestoreData(),
+            data: data,
             merge: false
         )
 
@@ -247,10 +272,17 @@ nonisolated final class MeetingService: Sendable {
         updatedMeeting.actionItems.append(actionItem)
         updatedMeeting.lastUpdated = Date()
 
+        var data = updatedMeeting.toFirestoreData()
+        data["participantUserIDs"] = Self.participantUserIDs(
+            organizerID: updatedMeeting.organizer,
+            actingUserID: session.membership.userID,
+            participants: updatedMeeting.participants
+        )
+
         try await store.setDocument(
             atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
             id: meetingId,
-            data: updatedMeeting.toFirestoreData(),
+            data: data,
             merge: false
         )
 
@@ -272,10 +304,17 @@ nonisolated final class MeetingService: Sendable {
         }
         updatedMeeting.lastUpdated = Date()
 
+        var data = updatedMeeting.toFirestoreData()
+        data["participantUserIDs"] = Self.participantUserIDs(
+            organizerID: updatedMeeting.organizer,
+            actingUserID: session.membership.userID,
+            participants: updatedMeeting.participants
+        )
+
         try await store.setDocument(
             atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
             id: meetingId,
-            data: updatedMeeting.toFirestoreData(),
+            data: data,
             merge: false
         )
 
@@ -292,10 +331,17 @@ nonisolated final class MeetingService: Sendable {
         updatedMeeting.actionItems.removeAll { $0.itemId == actionItemId }
         updatedMeeting.lastUpdated = Date()
 
+        var data = updatedMeeting.toFirestoreData()
+        data["participantUserIDs"] = Self.participantUserIDs(
+            organizerID: updatedMeeting.organizer,
+            actingUserID: session.membership.userID,
+            participants: updatedMeeting.participants
+        )
+
         try await store.setDocument(
             atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
             id: meetingId,
-            data: updatedMeeting.toFirestoreData(),
+            data: data,
             merge: false
         )
 
@@ -320,6 +366,24 @@ nonisolated final class MeetingService: Sendable {
         let meetings = try await fetchMeetings()
         return meetings.flatMap { $0.actionItems }
             .filter { $0.isOverdue }
+    }
+
+    // MARK: - Participant Visibility
+
+    /// Computes the `participantUserIDs` array that satisfies the Firestore
+    /// rule for `districts/{districtID}/meetings/{meetingID}`
+    /// (`request.auth.uid in resource.data.participantUserIDs`).
+    ///
+    /// Includes the meeting's organizer, the acting user (so whoever is
+    /// writing can always continue to read/update what they just wrote,
+    /// even if they aren't yet listed as a participant), and every
+    /// participant's user id, de-duplicated.
+    private static func participantUserIDs(
+        organizerID: String,
+        actingUserID: String,
+        participants: [MeetingParticipant]
+    ) -> [String] {
+        Array(Set([organizerID, actingUserID] + participants.map { $0.userId }))
     }
 
     // MARK: - Authorization Helpers

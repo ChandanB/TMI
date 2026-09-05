@@ -44,7 +44,11 @@ struct MeetingServiceTests {
         return AuthenticatedSession(profile: user, claim: claim, membership: membership)
     }
 
-    private func makeMeeting(id: String? = nil, relatedPlanId: String? = "plan-1") -> Meeting {
+    private func makeMeeting(
+        id: String? = nil,
+        relatedPlanId: String? = "plan-1",
+        participants: [MeetingParticipant] = []
+    ) -> Meeting {
         Meeting(
             id: id,
             title: "Check-in",
@@ -54,7 +58,7 @@ struct MeetingServiceTests {
             location: nil,
             meetingType: .checkIn,
             organizer: "someone-else",
-            participants: [],
+            participants: participants,
             relatedStudentIds: ["student-1"],
             relatedPlanId: relatedPlanId,
             status: .scheduled,
@@ -66,54 +70,74 @@ struct MeetingServiceTests {
         )
     }
 
-    @Test("scheduleMeeting writes to the district meetings path with the session's userID as organizer")
+    @Test("scheduleMeeting writes to the district meetings path with the session's userID as organizer and stamps participantUserIDs")
     func scheduleMeetingWritesDistrictPath() async throws {
         let store = FakeMeetingStore()
         let sessions = FakeAuthorizationSessionProvider(session: makeSession())
         let service = MeetingService(store: store, authorizationSessions: sessions, currentUserID: { userID })
+        let participant = MeetingParticipant(userId: "participant-1", name: "Participant", role: .teacher, responseStatus: .pending)
 
-        let result = try await service.scheduleMeeting(makeMeeting())
+        let result = try await service.scheduleMeeting(makeMeeting(participants: [participant]))
 
         #expect(store.addCalls.count == 1)
         let call = try #require(store.addCalls.first)
         #expect(call.path == FirestorePaths.meetings(districtID: districtID))
         #expect(!call.path.contains("users/"))
         #expect(call.data["organizer"] as? String == userID)
+        let participantUserIDs = try #require(call.data["participantUserIDs"] as? [String])
+        #expect(participantUserIDs.contains(userID))
+        #expect(participantUserIDs.contains("participant-1"))
         #expect(result.id == store.nextDocumentID)
     }
 
-    @Test("fetchMeetings reads from the district meetings path")
+    @Test("fetchMeetings issues an arrayContains query on participantUserIDs scoped to the session user")
     func fetchMeetingsReadsDistrictPath() async throws {
         let store = FakeMeetingStore()
         let meeting = makeMeeting(id: "meeting-1")
-        store.seed(atCollectionPath: FirestorePaths.meetings(districtID: districtID), id: "meeting-1", meeting: meeting)
+        store.seed(
+            atCollectionPath: FirestorePaths.meetings(districtID: districtID),
+            id: "meeting-1",
+            meeting: meeting,
+            participantUserIDs: [userID]
+        )
         let sessions = FakeAuthorizationSessionProvider(session: makeSession())
         let service = MeetingService(store: store, authorizationSessions: sessions, currentUserID: { userID })
 
         let meetings = try await service.fetchMeetings()
 
-        #expect(store.listCalls.count == 1)
-        let path = try #require(store.listCalls.first)
-        #expect(path == FirestorePaths.meetings(districtID: districtID))
-        #expect(!path.contains("users/"))
+        #expect(store.listCalls.isEmpty)
+        #expect(store.arrayContainsCalls.count == 1)
+        let call = try #require(store.arrayContainsCalls.first)
+        #expect(call.path == FirestorePaths.meetings(districtID: districtID))
+        #expect(call.field == "participantUserIDs")
+        #expect(call.value == userID)
+        #expect(!call.path.contains("users/"))
         #expect(meetings.count == 1)
         #expect(meetings.first?.id == "meeting-1")
     }
 
-    @Test("fetchMeetings(for:) queries the district meetings path filtered by relatedPlanId")
+    @Test("fetchMeetings(for:) queries participantUserIDs arrayContains, then filters relatedPlanId client-side")
     func fetchMeetingsForPlanQueriesDistrictPath() async throws {
         let store = FakeMeetingStore()
+        let matching = makeMeeting(id: "meeting-1", relatedPlanId: "plan-1")
+        let nonMatching = makeMeeting(id: "meeting-2", relatedPlanId: "plan-2")
+        store.seed(atCollectionPath: FirestorePaths.meetings(districtID: districtID), id: "meeting-1", meeting: matching, participantUserIDs: [userID])
+        store.seed(atCollectionPath: FirestorePaths.meetings(districtID: districtID), id: "meeting-2", meeting: nonMatching, participantUserIDs: [userID])
         let sessions = FakeAuthorizationSessionProvider(session: makeSession())
         let service = MeetingService(store: store, authorizationSessions: sessions, currentUserID: { userID })
 
-        _ = try await service.fetchMeetings(for: "plan-1")
+        let meetings = try await service.fetchMeetings(for: "plan-1")
 
-        #expect(store.queryCalls.count == 1)
-        let call = try #require(store.queryCalls.first)
+        #expect(store.arrayContainsCalls.count == 1)
+        let call = try #require(store.arrayContainsCalls.first)
         #expect(call.path == FirestorePaths.meetings(districtID: districtID))
-        #expect(call.field == "relatedPlanId")
-        #expect(call.value == "plan-1")
+        #expect(call.field == "participantUserIDs")
+        #expect(call.value == userID)
         #expect(!call.path.contains("users/"))
+        // No compound Firestore query for relatedPlanId - filtered client-side instead.
+        #expect(store.queryCalls.isEmpty)
+        #expect(meetings.count == 1)
+        #expect(meetings.first?.id == "meeting-1")
     }
 
     @Test("No trusted session throws and performs no store writes")
@@ -151,12 +175,14 @@ private final class FakeMeetingStore: MeetingStore, @unchecked Sendable {
     private(set) var deleteCalls: [(path: String, id: String)] = []
     private(set) var listCalls: [String] = []
     private(set) var queryCalls: [(path: String, field: String, value: String)] = []
+    private(set) var arrayContainsCalls: [(path: String, field: String, value: String)] = []
 
     var nextDocumentID = "generated-meeting-id"
     private var seeded: [String: [(id: String, data: [String: Any])]] = [:]
 
-    func seed(atCollectionPath path: String, id: String, meeting: Meeting) {
-        let data = (try? Firestore.Encoder().encode(meeting)) ?? [:]
+    func seed(atCollectionPath path: String, id: String, meeting: Meeting, participantUserIDs: [String] = []) {
+        var data = (try? Firestore.Encoder().encode(meeting)) ?? [:]
+        data["participantUserIDs"] = participantUserIDs
         seeded[path, default: []].append((id: id, data: data))
     }
 
@@ -172,6 +198,15 @@ private final class FakeMeetingStore: MeetingStore, @unchecked Sendable {
     ) async throws -> [(id: String, data: [String: Any])] {
         queryCalls.append((path: path, field: field, value: value))
         return (seeded[path] ?? []).filter { ($0.data[field] as? String) == value }
+    }
+
+    func documents(
+        atCollectionPath path: String,
+        whereField field: String,
+        arrayContains value: String
+    ) async throws -> [(id: String, data: [String: Any])] {
+        arrayContainsCalls.append((path: path, field: field, value: value))
+        return (seeded[path] ?? []).filter { ($0.data[field] as? [String])?.contains(value) == true }
     }
 
     @discardableResult
