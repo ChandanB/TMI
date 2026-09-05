@@ -133,19 +133,29 @@ struct SettingsView: View {
         settingsSectionCard(title: "District Administration", icon: "building.2") {
             VStack(spacing: 0) {
                 settingsRow(icon: "checkmark.seal", title: "Compliance Settings") {
-                    // Compliance configuration
+                    if let currentMembership {
+                        ComplianceSettingsView(districtId: currentMembership.districtID)
+                    } else {
+                        ContentUnavailableView("Unavailable", systemImage: "lock", description: Text("No active district membership."))
+                    }
                 }
-                
+
                 Divider().background(Color.white.opacity(0.1))
-                
+
                 settingsRow(icon: "doc.text.magnifyingglass", title: "Audit Configuration") {
                     // Audit settings
                 }
-                
+
                 Divider().background(Color.white.opacity(0.1))
-                
+
                 settingsRow(icon: "person.2.badge.gearshape", title: "Staff Management") {
                     // Staff management
+                }
+
+                Divider().background(Color.white.opacity(0.1))
+
+                settingsRow(icon: "person.text.rectangle", title: "Consent Management") {
+                    ConsentManagementView()
                 }
             }
         }
