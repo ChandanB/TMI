@@ -1,16 +1,20 @@
-import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   assertFails,
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import {
+  collection,
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import {
   activeMembership,
@@ -41,7 +45,16 @@ describe("canonical Firestore authorization", () => {
         doc(db, "districts/d1/members/admin-1"),
         activeMembership({
           role: "schoolAdministrator",
-          capabilities: ["student.read.detail"],
+          capabilities: [],
+          assignedStudentIDs: [],
+        }),
+      );
+      await setDoc(
+        doc(db, "districts/d1/members/district-admin-1"),
+        activeMembership({
+          role: "districtAdministrator",
+          schoolIDs: [],
+          capabilities: [],
           assignedStudentIDs: [],
         }),
       );
@@ -62,6 +75,24 @@ describe("canonical Firestore authorization", () => {
         schoolId: "school-2",
         assignedMemberIDs: [],
         name: "Other District Student",
+      });
+      await setDoc(doc(db, "districts/d1/plans/plan-unassigned"), {
+        districtId: "d1",
+        studentIDs: ["student-2"],
+        schoolIDs: ["school-1"],
+        assignedMemberIDs: [],
+      });
+      await setDoc(doc(db, "districts/d1/plans/plan-other-school"), {
+        districtId: "d1",
+        studentIDs: ["student-4"],
+        schoolIDs: ["school-2"],
+        assignedMemberIDs: [],
+      });
+      await setDoc(doc(db, "districts/d2/plans/plan-other-district"), {
+        districtId: "d2",
+        studentIDs: ["student-3"],
+        schoolIDs: ["school-2"],
+        assignedMemberIDs: [],
       });
       await setDoc(
         doc(db, "districts/d1/students/student-1/restrictedRecords/r1"),
@@ -104,14 +135,52 @@ describe("canonical Firestore authorization", () => {
     );
   });
 
-  it("allows assigned detail and denies unassigned or cross-tenant reads", async () => {
+  it("allows teachers to read every student in their school and denies cross-tenant reads", async () => {
     const db = testEnv
       .authenticatedContext("teacher-1", trustedClaims("d1"))
       .firestore();
 
     await assertSucceeds(getDoc(doc(db, "districts/d1/students/student-1")));
-    await assertFails(getDoc(doc(db, "districts/d1/students/student-2")));
+    await assertSucceeds(getDoc(doc(db, "districts/d1/students/student-2")));
     await assertFails(getDoc(doc(db, "districts/d2/students/student-3")));
+  });
+
+  it("allows school administrators to read their school without an extra read capability", async () => {
+    const db = testEnv
+      .authenticatedContext("admin-1", trustedClaims("d1"))
+      .firestore();
+
+    await assertSucceeds(getDoc(doc(db, "districts/d1/students/student-1")));
+    await assertSucceeds(getDoc(doc(db, "districts/d1/students/student-2")));
+  });
+
+  it("allows teachers and school administrators to list unassigned plans in their school", async () => {
+    for (const userID of ["teacher-1", "admin-1"]) {
+      const db = testEnv
+        .authenticatedContext(userID, trustedClaims("d1"))
+        .firestore();
+      const plans = collection(db, "districts/d1/plans");
+      const snapshot = await assertSucceeds(
+        getDocs(query(plans, where("schoolIDs", "==", ["school-1"]))),
+      );
+
+      expect(snapshot.docs.map((document) => document.id)).toContain("plan-unassigned");
+      await assertFails(getDoc(doc(db, "districts/d1/plans/plan-other-school")));
+      await assertFails(getDoc(doc(db, "districts/d2/plans/plan-other-district")));
+    }
+  });
+
+  it("allows district administrators to list every plan in their district", async () => {
+    const db = testEnv
+      .authenticatedContext("district-admin-1", trustedClaims("d1"))
+      .firestore();
+    const snapshot = await assertSucceeds(getDocs(collection(db, "districts/d1/plans")));
+
+    expect(snapshot.docs.map((document) => document.id).sort()).toEqual([
+      "plan-other-school",
+      "plan-unassigned",
+    ]);
+    await assertFails(getDoc(doc(db, "districts/d2/plans/plan-other-district")));
   });
 
   it("persists only scoped, versioned career relationships", async () => {
@@ -244,7 +313,7 @@ describe("canonical Firestore authorization", () => {
     );
   });
 
-  it("requires explicit administrator drill-down but permits scoped aggregate reads", async () => {
+  it("keeps administrator detail reads available when optional capabilities change", async () => {
     const adminDB = testEnv
       .authenticatedContext("admin-1", trustedClaims("d1"))
       .firestore();
@@ -259,7 +328,7 @@ describe("canonical Firestore authorization", () => {
         capabilities: [],
       });
     });
-    await assertFails(getDoc(doc(adminDB, "districts/d1/students/student-2")));
+    await assertSucceeds(getDoc(doc(adminDB, "districts/d1/students/student-2")));
   });
 
   it("denies client membership, audit, metric, approval, and hard-delete writes", async () => {

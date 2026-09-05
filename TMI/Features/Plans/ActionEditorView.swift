@@ -10,6 +10,7 @@ struct ActionEditorView: View {
     let goal: GoalRecord
     let member: MembershipContext
     var existing: ActionRecord?
+    var statusOnly = false
     var onSaved: () -> Void = {}
 
     @Environment(\.appDependencies) private var dependencies
@@ -20,6 +21,7 @@ struct ActionEditorView: View {
     @State private var cadence: ActionCadence = .weekly
     @State private var dueDate = Date()
     @State private var status: ActionStatus = .open
+    @State private var operationID = UUID()
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -34,12 +36,15 @@ struct ActionEditorView: View {
                     TextField("What happens", text: $title, axis: .vertical)
                         .lineLimit(1...3)
                         .accessibilityIdentifier("actionEditor.title")
+                        .disabled(statusOnly)
                     Picker("Cadence", selection: $cadence) {
                         ForEach(ActionCadence.allCases, id: \.self) { cadence in
                             Text(cadence.displayName).tag(cadence)
                         }
                     }
+                    .disabled(statusOnly)
                     DatePicker("Due", selection: $dueDate, displayedComponents: .date)
+                        .disabled(statusOnly)
                 }
 
                 Section {
@@ -49,6 +54,7 @@ struct ActionEditorView: View {
                         }
                     }
                     .accessibilityIdentifier("actionEditor.audience")
+                        .disabled(statusOnly)
                     LabeledContent("Owner", value: member.userID)
                 } footer: {
                     Text(audience == .student
@@ -126,7 +132,7 @@ struct ActionEditorView: View {
         defer { isSaving = false }
 
         let action = ActionRecord(
-            id: existing?.id ?? "action_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
+            id: existing?.id ?? "action_\(operationID.uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
             planID: planID,
             goalID: goal.id,
             title: title.trimmed,

@@ -1896,7 +1896,20 @@ actor CanonicalStudentRepository: StudentRepository {
         member: MembershipContext
     ) throws -> StudentStoreQueryScope {
         switch member.role {
-        case .teacher, .counselor, .socialWorker:
+        case .teacher:
+            let schoolID: String
+            if let requestedSchoolID = request.schoolID {
+                schoolID = requestedSchoolID
+            } else if member.schoolIDs.count == 1, let onlySchoolID = member.schoolIDs.first {
+                schoolID = onlySchoolID
+            } else {
+                throw StudentRepositoryError.schoolFilterRequired
+            }
+            guard member.schoolIDs.contains(schoolID) else {
+                throw StudentRepositoryError.permissionDenied
+            }
+            return .school(schoolID: schoolID)
+        case .counselor, .socialWorker:
             guard request.assignedMemberID == nil || request.assignedMemberID == member.userID else {
                 throw StudentRepositoryError.permissionDenied
             }
@@ -1913,9 +1926,6 @@ actor CanonicalStudentRepository: StudentRepository {
             }
             return .assigned(memberID: member.userID, schoolID: schoolID)
         case .schoolAdministrator:
-            guard member.capabilities.contains(.studentReadDetail) else {
-                throw StudentRepositoryError.permissionDenied
-            }
             let schoolID: String
             if let requestedSchoolID = request.schoolID {
                 schoolID = requestedSchoolID
@@ -1929,9 +1939,6 @@ actor CanonicalStudentRepository: StudentRepository {
             }
             return .school(schoolID: schoolID)
         case .districtAdministrator:
-            guard member.capabilities.contains(.studentReadDetail) else {
-                throw StudentRepositoryError.permissionDenied
-            }
             return .district
         }
     }

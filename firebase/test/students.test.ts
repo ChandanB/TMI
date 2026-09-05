@@ -990,11 +990,19 @@ describe("student Firestore rules", () => {
     );
   });
 
-  it("allows only a school-constrained assigned query and does not leak unassigned records", async () => {
+  it("allows school-wide teacher reads while preserving optional assignment filtering", async () => {
     const db = testEnv
       .authenticatedContext("teacher-1", trustedClaims(districtID))
       .firestore();
     const students = collection(db, "districts/d1/students");
+
+    const schoolRoster = await assertSucceeds(
+      getDocs(query(students, where("schoolId", "==", "school-1"))),
+    );
+    expect(schoolRoster.docs.map((snapshot) => snapshot.id).sort()).toEqual([
+      "student-assigned",
+      "student-unassigned",
+    ]);
 
     const assignedInSchool = await assertSucceeds(
       getDocs(
@@ -1016,9 +1024,7 @@ describe("student Firestore rules", () => {
         ),
       ),
     );
-    await assertFails(
-      getDoc(doc(db, "districts/d1/students/student-unassigned")),
-    );
+    await assertSucceeds(getDoc(doc(db, "districts/d1/students/student-unassigned")));
     await assertFails(
       getDoc(doc(db, "districts/d1/students/student-cross-school")),
     );

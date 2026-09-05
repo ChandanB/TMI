@@ -317,18 +317,27 @@ struct AuthorizationPolicyTests {
         #expect(!AuthorizationPolicy.canViewAggregate(schoolAdministrator, districtID: "district-a", schoolID: "school-b"))
     }
 
-    @Test("Teachers and counselors can read and write only assigned students in member schools")
-    func assignedEducatorDetailAccess() {
-        for role in [StaffRole.teacher, .counselor] {
-            let member = membership(role: role, assignedStudentIDs: ["student-1"])
+    @Test("Teachers read every student in their schools while writes remain assignment scoped")
+    func teacherDetailAccessIsSchoolWideForReads() {
+        let member = membership(role: .teacher, assignedStudentIDs: ["student-1"])
 
-            #expect(AuthorizationPolicy.canReadStudentDetail(member, student: scope()))
-            #expect(AuthorizationPolicy.canWriteStudentDetail(member, student: scope()))
-            #expect(!AuthorizationPolicy.canReadStudentDetail(member, student: scope(studentID: "student-2")))
-            #expect(!AuthorizationPolicy.canWriteStudentDetail(member, student: scope(studentID: "student-2")))
-            #expect(!AuthorizationPolicy.canReadStudentDetail(member, student: scope(schoolID: "school-b")))
-            #expect(!AuthorizationPolicy.canWriteStudentDetail(member, student: scope(schoolID: "school-b")))
-        }
+        #expect(AuthorizationPolicy.canReadStudentDetail(member, student: scope()))
+        #expect(AuthorizationPolicy.canWriteStudentDetail(member, student: scope()))
+        #expect(AuthorizationPolicy.canReadStudentDetail(member, student: scope(studentID: "student-2")))
+        #expect(!AuthorizationPolicy.canWriteStudentDetail(member, student: scope(studentID: "student-2")))
+        #expect(!AuthorizationPolicy.canReadStudentDetail(member, student: scope(schoolID: "school-b")))
+        #expect(!AuthorizationPolicy.canWriteStudentDetail(member, student: scope(schoolID: "school-b")))
+    }
+
+    @Test("Counselors remain assignment scoped for student detail")
+    func counselorDetailAccessRemainsAssignmentScoped() {
+        let member = membership(role: .counselor, assignedStudentIDs: ["student-1"])
+
+        #expect(AuthorizationPolicy.canReadStudentDetail(member, student: scope()))
+        #expect(AuthorizationPolicy.canWriteStudentDetail(member, student: scope()))
+        #expect(!AuthorizationPolicy.canReadStudentDetail(member, student: scope(studentID: "student-2")))
+        #expect(!AuthorizationPolicy.canWriteStudentDetail(member, student: scope(studentID: "student-2")))
+        #expect(!AuthorizationPolicy.canReadStudentDetail(member, student: scope(schoolID: "school-b")))
     }
 
     @Test("Social workers can read assigned detail but never write student profiles")
@@ -345,33 +354,33 @@ struct AuthorizationPolicyTests {
         #expect(!AuthorizationPolicy.canReadStudentDetail(member, student: scope(schoolID: "school-b")))
     }
 
-    @Test("School administrators require independent detail capabilities within a member school")
+    @Test("School administrators read their schools by role while writes require capability")
     func schoolAdministratorDetailCapabilities() {
         let noCapabilities = membership(role: .schoolAdministrator)
         let readOnly = membership(role: .schoolAdministrator, capabilities: [.studentReadDetail])
         let writeOnly = membership(role: .schoolAdministrator, capabilities: [.studentWriteDetail])
 
-        #expect(!AuthorizationPolicy.canReadStudentDetail(noCapabilities, student: scope()))
+        #expect(AuthorizationPolicy.canReadStudentDetail(noCapabilities, student: scope()))
         #expect(!AuthorizationPolicy.canWriteStudentDetail(noCapabilities, student: scope()))
         #expect(AuthorizationPolicy.canReadStudentDetail(readOnly, student: scope()))
         #expect(!AuthorizationPolicy.canWriteStudentDetail(readOnly, student: scope()))
-        #expect(!AuthorizationPolicy.canReadStudentDetail(writeOnly, student: scope()))
+        #expect(AuthorizationPolicy.canReadStudentDetail(writeOnly, student: scope()))
         #expect(AuthorizationPolicy.canWriteStudentDetail(writeOnly, student: scope()))
         #expect(!AuthorizationPolicy.canReadStudentDetail(readOnly, student: scope(schoolID: "school-b")))
         #expect(!AuthorizationPolicy.canWriteStudentDetail(writeOnly, student: scope(schoolID: "school-b")))
     }
 
-    @Test("District administrators require independent detail capabilities within their district")
+    @Test("District administrators read their district by role while writes require capability")
     func districtAdministratorDetailCapabilities() {
         let noCapabilities = membership(role: .districtAdministrator)
         let readOnly = membership(role: .districtAdministrator, capabilities: [.studentReadDetail])
         let writeOnly = membership(role: .districtAdministrator, capabilities: [.studentWriteDetail])
 
-        #expect(!AuthorizationPolicy.canReadStudentDetail(noCapabilities, student: scope()))
+        #expect(AuthorizationPolicy.canReadStudentDetail(noCapabilities, student: scope()))
         #expect(!AuthorizationPolicy.canWriteStudentDetail(noCapabilities, student: scope()))
         #expect(AuthorizationPolicy.canReadStudentDetail(readOnly, student: scope()))
         #expect(!AuthorizationPolicy.canWriteStudentDetail(readOnly, student: scope()))
-        #expect(!AuthorizationPolicy.canReadStudentDetail(writeOnly, student: scope()))
+        #expect(AuthorizationPolicy.canReadStudentDetail(writeOnly, student: scope()))
         #expect(AuthorizationPolicy.canWriteStudentDetail(writeOnly, student: scope()))
         #expect(!AuthorizationPolicy.canReadStudentDetail(readOnly, student: scope(districtID: "district-b")))
         #expect(!AuthorizationPolicy.canWriteStudentDetail(writeOnly, student: scope(districtID: "district-b")))
@@ -412,23 +421,17 @@ struct AuthorizationPolicyTests {
             role: .counselor,
             capabilities: [.studentRestrictedRead, .studentRestrictedWrite]
         )
-        let restrictedOnlyAdministrator = membership(
+        let scopedAdministrator = membership(
             role: .schoolAdministrator,
             capabilities: [.studentRestrictedRead, .studentRestrictedWrite]
-        )
-        let authorizedAdministrator = membership(
-            role: .schoolAdministrator,
-            capabilities: [.studentReadDetail, .studentRestrictedRead, .studentRestrictedWrite]
         )
 
         #expect(!AuthorizationPolicy.canReadRestrictedRecord(unassignedCounselor, student: scope()))
         #expect(!AuthorizationPolicy.canWriteRestrictedRecord(unassignedCounselor, student: scope()))
-        #expect(!AuthorizationPolicy.canReadRestrictedRecord(restrictedOnlyAdministrator, student: scope()))
-        #expect(!AuthorizationPolicy.canWriteRestrictedRecord(restrictedOnlyAdministrator, student: scope()))
-        #expect(AuthorizationPolicy.canReadRestrictedRecord(authorizedAdministrator, student: scope()))
-        #expect(AuthorizationPolicy.canWriteRestrictedRecord(authorizedAdministrator, student: scope()))
-        #expect(!AuthorizationPolicy.canReadRestrictedRecord(authorizedAdministrator, student: scope(schoolID: "school-b")))
-        #expect(!AuthorizationPolicy.canWriteRestrictedRecord(authorizedAdministrator, student: scope(districtID: "district-b")))
+        #expect(AuthorizationPolicy.canReadRestrictedRecord(scopedAdministrator, student: scope()))
+        #expect(AuthorizationPolicy.canWriteRestrictedRecord(scopedAdministrator, student: scope()))
+        #expect(!AuthorizationPolicy.canReadRestrictedRecord(scopedAdministrator, student: scope(schoolID: "school-b")))
+        #expect(!AuthorizationPolicy.canWriteRestrictedRecord(scopedAdministrator, student: scope(districtID: "district-b")))
     }
 
     @Test("Social workers may write restricted records without profile-write access")

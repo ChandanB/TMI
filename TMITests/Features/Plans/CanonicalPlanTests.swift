@@ -53,9 +53,9 @@ struct CanonicalPlanTests {
 
     @Test("A plan walks forward through its lifecycle")
     func lifecycleMovesForward() {
-        #expect(PlanLifecycle.isLegal(from: .draft, to: .active))
+        #expect(!PlanLifecycle.isLegal(from: .draft, to: .active))
         #expect(PlanLifecycle.isLegal(from: .draft, to: .pendingApproval))
-        #expect(PlanLifecycle.isLegal(from: .pendingApproval, to: .active))
+        #expect(!PlanLifecycle.isLegal(from: .pendingApproval, to: .active))
         #expect(PlanLifecycle.isLegal(from: .active, to: .paused))
         #expect(PlanLifecycle.isLegal(from: .paused, to: .active))
         #expect(PlanLifecycle.isLegal(from: .active, to: .completed))
@@ -78,11 +78,18 @@ struct CanonicalPlanTests {
         #expect(!PlanLifecycle.isLegal(from: .paused, to: .draft))
     }
 
-    @Test("Staying in the same status is always legal")
-    func identityTransitionIsLegal() {
+    @Test("A repeated command is not a new lifecycle transition")
+    func identityTransitionIsNotAMove() {
         for status in PlanRecordStatus.allCases {
-            #expect(PlanLifecycle.isLegal(from: status, to: status))
+            #expect(!PlanLifecycle.isLegal(from: status, to: status))
         }
+    }
+
+    @Test("Approval is a separate persisted state before activation")
+    func approvalHasItsOwnState() {
+        #expect(PlanRecordStatus(rawValue: "approved") == .approved)
+        #expect(PlanLifecycle.isLegal(from: .pendingApproval, to: .approved))
+        #expect(PlanLifecycle.isLegal(from: .approved, to: .active))
     }
 
     // MARK: - Validation

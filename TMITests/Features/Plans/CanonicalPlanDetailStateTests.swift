@@ -13,10 +13,12 @@ struct CanonicalPlanDetailStateTests {
         // it takes effect for a child.
         let writer = await state(for: plan(status: .pendingApproval), member: teacher)
         #expect(!writer.contains(.active))
+        #expect(!writer.contains(.approved))
         #expect(!writer.contains(.changesRequested))
 
         let approver = await state(for: plan(status: .pendingApproval), member: counselor)
-        #expect(approver.contains(.active))
+        #expect(approver.contains(.approved))
+        #expect(!approver.contains(.active))
         #expect(approver.contains(.changesRequested))
     }
 

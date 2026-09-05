@@ -10,7 +10,7 @@ struct PlanRevisionTests {
     func onlyCommitmentsFreeze() {
         // Editing a draft or pausing is not a commitment and leaves no
         // revision, so the timeline stays a record of what was agreed.
-        #expect(PlanRevisionHistory.reason(forEntering: .active) == .approved)
+        #expect(PlanRevisionHistory.reason(forEntering: .approved) == .approved)
         #expect(PlanRevisionHistory.reason(forEntering: .changesRequested) == .changesRequested)
         #expect(PlanRevisionHistory.reason(forEntering: .completed) == .completed)
         #expect(PlanRevisionHistory.reason(forEntering: .draft) == nil)
@@ -43,7 +43,7 @@ struct PlanRevisionTests {
     @Test("A revision records what was agreed and who agreed to it")
     func revisionCapturesTheAgreement() throws {
         let revision = try PlanRevisionHistory.freeze(
-            plan, entering: .active, goalIDs: ["goal-2", "goal-1"], actionIDs: ["action-1"],
+            plan, entering: .approved, goalIDs: ["goal-2", "goal-1"], actionIDs: ["action-1"],
             note: nil, frozenBy: "counselor-1", frozenAt: now, existing: []
         )
 
@@ -58,7 +58,7 @@ struct PlanRevisionTests {
     @Test("Sequence advances by one, so a missing revision is visible")
     func sequenceAdvances() throws {
         let first = try PlanRevisionHistory.freeze(
-            plan, entering: .active, goalIDs: [], actionIDs: [],
+            plan, entering: .approved, goalIDs: [], actionIDs: [],
             note: nil, frozenBy: "counselor-1", frozenAt: now, existing: []
         )
         let second = try PlanRevisionHistory.freeze(
@@ -75,7 +75,7 @@ struct PlanRevisionTests {
     @Test("History reads newest first")
     func historyReadsNewestFirst() throws {
         let first = try PlanRevisionHistory.freeze(
-            plan, entering: .active, goalIDs: [], actionIDs: [],
+            plan, entering: .approved, goalIDs: [], actionIDs: [],
             note: nil, frozenBy: "c", frozenAt: now, existing: []
         )
         let second = try PlanRevisionHistory.freeze(

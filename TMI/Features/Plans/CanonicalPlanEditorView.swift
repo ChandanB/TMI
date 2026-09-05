@@ -10,6 +10,7 @@ struct CanonicalPlanEditorView: View {
     let studentName: String
     let schoolID: String
     let member: MembershipContext
+    var existingPlan: PlanRecord? = nil
     var onCreated: (PlanRecord) -> Void = { _ in }
 
     @Environment(\.appDependencies) private var dependencies
@@ -22,6 +23,8 @@ struct CanonicalPlanEditorView: View {
     @State private var hasTargetDate = false
     @State private var targetDate = Date().addingTimeInterval(60 * 60 * 24 * 30)
     @State private var isSaving = false
+    @State private var operationID = UUID()
+    @State private var didPrefill = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -66,9 +69,9 @@ struct CanonicalPlanEditorView: View {
 
                 Section {
                     LabeledContent("Student", value: studentName)
-                    LabeledContent("Starts as", value: PlanRecordStatus.draft.displayName)
+                    LabeledContent("Status", value: existingPlan?.status.displayName ?? PlanRecordStatus.draft.displayName)
                 } footer: {
-                    Text("You can activate the plan once it is ready.")
+                    Text("Add goals and actions, then submit the draft for approval before activating it.")
                 }
 
                 if let errorMessage {
@@ -79,7 +82,18 @@ struct CanonicalPlanEditorView: View {
                     }
                 }
             }
-            .navigationTitle("New TMI Plan")
+            .navigationTitle(existingPlan == nil ? "New TMI Plan" : "Edit plan")
+            .onAppear {
+                guard !self.didPrefill else { return }
+                self.didPrefill = true
+                guard let plan = self.existingPlan else { return }
+                self.model = plan.model
+                self.title = plan.title
+                self.summary = plan.summary ?? ""
+                self.startDate = plan.startDate
+                self.hasTargetDate = plan.targetDate != nil
+                self.targetDate = plan.targetDate ?? plan.startDate
+            }
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(isSaving)
             .onChange(of: model) { oldModel, newModel in
@@ -95,7 +109,7 @@ struct CanonicalPlanEditorView: View {
                         .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
+                    Button(existingPlan == nil ? "Create" : "Save") {
                         Task { await create() }
                     }
                     .disabled(isSaving || trimmedTitle.isEmpty)
@@ -104,7 +118,7 @@ struct CanonicalPlanEditorView: View {
             }
             .overlay {
                 if isSaving {
-                    ProgressView("Creating…")
+                    ProgressView("Saving plan…")
                         .padding(TMISpacing.lg)
                         .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.lg))
                 }
@@ -125,7 +139,7 @@ struct CanonicalPlanEditorView: View {
         errorMessage = nil
         defer { isSaving = false }
 
-        let draft = PlanCreation.draft(
+        var draft = PlanCreation.draft(
             studentID: studentID,
             schoolID: schoolID,
             member: member,
@@ -136,6 +150,11 @@ struct CanonicalPlanEditorView: View {
             targetDate: hasTargetDate ? targetDate : nil
         )
 
+        if let existingPlan {
+            draft.studentIDs = existingPlan.studentIDs
+            draft.schoolIDs = existingPlan.schoolIDs
+            draft.assignedMemberIDs = existingPlan.assignedMemberIDs
+        }
         let issues = PlanValidation.issues(for: draft, member: member)
         guard issues.isEmpty else {
             errorMessage = issues.joined(separator: " ")
@@ -143,17 +162,21 @@ struct CanonicalPlanEditorView: View {
         }
 
         do {
-            let record = try await repository.create(
-                draft,
-                operationID: UUID(),
-                member: member
-            )
+            let record: PlanRecord
+            if let existingPlan {
+                record = try await repository.update(id: existingPlan.id, draft: draft,
+                    expectedVersion: existingPlan.metadata.recordVersion, member: member)
+            } else {
+                record = try await repository.create(draft, operationID: operationID, member: member)
+            }
             onCreated(record)
             dismiss()
         } catch PlanRecordRepositoryError.permissionDenied {
             errorMessage = "You do not have access to create a plan for this student."
         } catch PlanRecordRepositoryError.unavailable {
             errorMessage = "You appear to be offline. Try again when you reconnect."
+        } catch PlanRecordRepositoryError.versionConflict {
+            errorMessage = "This plan changed while you were editing. Your text is still here; reload the latest plan before applying it."
         } catch PlanRecordRepositoryError.invalidDraft {
             errorMessage = "Check the plan details and try again."
         } catch {

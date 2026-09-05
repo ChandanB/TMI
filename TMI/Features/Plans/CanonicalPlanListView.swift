@@ -166,7 +166,7 @@ private struct CanonicalPlanRow: View {
 
     private var statusSurface: Color {
         switch plan.status {
-        case .active: TMIColors.successSurface
+        case .approved, .active: TMIColors.successSurface
         case .paused, .changesRequested, .pendingApproval: TMIColors.warningSurface
         case .completed, .archived: TMIColors.infoSurface
         case .draft: TMIColors.aubergineSoft
@@ -175,7 +175,7 @@ private struct CanonicalPlanRow: View {
 
     private var statusText: Color {
         switch plan.status {
-        case .active: TMIColors.successText
+        case .approved, .active: TMIColors.successText
         case .paused, .changesRequested, .pendingApproval: TMIColors.warningText
         case .completed, .archived: TMIColors.infoText
         case .draft: TMIColors.aubergine

@@ -11,6 +11,7 @@ struct GoalEditorView: View {
     let member: MembershipContext
     let planStartDate: Date
     var existing: GoalRecord?
+    var statusOnly = false
     var onSaved: (GoalRecord) -> Void = { _ in }
 
     @Environment(\.appDependencies) private var dependencies
@@ -23,6 +24,7 @@ struct GoalEditorView: View {
     @State private var target = ""
     @State private var dueDate = Date()
     @State private var status: GoalRecordStatus = .notStarted
+    @State private var operationID = UUID()
     @State private var isSaving = false
     @State private var issues: [String] = []
 
@@ -32,20 +34,24 @@ struct GoalEditorView: View {
                 Section("Goal") {
                     TextField("Title", text: $title)
                         .accessibilityIdentifier("goalEditor.title")
+                        .disabled(statusOnly)
                     Picker("Measure", selection: $measure) {
                         ForEach(GoalMeasure.allCases, id: \.self) { measure in
                             Text(measure.displayName).tag(measure)
                         }
                     }
+                    .disabled(statusOnly)
                 }
 
                 Section {
                     TextField("Baseline", text: $baseline, axis: .vertical)
                         .lineLimit(1...3)
                         .accessibilityIdentifier("goalEditor.baseline")
+                        .disabled(statusOnly)
                     TextField("Target", text: $target, axis: .vertical)
                         .lineLimit(1...3)
                         .accessibilityIdentifier("goalEditor.target")
+                        .disabled(statusOnly)
                 } header: {
                     Text("Where the student is starting, and where this is going")
                 } footer: {
@@ -56,6 +62,7 @@ struct GoalEditorView: View {
                     TextField("How the student sees this (optional)", text: $studentFacingTitle, axis: .vertical)
                         .lineLimit(1...3)
                         .accessibilityIdentifier("goalEditor.studentWording")
+                        .disabled(statusOnly)
                 } header: {
                     Text("Student wording")
                 } footer: {
@@ -64,6 +71,7 @@ struct GoalEditorView: View {
 
                 Section("Schedule and ownership") {
                     DatePicker("Due", selection: $dueDate, displayedComponents: .date)
+                        .disabled(statusOnly)
                     LabeledContent("Responsible", value: member.userID)
                     Picker("Status", selection: $status) {
                         ForEach(GoalRecordStatus.allCases, id: \.self) { status in
@@ -123,7 +131,7 @@ struct GoalEditorView: View {
         defer { isSaving = false }
 
         let goal = GoalRecord(
-            id: existing?.id ?? "goal_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
+            id: existing?.id ?? "goal_\(operationID.uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
             planID: planID,
             studentID: studentID,
             title: title.trimmed,
@@ -132,7 +140,7 @@ struct GoalEditorView: View {
             baseline: baseline.trimmed,
             target: target.trimmed,
             dueDate: dueDate,
-            responsibleMemberID: member.userID,
+            responsibleMemberID: existing?.responsibleMemberID ?? member.userID,
             status: status
         )
 

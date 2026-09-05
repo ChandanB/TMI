@@ -25,6 +25,7 @@ nonisolated enum PlanRecordStatus: String, CaseIterable, Codable, Sendable {
     case draft
     case pendingApproval
     case changesRequested
+    case approved
     case active
     case paused
     case completed
@@ -35,6 +36,7 @@ nonisolated enum PlanRecordStatus: String, CaseIterable, Codable, Sendable {
         case .draft: "Draft"
         case .pendingApproval: "Pending approval"
         case .changesRequested: "Changes requested"
+        case .approved: "Approved"
         case .active: "Active"
         case .paused: "Paused"
         case .completed: "Completed"
@@ -42,9 +44,12 @@ nonisolated enum PlanRecordStatus: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    var isEditable: Bool { self == .draft || self == .changesRequested }
+    var acceptsProgress: Bool { self == .active || self == .paused }
+
     var isOpen: Bool {
         switch self {
-        case .draft, .pendingApproval, .changesRequested, .active, .paused: true
+        case .draft, .pendingApproval, .changesRequested, .approved, .active, .paused: true
         case .completed, .archived: false
         }
     }
@@ -58,15 +63,14 @@ nonisolated enum PlanApprovalState: String, Codable, Sendable {
 }
 
 nonisolated enum PlanLifecycle {
-    /// Mirrors `isLegalPlanTransition` in `firestore.rules`. Keeping the table
-    /// on both sides lets the client refuse an illegal transition immediately
-    /// instead of round-tripping to a permission denial, but the rules remain
-    /// the authority.
+    /// Mirrors the trusted transitionPlan callable. Firestore denies direct
+    /// status writes; approval and activation are distinct audited decisions.
     static func allowedTransitions(from status: PlanRecordStatus) -> Set<PlanRecordStatus> {
         switch status {
-        case .draft: [.pendingApproval, .active, .archived]
-        case .pendingApproval: [.draft, .changesRequested, .active]
+        case .draft: [.pendingApproval, .archived]
+        case .pendingApproval: [.draft, .changesRequested, .approved]
         case .changesRequested: [.draft, .archived]
+        case .approved: [.active]
         case .active: [.paused, .completed]
         case .paused: [.active, .completed]
         // A completed plan is duplicated into a new cycle, never reopened.
@@ -76,7 +80,7 @@ nonisolated enum PlanLifecycle {
     }
 
     static func isLegal(from: PlanRecordStatus, to: PlanRecordStatus) -> Bool {
-        from == to || allowedTransitions(from: from).contains(to)
+        allowedTransitions(from: from).contains(to)
     }
 }
 

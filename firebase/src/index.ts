@@ -22,6 +22,7 @@ import {
   assertDistrict,
   canManageSchool,
   canReadStudentDetail,
+  canWriteStudentDetail,
   capabilityValues,
   executePrivilegedOperation,
   parseBaseRequest,
@@ -83,25 +84,24 @@ const baseFields = [
 const maximumStudentAssignments = 200;
 
 const allowedPlanStatuses = [
-  "draft",
-  "submitted",
-  "changesRequested",
-  "approved",
-  "active",
-  "completed",
-  "archived",
+  "draft", "pendingApproval", "changesRequested", "approved", "active",
+  "paused", "completed", "archived",
 ] as const;
-
 type PlanStatus = (typeof allowedPlanStatuses)[number];
-
 const allowedPlanTransitions: Readonly<Record<PlanStatus, readonly PlanStatus[]>> = {
-  draft: ["submitted"],
-  submitted: ["changesRequested", "approved"],
-  changesRequested: ["submitted"],
-  approved: ["active"],
-  active: ["completed"],
-  completed: ["archived"],
-  archived: [],
+  draft: ["pendingApproval", "archived"],
+  pendingApproval: ["draft", "changesRequested", "approved"],
+  changesRequested: ["draft", "archived"], approved: ["active"],
+  active: ["paused", "completed"], paused: ["active", "completed"],
+  completed: ["archived"], archived: [],
+};
+const planModelNames: Record<string, string> = {
+  chaseYourSpace: "Chase Your Space",
+  acknowledgeInterests: "Acknowledge Your Interests and Hobbies",
+  alignYourMind: "Align Your Mind",
+  directAndCorrect: "Direct & Correct Negative Behavior",
+  bullyToBoss: "From Bully to Boss",
+  meekToProtector: "From Meek to Promising Protector",
 };
 
 export interface MutateMembershipRequest extends PrivilegedBaseRequest {
@@ -155,6 +155,7 @@ export interface StudentMutationResult extends PrivilegedOperationResult {
 export interface TransitionPlanRequest extends PrivilegedBaseRequest {
   readonly planID: string;
   readonly nextStatus: PlanStatus;
+  readonly note?: string;
 }
 
 export interface IssueStudentModeSessionRequest
@@ -571,16 +572,14 @@ const parseArchiveStudentRequest = (value: unknown): ArchiveStudentRequest => {
 
 const parseTransitionPlanRequest = (value: unknown): TransitionPlanRequest => {
   const data = requireRecord(value);
-  rejectUnexpectedFields(data, withBaseFields("planID", "nextStatus"));
-  return {
-    ...parseBaseRequest(data),
-    planID: requireIdentifier(data.planID, "planID"),
-    nextStatus: requireEnum(
-      data.nextStatus,
-      "nextStatus",
-      allowedPlanStatuses,
-    ),
-  };
+  rejectUnexpectedFields(data, withBaseFields("planID", "nextStatus", "note"));
+  const nextStatus = requireEnum(data.nextStatus, "nextStatus", allowedPlanStatuses);
+  const note = data.note === undefined ? undefined : requireString(data.note, "note", 4000).trim();
+  if ((nextStatus === "changesRequested" || nextStatus === "completed") && !note) {
+    throw new HttpsError("invalid-argument", "Explain the requested changes or completion outcome.");
+  }
+  return { ...parseBaseRequest(data), planID: requireIdentifier(data.planID, "planID"), nextStatus,
+    ...(note ? { note } : {}) };
 };
 
 const parseIssueStudentModeSessionRequest = (
@@ -1944,59 +1943,84 @@ const transitionPlanHandler = async (
   const firestore = getFirestore();
   return executePrivilegedOperation(firestore, request, data, {
     action: "plan.transition",
-    targetPath: (input) =>
-      `districts/${input.districtID}/plans/${input.planID}`,
-    requiredCapability: "plan.approve",
-    auditDetails: (input) => ({
-      planID: input.planID,
-      nextStatus: input.nextStatus,
-    }),
+    targetPath: (input) => `districts/${input.districtID}/plans/${input.planID}`,
+    requiredCapability: null,
+    auditDetails: (input) => ({ planID: input.planID, nextStatus: input.nextStatus }),
     mutate: async ({ transaction, membership, identity }) => {
-      const reference = firestore.doc(
-        `districts/${data.districtID}/plans/${data.planID}`,
-      );
-      const snapshot = await transaction.get(reference);
-      const plan = requireExistingData(snapshot, "Plan");
+      const reference = firestore.doc(`districts/${data.districtID}/plans/${data.planID}`);
+      const plan = requireExistingData(await transaction.get(reference), "Plan");
       assertRecordVersion(plan.recordVersion, data.expectedRecordVersion);
-      const currentStatus = requireEnum(
-        plan.status,
-        "plan.status",
-        allowedPlanStatuses,
-      );
+      // Legacy submitted documents migrate on their next authorized transition.
+      const currentStatus = requireEnum(plan.status === "submitted" ? "pendingApproval" : plan.status,
+        "plan.status", allowedPlanStatuses);
       if (!allowedPlanTransitions[currentStatus].includes(data.nextStatus)) {
-        throw new HttpsError(
-          "failed-precondition",
-          `The plan cannot transition from ${currentStatus} to ${data.nextStatus}.`,
-        );
+        throw new HttpsError("failed-precondition", "This plan transition is not allowed.");
       }
-      const schoolID = requireSchoolID(plan, "Plan");
-      const studentIDs = requireStoredIdentifierArray(
-        plan.studentIDs,
-        "plan.studentIDs",
-      );
-      const isInScope =
-        membership.role === "districtAdministrator" ||
-        (membership.role === "schoolAdministrator"
-          ? membership.schoolIDs.has(schoolID)
-          : membership.schoolIDs.has(schoolID) &&
-            studentIDs.length > 0 &&
-            studentIDs.every((studentID) =>
-              membership.assignedStudentIDs.has(studentID),
-            ));
-      if (!isInScope) {
-        throw new HttpsError(
-          "permission-denied",
-          "The plan is outside the member's assigned scope.",
-        );
+      const isApproval = currentStatus === "pendingApproval"
+        && (data.nextStatus === "approved" || data.nextStatus === "changesRequested");
+      requireCapability(membership, isApproval ? "plan.approve" : "student.write.detail");
+      const schools = requireStoredIdentifierArray(plan.schoolIDs ?? (plan.schoolId ? [plan.schoolId] : []), "plan.schoolIDs");
+      const students = requireStoredIdentifierArray(plan.studentIDs, "plan.studentIDs");
+      const administrator = membership.role === "districtAdministrator" || membership.role === "schoolAdministrator";
+      if (plan.districtId !== data.districtID || !schools.length || !students.length
+        || (membership.role !== "districtAdministrator" && !schools.every(id => membership.schoolIDs.has(id)))
+        || (!administrator && (!Array.isArray(plan.assignedMemberIDs)
+          || !plan.assignedMemberIDs.includes(identity.userID)
+          || !students.every(id => membership.assignedStudentIDs.has(id))))) {
+        throw new HttpsError("permission-denied", "The plan is outside the member's assigned scope.");
       }
-      const nextVersion = data.expectedRecordVersion + 1;
-      transaction.update(reference, {
-        status: data.nextStatus,
-        recordVersion: nextVersion,
-        updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: identity.userID,
-      });
-      return { recordVersion: nextVersion };
+      for (const studentID of students) {
+        const student = requireExistingData(await transaction.get(firestore.doc(
+          `districts/${data.districtID}/students/${studentID}`)), "Student");
+        if (student.districtId !== data.districtID || !schools.includes(student.schoolId)
+          || (!administrator && (!Array.isArray(student.assignedMemberIDs)
+            || !student.assignedMemberIDs.includes(identity.userID)))) {
+          throw new HttpsError("permission-denied", "A student is outside the plan's authorized scope.");
+        }
+      }
+      if (currentStatus === "approved" && data.nextStatus === "active") {
+        if (plan.createdBy !== identity.userID) {
+          throw new HttpsError("permission-denied", "Only the responsible owner can activate this plan.");
+        }
+        if (!(plan.startDate instanceof Timestamp)) {
+          throw new HttpsError("failed-precondition", "Set a valid plan start date before activation.");
+        }
+      }
+      const frozen = ["approved", "changesRequested", "completed"].includes(data.nextStatus);
+      // Read every dependency before issuing writes in this transaction.
+      const goals = frozen ? await transaction.get(reference.collection("goals")) : undefined;
+      const actions = frozen ? await transaction.get(reference.collection("actions")) : undefined;
+      const revisions = frozen ? await transaction.get(reference.collection("revisions")) : undefined;
+      const stamp = FieldValue.serverTimestamp();
+      const version = data.expectedRecordVersion + 1;
+      const approvalStatus = data.nextStatus === "pendingApproval" ? "pending"
+        : data.nextStatus === "changesRequested" ? "changesRequested"
+        : data.nextStatus === "draft" ? "notRequested"
+        : data.nextStatus === "approved" ? "approved" : plan.approvalStatus ?? "notRequested";
+      const patch: DocumentData = { status: data.nextStatus, approvalStatus,
+        recordVersion: version, updatedAt: stamp, updatedBy: identity.userID };
+      if (data.nextStatus === "approved") Object.assign(patch, { approvedAt: stamp, approvedBy: identity.userID });
+      if (frozen) {
+        const sequence = Math.max(0, ...(revisions?.docs.map(doc => Number(doc.get("sequence")) || 0) ?? [])) + 1;
+        const revision: DocumentData = {
+          schemaVersion: 1, planID: data.planID, sequence, reason: data.nextStatus,
+          status: data.nextStatus, model: planModelNames[plan.modelID ?? plan.model] ?? plan.model ?? "",
+          title: plan.title ?? "", summary: plan.summary ?? null, startDate: plan.startDate ?? stamp,
+          targetDate: plan.targetDate ?? null, frozenBy: identity.userID, frozenAt: stamp,
+          note: data.note ?? null, goalIDs: goals?.docs.map(doc => doc.id).sort() ?? [],
+          actionIDs: actions?.docs.map(doc => doc.id).sort() ?? [],
+          goals: goals?.docs.map(doc => ({ ...doc.data(), id: doc.id })) ?? [],
+          actions: actions?.docs.map(doc => ({ ...doc.data(), id: doc.id })) ?? [],
+        };
+        transaction.create(reference.collection("revisions").doc(`${data.planID}__r${sequence}`), revision);
+        patch.revisionSequence = sequence;
+        if (isApproval) transaction.create(reference.collection("approvals").doc(data.idempotencyKey), {
+          status: data.nextStatus, actorUserID: identity.userID, createdAt: stamp,
+          revisionSequence: sequence, note: data.note ?? null,
+        });
+      }
+      transaction.update(reference, patch);
+      return { recordVersion: version };
     },
   });
 };
@@ -4241,7 +4265,7 @@ export const createSurveyHandlers = (
           if (
             student.districtId !== data.districtID ||
             student.isArchived === true ||
-            !canReadStudentDetail(membership, data.studentID, schoolID)
+            !canWriteStudentDetail(membership, data.studentID, schoolID)
           ) {
             throw new HttpsError(
               "permission-denied",
@@ -4716,7 +4740,7 @@ export const createSurveyHandlers = (
           const schoolID = requireSchoolID(student, "Student");
           if (
             student.districtId !== data.districtID ||
-            !canReadStudentDetail(membership, data.studentID, schoolID) ||
+            !canWriteStudentDetail(membership, data.studentID, schoolID) ||
             response.districtID !== data.districtID ||
             response.studentID !== data.studentID ||
             response.responseID !== data.responseID
@@ -4850,7 +4874,7 @@ export const createSurveyHandlers = (
           if (
             student.districtId !== data.districtID ||
             student.isArchived === true ||
-            !canReadStudentDetail(membership, data.studentID, schoolID) ||
+            !canWriteStudentDetail(membership, data.studentID, schoolID) ||
             response.districtID !== data.districtID ||
             response.studentID !== data.studentID ||
             response.responseID !== data.responseID

@@ -185,18 +185,18 @@ service cloud.firestore {
         && studentData.get('districtId', '') == districtID
         && (
           (
-            role(districtID) in ['teacher', 'counselor', 'socialWorker']
+            role(districtID) == 'teacher'
+            && belongsToSchool(districtID, studentData.get('schoolId', ''))
+          )
+          || (
+            role(districtID) in ['counselor', 'socialWorker']
             && isAssignedStudent(districtID, studentID, studentData)
           )
           || (
             role(districtID) == 'schoolAdministrator'
-            && hasCapability(districtID, 'student.read.detail')
             && belongsToSchool(districtID, studentData.get('schoolId', ''))
           )
-          || (
-            role(districtID) == 'districtAdministrator'
-            && hasCapability(districtID, 'student.read.detail')
-          )
+          || role(districtID) == 'districtAdministrator'
         );
     }
 
@@ -204,19 +204,19 @@ service cloud.firestore {
       return hasActiveMembership(districtID)
         && (
           (
-            role(districtID) in ['teacher', 'counselor', 'socialWorker']
+            role(districtID) == 'teacher'
+            && studentData.get('schoolId', '') in membership(districtID).get('schoolIDs', [])
+          )
+          || (
+            role(districtID) in ['counselor', 'socialWorker']
             && request.auth.uid in studentData.get('assignedMemberIDs', [])
             && studentData.get('schoolId', '') in membership(districtID).get('schoolIDs', [])
           )
           || (
             role(districtID) == 'schoolAdministrator'
-            && hasCapability(districtID, 'student.read.detail')
             && belongsToSchool(districtID, studentData.get('schoolId', ''))
           )
-          || (
-            role(districtID) == 'districtAdministrator'
-            && hasCapability(districtID, 'student.read.detail')
-          )
+          || role(districtID) == 'districtAdministrator'
         );
     }
 
@@ -426,41 +426,22 @@ service cloud.firestore {
         ) == request.auth.token.get('tmiSessionID', '');
     }
 
-    // Draft -> Pending approval -> Active, with pause/complete/archive from
-    // there. A completed plan is duplicated into a new cycle rather than
-    // reopened, so nothing transitions backwards out of completed.
-    function isLegalPlanTransition(from, to) {
-      return from == to
-        || (from == 'draft' && to in ['pendingApproval', 'active', 'archived'])
-        || (from == 'pendingApproval' && to in ['draft', 'changesRequested', 'active'])
-        || (from == 'changesRequested' && to in ['draft', 'archived'])
-        || (from == 'active' && to in ['paused', 'completed'])
-        || (from == 'paused' && to in ['active', 'completed'])
-        || (from == 'completed' && to == 'archived');
-    }
-
     function canReadPlan(districtID, planID, planData) {
-      let studentIDs = planData.get('studentIDs', []);
       let schoolIDs = planData.get('schoolIDs', []);
       return hasActiveMembership(districtID)
-        && planData.get('districtId', districtID) == districtID
-        && studentIDs.size() > 0
         && (
-          (
-            role(districtID) in ['teacher', 'counselor', 'socialWorker']
-            && request.auth.uid in planData.get('assignedMemberIDs', [])
-            && schoolIDs.size() > 0
-            && schoolIDs.hasOnly(membership(districtID).get('schoolIDs', []))
-          )
+          role(districtID) == 'districtAdministrator'
           || (
-            role(districtID) == 'schoolAdministrator'
-            && hasCapability(districtID, 'student.read.detail')
-            && schoolIDs.size() > 0
+            schoolIDs.size() == 1
             && schoolIDs.hasOnly(membership(districtID).get('schoolIDs', []))
-          )
-          || (
-            role(districtID) == 'districtAdministrator'
-            && hasCapability(districtID, 'student.read.detail')
+            && (
+              role(districtID) == 'teacher'
+              || role(districtID) == 'schoolAdministrator'
+              || (
+                role(districtID) in ['counselor', 'socialWorker']
+                && request.auth.uid in planData.get('assignedMemberIDs', [])
+              )
+            )
           )
         );
     }
@@ -856,33 +837,19 @@ service cloud.firestore {
         allow read: if canReadPlan(districtID, planID, resource.data);
         allow create: if canWritePlan(districtID, planID, request.resource.data)
           && request.resource.data.get('status', 'draft') == 'draft'
+          && request.resource.data.get('approvalStatus', 'notRequested') == 'notRequested'
+          && !request.resource.data.keys().hasAny(['approvedAt', 'approvedBy', 'approvalHistory', 'revisionSequence'])
           && request.auth.uid in request.resource.data.get('assignedMemberIDs', []);
-        // Status transitions ran through the transitionPlan callable. With
-        // Functions undeployed a plan would be stuck in draft forever, so the
-        // legal transitions are enforced here instead. Scope, ownership, and
-        // creation metadata stay immutable, and approval remains gated on the
-        // plan.approve capability.
+        // Lifecycle, approvals and history belong to the trusted callable.
         allow update: if canWritePlan(districtID, planID, resource.data)
           && canWritePlan(districtID, planID, request.resource.data)
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'districtId',
-            'studentIDs',
-            'schoolIDs',
-            'createdAt',
-            'createdBy'
+          && resource.data.get('status', '') in ['draft', 'changesRequested']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'title', 'summary', 'modelID', 'startDate', 'targetDate',
+            'recordVersion', 'updatedAt', 'updatedBy'
           ])
-          && isLegalPlanTransition(
-            resource.data.get('status', 'draft'),
-            request.resource.data.get('status', 'draft')
-          )
-          && (
-            !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-              'approvalStatus',
-              'approvedAt',
-              'approvedBy'
-            ])
-            || hasCapability(districtID, 'plan.approve')
-          );
+          && request.resource.data.recordVersion == resource.data.recordVersion + 1
+          && request.resource.data.updatedBy == request.auth.uid;
         allow delete: if false;
 
         match /approvals/{approvalID} {
@@ -900,20 +867,7 @@ service cloud.firestore {
             planID,
             planData(districtID, planID)
           );
-          // Revisions froze through a callable. With Functions undeployed the
-          // freeze happens on the client, so the guarantees that made a
-          // revision worth trusting are enforced here: it belongs to this
-          // plan, it names its author honestly, and once written nothing can
-          // change it. A rewritable history is not evidence of anything.
-          allow create: if canWritePlan(
-              districtID,
-              planID,
-              planData(districtID, planID)
-            )
-            && request.resource.data.get('planID', '') == planID
-            && request.resource.data.get('frozenBy', '') == request.auth.uid
-            && request.resource.data.get('sequence', 0) is int
-            && request.resource.data.get('sequence', 0) > 0;
+          allow create: if false;
           allow update, delete: if false;
         }
 
@@ -927,7 +881,11 @@ service cloud.firestore {
             districtID,
             planID,
             planData(districtID, planID)
-          );
+          )
+            && planData(districtID, planID).get('status', '') in ['active', 'paused']
+            && request.resource.data.get('planID', '') == planID
+            && request.resource.data.get('studentID', '') in planData(districtID, planID).studentIDs
+            && request.resource.data.get('authorID', '') == request.auth.uid;
           allow update, delete: if false;
         }
 
@@ -948,17 +906,19 @@ service cloud.firestore {
                 resource.data
               )
             );
-          allow create, update: if collectionName in [
-              'goals',
-              'actions',
-              'resources',
-              'forms'
-            ]
-            && canWritePlan(
-              districtID,
-              planID,
-              planData(districtID, planID)
-            );
+          allow create: if collectionName in ['goals', 'actions', 'resources', 'forms']
+            && canWritePlan(districtID, planID, planData(districtID, planID))
+            && planData(districtID, planID).get('status', '') in ['draft', 'changesRequested']
+            && request.resource.data.get('planID', '') == planID;
+          allow update: if collectionName in ['goals', 'actions', 'resources', 'forms']
+            && canWritePlan(districtID, planID, planData(districtID, planID))
+            && request.resource.data.get('planID', '') == planID
+            && (planData(districtID, planID).get('status', '') in ['draft', 'changesRequested']
+              || (collectionName in ['goals', 'actions']
+                && planData(districtID, planID).get('status', '') in ['active', 'paused']
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+                && ((collectionName == 'goals' && request.resource.data.status in ['notStarted', 'inProgress', 'met', 'discontinued'])
+                  || (collectionName == 'actions' && request.resource.data.status in ['open', 'done', 'skipped']))));
           allow delete: if false;
         }
       }
@@ -1102,7 +1062,7 @@ service cloud.firestore {
             || role(districtID) == 'districtAdministrator'
             || belongsToSchool(districtID, resource.data.get('schoolId', ''))
           );
-        allow create, update: if hasActiveMembership(districtID)
+        allow create: if hasActiveMembership(districtID)
           && (
             role(districtID) == 'districtAdministrator'
             || belongsToSchool(
@@ -1110,6 +1070,11 @@ service cloud.firestore {
               request.resource.data.get('schoolId', '')
             )
           );
+        allow update: if hasActiveMembership(districtID)
+          && request.resource.data.get('schoolId', null) == resource.data.get('schoolId', null)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy', 'createdAt', 'districtId'])
+          && (role(districtID) == 'districtAdministrator'
+            || belongsToSchool(districtID, resource.data.get('schoolId', '')));
         allow delete: if false;
       }
 

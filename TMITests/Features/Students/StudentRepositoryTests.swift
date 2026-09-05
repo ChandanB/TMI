@@ -51,7 +51,7 @@ struct StudentRepositoryTests {
         let requests = await store.pageRequests
         #expect(requests.count == 2)
         #expect(requests[0].districtID == "district-a")
-        #expect(requests[0].scope == .assigned(memberID: "teacher-a", schoolID: "school-a"))
+        #expect(requests[0].scope == .school(schoolID: "school-a"))
         #expect(requests[0].search == .normalizedNamePrefix("jose stone"))
         #expect(requests[0].schoolID == "school-a")
         #expect(requests[0].grade == "7")
@@ -128,21 +128,19 @@ struct StudentRepositoryTests {
         #expect(requests[1].assignedMemberID == "teacher-b")
     }
 
-    @Test("Ordinary staff reads always bind one permitted school and their own member identity")
-    func ordinaryStaffReadScopeIsSchoolBound() async throws {
+    @Test("Teacher roster reads are school scoped and may filter by assignment")
+    func teacherReadScopeIsSchoolBound() async throws {
         let store = StudentRecordStoreSpy(
             pageResults: [.success(StudentStorePage(documents: [], nextCursor: nil))]
         )
         let repository = makeRepository(store: store)
 
         _ = try await repository.page(
-            StudentPageRequest(schoolID: "school-b", assignedMemberID: "teacher-a"),
+            StudentPageRequest(schoolID: "school-b", assignedMemberID: "teacher-b"),
             member: membership(schoolIDs: ["school-a", "school-b"])
         )
-        #expect(store.pageRequests.first?.scope == .assigned(
-            memberID: "teacher-a",
-            schoolID: "school-b"
-        ))
+        #expect(store.pageRequests.first?.scope == .school(schoolID: "school-b"))
+        #expect(store.pageRequests.first?.assignedMemberID == "teacher-b")
 
         await expectRepositoryError(.schoolFilterRequired) {
             _ = try await repository.page(
@@ -152,8 +150,8 @@ struct StudentRepositoryTests {
         }
         await expectRepositoryError(.permissionDenied) {
             _ = try await repository.page(
-                StudentPageRequest(schoolID: "school-a", assignedMemberID: "teacher-b"),
-                member: membership()
+                StudentPageRequest(schoolID: "school-c"),
+                member: membership(schoolIDs: ["school-a", "school-b"])
             )
         }
     }
@@ -311,11 +309,11 @@ struct StudentRepositoryTests {
         #expect(store.pageRequests.first?.sort == .recentlyUpdated)
     }
 
-    @Test("A response containing any cross-tenant or unassigned record fails closed")
+    @Test("A response containing any cross-tenant or out-of-school record fails closed")
     func unauthorizedResponseFailsClosed() async throws {
         for unauthorized in [
             snapshot(id: "student-a", districtID: "district-b"),
-            snapshot(id: "student-c", assignedMemberIDs: ["teacher-b"]),
+            snapshot(id: "student-c", schoolID: "school-b", assignedMemberIDs: ["teacher-b"]),
         ] {
             let cache = StudentPageCacheSpy()
             let store = StudentRecordStoreSpy(
@@ -354,12 +352,13 @@ struct StudentRepositoryTests {
         #expect(cache.savedKeys.isEmpty)
     }
 
-    @Test("Student reads are server-first and deny unassigned identifiers")
-    func studentReadIsServerFirstAndAssigned() async throws {
+    @Test("Teacher student reads are server-first and school scoped")
+    func studentReadIsServerFirstAndSchoolScoped() async throws {
         let store = StudentRecordStoreSpy(
             studentResults: [
                 .success(snapshot(id: "student-a")),
                 .success(snapshot(id: "student-c", assignedMemberIDs: ["teacher-b"])),
+                .success(snapshot(id: "student-d", schoolID: "school-b", assignedMemberIDs: ["teacher-a"])),
             ]
         )
         let repository = makeRepository(store: store)
@@ -368,8 +367,11 @@ struct StudentRepositoryTests {
         #expect(record.id == "student-a")
         #expect((await store.studentRequests).first?.source == .server)
 
+        let unassigned = try await repository.student(id: "student-c", member: membership())
+        #expect(unassigned.id == "student-c")
+
         await expectRepositoryError(.permissionDenied) {
-            _ = try await repository.student(id: "student-c", member: membership())
+            _ = try await repository.student(id: "student-d", member: membership())
         }
     }
 

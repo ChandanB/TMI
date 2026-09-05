@@ -74,7 +74,7 @@ final class PlanChildRepository: PlanChildRepositoryProtocol {
             planID: goal.planID,
             child: "goals",
             id: goal.id,
-            data: Self.fields(goal),
+            fields: { Self.fields(goal) },
             member: member,
             merge: true
         )
@@ -85,7 +85,7 @@ final class PlanChildRepository: PlanChildRepositoryProtocol {
             planID: action.planID,
             child: "actions",
             id: action.id,
-            data: Self.fields(action),
+            fields: { Self.fields(action) },
             member: member,
             merge: true
         )
@@ -98,7 +98,7 @@ final class PlanChildRepository: PlanChildRepositoryProtocol {
             planID: progress.planID,
             child: "progress",
             id: progress.id,
-            data: Self.fields(progress),
+            fields: { Self.fields(progress) },
             member: member,
             merge: false
         )
@@ -107,17 +107,8 @@ final class PlanChildRepository: PlanChildRepositoryProtocol {
     /// Freezes what was agreed. Refused if it names anyone but the caller as
     /// its author, and immutable once written.
     func freeze(revision: PlanRevision, member: MembershipContext) async throws {
-        guard revision.frozenBy == member.userID else {
-            throw PlanRecordRepositoryError.permissionDenied
-        }
-        try await write(
-            planID: revision.planID,
-            child: "revisions",
-            id: revision.id,
-            data: Self.fields(revision),
-            member: member,
-            merge: false
-        )
+        // Only transitionPlan can atomically freeze an authoritative revision.
+        throw PlanRecordRepositoryError.permissionDenied
     }
 
     // MARK: - Plumbing
@@ -139,13 +130,21 @@ final class PlanChildRepository: PlanChildRepositoryProtocol {
         member: MembershipContext,
         transform: (String, [String: Any]) -> T?
     ) async throws -> [T] {
+        guard member.isActive, currentUserID() == member.userID else {
+            throw PlanRecordRepositoryError.permissionDenied
+        }
         do {
             let snapshot = try await collection(
                 districtID: member.districtID,
                 planID: planID,
                 child: child
             ).getDocuments()
-            return snapshot.documents.compactMap { transform($0.documentID, $0.data()) }
+            return try snapshot.documents.map { document in
+                guard let record = transform(document.documentID, document.data()) else {
+                    throw PlanRecordRepositoryError.invalidResponse
+                }
+                return record
+            }
         } catch {
             throw Self.mapped(error)
         }
@@ -155,23 +154,66 @@ final class PlanChildRepository: PlanChildRepositoryProtocol {
         planID: String,
         child: String,
         id: String,
-        data: [String: Any],
+        fields: @escaping @Sendable () -> [String: Any],
         member: MembershipContext,
         merge: Bool
     ) async throws {
-        guard currentUserID() != nil else {
+        guard member.isActive, currentUserID() == member.userID else {
             throw PlanRecordRepositoryError.permissionDenied
         }
-        do {
-            try await collection(districtID: member.districtID, planID: planID, child: child)
-                .document(id)
-                .setData(data, merge: merge)
-        } catch {
-            throw Self.mapped(error)
+        let parent = firestore.collection("districts").document(member.districtID)
+            .collection("plans").document(planID)
+        let reference = parent.collection(child).document(id)
+        let block: @Sendable (Transaction, NSErrorPointer) -> Any? = { transaction, errorPointer in
+            do {
+                let plan = try transaction.getDocument(parent)
+                let existing = try transaction.getDocument(reference)
+                let payload = fields()
+                if child == "progress", let stored = existing.data() {
+                    var expected = payload
+                    expected.removeValue(forKey: "recordedAt")
+                    var persisted = stored
+                    persisted.removeValue(forKey: "recordedAt")
+                    guard NSDictionary(dictionary: persisted).isEqual(to: expected) else {
+                        throw PlanRecordRepositoryError.invalidDraft
+                    }
+                    return true
+                }
+                guard let status = (plan.data()?["status"] as? String).flatMap(PlanRecordStatus.init(rawValue:)) else {
+                    throw PlanRecordRepositoryError.invalidResponse
+                }
+                if child == "progress" {
+                    guard status.acceptsProgress, payload["authorID"] as? String == member.userID else {
+                        throw PlanRecordRepositoryError.permissionDenied
+                    }
+                    transaction.setData(payload, forDocument: reference)
+                } else if status.acceptsProgress, existing.exists {
+                    guard let childStatus = payload["status"] as? String else {
+                        throw PlanRecordRepositoryError.invalidDraft
+                    }
+                    transaction.updateData(["status": childStatus], forDocument: reference)
+                } else {
+                    guard status.isEditable else { throw PlanRecordRepositoryError.permissionDenied }
+                    transaction.setData(payload, forDocument: reference, merge: merge)
+                }
+                return true
+            } catch {
+                errorPointer?.pointee = error as NSError
+                return nil
+            }
         }
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                self.firestore.runTransaction(block) { _, error in
+                    if let error { continuation.resume(throwing: error) }
+                    else { continuation.resume() }
+                }
+            }
+        } catch { throw Self.mapped(error) }
     }
 
     private static func mapped(_ error: Error) -> PlanRecordRepositoryError {
+        if let error = error as? PlanRecordRepositoryError { return error }
         let nsError = error as NSError
         guard nsError.domain == FirestoreErrorDomain else { return .invalidResponse }
         switch FirestoreErrorCode.Code(rawValue: nsError.code) {
@@ -192,7 +234,7 @@ nonisolated extension PlanChildRepository {
             "planID": goal.planID,
             "studentID": goal.studentID,
             "title": goal.title,
-            "studentFacingTitle": goal.studentFacingTitle as Any,
+            "studentFacingTitle": goal.studentFacingTitle.map { $0 as Any } ?? NSNull(),
             "measure": goal.measure.rawValue,
             "baseline": goal.baseline,
             "target": goal.target,
@@ -223,8 +265,8 @@ nonisolated extension PlanChildRepository {
             "studentID": entry.studentID,
             "source": entry.source.rawValue,
             "sourceID": entry.sourceID,
-            "measuredValue": entry.measuredValue as Any,
-            "note": entry.note as Any,
+            "measuredValue": entry.measuredValue.map { $0 as Any } ?? NSNull(),
+            "note": entry.note.map { $0 as Any } ?? NSNull(),
             "visibility": entry.visibility.rawValue,
             "authorID": entry.authorID,
             // The server stamps the time an entry is recorded, so ordering does
@@ -242,14 +284,14 @@ nonisolated extension PlanChildRepository {
             "status": revision.status.rawValue,
             "model": revision.model.rawValue,
             "title": revision.title,
-            "summary": revision.summary as Any,
+            "summary": revision.summary.map { $0 as Any } ?? NSNull(),
             "startDate": Timestamp(date: revision.startDate),
-            "targetDate": revision.targetDate.map { Timestamp(date: $0) } as Any,
+            "targetDate": revision.targetDate.map { Timestamp(date: $0) as Any } ?? NSNull(),
             "goalIDs": revision.goalIDs,
             "actionIDs": revision.actionIDs,
             "frozenBy": revision.frozenBy,
             "frozenAt": FieldValue.serverTimestamp(),
-            "note": revision.note as Any,
+            "note": revision.note.map { $0 as Any } ?? NSNull(),
         ]
     }
 

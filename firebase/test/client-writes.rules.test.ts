@@ -120,9 +120,9 @@ describe("client-side canonical writes", () => {
     );
   });
 
-  it("does not let a teacher read a student that does not list them", async () => {
+  it("lets a teacher read an unassigned student in their school", async () => {
     const db = teacherDb("teacher-1");
-    await assertFails(
+    await assertSucceeds(
       getDoc(doc(db, `districts/${districtID}/students/other-student`)),
     );
   });
@@ -212,10 +212,10 @@ describe("client-side canonical writes", () => {
     ...overrides,
   });
 
-  it("lets a plan writer freeze a revision", async () => {
+  it("requires server authority to freeze a revision", async () => {
     await seedPlan("plan-rev");
     const db = teacherDb("teacher-1");
-    await assertSucceeds(
+    await assertFails(
       setDoc(doc(db, `districts/${districtID}/plans/plan-rev/revisions/r1`), revision()),
     );
   });
@@ -224,7 +224,9 @@ describe("client-side canonical writes", () => {
     await seedPlan("plan-rev");
     const db = teacherDb("teacher-1");
     const ref = doc(db, `districts/${districtID}/plans/plan-rev/revisions/r1`);
-    await assertSucceeds(setDoc(ref, revision()));
+    await testEnv.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), `districts/${districtID}/plans/plan-rev/revisions/r1`), revision());
+    });
 
     // A history that can be rewritten is not evidence of anything.
     await assertFails(updateDoc(ref, { title: "Something else" }));
@@ -265,7 +267,7 @@ describe("client-side canonical writes", () => {
     );
   });
 
-  it("does not let a teacher read a plan that does not list them", async () => {
+  it("lets a teacher read an unassigned plan in their school", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
         doc(context.firestore(), `districts/${districtID}/plans/plan-other`),
@@ -282,7 +284,7 @@ describe("client-side canonical writes", () => {
     });
 
     const db = teacherDb("teacher-1");
-    await assertFails(
+    await assertSucceeds(
       getDoc(doc(db, `districts/${districtID}/plans/plan-other`)),
     );
   });
@@ -466,15 +468,15 @@ describe("client-side canonical writes", () => {
       await assertSucceeds(setDoc(planRef(db), planDoc()));
     };
 
-    it("walks a plan through its lifecycle", async () => {
+    it("denies direct lifecycle transitions", async () => {
       const db = teacherDb("teacher-1");
       await seed(db);
 
-      await assertSucceeds(updateDoc(planRef(db), { status: "active" }));
-      await assertSucceeds(updateDoc(planRef(db), { status: "paused" }));
-      await assertSucceeds(updateDoc(planRef(db), { status: "active" }));
-      await assertSucceeds(updateDoc(planRef(db), { status: "completed" }));
-      await assertSucceeds(updateDoc(planRef(db), { status: "archived" }));
+      await assertFails(updateDoc(planRef(db), { status: "active" }));
+      await assertFails(updateDoc(planRef(db), { status: "paused" }));
+      await assertFails(updateDoc(planRef(db), { status: "active" }));
+      await assertFails(updateDoc(planRef(db), { status: "completed" }));
+      await assertFails(updateDoc(planRef(db), { status: "archived" }));
     });
 
     it("refuses transitions that skip or reverse the lifecycle", async () => {
@@ -483,10 +485,10 @@ describe("client-side canonical writes", () => {
 
       // draft cannot jump straight to completed
       await assertFails(updateDoc(planRef(db), { status: "completed" }));
-      await assertSucceeds(updateDoc(planRef(db), { status: "active" }));
+      await assertFails(updateDoc(planRef(db), { status: "active" }));
       // active cannot go back to draft
       await assertFails(updateDoc(planRef(db), { status: "draft" }));
-      await assertSucceeds(updateDoc(planRef(db), { status: "completed" }));
+      await assertFails(updateDoc(planRef(db), { status: "completed" }));
       // a completed plan is duplicated into a new cycle, never reopened
       await assertFails(updateDoc(planRef(db), { status: "active" }));
       await assertFails(updateDoc(planRef(db), { status: "draft" }));
@@ -517,7 +519,7 @@ describe("client-side canonical writes", () => {
           activeMembership({ assignedStudentIDs: [], capabilities: ["plan.approve"] }),
         );
       });
-      await assertSucceeds(
+      await assertFails(
         updateDoc(planRef(db), { approvalStatus: "approved", approvedBy: "teacher-1" }),
       );
     });

@@ -196,6 +196,11 @@ struct TMIApp: App {
             CareerDiscoveryUITestingContent()
         case .careerDetail:
             CareerDetailUITestingContent()
+        case .planWorkflow:
+            PlanWorkflowUITestingContent(failsDetails: false)
+                .dynamicTypeSize(uiTestingConfiguration.contentSize == .accessibility5 ? .accessibility5 : .large)
+        case .planDetailsFailure:
+            PlanWorkflowUITestingContent(failsDetails: true)
         case nil:
             ContentUnavailableView(
                 "UI Test Fixture Unavailable",

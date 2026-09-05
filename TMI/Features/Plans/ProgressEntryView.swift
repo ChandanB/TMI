@@ -20,6 +20,7 @@ struct ProgressEntryView: View {
     @State private var measuredValue = ""
     @State private var note = ""
     @State private var visibility: ProgressVisibility = .staffOnly
+    @State private var operationID = UUID()
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -91,7 +92,7 @@ struct ProgressEntryView: View {
         defer { isSaving = false }
 
         let entry = ProgressRecord(
-            id: "progress_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
+            id: "progress_\(operationID.uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
             planID: planID,
             studentID: studentID,
             source: source,
@@ -111,7 +112,7 @@ struct ProgressEntryView: View {
         } catch PlanRecordRepositoryError.permissionDenied {
             errorMessage = "You do not have access to record progress on this plan."
         } catch PlanRecordRepositoryError.unavailable {
-            errorMessage = "You appear to be offline. Nothing was recorded."
+            errorMessage = "The save could not be confirmed. Reconnect and retry with the same details."
         } catch {
             errorMessage = "The entry could not be recorded."
         }

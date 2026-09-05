@@ -54,10 +54,10 @@ nonisolated enum PlanRevisionHistory {
     /// timeline stays a record of commitments rather than keystrokes.
     static func reason(forEntering status: PlanRecordStatus) -> PlanRevisionReason? {
         switch status {
-        case .active: .approved
+        case .approved: .approved
         case .changesRequested: .changesRequested
         case .completed: .completed
-        case .draft, .pendingApproval, .paused, .archived: nil
+        case .draft, .pendingApproval, .active, .paused, .archived: nil
         }
     }
 

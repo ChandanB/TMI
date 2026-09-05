@@ -422,7 +422,7 @@ describe("privileged callable boundary", () => {
     await expect(
       transitionPlan.run(
         callableRequest(
-          transitionRequest({ nextStatus: "changesRequested" }),
+          transitionRequest({ nextStatus: "changesRequested", note: "Clarify the goal" }),
         ),
       ),
     ).rejects.toMatchObject({

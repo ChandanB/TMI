@@ -14,6 +14,7 @@ struct PlanExportAuditingTests {
         let state = CanonicalPlanDetailState(
             planID: "plan-1",
             repository: StubPlanRepo(plan: plan),
+            children: ExportChildren(),
             auditing: FailingAuditing(error: .unavailable)
         )
         await state.load(member: exporter)
@@ -30,6 +31,7 @@ struct PlanExportAuditingTests {
         let state = CanonicalPlanDetailState(
             planID: "plan-1",
             repository: StubPlanRepo(plan: plan),
+            children: ExportChildren(),
             auditing: FailingAuditing(error: .unavailable)
         )
         await state.load(member: exporter)
@@ -43,6 +45,7 @@ struct PlanExportAuditingTests {
         let state = CanonicalPlanDetailState(
             planID: "plan-1",
             repository: StubPlanRepo(plan: plan),
+            children: ExportChildren(),
             auditing: StubAuditing(auditID: "audit-server-1")
         )
         await state.load(member: exporter)
@@ -109,4 +112,16 @@ private final class StubPlanRepo: PlanRecordRepository {
     func create(_ draft: PlanDraft, operationID: UUID, member: MembershipContext) async throws -> PlanRecord { stored }
     func update(id: String, draft: PlanDraft, expectedVersion: Int, member: MembershipContext) async throws -> PlanRecord { stored }
     func transition(id: String, to status: PlanRecordStatus, expectedVersion: Int, member: MembershipContext) async throws -> PlanRecord { stored }
+}
+
+@MainActor
+private final class ExportChildren: PlanChildRepositoryProtocol {
+    func goals(planID: String, member: MembershipContext) async throws -> [GoalRecord] { [] }
+    func actions(planID: String, member: MembershipContext) async throws -> [ActionRecord] { [] }
+    func progress(planID: String, member: MembershipContext) async throws -> [ProgressRecord] { [] }
+    func revisions(planID: String, member: MembershipContext) async throws -> [PlanRevision] { [] }
+    func save(goal: GoalRecord, member: MembershipContext) async throws {}
+    func save(action: ActionRecord, member: MembershipContext) async throws {}
+    func append(progress: ProgressRecord, member: MembershipContext) async throws {}
+    func freeze(revision: PlanRevision, member: MembershipContext) async throws {}
 }

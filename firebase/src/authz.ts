@@ -432,6 +432,7 @@ export function canReadStudentDetail(
 
   switch (membership.role) {
     case "teacher":
+      return membership.schoolIDs.has(schoolID);
     case "counselor":
     case "socialWorker":
       return (
@@ -439,12 +440,37 @@ export function canReadStudentDetail(
         membership.assignedStudentIDs.has(studentID)
       );
     case "schoolAdministrator":
+      return membership.schoolIDs.has(schoolID);
+    case "districtAdministrator":
+      return true;
+  }
+}
+
+export function canWriteStudentDetail(
+  membership: TrustedMembership,
+  studentID: string,
+  schoolID: string,
+): boolean {
+  if (!isValidIdentifier(studentID) || !isValidIdentifier(schoolID)) {
+    return false;
+  }
+
+  switch (membership.role) {
+    case "teacher":
+    case "counselor":
       return (
         membership.schoolIDs.has(schoolID) &&
-        membership.capabilities.has("student.read.detail")
+        membership.assignedStudentIDs.has(studentID)
+      );
+    case "socialWorker":
+      return false;
+    case "schoolAdministrator":
+      return (
+        membership.schoolIDs.has(schoolID) &&
+        membership.capabilities.has("student.write.detail")
       );
     case "districtAdministrator":
-      return membership.capabilities.has("student.read.detail");
+      return membership.capabilities.has("student.write.detail");
   }
 }
 

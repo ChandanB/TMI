@@ -108,13 +108,14 @@ nonisolated enum AuthorizationPolicy {
         }
 
         switch member.role {
-        case .teacher, .counselor, .socialWorker:
+        case .teacher:
+            return member.schoolIDs.contains(student.schoolID)
+        case .counselor, .socialWorker:
             return isAssignedStudentInMemberSchool(member, student: student)
         case .schoolAdministrator:
             return member.schoolIDs.contains(student.schoolID)
-                && member.capabilities.contains(.studentReadDetail)
         case .districtAdministrator:
-            return member.capabilities.contains(.studentReadDetail)
+            return true
         }
     }
 
