@@ -427,6 +427,20 @@ private struct StudentOperationalHubContent: View {
                       let repository = dependencies.planRepository {
                 CanonicalPlanListView(state: CanonicalPlanListState(repository: repository, studentID: student.id), member: member, embedded: true)
                     .id(student.id)
+            } else if domain == .resources, let student = state.student, let member,
+                      let repository = dependencies.resourceRepository {
+                StudentResourceListSection(
+                    studentID: student.id,
+                    member: member,
+                    repository: repository
+                )
+                .id(student.id)
+            } else if domain == .resources {
+                ContentUnavailableView(
+                    "Resources unavailable",
+                    systemImage: "books.vertical",
+                    description: Text("Resource assignment requires a verified staff membership.")
+                )
             } else if domain == .meetingsAndNotes {
                 StudentTimelineView(
                     privateNotes: state.privateNotes,
