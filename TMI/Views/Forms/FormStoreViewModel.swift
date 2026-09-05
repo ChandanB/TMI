@@ -2,22 +2,28 @@ import Foundation
 import Observation
 import FirebaseFirestore
 
+protocol FormTemplatePersisting {
+    func createTemplate(_ template: FormTemplate) async throws -> FormTemplate
+}
+
+extension FormTemplateService: FormTemplatePersisting {}
+
 @Observable
 class FormStoreViewModel {
     var formTemplates: [FormTemplate] = []
     var isLoading: Bool = false
     var errorMessage: String?
-    
-    private let db = Firestore.firestore()
-    
+
+    private let persister: FormTemplatePersisting
+
+    init(persister: FormTemplatePersisting = FormTemplateService()) {
+        self.persister = persister
+    }
+
     func loadTemplates() {
         isLoading = true
-        
-        // Simulate network delay or fetch from Firestore
-        // For now, we'll use the default templates and maybe some mock data
         Task {
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
-            
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
             await MainActor.run {
                 self.formTemplates = [
                     DefaultFormTemplates.studentEnrollmentFormTemplate,
@@ -27,10 +33,15 @@ class FormStoreViewModel {
             }
         }
     }
-    
-    func createTemplate(_ template: FormTemplate) {
-        // Add to local list and save to Firestore
-        formTemplates.append(template)
-        // TODO: Save to Firestore
+
+    @MainActor
+    func createTemplate(_ template: FormTemplate) async {
+        do {
+            let savedTemplate = try await persister.createTemplate(template)
+            formTemplates.append(savedTemplate)
+            errorMessage = nil
+        } catch {
+            errorMessage = "Unable to save the template. Please try again."
+        }
     }
 }
