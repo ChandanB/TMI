@@ -87,8 +87,16 @@ struct SettingsView: View {
                                 .offset(y: isLoaded ? 0 : 20)
                                 .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.3), value: isLoaded)
                         }
-                        
-                        
+
+                        // Forms & Surveys admin - visible to all active staff
+                        if currentMembership != nil {
+                            formsSection
+                                .opacity(isLoaded ? 1 : 0)
+                                .offset(y: isLoaded ? 0 : 20)
+                                .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.4), value: isLoaded)
+                        }
+
+
                         // Account Actions Section - visible to all
                         dangerousActionsSection
                             .opacity(isLoaded ? 1 : 0)
@@ -183,17 +191,33 @@ struct SettingsView: View {
                 settingsRow(icon: "bell", title: "Progress Notifications") {
                     // Progress notification settings
                 }
-                
+
                 Divider().background(Color.white.opacity(0.1))
-                
+
                 settingsRow(icon: "doc.text", title: "Consent Management") {
                     // Consent management
                 }
             }
         }
     }
-    
-    
+
+    private var formsSection: some View {
+        settingsSectionCard(title: "Forms & Surveys", icon: "doc.text.fill") {
+            VStack(spacing: 0) {
+                settingsRow(icon: "doc.on.doc", title: "Form Templates") {
+                    FormTemplateLibraryView()
+                }
+
+                Divider().background(Color.white.opacity(0.1))
+
+                settingsRow(icon: "list.bullet.rectangle", title: "Form Assignments") {
+                    StaffAssignmentListView()
+                }
+            }
+        }
+    }
+
+
     // MARK: - Helper Views
     
     private func settingsSectionCard<Content: View>(
