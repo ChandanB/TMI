@@ -9,35 +9,56 @@ locally without the emulator).
 ## Collection — `districts/{districtID}/recommendations/{recommendationID}`
 - Rule: `firestore.rules` `match /districts/{districtID}` → `match
   /recommendations/{recommendationID}` (added just before the district block's
-  `{unmatched=**}` deny, near the `complianceAudits` block, ~line 1120):
+  `{unmatched=**}` deny, near the `complianceAudits` block, ~line 1127):
   ```
   match /recommendations/{recommendationID} {
     allow read: if hasActiveMembership(districtID);
-    allow write: if hasActiveMembership(districtID);
+    allow create: if hasActiveMembership(districtID)
+      && canCollaborateOnStudent(districtID, request.resource.data.studentId);
+    allow update: if hasActiveMembership(districtID)
+      && canCollaborateOnStudent(districtID, resource.data.studentId)
+      && canCollaborateOnStudent(districtID, request.resource.data.studentId);
+    allow delete: if hasActiveMembership(districtID)
+      && canCollaborateOnStudent(districtID, resource.data.studentId);
   }
   ```
-- `allow write` covers `create`, `update`, and `delete`, matching
-  `RecommendationsService.saveRecommendation` / `updateRecommendation` /
-  `deleteRecommendation`.
-- `hasActiveMembership(districtID)` already requires the caller to hold an
+- `create`/`update`/`delete` are gated on `canCollaborateOnStudent(districtID,
+  studentID)` (defined ~line 287), matching the pattern used by sibling
+  student-scoped collections (e.g. `careerRelationships`, `progressEntries`).
+  `update` checks collaboration against both the existing document's
+  `studentId` and the incoming payload's `studentId`, so a write cannot be
+  used to reassign a recommendation onto a student the caller can't
+  collaborate on. `RecommendationsService.toFirestoreData()` always writes a
+  `studentId` field, and `parseRecommendation` reads it back, so every
+  document has the field the rule depends on.
+- `hasActiveMembership(districtID)` still requires the caller to hold an
   active staff membership in that district (see the function definition
-  ~line 49), so this satisfies "staff can write" without widening to `if
-  true`. It intentionally does not further restrict by role/capability
-  beyond membership — recommendations are a district-shared advisory
-  artifact, same trust level as `meetings`.
+  ~line 49); read remains active-member-only per the original plan, but
+  writes now also require collaboration on the referenced student, so a
+  district member with no relationship to the student can no longer
+  create, overwrite, or delete that student's recommendations.
 - Path is registered in `FirestorePaths.recommendations(districtID:)` /
   `productionCollectionTemplates` (`TMI/Services/FirestorePaths.swift`) and
   covered by `TMITests/Services/FirestorePathsTests.swift`.
 
 ## Manual checks (run once against the live project or emulator)
-1. As an active staff member of district `d1`, `read` and `write` (create,
-   update, delete) a document at `districts/d1/recommendations/{id}` → expect
-   ALLOW for all four operations.
-2. As a user with no active membership in `d1` (e.g. member of a different
+1. As a staff member who can collaborate on student `s1` in district `d1`
+   (assigned staff or otherwise satisfies `canWriteStudent`), `create`,
+   `update`, and `delete` a document at
+   `districts/d1/recommendations/{id}` with `studentId: "s1"` → expect ALLOW
+   for all three writes, and ALLOW on read.
+2. As an active member of `d1` who is NOT a collaborator on `s1` → expect
+   DENY on create/update/delete of a recommendation with `studentId: "s1"`,
+   while read still succeeds (read remains active-member-only).
+3. As a collaborator on `s1`, attempt to `update` an existing `s1`
+   recommendation by changing its payload `studentId` to `s2`, a student the
+   caller does NOT collaborate on → expect DENY (the update rule requires
+   collaboration on both the existing and incoming `studentId`).
+4. As a user with no active membership in `d1` (e.g. member of a different
    district, or a deactivated membership) → expect DENY on read and write.
-3. As an unauthenticated request → expect DENY (covered generally by
+5. As an unauthenticated request → expect DENY (covered generally by
    `hasActiveMembership` requiring `request.auth != null`).
-4. Confirm no client can still reach the old `users/{uid}/recommendations`
+6. Confirm no client can still reach the old `users/{uid}/recommendations`
    shape with district-scoped data — `RecommendationsService` no longer
    constructs that path at all, so there is nothing to deny; the legacy path
    is otherwise covered by the top-level `users/{uid}/{unmatched=**}` deny

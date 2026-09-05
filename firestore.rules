@@ -1126,7 +1126,13 @@ service cloud.firestore {
 
       match /recommendations/{recommendationID} {
         allow read: if hasActiveMembership(districtID);
-        allow write: if hasActiveMembership(districtID);
+        allow create: if hasActiveMembership(districtID)
+          && canCollaborateOnStudent(districtID, request.resource.data.studentId);
+        allow update: if hasActiveMembership(districtID)
+          && canCollaborateOnStudent(districtID, resource.data.studentId)
+          && canCollaborateOnStudent(districtID, request.resource.data.studentId);
+        allow delete: if hasActiveMembership(districtID)
+          && canCollaborateOnStudent(districtID, resource.data.studentId);
       }
 
       match /{unmatched=**} {
