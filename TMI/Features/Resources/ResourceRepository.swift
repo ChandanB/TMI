@@ -6,10 +6,11 @@ enum ResourceRepositoryError: Error, Equatable {
     case permissionDenied
     case notFound
     case decodingFailed
+    case encodingFailed
 }
 
 @MainActor
-protocol ResourceRepository {
+protocol ResourceRepository: Sendable {
     func library(member: MembershipContext) async throws -> [Resource]
     func studentResources(studentID: String, member: MembershipContext) async throws -> [Resource]
     func create(_ resource: Resource, member: MembershipContext) async throws -> Resource
@@ -21,7 +22,8 @@ protocol ResourceRepository {
 @MainActor
 protocol ResourceTransport {
     func documents(atCollectionPath path: String) async throws -> [(id: String, data: [String: Any])]
-    func setDocument(collectionPath: String, id: String, data: [String: Any]) async throws
+    func document(atCollectionPath path: String, id: String) async throws -> [String: Any]?
+    func setDocument(collectionPath: String, id: String, data: [String: Any], merge: Bool) async throws
 }
 
 @MainActor
@@ -40,14 +42,14 @@ final class FirebaseResourceRepository: ResourceRepository {
     func library(member: MembershipContext) async throws -> [Resource] {
         try authorize(member)
         let documents = try await transport.documents(atCollectionPath: FirestorePaths.resources(districtID: member.districtID))
-        return try documents.map { try Self.decode(id: $0.id, data: $0.data) }
+        return try documents.map { try Self.decode(id: $0.id, data: $0.data, member: member) }
     }
 
     func studentResources(studentID: String, member: MembershipContext) async throws -> [Resource] {
         try authorize(member)
         let path = FirestorePaths.studentResources(districtID: member.districtID, studentID: studentID)
         let documents = try await transport.documents(atCollectionPath: path)
-        return try documents.map { try Self.decode(id: $0.id, data: $0.data) }
+        return try documents.map { try Self.decode(id: $0.id, data: $0.data, member: member) }
     }
 
     func create(_ resource: Resource, member: MembershipContext) async throws -> Resource {
@@ -57,27 +59,36 @@ final class FirebaseResourceRepository: ResourceRepository {
         do {
             data = try Firestore.Encoder().encode(resource)
         } catch {
-            throw ResourceRepositoryError.decodingFailed
+            throw ResourceRepositoryError.encodingFailed
         }
         data["districtId"] = member.districtID
         data["ownerUid"] = member.userID
         try await transport.setDocument(
             collectionPath: FirestorePaths.resources(districtID: member.districtID),
             id: id,
-            data: data
+            data: data,
+            merge: false
         )
-        return try Self.decode(id: id, data: data)
+        return try Self.decode(id: id, data: data, member: member)
     }
 
     func assign(resourceID: String, toStudent studentID: String, member: MembershipContext) async throws {
         try authorize(member)
+        guard let resourceData = try await transport.document(
+            atCollectionPath: FirestorePaths.resources(districtID: member.districtID),
+            id: resourceID
+        ) else {
+            throw ResourceRepositoryError.notFound
+        }
+        // Decode-then-reencode would drop unknown fields; instead denormalize the
+        // raw document so studentResources() decodes the same shape as library().
+        var data = resourceData
+        data["districtId"] = member.districtID
+        data["ownerUid"] = member.userID
+        data["assignedBy"] = member.userID
+        data["assignedAt"] = FieldValue.serverTimestamp()
         let path = FirestorePaths.studentResources(districtID: member.districtID, studentID: studentID)
-        let data: [String: Any] = [
-            "resourceID": resourceID,
-            "assignedBy": member.userID,
-            "assignedAt": FieldValue.serverTimestamp()
-        ]
-        try await transport.setDocument(collectionPath: path, id: resourceID, data: data)
+        try await transport.setDocument(collectionPath: path, id: resourceID, data: data, merge: true)
     }
 
     func linkToPlan(resourceID: String, planID: String, member: MembershipContext) async throws {
@@ -88,7 +99,7 @@ final class FirebaseResourceRepository: ResourceRepository {
             "linkedBy": member.userID,
             "linkedAt": FieldValue.serverTimestamp()
         ]
-        try await transport.setDocument(collectionPath: path, id: resourceID, data: data)
+        try await transport.setDocument(collectionPath: path, id: resourceID, data: data, merge: true)
     }
 
     private func authorize(_ member: MembershipContext) throws {
@@ -98,13 +109,20 @@ final class FirebaseResourceRepository: ResourceRepository {
         }
     }
 
-    private static func decode(id: String, data: [String: Any]) throws -> Resource {
+    private static func decode(id: String, data: [String: Any], member: MembershipContext) throws -> Resource {
         do {
             var resource = try Firestore.Decoder().decode(Resource.self, from: data)
             if resource.id == nil {
                 resource.id = id
             }
+            // Tolerate nil districtId (global/public resources); a mismatched
+            // non-nil districtId means the document does not belong to this caller.
+            if let districtId = resource.districtId, districtId != member.districtID {
+                throw ResourceRepositoryError.decodingFailed
+            }
             return resource
+        } catch let error as ResourceRepositoryError {
+            throw error
         } catch {
             throw ResourceRepositoryError.decodingFailed
         }
@@ -120,7 +138,11 @@ final class FirebaseResourceTransport: ResourceTransport {
         return snapshot.documents.map { (id: $0.documentID, data: $0.data()) }
     }
 
-    func setDocument(collectionPath: String, id: String, data: [String: Any]) async throws {
-        try await Firestore.firestore().collection(collectionPath).document(id).setData(data, merge: true)
+    func document(atCollectionPath path: String, id: String) async throws -> [String: Any]? {
+        try await Firestore.firestore().collection(path).document(id).getDocument().data()
+    }
+
+    func setDocument(collectionPath: String, id: String, data: [String: Any], merge: Bool = true) async throws {
+        try await Firestore.firestore().collection(collectionPath).document(id).setData(data, merge: merge)
     }
 }

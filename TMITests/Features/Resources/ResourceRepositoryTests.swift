@@ -129,9 +129,15 @@ struct ResourceRepositoryTests {
         #expect(results.first?.id == "resource-1")
     }
 
-    @Test("Assign writes a link document under the student's resources collection")
-    func assignWritesLinkDocument() async throws {
+    @Test("Assign denormalizes the full library resource into the student's collection")
+    func assignDenormalizesFullResource() async throws {
         let transport = MemoryResourceTransport()
+        let libraryPath = FirestorePaths.resources(districtID: member.districtID)
+        var data: [String: Any] = try Firestore.Encoder().encode(resource(id: nil))
+        data["districtId"] = member.districtID
+        data["ownerUid"] = member.userID
+        transport.seed(path: libraryPath, id: "resource-1", data: data)
+
         let repository = repository(transport)
         try await repository.assign(resourceID: "resource-1", toStudent: "student-1", member: member)
 
@@ -140,8 +146,37 @@ struct ResourceRepositoryTests {
         let write = try #require(writes.first)
         #expect(write.path == FirestorePaths.studentResources(districtID: member.districtID, studentID: "student-1"))
         #expect(write.id == "resource-1")
-        #expect(write.data["resourceID"] as? String == "resource-1")
+        #expect(write.merge == true)
+        #expect(write.data["title"] as? String == "Understanding Trauma")
         #expect(write.data["assignedBy"] as? String == member.userID)
+    }
+
+    @Test("Assign of a non-existent resource throws notFound")
+    func assignMissingResourceThrows() async throws {
+        let transport = MemoryResourceTransport()
+        let repository = repository(transport)
+        await #expect(throws: ResourceRepositoryError.notFound) {
+            try await repository.assign(resourceID: "missing-resource", toStudent: "student-1", member: self.member)
+        }
+        #expect(transport.writeCount == 0)
+    }
+
+    @Test("Assign then studentResources round-trips the full resource")
+    func assignThenStudentResourcesRoundTrips() async throws {
+        let transport = MemoryResourceTransport()
+        let libraryPath = FirestorePaths.resources(districtID: member.districtID)
+        var data: [String: Any] = try Firestore.Encoder().encode(resource(id: nil))
+        data["districtId"] = member.districtID
+        data["ownerUid"] = member.userID
+        transport.seed(path: libraryPath, id: "resource-1", data: data)
+
+        let repository = repository(transport)
+        try await repository.assign(resourceID: "resource-1", toStudent: "student-1", member: member)
+
+        let results = try await repository.studentResources(studentID: "student-1", member: member)
+        #expect(results.count == 1)
+        #expect(results.first?.id == "resource-1")
+        #expect(results.first?.title == "Understanding Trauma")
     }
 
     @Test("LinkToPlan writes a link document under the plan's resources collection")
@@ -155,6 +190,7 @@ struct ResourceRepositoryTests {
         let write = try #require(writes.first)
         #expect(write.path == FirestorePaths.planResources(districtID: member.districtID, planID: "plan-1"))
         #expect(write.id == "resource-1")
+        #expect(write.merge == true)
         #expect(write.data["resourceID"] as? String == "resource-1")
         #expect(write.data["linkedBy"] as? String == member.userID)
     }
@@ -162,7 +198,7 @@ struct ResourceRepositoryTests {
 
 @MainActor
 private final class MemoryResourceTransport: ResourceTransport {
-    private(set) var writes: [(path: String, id: String, data: [String: Any])] = []
+    private(set) var writes: [(path: String, id: String, data: [String: Any], merge: Bool)] = []
     private var documentsByPath: [String: [(id: String, data: [String: Any])]] = [:]
 
     var writeCount: Int { writes.count }
@@ -175,8 +211,15 @@ private final class MemoryResourceTransport: ResourceTransport {
         documentsByPath[path] ?? []
     }
 
-    func setDocument(collectionPath: String, id: String, data: [String: Any]) async throws {
-        writes.append((path: collectionPath, id: id, data: data))
-        documentsByPath[collectionPath, default: []].append((id: id, data: data))
+    func document(atCollectionPath path: String, id: String) async throws -> [String: Any]? {
+        documentsByPath[path]?.first(where: { $0.id == id })?.data
+    }
+
+    func setDocument(collectionPath: String, id: String, data: [String: Any], merge: Bool) async throws {
+        writes.append((path: collectionPath, id: id, data: data, merge: merge))
+        var documents = documentsByPath[collectionPath, default: []]
+        documents.removeAll { $0.id == id }
+        documents.append((id: id, data: data))
+        documentsByPath[collectionPath] = documents
     }
 }
