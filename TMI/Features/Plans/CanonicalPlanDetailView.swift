@@ -227,7 +227,12 @@ struct CanonicalPlanDetailView: View {
 
                 if let repository = dependencies.resourceRepository {
                     section("Resources") {
-                        PlanResourceListSection(planID: plan.id, member: member, repository: repository)
+                        PlanResourceListSection(
+                            planID: plan.id,
+                            member: member,
+                            repository: repository,
+                            canLink: plan.status.isEditable
+                        )
                     }
                 }
 

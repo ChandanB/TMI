@@ -7,14 +7,21 @@ struct PlanResourceListSection: View {
     let planID: String
     let member: MembershipContext
     let repository: any ResourceRepository
+    let canLink: Bool
 
     @State private var model: PlanResourcesSectionModel
     @State private var showingLibrary = false
 
-    init(planID: String, member: MembershipContext, repository: any ResourceRepository) {
+    init(
+        planID: String,
+        member: MembershipContext,
+        repository: any ResourceRepository,
+        canLink: Bool
+    ) {
         self.planID = planID
         self.member = member
         self.repository = repository
+        self.canLink = canLink
         _model = State(initialValue: PlanResourcesSectionModel(repository: repository))
     }
 
@@ -28,11 +35,19 @@ struct PlanResourceListSection: View {
                     ProgressView()
                         .controlSize(.small)
                 }
-                Button("Add from library", systemImage: "plus.circle") {
-                    showingLibrary = true
+                if canLink {
+                    Button("Add from library", systemImage: "plus.circle") {
+                        showingLibrary = true
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("planResources.addFromLibrary")
                 }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("planResources.addFromLibrary")
+            }
+
+            if !canLink {
+                Text("Resources can be linked while the plan is in draft.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if let errorMessage = model.errorMessage {
