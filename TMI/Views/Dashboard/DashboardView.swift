@@ -645,7 +645,6 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
 
 // MARK: - DashboardActivityRow moved to Components/DashboardActivityRow.swift
 
-// TODO: Add `HelpTooltipButton` to other sections (Hero Card, Student Engagement, Insights, etc.) as needed.
 struct DashboardView: View {
     @Environment(\.dashboardStateModel) var stateModel
     @Environment(\.authStateModel) private var authStateModel

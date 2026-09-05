@@ -553,9 +553,6 @@ struct WorkspacePanelView: View {
                         if contextMatchesRouter {
                             quickStatsSection
                         }
-                        
-                        // Actions
-                        actionsSection
                     }
                     .padding()
                 }
@@ -693,26 +690,6 @@ struct WorkspacePanelView: View {
         }
     }
     
-    private var actionsSection: some View {
-        VStack(spacing: TMISpacing.sm) {
-            if router.activeStudent != nil {
-                Button {
-                    // Would navigate to plan creation
-                } label: {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Create New Plan")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.tmiPrimary)
-                    .foregroundColor(Color.tmiTextOnPrimary)
-                    .cornerRadius(TMIRadius.md)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
 }
 
 // MARK: - Supporting Components
