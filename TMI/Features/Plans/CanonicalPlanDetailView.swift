@@ -225,6 +225,12 @@ struct CanonicalPlanDetailView: View {
                 if state.childrenPhase == .loaded {
                 goalsSection(plan: plan, state: state, member: member)
 
+                if let repository = dependencies.resourceRepository {
+                    section("Resources") {
+                        PlanResourceListSection(planID: plan.id, member: member, repository: repository)
+                    }
+                }
+
                 section("Progress") {
                     if state.progress.isEmpty {
                         Text("No progress recorded yet.")

@@ -116,4 +116,8 @@ private final class FakeResourceRepository: ResourceRepository {
     }
 
     func linkToPlan(resourceID: String, planID: String, member: MembershipContext) async throws {}
+
+    func planResources(planID: String, member: MembershipContext) async throws -> [Resource] {
+        []
+    }
 }

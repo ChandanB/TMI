@@ -59,6 +59,9 @@ struct ResourceRepositoryTests {
             await #expect(throws: ResourceRepositoryError.permissionDenied) {
                 try await repository.linkToPlan(resourceID: "resource-1", planID: "plan-1", member: context)
             }
+            await #expect(throws: ResourceRepositoryError.permissionDenied) {
+                try await repository.planResources(planID: "plan-1", member: context)
+            }
             let writeCount = transport.writeCount
             #expect(writeCount == 0)
         }
@@ -179,9 +182,15 @@ struct ResourceRepositoryTests {
         #expect(results.first?.title == "Understanding Trauma")
     }
 
-    @Test("LinkToPlan writes a link document under the plan's resources collection")
-    func linkToPlanWritesLinkDocument() async throws {
+    @Test("LinkToPlan denormalizes the full library resource into the plan's resources collection")
+    func linkToPlanDenormalizesFullResource() async throws {
         let transport = MemoryResourceTransport()
+        let libraryPath = FirestorePaths.resources(districtID: member.districtID)
+        var data: [String: Any] = try Firestore.Encoder().encode(resource(id: nil))
+        data["districtId"] = member.districtID
+        data["ownerUid"] = member.userID
+        transport.seed(path: libraryPath, id: "resource-1", data: data)
+
         let repository = repository(transport)
         try await repository.linkToPlan(resourceID: "resource-1", planID: "plan-1", member: member)
 
@@ -191,8 +200,38 @@ struct ResourceRepositoryTests {
         #expect(write.path == FirestorePaths.planResources(districtID: member.districtID, planID: "plan-1"))
         #expect(write.id == "resource-1")
         #expect(write.merge == true)
-        #expect(write.data["resourceID"] as? String == "resource-1")
+        #expect(write.data["title"] as? String == "Understanding Trauma")
+        #expect(write.data["districtId"] as? String == member.districtID)
+        #expect(write.data["ownerUid"] as? String == member.userID)
         #expect(write.data["linkedBy"] as? String == member.userID)
+    }
+
+    @Test("LinkToPlan of a non-existent resource throws notFound")
+    func linkToPlanMissingResourceThrows() async throws {
+        let transport = MemoryResourceTransport()
+        let repository = repository(transport)
+        await #expect(throws: ResourceRepositoryError.notFound) {
+            try await repository.linkToPlan(resourceID: "missing-resource", planID: "plan-1", member: self.member)
+        }
+        #expect(transport.writeCount == 0)
+    }
+
+    @Test("Link then planResources round-trips the full resource")
+    func linkThenPlanResourcesRoundTrips() async throws {
+        let transport = MemoryResourceTransport()
+        let libraryPath = FirestorePaths.resources(districtID: member.districtID)
+        var data: [String: Any] = try Firestore.Encoder().encode(resource(id: nil))
+        data["districtId"] = member.districtID
+        data["ownerUid"] = member.userID
+        transport.seed(path: libraryPath, id: "resource-1", data: data)
+
+        let repository = repository(transport)
+        try await repository.linkToPlan(resourceID: "resource-1", planID: "plan-1", member: member)
+
+        let results = try await repository.planResources(planID: "plan-1", member: member)
+        #expect(results.count == 1)
+        #expect(results.first?.id == "resource-1")
+        #expect(results.first?.title == "Understanding Trauma")
     }
 }
 

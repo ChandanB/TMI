@@ -16,6 +16,7 @@ protocol ResourceRepository: Sendable {
     func create(_ resource: Resource, member: MembershipContext) async throws -> Resource
     func assign(resourceID: String, toStudent studentID: String, member: MembershipContext) async throws
     func linkToPlan(resourceID: String, planID: String, member: MembershipContext) async throws
+    func planResources(planID: String, member: MembershipContext) async throws -> [Resource]
 }
 
 /// Transport abstraction so the repository is unit-testable in memory (mirrors CanonicalPlanTransport).
@@ -93,13 +94,28 @@ final class FirebaseResourceRepository: ResourceRepository {
 
     func linkToPlan(resourceID: String, planID: String, member: MembershipContext) async throws {
         try authorize(member)
+        guard let resourceData = try await transport.document(
+            atCollectionPath: FirestorePaths.resources(districtID: member.districtID),
+            id: resourceID
+        ) else {
+            throw ResourceRepositoryError.notFound
+        }
+        // Decode-then-reencode would drop unknown fields; instead denormalize the
+        // raw document so planResources() decodes the same shape as library().
+        var data = resourceData
+        data["districtId"] = member.districtID
+        data["ownerUid"] = member.userID
+        data["linkedBy"] = member.userID
+        data["linkedAt"] = FieldValue.serverTimestamp()
         let path = FirestorePaths.planResources(districtID: member.districtID, planID: planID)
-        let data: [String: Any] = [
-            "resourceID": resourceID,
-            "linkedBy": member.userID,
-            "linkedAt": FieldValue.serverTimestamp()
-        ]
         try await transport.setDocument(collectionPath: path, id: resourceID, data: data, merge: true)
+    }
+
+    func planResources(planID: String, member: MembershipContext) async throws -> [Resource] {
+        try authorize(member)
+        let path = FirestorePaths.planResources(districtID: member.districtID, planID: planID)
+        let documents = try await transport.documents(atCollectionPath: path)
+        return try documents.map { try Self.decode(id: $0.id, data: $0.data, member: member) }
     }
 
     private func authorize(_ member: MembershipContext) throws {
