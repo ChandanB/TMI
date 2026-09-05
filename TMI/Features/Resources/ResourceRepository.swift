@@ -131,18 +131,22 @@ final class FirebaseResourceRepository: ResourceRepository {
 
 @MainActor
 final class FirebaseResourceTransport: ResourceTransport {
-    init() {}
+    private let firestore: Firestore
+
+    init(firestore: Firestore = Firestore.firestore()) {
+        self.firestore = firestore
+    }
 
     func documents(atCollectionPath path: String) async throws -> [(id: String, data: [String: Any])] {
-        let snapshot = try await Firestore.firestore().collection(path).getDocuments()
+        let snapshot = try await firestore.collection(path).getDocuments()
         return snapshot.documents.map { (id: $0.documentID, data: $0.data()) }
     }
 
     func document(atCollectionPath path: String, id: String) async throws -> [String: Any]? {
-        try await Firestore.firestore().collection(path).document(id).getDocument().data()
+        try await firestore.collection(path).document(id).getDocument().data()
     }
 
     func setDocument(collectionPath: String, id: String, data: [String: Any], merge: Bool = true) async throws {
-        try await Firestore.firestore().collection(collectionPath).document(id).setData(data, merge: merge)
+        try await firestore.collection(collectionPath).document(id).setData(data, merge: merge)
     }
 }
