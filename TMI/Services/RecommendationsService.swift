@@ -7,67 +7,70 @@
 //
 
 import Foundation
-import FirebaseFirestore
-import FirebaseAuth
+@preconcurrency import FirebaseFirestore
+@preconcurrency import FirebaseAuth
 
 // MARK: - Recommendations Service
 
-final class RecommendationsService {
+nonisolated final class RecommendationsService: Sendable {
     static let shared = RecommendationsService()
-    
-    private let db = Firestore.firestore()
-    
-    private init() {}
-    
-    // MARK: - Collection Access
-    
-    private var recommendationsCollection: CollectionReference? {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            return nil
-        }
-        return db.collection("users").document(uid).collection("recommendations")
+
+    private let store: RecommendationStore
+    private let authorizationSessions: any AuthorizationSessionProviding
+    private let currentUserID: @Sendable () -> String?
+
+    init(
+        store: RecommendationStore = FirebaseRecommendationStore(),
+        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared,
+        currentUserID: @escaping @Sendable () -> String? = { Auth.auth().currentUser?.uid }
+    ) {
+        self.store = store
+        self.authorizationSessions = authorizationSessions
+        self.currentUserID = currentUserID
     }
-    
+
     // MARK: - Fetch Operations
-    
+
     /// Fetch recommendations for a specific student
     func fetchRecommendations(forStudentId studentId: String) async throws -> [Recommendation] {
-        guard let collection = recommendationsCollection else {
-            throw RecommendationsServiceError.userNotAuthenticated
-        }
-        
-        let query = collection.whereField("studentId", isEqualTo: studentId)
-        let snapshot = try await query.getDocuments()
-        
-        return snapshot.documents.compactMap { parseRecommendation(from: $0) }
+        let session = try authorizedSession()
+
+        let documents = try await store.documents(
+            atCollectionPath: FirestorePaths.recommendations(districtID: session.membership.districtID),
+            whereField: "studentId",
+            equals: studentId
+        )
+
+        return documents.compactMap(parseRecommendation)
     }
-    
+
     /// Fetch recommendations for a specific plan
     func fetchRecommendations(forPlanId planId: String) async throws -> [Recommendation] {
-        guard let collection = recommendationsCollection else {
-            throw RecommendationsServiceError.userNotAuthenticated
-        }
-        
-        let query = collection.whereField("planId", isEqualTo: planId)
-        let snapshot = try await query.getDocuments()
-        
-        return snapshot.documents.compactMap { parseRecommendation(from: $0) }
+        let session = try authorizedSession()
+
+        let documents = try await store.documents(
+            atCollectionPath: FirestorePaths.recommendations(districtID: session.membership.districtID),
+            whereField: "planId",
+            equals: planId
+        )
+
+        return documents.compactMap(parseRecommendation)
     }
-    
+
     // MARK: - Generation
-    
+
     /// Generate new recommendations for a student
     func generateRecommendations(studentId: String, planId: String?) async throws -> [Recommendation] {
         // In production, this would call an AI/ML service or rule engine
         // For now, return empty - the logic would be domain-specific
-        
+
         print("[RecommendationsService] Generating recommendations for student: \(studentId)")
-        
+
         // Example: Get student interests and generate resource recommendations
         let interests = try await StudentInterestService.shared.getStudentInterests(studentId: studentId)
-        
+
         var recommendations: [Recommendation] = []
-        
+
         // Generate resource recommendations based on interests
         for interest in interests.prefix(3) {
             let recommendation = Recommendation(
@@ -92,59 +95,78 @@ final class RecommendationsService {
             )
             recommendations.append(recommendation)
         }
-        
+
         // Save recommendations
         for recommendation in recommendations {
             try await saveRecommendation(recommendation)
         }
-        
+
         return recommendations
     }
-    
+
     // MARK: - CRUD Operations
-    
+
     /// Save a recommendation
     func saveRecommendation(_ recommendation: Recommendation) async throws {
-        guard let collection = recommendationsCollection else {
-            throw RecommendationsServiceError.userNotAuthenticated
-        }
-        
-        let data = recommendation.toFirestoreData()
-        try await collection.document(recommendation.id).setData(data)
+        let session = try authorizedSession()
+
+        try await store.setDocument(
+            atCollectionPath: FirestorePaths.recommendations(districtID: session.membership.districtID),
+            id: recommendation.id,
+            data: recommendation.toFirestoreData(),
+            merge: false
+        )
     }
-    
+
     /// Update a recommendation
     func updateRecommendation(_ recommendation: Recommendation) async throws {
-        guard let collection = recommendationsCollection else {
-            throw RecommendationsServiceError.userNotAuthenticated
-        }
-        
-        let data = recommendation.toFirestoreData()
-        try await collection.document(recommendation.id).updateData(data)
+        let session = try authorizedSession()
+
+        try await store.updateDocument(
+            atCollectionPath: FirestorePaths.recommendations(districtID: session.membership.districtID),
+            id: recommendation.id,
+            data: recommendation.toFirestoreData()
+        )
     }
-    
+
     /// Delete a recommendation
     func deleteRecommendation(id: String) async throws {
-        guard let collection = recommendationsCollection else {
-            throw RecommendationsServiceError.userNotAuthenticated
-        }
-        
-        try await collection.document(id).delete()
+        let session = try authorizedSession()
+
+        try await store.deleteDocument(
+            atCollectionPath: FirestorePaths.recommendations(districtID: session.membership.districtID),
+            id: id
+        )
     }
-    
-    
+
+
     /// Get TMI plan suggestions for a student
+    ///
+    /// Not currently called anywhere in the app (verified by repo-wide grep).
+    /// Left unrouted to the district-scoped store since it doesn't persist or
+    /// read anything today; it's a stub returning an empty array either way.
     func getTMIPlanSuggestions(for student: Student) async throws -> [TMIPlanSuggestion] {
         // In production, this would analyze student data and generate plan suggestions
         // For now, return empty array
         return []
     }
-    
+
+    // MARK: - Authorization Helpers
+
+    private func authorizedSession() throws -> AuthenticatedSession {
+        guard let session = authorizationSessions.session(
+            authenticatedUserID: currentUserID()
+        ) else {
+            throw RecommendationsServiceError.userNotAuthenticated
+        }
+        return session
+    }
+
     // MARK: - Private Helpers
-    
-    private func parseRecommendation(from document: DocumentSnapshot) -> Recommendation? {
-        guard let data = document.data() else { return nil }
-        
+
+    private func parseRecommendation(from document: (id: String, data: [String: Any])) -> Recommendation? {
+        let data = document.data
+
         guard let typeRaw = data["type"] as? String,
               let type = RecommendationType(rawValue: typeRaw),
               let title = data["title"] as? String,
@@ -161,7 +183,7 @@ final class RecommendationsService {
               let actionType = RecommendationActionType(rawValue: actionTypeRaw) else {
             return nil
         }
-        
+
         let feedback: RecommendationFeedback?
         if let feedbackData = data["feedback"] as? [String: Any],
            let rating = feedbackData["rating"] as? Int,
@@ -176,9 +198,9 @@ final class RecommendationsService {
         } else {
             feedback = nil
         }
-        
+
         return Recommendation(
-            id: document.documentID,
+            id: document.id,
             type: type,
             title: title,
             description: description,
@@ -203,7 +225,7 @@ final class RecommendationsService {
 // MARK: - Recommendation Firestore Extension
 
 extension Recommendation {
-    func toFirestoreData() -> [String: Any] {
+    nonisolated func toFirestoreData() -> [String: Any] {
         var data: [String: Any] = [
             "type": type.rawValue,
             "title": title,
@@ -220,15 +242,15 @@ extension Recommendation {
             "linkedGoalIds": linkedGoalIds,
             "actionType": actionType.rawValue
         ]
-        
+
         if let planId = planId {
             data["planId"] = planId
         }
-        
+
         if let actionPayload = actionPayload {
             data["actionPayload"] = actionPayload
         }
-        
+
         if let feedback = feedback {
             data["feedback"] = [
                 "rating": feedback.rating,
@@ -237,7 +259,7 @@ extension Recommendation {
                 "createdAt": feedback.createdAt.timeIntervalSince1970
             ]
         }
-        
+
         return data
     }
 }
@@ -253,7 +275,7 @@ struct TMIPlanSuggestion: Codable, Identifiable, Sendable {
     let priority: Priority
     let suggestedInterests: [String]
     let suggestedGoals: [String]
-    
+
     enum Priority: String, Codable, CaseIterable {
         case low = "low"
         case medium = "medium"
@@ -264,11 +286,11 @@ struct TMIPlanSuggestion: Codable, Identifiable, Sendable {
 
 // MARK: - Errors
 
-enum RecommendationsServiceError: LocalizedError {
+enum RecommendationsServiceError: Error, LocalizedError, Equatable {
     case userNotAuthenticated
     case fetchFailed(String)
     case saveFailed(String)
-    
+
     var errorDescription: String? {
         switch self {
         case .userNotAuthenticated:

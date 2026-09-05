@@ -65,6 +65,7 @@ struct FirestorePathsTests {
         #expect(FirestorePaths.notifications(districtID: "d1") == "districts/d1/notifications")
         #expect(FirestorePaths.auditEvents(districtID: "d1") == "districts/d1/auditEvents")
         #expect(FirestorePaths.metricSnapshots(districtID: "d1") == "districts/d1/metricSnapshots")
+        #expect(FirestorePaths.recommendations(districtID: "d1") == "districts/d1/recommendations")
     }
 
     @Test("Compliance paths are tenant scoped")
@@ -108,6 +109,7 @@ struct FirestorePathsTests {
         #expect(!names.contains("plans/{planId}"))
         #expect(names.contains("districts/{districtId}/students"))
         #expect(names.contains("districts/{districtId}/plans"))
+        #expect(names.contains("districts/{districtId}/recommendations"))
         #expect(names.contains("catalogs/{catalogName}/items"))
     }
 

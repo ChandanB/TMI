@@ -1124,6 +1124,11 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      match /recommendations/{recommendationID} {
+        allow read: if hasActiveMembership(districtID);
+        allow write: if hasActiveMembership(districtID);
+      }
+
       match /{unmatched=**} {
         allow read, write: if false;
       }

@@ -365,6 +365,16 @@ nonisolated enum FirestorePaths {
         districtCollection("complianceAudits", districtID: districtID)
     }
 
+    // MARK: - Recommendations
+
+    static func recommendations(districtID: String) -> String {
+        districtCollection("recommendations", districtID: districtID)
+    }
+
+    static func recommendation(districtID: String, recommendationID: String) -> String {
+        path(recommendations(districtID: districtID), recommendationID)
+    }
+
     // MARK: - Catalogs
 
     static func catalog(_ name: CatalogName) -> String {
@@ -414,6 +424,7 @@ nonisolated enum FirestorePaths {
         "districts/{districtId}/studentModeSessions",
         "districts/{districtId}/auditEvents",
         "districts/{districtId}/metricSnapshots",
+        "districts/{districtId}/recommendations",
         "catalogs/{catalogName}/items",
     ]
 
