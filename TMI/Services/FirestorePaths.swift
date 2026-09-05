@@ -355,6 +355,16 @@ nonisolated enum FirestorePaths {
         path(metricSnapshots(districtID: districtID), snapshotID)
     }
 
+    // MARK: - Compliance
+
+    static func complianceSettings(districtID: String) -> String {
+        path(district(districtID: districtID), "settings", "compliance")
+    }
+
+    static func complianceAudits(districtID: String) -> String {
+        districtCollection("complianceAudits", districtID: districtID)
+    }
+
     // MARK: - Catalogs
 
     static func catalog(_ name: CatalogName) -> String {

@@ -23,7 +23,7 @@ final class ComplianceService {
     
     /// Fetch compliance settings for a district
     func fetchSettings(districtId: String) async throws -> ComplianceSettings? {
-        let docRef = db.collection("districts").document(districtId).collection("settings").document("compliance")
+        let docRef = db.document(FirestorePaths.complianceSettings(districtID: districtId))
         let document = try await docRef.getDocument()
         
         if document.exists {
@@ -35,7 +35,7 @@ final class ComplianceService {
     
     /// Update compliance settings for a district
     func updateSettings(districtId: String, settings: ComplianceSettings) async throws {
-        let docRef = db.collection("districts").document(districtId).collection("settings").document("compliance")
+        let docRef = db.document(FirestorePaths.complianceSettings(districtID: districtId))
         let data = settings.toFirestoreData()
         
         try await docRef.setData(data, merge: true)
@@ -47,7 +47,7 @@ final class ComplianceService {
     
     /// Get compliance audit results for a district
     func getAuditResults(districtId: String, dateRange: ClosedRange<Date>?) async throws -> [ComplianceAuditResult] {
-        var query: Query = db.collection("districts").document(districtId).collection("complianceAudits")
+        var query: Query = db.collection(FirestorePaths.complianceAudits(districtID: districtId))
         
         if let dateRange = dateRange {
             query = query
@@ -128,7 +128,7 @@ final class ComplianceService {
     // MARK: - Private Helpers
     
     private func saveAuditResult(districtId: String, result: ComplianceAuditResult) async throws {
-        let collection = db.collection("districts").document(districtId).collection("complianceAudits")
+        let collection = db.collection(FirestorePaths.complianceAudits(districtID: districtId))
         let data = result.toFirestoreData()
         
         try await collection.document(result.id).setData(data)

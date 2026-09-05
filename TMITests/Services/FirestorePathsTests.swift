@@ -67,6 +67,18 @@ struct FirestorePathsTests {
         #expect(FirestorePaths.metricSnapshots(districtID: "d1") == "districts/d1/metricSnapshots")
     }
 
+    @Test("Compliance paths are tenant scoped")
+    func compliancePathsAreTenantScoped() {
+        #expect(
+            FirestorePaths.complianceSettings(districtID: "d1")
+                == "districts/d1/settings/compliance"
+        )
+        #expect(
+            FirestorePaths.complianceAudits(districtID: "d1")
+                == "districts/d1/complianceAudits"
+        )
+    }
+
     @Test("Only the five brand-fixed catalog names are canonical")
     func canonicalCatalogNamesAreExact() {
         #expect(CatalogName.allCases.map(\.rawValue) == [
