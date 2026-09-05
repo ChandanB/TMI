@@ -231,6 +231,12 @@ struct CanonicalPlanDetailView: View {
                     }
                 }
 
+                if let studentID = plan.studentIDs.sorted().first {
+                    section("Recommendations") {
+                        PlanRecommendationsStrip(studentID: studentID, planID: plan.id)
+                    }
+                }
+
                 section("Progress") {
                     if state.progress.isEmpty {
                         Text("No progress recorded yet.")
