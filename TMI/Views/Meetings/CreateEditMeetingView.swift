@@ -469,7 +469,6 @@ struct CreateEditMeetingView: View {
                     isSaving = false
                     errorMessage = error.localizedDescription
                     showingError = true
-                    print("[CreateEditMeetingView] Failed to save meeting: \(error)")
                 }
             }
         }

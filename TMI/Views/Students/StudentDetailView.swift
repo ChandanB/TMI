@@ -441,6 +441,15 @@ private struct StudentOperationalHubContent: View {
                     systemImage: "books.vertical",
                     description: Text("Resource assignment requires a verified staff membership.")
                 )
+            } else if domain == .meetingsAndNotes, let student = state.student {
+                VStack(alignment: .leading, spacing: TMISpacing.lg) {
+                    StudentMeetingsSection(studentID: student.id)
+
+                    StudentTimelineView(
+                        privateNotes: state.privateNotes,
+                        studentReflections: state.studentReflections
+                    )
+                }
             } else if domain == .meetingsAndNotes {
                 StudentTimelineView(
                     privateNotes: state.privateNotes,

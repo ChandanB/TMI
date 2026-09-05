@@ -202,7 +202,7 @@ struct SettingsView: View {
     }
 
     private var formsSection: some View {
-        settingsSectionCard(title: "Forms & Surveys", icon: "doc.text.fill") {
+        settingsSectionCard(title: "Forms & Meetings", icon: "doc.text.fill") {
             VStack(spacing: 0) {
                 settingsRow(icon: "doc.on.doc", title: "Form Templates") {
                     FormTemplateLibraryView()
@@ -212,6 +212,12 @@ struct SettingsView: View {
 
                 settingsRow(icon: "list.bullet.rectangle", title: "Form Assignments") {
                     StaffAssignmentListView()
+                }
+
+                Divider().background(Color.white.opacity(0.1))
+
+                settingsRow(icon: "calendar", title: "Meetings") {
+                    MeetingsHubView()
                 }
             }
         }
