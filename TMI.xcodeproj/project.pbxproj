@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		115B60D52EA6BD48003A033A /* IMPLEMENTATION_STATUS.md in Resources */ = {isa = PBXBuildFile; fileRef = 115B603B2EA6BD48003A033A /* IMPLEMENTATION_STATUS.md */; };
 		1185DAE42C93A75C004616D5 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DAE32C93A75C004616D5 /* FirebaseAuth */; };
 		1185DAEE2C93A75C004616D5 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DAED2C93A75C004616D5 /* FirebaseFirestore */; };
 		1185DAF02C93A75C004616D5 /* FirebaseFirestoreCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DAEF2C93A75C004616D5 /* FirebaseFirestoreCombine-Community */; };
@@ -17,7 +16,6 @@
 		1185DB0C2C93AA92004616D5 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 1185DB0B2C93AA91004616D5 /* GoogleService-Info.plist */; };
 		11B2387B2F29F4A000CA2BBE /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 11B2387A2F29F4A000CA2BBE /* FirebaseCore */; };
 		11C813C72DB57544005477FC /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 11C813C62DB57544005477FC /* SwiftSoup */; };
-		11C813DF2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md in Resources */ = {isa = PBXBuildFile; fileRef = 11C813DE2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md */; };
 		11C813E12DB59A6D005477FC /* Apple_MCP.md in Resources */ = {isa = PBXBuildFile; fileRef = 11C813E02DB59A6D005477FC /* Apple_MCP.md */; };
 		11E7D12A2C93A2B70021AC20 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11E7D1292C93A2B70021AC20 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -40,9 +38,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		115B603B2EA6BD48003A033A /* IMPLEMENTATION_STATUS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = IMPLEMENTATION_STATUS.md; sourceTree = "<group>"; };
 		1185DB0B2C93AA91004616D5 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
-		11C813DE2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "TMI_App_ Development_Breakdown.md"; sourceTree = "<group>"; };
 		11C813E02DB59A6D005477FC /* Apple_MCP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Apple_MCP.md; sourceTree = "<group>"; };
 		11E7D1222C93A2B60021AC20 /* TMI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TMI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		11E7D1292C93A2B70021AC20 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -93,8 +89,6 @@
 			isa = PBXGroup;
 			children = (
 				11C813E02DB59A6D005477FC /* Apple_MCP.md */,
-				11C813DE2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md */,
-				115B603B2EA6BD48003A033A /* IMPLEMENTATION_STATUS.md */,
 				11C816A22DB5F5AC005477FC /* TMI */,
 				A1B2C3D4E5F6012345678901 /* TMITests */,
 				B1C2D3E4F5A6012345678901 /* TMIUITests */,
@@ -243,10 +237,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				11C813E12DB59A6D005477FC /* Apple_MCP.md in Resources */,
-				11C813DF2DB59A3A005477FC /* TMI_App_ Development_Breakdown.md in Resources */,
 				11E7D12A2C93A2B70021AC20 /* Assets.xcassets in Resources */,
 				1185DB0C2C93AA92004616D5 /* GoogleService-Info.plist in Resources */,
-				115B60D52EA6BD48003A033A /* IMPLEMENTATION_STATUS.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

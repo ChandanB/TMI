@@ -29,6 +29,15 @@ struct CanonicalPlanEditorView: View {
 
     var body: some View {
         NavigationStack {
+            editorForm
+        }
+        // A sheet on macOS auto-sizes to its content; without an explicit
+        // frame the grouped Form's label/field columns collapse and overlap
+        // (the "mary (optional)" clipping). Pin a legible width and height.
+        .frame(minWidth: 480, idealWidth: 520, minHeight: 560, idealHeight: 620)
+    }
+
+    private var editorForm: some View {
             Form {
                 Section("Intervention model") {
                     Picker("Model", selection: $model) {
@@ -82,6 +91,7 @@ struct CanonicalPlanEditorView: View {
                     }
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(existingPlan == nil ? "New TMI Plan" : "Edit plan")
             .onAppear {
                 guard !self.didPrefill else { return }
@@ -123,7 +133,6 @@ struct CanonicalPlanEditorView: View {
                         .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.lg))
                 }
             }
-        }
     }
 
     private var trimmedTitle: String {

@@ -5,3 +5,7 @@ firebase/lib/
 firebase/*-debug.log
 .firebase/
 firebase-debug.log
+
+# Xcode per-user data (keeps filled scheme env vars / debug creds out of git)
+xcuserdata/
+*.xcuserstate

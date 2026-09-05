@@ -91,6 +91,7 @@ struct GoalEditorView: View {
                     .accessibilityIdentifier("goalEditor.issues")
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(existing == nil ? "New Goal" : "Edit Goal")
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(isSaving)
@@ -106,6 +107,10 @@ struct GoalEditorView: View {
             }
             .onAppear(perform: prefill)
         }
+        // A macOS sheet auto-sizes to its content; without a frame the grouped
+        // Form's label/field columns collapse and clip (the same defect the
+        // plan editor had). Pin a legible size.
+        .frame(minWidth: 480, idealWidth: 520, minHeight: 520)
     }
 
     private func prefill() {

@@ -85,6 +85,7 @@ struct ActionEditorView: View {
                     }
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(existing == nil ? "New Action" : "Edit Action")
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(isSaving)
@@ -100,6 +101,8 @@ struct ActionEditorView: View {
             }
             .onAppear(perform: prefill)
         }
+        // See GoalEditorView: pin the sheet so the grouped Form lays out.
+        .frame(minWidth: 480, idealWidth: 520, minHeight: 520)
     }
 
     private func statusLabel(_ status: ActionStatus) -> String {

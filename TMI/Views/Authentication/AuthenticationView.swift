@@ -20,6 +20,10 @@ struct AuthenticationView: View {
   @State private var animatePassword = false
   @State private var animateButtons = false
 
+  #if DEBUG
+  @State private var didAttemptDebugAutoLogin = false
+  #endif
+
   let onCreateAccount: @MainActor () -> Void
 
   init(onCreateAccount: @escaping @MainActor () -> Void = {}) {
@@ -179,6 +183,26 @@ struct AuthenticationView: View {
                   value: animateButtons
                 )
 
+                #if DEBUG
+                // Developer-only shortcut past the login screen. Compiled out
+                // of Release/App Store builds; shown only when the scheme
+                // supplies TMI_DEBUG_EMAIL / TMI_DEBUG_PASSWORD.
+                if stateModel.isDebugSignInAvailable {
+                  Button {
+                    Task { await stateModel.debugSignIn() }
+                  } label: {
+                    Label("Debug sign-in", systemImage: "hammer.fill")
+                      .font(.footnote.weight(.semibold))
+                      .frame(maxWidth: .infinity)
+                  }
+                  .buttonStyle(.bordered)
+                  .tint(.orange)
+                  .disabled(stateModel.isAuthenticating)
+                  .padding(.top, 4)
+                  .accessibilityIdentifier("authentication.signIn.debug")
+                }
+                #endif
+
                 // Enhanced Sign Up Section
                 VStack(spacing: 12) {
                   Button(action: {
@@ -235,6 +259,17 @@ struct AuthenticationView: View {
       }
       .task {
         await stateModel.fetch()
+        #if DEBUG
+        // Optional: launch with `-TMIDebugAutoLogin` (and the debug env vars set)
+        // to skip the login screen automatically. DEBUG-only; runs at most once.
+        if !didAttemptDebugAutoLogin,
+           ProcessInfo.processInfo.arguments.contains("-TMIDebugAutoLogin"),
+           stateModel.isDebugSignInAvailable,
+           !stateModel.isLoggedIn {
+          didAttemptDebugAutoLogin = true
+          await stateModel.debugSignIn()
+        }
+        #endif
       }
       .navigationBarTitleDisplayMode(.inline)
       .alert("Reset Password", isPresented: $showingForgotPassword) {

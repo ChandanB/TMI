@@ -98,7 +98,47 @@ struct DebugStaffInvitationProvisionerTests {
 
         #expect(page.records == [created])
         #expect(page.nextCursor == nil)
-        #expect(page.source == .cache)
+        // A durable local roster is authoritative for the Debug tenant, so it is
+        // reported as a live source rather than a stale offline cache.
+        #expect(page.source == .server)
+    }
+
+    @Test("Debug roster survives relaunch and reports a live source")
+    func debugStaffRosterPersistsAcrossInstances() async throws {
+        let membership = DebugStaffInvitationProvisioner.membership(userID: "debug-user")
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("debug-roster-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let persistence = DebugStudentPersistence.file(url: fileURL)
+        let draft = StudentDraft(
+            displayName: "Jordan Lee",
+            schoolID: DebugStaffInvitationProvisioner.schoolID,
+            grade: "8",
+            studentIdentifier: "S-100",
+            dateOfBirth: nil,
+            pronouns: nil,
+            assignedMemberIDs: [membership.userID]
+        )
+
+        let firstLaunch = DebugStudentRepository(
+            delegate: UnavailableStudentRepository(),
+            persistence: persistence
+        )
+        let created = try await firstLaunch.create(
+            draft,
+            operationID: UUID(),
+            member: membership
+        )
+
+        // A fresh repository instance simulates the app being rebuilt/relaunched.
+        let secondLaunch = DebugStudentRepository(
+            delegate: UnavailableStudentRepository(),
+            persistence: persistence
+        )
+        let page = try await secondLaunch.page(.first, member: membership)
+
+        #expect(page.records == [created])
+        #expect(page.source == .server)
     }
 
     @Test("Dashboard uses the injected Debug roster repository")

@@ -63,36 +63,52 @@ struct StudentCareerDiscoveryView: View {
                     .accessibilityIdentifier("careerDiscovery.relationshipError")
             }
 
-            if approvedInterests.isEmpty {
-                ContentUnavailableView(
-                    "No approved interests yet",
-                    systemImage: "star",
-                    description: Text(
-                        "Careers are matched from interests a staff member has approved. Search to browse in the meantime."
-                    )
-                )
-                .accessibilityIdentifier("careerDiscovery.noInterests")
-            }
-
+            // Exactly one primary state shows at a time. A failed catalog
+            // supersedes everything else — it is the one thing the reader can
+            // act on, and stacking it under "no interests" only muddled which
+            // problem was real.
             if isLoading {
                 ProgressView("Loading careers…")
                     .frame(maxWidth: .infinity)
                     .accessibilityIdentifier("careerDiscovery.loading")
             } else if let loadError {
-                ContentUnavailableView(
-                    "Career catalog unavailable",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text(loadError)
-                )
+                ContentUnavailableView {
+                    Label("Career catalog unavailable", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(loadError)
+                } actions: {
+                    Button("Try again") { Task { await loadCatalog() } }
+                        .buttonStyle(.borderedProminent)
+                        .tint(TMIColors.aubergine)
+                }
                 .accessibilityIdentifier("careerDiscovery.error")
             } else if results.isEmpty {
-                ContentUnavailableView(
-                    "No careers match",
-                    systemImage: "magnifyingglass",
-                    description: Text("Try fewer words or clear the filters.")
-                )
-                .accessibilityIdentifier("careerDiscovery.empty")
+                if approvedInterests.isEmpty {
+                    ContentUnavailableView(
+                        "No approved interests yet",
+                        systemImage: "star",
+                        description: Text(
+                            "Careers are matched from interests a staff member has approved. Search to browse in the meantime."
+                        )
+                    )
+                    .accessibilityIdentifier("careerDiscovery.noInterests")
+                } else {
+                    ContentUnavailableView(
+                        "No careers match",
+                        systemImage: "magnifyingglass",
+                        description: Text("Try fewer words or clear the filters.")
+                    )
+                    .accessibilityIdentifier("careerDiscovery.empty")
+                }
             } else {
+                if approvedInterests.isEmpty {
+                    // Browsable results exist, but nothing is matched to this
+                    // student yet — say so inline rather than hijacking the view.
+                    Text("No approved interests yet — showing all careers to browse.")
+                        .font(.footnote)
+                        .foregroundStyle(TMIColors.textSecondary)
+                        .accessibilityIdentifier("careerDiscovery.noInterests")
+                }
                 ForEach(results) { career in
                     careerRow(career)
                 }
@@ -166,11 +182,11 @@ struct StudentCareerDiscoveryView: View {
     }
 
     private var filters: some View {
+        // A single scrolling row of chips that each hug their label. The old
+        // adaptive grid capped every cell at 100pt, which truncated the longer
+        // education levels ("Certificate o…", "Associate d…").
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 100), spacing: TMISpacing.xs)],
-                spacing: TMISpacing.xs
-            ) {
+            HStack(spacing: TMISpacing.xs) {
                 ForEach(CareerEducationLevel.allCases, id: \.self) { level in
                     let isOn = state.educationLevels.contains(level)
                     Button(level.displayName) {
@@ -182,6 +198,7 @@ struct StudentCareerDiscoveryView: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(isOn ? TMIColors.aubergine : nil)
+                    .fixedSize()
                     .accessibilityIdentifier("careerDiscovery.filter.\(level.rawValue)")
                 }
                 Button("Recently viewed") {
@@ -189,14 +206,17 @@ struct StudentCareerDiscoveryView: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(state.showRecentlyViewed ? TMIColors.aubergine : nil)
+                .fixedSize()
                 .accessibilityAddTraits(state.showRecentlyViewed ? .isSelected : [])
                 .accessibilityIdentifier("careerDiscovery.filter.recent")
                 if state.hasActiveFilters {
                     Button("Clear") { state.clearFilters() }
                         .buttonStyle(.borderless)
+                        .fixedSize()
                         .accessibilityIdentifier("careerDiscovery.filter.clear")
                 }
             }
+            .padding(.horizontal, 1)
         }
     }
 

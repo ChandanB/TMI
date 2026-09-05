@@ -1389,6 +1389,55 @@ final class AuthStateModel: BaseStateModel<AuthenticationState, IdentifiableErro
     }
   }
 
+#if DEBUG
+  // MARK: - Debug Sign-In (never shipped)
+  //
+  // A developer convenience for skipping the login screen during local work.
+  // This whole block is inside `#if DEBUG`, so it is compiled out of Release
+  // and TestFlight/App Store builds entirely — it cannot ship. It also plants
+  // no secret: the credentials are read from the process environment
+  // (set once in the Xcode scheme), never hardcoded here or committed.
+
+  static let debugEmailEnvKey = "TMI_DEBUG_EMAIL"
+  static let debugPasswordEnvKey = "TMI_DEBUG_PASSWORD"
+
+  /// Debug credentials from the environment, or nil when they aren't set.
+  static func debugCredentials() -> (email: String, password: String)? {
+    let environment = ProcessInfo.processInfo.environment
+    guard
+      let email = environment[debugEmailEnvKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      let password = environment[debugPasswordEnvKey],
+      !email.isEmpty, !password.isEmpty
+    else {
+      return nil
+    }
+    return (email, password)
+  }
+
+  /// True when the scheme supplies debug credentials, so the UI can show the
+  /// shortcut only when it will actually work.
+  var isDebugSignInAvailable: Bool { Self.debugCredentials() != nil }
+
+  /// Signs in with the environment-supplied debug account, reusing the real
+  /// Firebase sign-in pipeline so the resulting session has valid tokens.
+  func debugSignIn() async {
+    guard let credentials = Self.debugCredentials() else {
+      let error = AuthenticationError(
+        type: .invalidCredentials,
+        message: "Debug sign-in needs \(Self.debugEmailEnvKey) and "
+          + "\(Self.debugPasswordEnvKey) set in the scheme's environment variables."
+      )
+      updateState(.loaded(.error(error)))
+      return
+    }
+    print("⚠️ [DEBUG] Debug sign-in invoked for \(credentials.email)")
+    updateEmail(credentials.email)
+    updatePassword(credentials.password)
+    await signIn()
+  }
+#endif
+
   @MainActor
   func signOut() -> Bool {
     let previousState = state

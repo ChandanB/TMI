@@ -234,12 +234,79 @@ struct DebugMembershipProvider: MembershipProviding {
     }
 }
 
+/// Durable, Debug-only backing store for the synthetic roster.
+///
+/// Accounts created under the Debug school (`district-debug`/`school-debug`) are
+/// served entirely from `DebugStudentRepository` instead of Firestore. Without a
+/// durable store those records lived only in process memory, so every rebuild or
+/// relaunch started with an empty roster. This persists them to disk so the Debug
+/// tenant behaves like a real one across launches. It only covers the Debug
+/// tenant; real accounts still read and write Firestore directly.
+nonisolated struct DebugStudentPersistence: Sendable {
+    var load: @Sendable () -> [StudentRecord]
+    var save: @Sendable ([StudentRecord]) -> Void
+
+    static let standard = DebugStudentPersistence.file(url: defaultURL)
+
+    static func file(url: URL) -> DebugStudentPersistence {
+        DebugStudentPersistence(
+            load: {
+                guard let data = try? Data(contentsOf: url) else { return [] }
+                return (try? JSONDecoder().decode([StudentRecord].self, from: data)) ?? []
+            },
+            save: { records in
+                let directory = url.deletingLastPathComponent()
+                try? FileManager.default.createDirectory(
+                    at: directory,
+                    withIntermediateDirectories: true
+                )
+                guard let data = try? JSONEncoder().encode(records) else { return }
+                try? data.write(to: url, options: .atomic)
+            }
+        )
+    }
+
+    private static var defaultURL: URL {
+        let base = (try? FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )) ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("DebugStudentRoster.json")
+    }
+}
+
 actor DebugStudentRepository: StudentRepository {
     private let delegate: any StudentRepository
-    private var recordsByID: [String: StudentRecord] = [:]
+    private let persistence: DebugStudentPersistence
+    private var cachedRecordsByID: [String: StudentRecord]?
 
-    init(delegate: any StudentRepository) {
+    init(
+        delegate: any StudentRepository,
+        persistence: DebugStudentPersistence = .standard
+    ) {
         self.delegate = delegate
+        self.persistence = persistence
+    }
+
+    /// Lazily loads the durable roster on first access, then keeps it in memory.
+    private func recordsByID() -> [String: StudentRecord] {
+        if let cachedRecordsByID { return cachedRecordsByID }
+        let loaded = Dictionary(
+            persistence.load().map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        cachedRecordsByID = loaded
+        return loaded
+    }
+
+    /// Applies an in-place mutation and writes the result back to disk.
+    private func mutateRecords(_ body: (inout [String: StudentRecord]) -> Void) {
+        var records = recordsByID()
+        body(&records)
+        cachedRecordsByID = records
+        persistence.save(Array(records.values))
     }
 
     func page(
@@ -252,7 +319,7 @@ actor DebugStudentRepository: StudentRepository {
         guard request.limit > 0, request.limit <= StudentPageRequest.maximumPageSize else {
             throw StudentRepositoryError.invalidRequest
         }
-        var records = recordsByID.values.filter { record in
+        var records = recordsByID().values.filter { record in
             switch request.status {
             case .active: !record.isArchived
             case .archived: record.isArchived
@@ -286,7 +353,9 @@ actor DebugStudentRepository: StudentRepository {
         return StudentPage(
             records: Array(records.prefix(request.limit)),
             nextCursor: nil,
-            source: .cache
+            // The durable local roster is authoritative for the Debug tenant, so
+            // it is treated as a live source rather than a stale offline cache.
+            source: .server
         )
     }
 
@@ -294,7 +363,7 @@ actor DebugStudentRepository: StudentRepository {
         guard isDebug(member) else {
             return try await delegate.student(id: id, member: member)
         }
-        guard let record = recordsByID[id] else {
+        guard let record = recordsByID()[id] else {
             throw StudentRepositoryError.notFound
         }
         return record
@@ -339,7 +408,7 @@ actor DebugStudentRepository: StudentRepository {
                 updatedBy: member.userID
             )
         )
-        recordsByID[record.id] = record
+        mutateRecords { $0[record.id] = record }
         return record
     }
 
@@ -366,7 +435,7 @@ actor DebugStudentRepository: StudentRepository {
                 member: member
             )
         }
-        guard let existing = recordsByID[id] else {
+        guard let existing = recordsByID()[id] else {
             throw StudentRepositoryError.notFound
         }
         guard existing.metadata.recordVersion == expectedVersion else {
@@ -405,7 +474,7 @@ actor DebugStudentRepository: StudentRepository {
                 updatedBy: member.userID
             )
         )
-        recordsByID[id] = updated
+        mutateRecords { $0[id] = updated }
         return updated
     }
 
@@ -424,7 +493,7 @@ actor DebugStudentRepository: StudentRepository {
             )
             return
         }
-        guard var existing = recordsByID[id] else {
+        guard var existing = recordsByID()[id] else {
             throw StudentRepositoryError.notFound
         }
         guard existing.metadata.recordVersion == expectedVersion else {
@@ -442,7 +511,7 @@ actor DebugStudentRepository: StudentRepository {
             updatedAt: Date(),
             updatedBy: member.userID
         )
-        recordsByID[id] = existing
+        mutateRecords { $0[id] = existing }
     }
 
     private func isDebug(_ member: MembershipContext) -> Bool {
