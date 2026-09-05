@@ -78,7 +78,15 @@ struct DebugStaffInvitationProvisionerTests {
     @Test("Debug staff roster is locally usable without trusted Firestore claims")
     func debugStaffRosterUsesLocalStorage() async throws {
         let membership = DebugStaffInvitationProvisioner.membership(userID: "debug-user")
-        let repository = DebugStudentRepository(delegate: UnavailableStudentRepository())
+        // Isolate the durable roster per run so leftover on-disk records from
+        // prior test invocations cannot leak into this expectation.
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("debug-roster-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let repository = DebugStudentRepository(
+            delegate: UnavailableStudentRepository(),
+            persistence: .file(url: fileURL)
+        )
         let draft = StudentDraft(
             displayName: "Jordan Lee",
             schoolID: DebugStaffInvitationProvisioner.schoolID,
@@ -144,7 +152,14 @@ struct DebugStaffInvitationProvisionerTests {
     @Test("Dashboard uses the injected Debug roster repository")
     func dashboardUsesInjectedDebugRoster() async {
         let membership = DebugStaffInvitationProvisioner.membership(userID: "debug-user")
-        let repository = DebugStudentRepository(delegate: UnavailableStudentRepository())
+        // Isolate the durable roster per run so a clean store yields zero students.
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("debug-roster-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let repository = DebugStudentRepository(
+            delegate: UnavailableStudentRepository(),
+            persistence: .file(url: fileURL)
+        )
         let model = DashboardStateModel(studentRepository: repository)
 
         await model.fetchWithMembership(membership)
