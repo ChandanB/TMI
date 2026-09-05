@@ -6,59 +6,72 @@
 //
 
 import Foundation
-import FirebaseFirestore
-import FirebaseAuth
+@preconcurrency import FirebaseFirestore
+@preconcurrency import FirebaseAuth
 
-final class MeetingService {
+nonisolated final class MeetingService: Sendable {
     static let shared = MeetingService()
-    private let db = Firestore.firestore()
 
-    private init() {}
+    private let store: MeetingStore
+    private let authorizationSessions: any AuthorizationSessionProviding
+    private let currentUserID: @Sendable () -> String?
+
+    init(
+        store: MeetingStore = FirebaseMeetingStore(),
+        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared,
+        currentUserID: @escaping @Sendable () -> String? = { Auth.auth().currentUser?.uid }
+    ) {
+        self.store = store
+        self.authorizationSessions = authorizationSessions
+        self.currentUserID = currentUserID
+    }
 
     // MARK: - Create Meeting
 
     /// Schedule a new meeting
     func scheduleMeeting(_ meeting: Meeting) async throws -> Meeting {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "MeetingService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
-        }
+        let session = try authorizedSession()
 
         print("[MeetingService] 📅 Scheduling meeting: \(meeting.title)")
 
-        let docRef = db.collection("users").document(userId)
-            .collection("meetings")
-            .document()
-        try await docRef.setModel(meeting)
+        var newMeeting = meeting
+        newMeeting.id = nil
 
-        print("[MeetingService] ✅ Meeting scheduled with ID: \(docRef.documentID)")
+        var data = try encode(newMeeting)
+        data["organizer"] = session.membership.userID
+
+        let documentID = try await store.addDocument(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            data: data
+        )
+
+        print("[MeetingService] ✅ Meeting scheduled with ID: \(documentID)")
 
         // Post notification for calendar integration
         NotificationCenter.default.post(
             name: NSNotification.Name("MeetingScheduled"),
             object: nil,
-            userInfo: ["meetingId": docRef.documentID]
+            userInfo: ["meetingId": documentID]
         )
 
         // Return meeting with ID
         var savedMeeting = meeting
-        savedMeeting.id = docRef.documentID
+        savedMeeting.id = documentID
         return savedMeeting
     }
 
     // MARK: - Fetch Meetings
 
-    /// Fetch all meetings for current user
+    /// Fetch all meetings for the caller's district
     func fetchMeetings() async throws -> [Meeting] {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "MeetingService", code: 401)
-        }
+        let session = try authorizedSession()
 
-        let snapshot = try await db.collection("users").document(userId)
-            .collection("meetings")
-            .order(by: "startTime", descending: false)
-            .getDocuments()
+        let documents = try await store.documents(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID)
+        )
 
-        let meetings = snapshot.documents.compactMap(decodeMeeting)
+        let meetings = documents.compactMap(decodeMeeting)
+            .sorted { $0.startTime < $1.startTime }
 
         print("[MeetingService] 📖 Fetched \(meetings.count) meetings")
         return meetings
@@ -66,16 +79,15 @@ final class MeetingService {
 
     /// Fetch meetings for a specific TMI Plan
     func fetchMeetings(for planId: String) async throws -> [Meeting] {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "MeetingService", code: 401)
-        }
+        let session = try authorizedSession()
 
-        let snapshot = try await db.collection("users").document(userId)
-            .collection("meetings")
-            .whereField("relatedPlanId", isEqualTo: planId)
-            .getDocuments()
+        let documents = try await store.documents(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            whereField: "relatedPlanId",
+            equals: planId
+        )
 
-        let meetings = snapshot.documents.compactMap(decodeMeeting)
+        let meetings = documents.compactMap(decodeMeeting)
 
         print("[MeetingService] 📖 Fetched \(meetings.count) meetings for plan: \(planId)")
         return meetings
@@ -91,21 +103,22 @@ final class MeetingService {
 
     /// Update an existing meeting
     func updateMeeting(_ meeting: Meeting) async throws -> Meeting {
-        guard let userId = Auth.auth().currentUser?.uid,
-              let meetingId = meeting.id else {
-            throw NSError(domain: "MeetingService", code: 400)
+        guard let meetingId = meeting.id else {
+            throw MeetingServiceError.invalidRequest
         }
+        let session = try authorizedSession()
 
         print("[MeetingService] 📝 Updating meeting: \(meeting.title)")
 
         var updatedMeeting = meeting
         updatedMeeting.lastUpdated = Date()
 
-        let docRef = db.collection("users").document(userId)
-            .collection("meetings")
-            .document(meetingId)
-
-        try await docRef.setData(updatedMeeting.toFirestoreData())
+        try await store.setDocument(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            id: meetingId,
+            data: updatedMeeting.toFirestoreData(),
+            merge: false
+        )
 
         print("[MeetingService] ✅ Meeting updated successfully")
 
@@ -121,15 +134,9 @@ final class MeetingService {
 
     /// Update meeting status
     func updateMeetingStatus(_ meetingId: String, status: Meeting.MeetingStatus) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "MeetingService", code: 401)
-        }
+        let session = try authorizedSession()
 
         print("[MeetingService] 📝 Updating meeting status to: \(status.rawValue)")
-
-        let docRef = db.collection("users").document(userId)
-            .collection("meetings")
-            .document(meetingId)
 
         var updateData: [String: Any] = [
             "status": status.rawValue,
@@ -140,22 +147,20 @@ final class MeetingService {
             updateData["completedAt"] = Timestamp(date: Date())
         }
 
-        try await docRef.updateData(updateData)
+        try await store.updateDocument(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            id: meetingId,
+            data: updateData
+        )
 
         print("[MeetingService] ✅ Status updated successfully")
     }
 
     /// Mark meeting as completed with notes
     func completeMeeting(_ meetingId: String, notes: String?) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "MeetingService", code: 401)
-        }
+        let session = try authorizedSession()
 
         print("[MeetingService] ✅ Completing meeting")
-
-        let docRef = db.collection("users").document(userId)
-            .collection("meetings")
-            .document(meetingId)
 
         var updateData: [String: Any] = [
             "status": Meeting.MeetingStatus.completed.rawValue,
@@ -167,7 +172,11 @@ final class MeetingService {
             updateData["notes"] = notes
         }
 
-        try await docRef.updateData(updateData)
+        try await store.updateDocument(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            id: meetingId,
+            data: updateData
+        )
     }
 
     // MARK: - Delete Meeting
@@ -186,18 +195,22 @@ final class MeetingService {
         )
     }
 
-    /// Delete a meeting permanently
+    /// Delete a meeting permanently.
+    ///
+    /// `firestore.rules` denies `delete` unconditionally on
+    /// `districts/{districtID}/meetings/{meetingID}` (`delete: if false`), so
+    /// this call will be rejected server-side. The method is retained so
+    /// callers keep compiling; use `cancelMeeting` for the supported
+    /// soft-delete path instead of trying to route around the rule.
     func deleteMeeting(_ meetingId: String) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "MeetingService", code: 401)
-        }
+        let session = try authorizedSession()
 
         print("[MeetingService] 🗑️ Deleting meeting permanently")
 
-        try await db.collection("users").document(userId)
-            .collection("meetings")
-            .document(meetingId)
-            .delete()
+        try await store.deleteDocument(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            id: meetingId
+        )
 
         print("[MeetingService] ✅ Meeting deleted")
     }
@@ -206,29 +219,25 @@ final class MeetingService {
 
     /// Add an action item to a meeting
     func addActionItem(to meetingId: String, actionItem: ActionItem) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "MeetingService", code: 401)
-        }
+        let session = try authorizedSession()
 
         print("[MeetingService] ➕ Adding action item to meeting")
 
-        let docRef = db.collection("users").document(userId)
-            .collection("meetings")
-            .document(meetingId)
-
-        try await docRef.updateData([
-            "actionItems": FieldValue.arrayUnion([actionItem.toFirestoreData()]),
-            "lastUpdated": Timestamp(date: Date())
-        ])
+        try await store.updateDocument(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            id: meetingId,
+            data: [
+                "actionItems": FieldValue.arrayUnion([actionItem.toFirestoreData()]),
+                "lastUpdated": Timestamp(date: Date())
+            ]
+        )
 
         print("[MeetingService] ✅ Action item added")
     }
 
     /// Update an action item within a meeting
     func updateActionItem(meetingId: String, actionItem: ActionItem, currentMeeting: Meeting) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "MeetingService", code: 401)
-        }
+        let session = try authorizedSession()
 
         print("[MeetingService] 📝 Updating action item")
 
@@ -238,20 +247,19 @@ final class MeetingService {
         updatedMeeting.actionItems.append(actionItem)
         updatedMeeting.lastUpdated = Date()
 
-        let docRef = db.collection("users").document(userId)
-            .collection("meetings")
-            .document(meetingId)
-
-        try await docRef.setData(updatedMeeting.toFirestoreData())
+        try await store.setDocument(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            id: meetingId,
+            data: updatedMeeting.toFirestoreData(),
+            merge: false
+        )
 
         print("[MeetingService] ✅ Action item updated")
     }
 
     /// Toggle action item completion status
     func toggleActionItemCompletion(meetingId: String, actionItemId: String, currentMeeting: Meeting) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "MeetingService", code: 401)
-        }
+        let session = try authorizedSession()
 
         print("[MeetingService] ✅ Toggling action item completion")
 
@@ -264,20 +272,19 @@ final class MeetingService {
         }
         updatedMeeting.lastUpdated = Date()
 
-        let docRef = db.collection("users").document(userId)
-            .collection("meetings")
-            .document(meetingId)
-
-        try await docRef.setData(updatedMeeting.toFirestoreData())
+        try await store.setDocument(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            id: meetingId,
+            data: updatedMeeting.toFirestoreData(),
+            merge: false
+        )
 
         print("[MeetingService] ✅ Action item completion toggled")
     }
 
     /// Delete an action item from a meeting
     func deleteActionItem(from meetingId: String, actionItemId: String, currentMeeting: Meeting) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "MeetingService", code: 401)
-        }
+        let session = try authorizedSession()
 
         print("[MeetingService] 🗑️ Deleting action item")
 
@@ -285,11 +292,12 @@ final class MeetingService {
         updatedMeeting.actionItems.removeAll { $0.itemId == actionItemId }
         updatedMeeting.lastUpdated = Date()
 
-        let docRef = db.collection("users").document(userId)
-            .collection("meetings")
-            .document(meetingId)
-
-        try await docRef.setData(updatedMeeting.toFirestoreData())
+        try await store.setDocument(
+            atCollectionPath: FirestorePaths.meetings(districtID: session.membership.districtID),
+            id: meetingId,
+            data: updatedMeeting.toFirestoreData(),
+            merge: false
+        )
 
         print("[MeetingService] ✅ Action item deleted")
     }
@@ -314,11 +322,40 @@ final class MeetingService {
             .filter { $0.isOverdue }
     }
 
-    private func decodeMeeting(_ document: QueryDocumentSnapshot) -> Meeting? {
-        guard var meeting = try? document.data(as: Meeting.self) else {
+    // MARK: - Authorization Helpers
+
+    private func authorizedSession() throws -> AuthenticatedSession {
+        guard let session = authorizationSessions.session(
+            authenticatedUserID: currentUserID()
+        ) else {
+            throw MeetingServiceError.userNotAuthenticated
+        }
+        return session
+    }
+
+    private func encode(_ meeting: Meeting) throws -> [String: Any] {
+        try Firestore.Encoder().encode(meeting)
+    }
+
+    private func decodeMeeting(_ document: (id: String, data: [String: Any])) -> Meeting? {
+        guard var meeting = try? Firestore.Decoder().decode(Meeting.self, from: document.data) else {
             return nil
         }
-        meeting.id = document.documentID
+        meeting.id = document.id
         return meeting
+    }
+}
+
+enum MeetingServiceError: Error, LocalizedError, Equatable {
+    case userNotAuthenticated
+    case invalidRequest
+
+    var errorDescription: String? {
+        switch self {
+        case .userNotAuthenticated:
+            return "User not authenticated"
+        case .invalidRequest:
+            return "Invalid meeting request"
+        }
     }
 }
