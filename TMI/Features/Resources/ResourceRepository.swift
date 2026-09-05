@@ -107,6 +107,10 @@ final class FirebaseResourceRepository: ResourceRepository {
         data["ownerUid"] = member.userID
         data["linkedBy"] = member.userID
         data["linkedAt"] = FieldValue.serverTimestamp()
+        // firestore.rules requires plan sub-collection writes to carry the
+        // matching planID (districts/{id}/plans/{planID}/{collection} create
+        // guard); without it the write is denied in production.
+        data["planID"] = planID
         let path = FirestorePaths.planResources(districtID: member.districtID, planID: planID)
         try await transport.setDocument(collectionPath: path, id: resourceID, data: data, merge: true)
     }

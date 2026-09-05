@@ -204,6 +204,8 @@ struct ResourceRepositoryTests {
         #expect(write.data["districtId"] as? String == member.districtID)
         #expect(write.data["ownerUid"] as? String == member.userID)
         #expect(write.data["linkedBy"] as? String == member.userID)
+        // firestore.rules plan sub-collection create guard requires planID.
+        #expect(write.data["planID"] as? String == "plan-1")
     }
 
     @Test("LinkToPlan of a non-existent resource throws notFound")
