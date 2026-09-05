@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 struct PlanWorkflowUITestingContent: View {
     let failsDetails: Bool
+    var showsStudentList = false
     private let member = MembershipContext(userID: "fixture-owner", districtID: "fixture-district",
         schoolIDs: ["fixture-school"], role: .counselor,
         capabilities: [.studentReadDetail, .studentWriteDetail, .planApprove, .reportExport],
@@ -14,7 +15,24 @@ struct PlanWorkflowUITestingContent: View {
         let store = PlanWorkflowFixture(failsDetails: failsDetails)
         let students = UnavailableStudentRepository()
         NavigationStack {
-            CanonicalPlanDetailView(planID: "fixture-plan", member: member)
+            Group {
+                if showsStudentList {
+                    ScrollView {
+                        VStack(alignment: .leading) {
+                            Text("Selected student").font(.title)
+                            CanonicalPlanListView(state: CanonicalPlanListState(repository: store, studentID: "fixture-student"), member: member, embedded: true)
+                        }
+                        .padding()
+                    }
+                } else {
+                    CanonicalPlanDetailView(planID: "fixture-plan", member: member)
+                }
+            }
+            .navigationDestination(for: AppRoute.self) { route in
+                if case .plan(let id) = route {
+                    CanonicalPlanDetailView(planID: id, member: member)
+                }
+            }
         }
         .environment(\.appDependencies, AppDependencies(runtime: .preview, flags: .production,
             membership: InMemoryMembershipProvider(memberships: [member]), authentication: nil,

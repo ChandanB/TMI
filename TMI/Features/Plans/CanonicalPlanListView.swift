@@ -7,6 +7,14 @@ struct CanonicalPlanListView: View {
     @State private var state: CanonicalPlanListState?
 
     var body: some View {
+        if embedded {
+            content
+        } else {
+            content.navigationTitle("TMI Plans")
+        }
+    }
+
+    private var content: some View {
         Group {
             if let membership {
                 content(membership: membership)
@@ -18,17 +26,19 @@ struct CanonicalPlanListView: View {
                 )
             }
         }
-        .navigationTitle("TMI Plans")
     }
 
     private let memberOverride: MembershipContext?
+    private let embedded: Bool
 
     init(
         state: CanonicalPlanListState? = nil,
-        member: MembershipContext? = nil
+        member: MembershipContext? = nil,
+        embedded: Bool = false
     ) {
         _state = State(initialValue: state)
         memberOverride = member
+        self.embedded = embedded
     }
 
     private var membership: MembershipContext? {
@@ -97,7 +107,7 @@ struct CanonicalPlanListView: View {
                 planList(state: state, membership: membership)
             }
         }
-        .task(id: membership.userID) {
+        .task(id: membership) {
             await state.load(member: membership)
         }
     }
@@ -108,22 +118,41 @@ struct CanonicalPlanListView: View {
     ) -> some View {
         @Bindable var state = state
 
-        return List {
-            Section {
-                Toggle("Open plans only", isOn: $state.showOpenOnly)
-                    .accessibilityIdentifier("plans.openOnly")
-            }
-            ForEach(state.visiblePlans) { plan in
-                NavigationLink(value: AppRoute.plan(plan.id)) {
-                    CanonicalPlanRow(plan: plan)
+        return Group {
+            if embedded {
+                VStack(alignment: .leading, spacing: TMISpacing.md) {
+                    Toggle("Open plans only", isOn: $state.showOpenOnly)
+                        .accessibilityIdentifier("plans.openOnly")
+                    ForEach(state.visiblePlans) { plan in
+                        NavigationLink(value: AppRoute.plan(plan.id)) {
+                            CanonicalPlanRow(plan: plan)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(TMISpacing.md)
+                                .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: 16))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("plans.row.\(plan.id)")
+                    }
                 }
-                .listRowBackground(TMIColors.surface)
-                .accessibilityIdentifier("plans.row.\(plan.id)")
+            } else {
+                List {
+                    Section {
+                        Toggle("Open plans only", isOn: $state.showOpenOnly)
+                            .accessibilityIdentifier("plans.openOnly")
+                    }
+                    ForEach(state.visiblePlans) { plan in
+                        NavigationLink(value: AppRoute.plan(plan.id)) {
+                            CanonicalPlanRow(plan: plan)
+                        }
+                        .listRowBackground(TMIColors.surface)
+                        .accessibilityIdentifier("plans.row.\(plan.id)")
+                    }
+                }
+                .scrollContentBackground(.hidden)
+                .refreshable { await state.load(member: membership) }
+                .accessibilityIdentifier("plans.list")
             }
         }
-        .scrollContentBackground(.hidden)
-        .refreshable { await state.load(member: membership) }
-        .accessibilityIdentifier("plans.list")
     }
 
 }

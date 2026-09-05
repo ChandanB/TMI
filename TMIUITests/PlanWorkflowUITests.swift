@@ -20,7 +20,14 @@ final class PlanWorkflowUITests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
         share.tap()
-        XCTAssertTrue(app.buttons["Copy"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.cells["Copy"].waitForExistence(timeout: 10))
+    }
+
+    func testStudentPlanRowIsVisibleAndOpensDetail() {
+        let app = launch("student-plan-list")
+        tap("plans.row.fixture-plan", in: app)
+        XCTAssertTrue(app.staticTexts["planDetail.title"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["planDetail.title"].label, "Build a creative routine")
     }
 
     func testFailedDetailsAreNotEmptyEvidence() {

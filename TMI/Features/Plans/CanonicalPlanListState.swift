@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 
 @MainActor
@@ -16,8 +17,11 @@ final class CanonicalPlanListState {
     var showOpenOnly = true
 
     private let repository: any PlanRecordRepository
+    private let studentID: String?
+    private var generation = UUID()
 
-    init(repository: any PlanRecordRepository) {
+    init(repository: any PlanRecordRepository, studentID: String? = nil) {
+        self.studentID = studentID
         self.repository = repository
     }
 
@@ -27,15 +31,22 @@ final class CanonicalPlanListState {
     }
 
     func load(member: MembershipContext) async {
-        if case .loaded = phase {} else { phase = .loading }
+        generation = UUID()
+        let request = generation
+        phase = .loading
         do {
-            let plans = try await repository.plans(member: member)
+            let records = try await repository.plans(member: member)
+            guard request == generation, !Task.isCancelled else { return }
+            let plans = records.filter { self.studentID == nil || $0.studentIDs.contains(self.studentID ?? "") }
             phase = plans.isEmpty ? .empty : .loaded(plans)
         } catch PlanRecordRepositoryError.permissionDenied {
+            guard request == generation else { return }
             phase = .permissionDenied
         } catch PlanRecordRepositoryError.unavailable {
+            guard request == generation else { return }
             phase = .failed("You appear to be offline. Plans will load when you reconnect.")
         } catch {
+            guard request == generation else { return }
             phase = .failed("Plans could not be loaded. Pull to try again.")
         }
     }

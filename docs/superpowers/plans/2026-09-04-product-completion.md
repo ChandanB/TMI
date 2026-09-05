@@ -17,7 +17,7 @@ The user confirmed September 4 that the pasted blueprint is the oldest source. `
 - Starting commit: `b71f75f`; working tree clean; implementation branch `codex/product-completion`.
 - [x] Read coding standards and existing program/release plans.
 - [x] Run Firebase baseline: 225 tests passed across 13 files.
-- [ ] Run iOS unit baseline and record real failures.
+- [x] Run iOS unit baseline and record real failures. Latest student-hub regression: 568 Swift tests and 164 XCTest cases, with 3 existing skips and no unit failures.
 - [ ] Inventory reachable core, supporting, and district workflows against current specification.
 
 ## 1. Repair canonical plan lifecycle
@@ -43,3 +43,7 @@ Files: `TMI/Features/Plans/PlanRecord.swift`, `CanonicalPlanRepository.swift`, `
 ## Release evidence
 
 Only mark a gate complete with executable evidence. Production deployment, staging workflow, TestFlight and institutional pilot validation remain distinct gates; local passing tests are not a substitute.
+
+## September 5 continuation
+
+The latest workspace includes committed plan lifecycle and Debug teacher access repairs (`f206bda`, `5a88ba8`). This continuation connects the production student hub to canonical plan/discovery records and makes student-scoped plan navigation reachable. Detailed commands, test outcomes, and remaining release gates are tracked in `docs/release-evidence/student-plan-hub.md`. The remaining unchecked product gates above still apply.

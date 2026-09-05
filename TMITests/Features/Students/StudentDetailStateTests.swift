@@ -177,7 +177,7 @@ struct StudentDetailStateTests {
     @Test("A returned record does not establish context without current authorization")
     func unauthorizedRecordDoesNotEstablishActiveContext() async {
         let member = membership(
-            role: .teacher,
+            role: .counselor,
             assignedStudentIDs: []
         )
         let router = AppRouter(policy: AppNavigationPolicy(membership: member))

@@ -104,7 +104,7 @@ nonisolated struct AppDependencies: Sendable {
             membership: membership,
             authentication: authentication,
             studentRepository: students,
-            studentDetailRepository: Release1StudentDetailRepository(students: students),
+            studentDetailRepository: CanonicalStudentDetailRepository.firebase(students: students, plans: plans, firestore: firestore),
             studentModeRepository: .firebase(),
             planRepository: plans,
             planChildRepository: planChildren,

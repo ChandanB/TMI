@@ -196,6 +196,8 @@ struct TMIApp: App {
             CareerDiscoveryUITestingContent()
         case .careerDetail:
             CareerDetailUITestingContent()
+        case .studentPlanList:
+            PlanWorkflowUITestingContent(failsDetails: false, showsStudentList: true)
         case .planWorkflow:
             PlanWorkflowUITestingContent(failsDetails: false)
                 .dynamicTypeSize(uiTestingConfiguration.contentSize == .accessibility5 ? .accessibility5 : .large)

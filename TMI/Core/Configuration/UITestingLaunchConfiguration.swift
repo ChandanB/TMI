@@ -24,6 +24,7 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
         case studentModeSurvey = "student-mode-survey"
         case careerDiscovery = "career-discovery"
         case careerDetail = "career-detail"
+        case studentPlanList = "student-plan-list"
         case planWorkflow = "plan-workflow"
         case planDetailsFailure = "plan-details-failure"
     }

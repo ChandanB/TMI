@@ -212,6 +212,8 @@ private struct StudentOperationalHubContent: View {
                     onCreated: { record in
                         planCreatedMessage =
                             "Created \(record.title) as a \(record.status.displayName.lowercased())."
+                        selectedDestination = .domain(.plans)
+                        Task { await state.refresh() }
                     }
                 )
             }
@@ -421,6 +423,10 @@ private struct StudentOperationalHubContent: View {
                     member: member,
                     relationshipRepository: dependencies.careerRelationshipRepository
                 )
+            } else if domain == .plans, let student = state.student, let member,
+                      let repository = dependencies.planRepository {
+                CanonicalPlanListView(state: CanonicalPlanListState(repository: repository, studentID: student.id), member: member, embedded: true)
+                    .id(student.id)
             } else if domain == .meetingsAndNotes {
                 StudentTimelineView(
                     privateNotes: state.privateNotes,
