@@ -1111,6 +1111,19 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      match /settings/{settingID} {
+        allow read: if hasActiveMembership(districtID);
+        allow write: if hasActiveMembership(districtID)
+          && role(districtID) == 'districtAdministrator';
+      }
+
+      match /complianceAudits/{auditID} {
+        allow read: if hasActiveMembership(districtID);
+        allow create, update: if hasActiveMembership(districtID)
+          && role(districtID) == 'districtAdministrator';
+        allow delete: if false;
+      }
+
       match /{unmatched=**} {
         allow read, write: if false;
       }
