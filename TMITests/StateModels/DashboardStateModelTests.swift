@@ -123,6 +123,44 @@ struct DashboardStateModelTests {
 
         #expect(action == nil)
     }
+
+    @MainActor
+    @Test("Dashboard plan metrics are computed from canonical plan records")
+    func dashboardComputesMetricsFromCanonicalPlans() async {
+        let activePlan = makePlanRecord(
+            id: "plan-active",
+            status: .active,
+            approvalStatus: .approved,
+            studentIDs: ["student-a"]
+        )
+        let pendingPlan = makePlanRecord(
+            id: "plan-pending",
+            status: .pendingApproval,
+            approvalStatus: .pending,
+            studentIDs: ["student-b"]
+        )
+        let archivedPlan = makePlanRecord(
+            id: "plan-archived",
+            status: .archived,
+            approvalStatus: .approved,
+            studentIDs: ["student-c"]
+        )
+        let planRepository = DashboardTestPlanRepository(
+            plans: [activePlan, pendingPlan, archivedPlan]
+        )
+        let studentRepository = DashboardTestStudentRepository()
+        let model = DashboardStateModel(
+            studentRepository: studentRepository,
+            planRepository: planRepository
+        )
+
+        await model.fetchWithMembership(membership(role: .teacher))
+
+        #expect(model.value?.activeTMIPlans == 1)
+        #expect(model.value?.plansAligned == 2)
+        #expect(model.value?.nextBestAction?.type == .pendingApproval)
+        #expect(model.value?.nextBestAction?.targetPlanId == "plan-pending")
+    }
 }
 
 private extension DashboardStateModelTests {
@@ -195,4 +233,77 @@ private extension DashboardStateModelTests {
             approvalStatus: approvalStatus
         )
     }
+
+    func makePlanRecord(
+        id: String,
+        status: PlanRecordStatus,
+        approvalStatus: PlanApprovalState,
+        studentIDs: Set<String>
+    ) -> PlanRecord {
+        let now = Date()
+        return PlanRecord(
+            id: id,
+            districtID: "district-a",
+            studentIDs: studentIDs,
+            schoolIDs: ["school-a"],
+            assignedMemberIDs: ["staff-1"],
+            ownerMemberID: "staff-1",
+            status: status,
+            model: .chaseYourSpace,
+            title: "Support Plan",
+            summary: nil,
+            startDate: now.addingTimeInterval(-604_800),
+            targetDate: nil,
+            approvalStatus: approvalStatus,
+            metadata: CanonicalRecordMetadata(
+                schemaVersion: 1,
+                recordVersion: 1,
+                createdAt: now.addingTimeInterval(-604_800),
+                createdBy: "staff-1",
+                updatedAt: now,
+                updatedBy: "staff-1"
+            )
+        )
+    }
+}
+
+@MainActor
+private final class DashboardTestPlanRepository: PlanRecordRepository {
+    private let stored: [PlanRecord]
+
+    init(plans: [PlanRecord]) { stored = plans }
+
+    func plans(member: MembershipContext) async throws -> [PlanRecord] { stored }
+    func plan(id: String, member: MembershipContext) async throws -> PlanRecord {
+        guard let record = stored.first(where: { $0.id == id }) else {
+            throw PlanRecordRepositoryError.notFound
+        }
+        return record
+    }
+    func create(_ draft: PlanDraft, operationID: UUID, member: MembershipContext) async throws -> PlanRecord {
+        stored[0]
+    }
+    func update(id: String, draft: PlanDraft, expectedVersion: Int, member: MembershipContext) async throws -> PlanRecord {
+        stored[0]
+    }
+    func transition(id: String, to status: PlanRecordStatus, expectedVersion: Int, member: MembershipContext) async throws -> PlanRecord {
+        stored[0]
+    }
+}
+
+private struct DashboardTestStudentRepository: StudentRepository {
+    func page(_ request: StudentPageRequest, member: MembershipContext) async throws -> StudentPage {
+        StudentPage(records: [], nextCursor: nil, source: .server)
+    }
+    func student(id: String, member: MembershipContext) async throws -> StudentRecord {
+        throw StudentRepositoryError.notFound
+    }
+    func create(_ draft: StudentDraft, operationID: UUID, member: MembershipContext) async throws -> StudentRecord {
+        throw StudentRepositoryError.invalidDraft
+    }
+    func reconcilePendingCreates(member: MembershipContext) async throws -> [StudentRecord] { [] }
+    func update(id: String, draft: StudentDraft, expectedVersion: Int, operationID: UUID, member: MembershipContext) async throws -> StudentRecord {
+        throw StudentRepositoryError.invalidDraft
+    }
+    func archive(id: String, expectedVersion: Int, operationID: UUID, member: MembershipContext) async throws {}
 }

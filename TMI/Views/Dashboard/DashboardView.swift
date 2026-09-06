@@ -131,15 +131,18 @@ extension EnvironmentValues {
 final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError> {
   // MARK: - Dependencies
   private let studentRepository: any StudentRepository
+  private let planRepository: (any PlanRecordRepository)?
 
   // MARK: - Cancellables
   private var cancellables = Set<AnyCancellable>()
 
   // MARK: - Initialization
   init(
-    studentRepository: any StudentRepository = CanonicalStudentRepository.firebase()
+    studentRepository: any StudentRepository = CanonicalStudentRepository.firebase(),
+    planRepository: (any PlanRecordRepository)? = nil
   ) {
     self.studentRepository = studentRepository
+    self.planRepository = planRepository
     super.init()
 
     // Initialize UI state
@@ -168,23 +171,36 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
         throw StudentRepositoryError.permissionDenied
       }
 
-      // Release 1 roster counts come only from the canonical district repository.
+      // Roster counts come from the canonical district repository.
       let students = try await fetchCanonicalStudents(member: membership)
-      // Canonical plans arrive in Release 3. Release 1 must not make roster
-      // availability depend on the denied legacy user-scoped plan store.
-      let plans: [TMIPlan] = []
-      
+
+      // Plan metrics come from the canonical plan repository. A plan-fetch
+      // failure must not blank the whole dashboard, so it is non-fatal.
+      let planRecords: [PlanRecord]
+      if let planRepository {
+        planRecords = (try? await planRepository.plans(member: membership)) ?? []
+      } else {
+        planRecords = []
+      }
+
       let totalStudents = students.count
-      let activeTMIPlans = plans.count
-      let studentsWithPlans = Set(plans.flatMap { $0.students.compactMap { $0.id } }).count
-      let recentActivities = generateRecentActivities(from: [], plans: plans)
+      let activeTMIPlans = planRecords.filter {
+        $0.status == .active && $0.approvalStatus == .approved
+      }.count
+      let studentsWithPlans = Set(
+        planRecords.filter { $0.status.isOpen }.flatMap { $0.studentIDs }
+      ).count
+      // TODO: recent activities and role-data plan breakdowns still consume
+      // the legacy TMIPlan-typed helpers below; wiring those to PlanRecord is
+      // a follow-up beyond the headline metrics computed here.
+      let recentActivities = generateRecentActivities(from: [], plans: [])
       let roleData = canonicalRoleData(
         membership: membership,
         students: students,
-        plans: plans
+        plans: []
       )
       let nextAction = Self.approvalAction(
-        for: plans.filter { $0.approvalStatus == .pendingApproval }
+        forPending: planRecords.filter { $0.status == .pendingApproval }
       )
 
       let dashboardData = DashboardData(
@@ -352,6 +368,22 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       priority: .urgent,
       targetStudentId: nil,
       targetPlanId: pendingPlans.first?.id
+    )
+  }
+
+  private nonisolated static func approvalAction(
+    forPending pendingPlanRecords: [PlanRecord]
+  ) -> NextBestAction? {
+    guard !pendingPlanRecords.isEmpty else { return nil }
+
+    return NextBestAction(
+      id: "pending_approval",
+      type: .pendingApproval,
+      title: "Plans Awaiting Approval",
+      description: "\(pendingPlanRecords.count) plan\(pendingPlanRecords.count == 1 ? "" : "s") need your review",
+      priority: .urgent,
+      targetStudentId: nil,
+      targetPlanId: pendingPlanRecords.first?.id
     )
   }
 

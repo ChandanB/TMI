@@ -109,7 +109,10 @@ struct TMIApp: App {
         _dashboardStateModel = State(
             initialValue: usesInMemoryDependencies
                 ? nil
-                : DashboardStateModel(studentRepository: dependencies.studentRepository)
+                : DashboardStateModel(
+                    studentRepository: dependencies.studentRepository,
+                    planRepository: dependencies.planRepository
+                  )
         )
         _interestsStateModel = State(
             initialValue: usesInMemoryDependencies ? nil : InterestsAndHobbiesStateModel()
