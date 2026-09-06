@@ -190,14 +190,14 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       let studentsWithPlans = Set(
         planRecords.filter { $0.status.isOpen }.flatMap { $0.studentIDs }
       ).count
-      // TODO: recent activities and role-data plan breakdowns still consume
-      // the legacy TMIPlan-typed helpers below; wiring those to PlanRecord is
-      // a follow-up beyond the headline metrics computed here.
-      let recentActivities = generateRecentActivities(from: [], plans: [])
+      let recentActivities = canonicalRecentActivities(
+        students: students,
+        planRecords: planRecords
+      )
       let roleData = canonicalRoleData(
         membership: membership,
         students: students,
-        plans: []
+        planRecords: planRecords
       )
       let nextAction = Self.approvalAction(
         forPending: planRecords.filter { $0.status == .pendingApproval }
@@ -259,27 +259,78 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   private func canonicalRoleData(
     membership: MembershipContext,
     students: [StudentRecord],
-    plans: [TMIPlan]
+    planRecords: [PlanRecord]
   ) -> RoleSpecificData {
     var result = RoleSpecificData(role: membership.role)
     switch membership.role {
     case .counselor, .socialWorker:
       result.caseloadCount = students.count
-      result.pendingApprovals = plans.filter {
-        $0.approvalStatus == .pendingApproval
+      result.pendingApprovals = planRecords.filter {
+        $0.status == .pendingApproval
       }.count
       result.caseloadStudentIds = students.map(\.id)
     case .teacher:
       result.classroomStudentCount = students.count
-      result.classroomPlansActive = plans.filter {
-        $0.approvalStatus == .approved
+      result.classroomPlansActive = planRecords.filter {
+        $0.status == .active && $0.approvalStatus == .approved
       }.count
       result.classroomStudentIds = students.map(\.id)
     case .schoolAdministrator, .districtAdministrator:
       result.schoolWideStudents = students.count
-      result.schoolWidePlans = plans.count
+      result.schoolWidePlans = planRecords.count
     }
     return result
+  }
+
+  // MARK: - Canonical Recent Activity
+
+  private func canonicalRecentActivities(
+    students: [StudentRecord],
+    planRecords: [PlanRecord]
+  ) -> [RecentActivity] {
+    let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+    let namesByID = Dictionary(
+      uniqueKeysWithValues: students.map { ($0.id, $0.displayName) }
+    )
+
+    let planActivities = planRecords.compactMap { plan -> RecentActivity? in
+      guard plan.metadata.updatedAt > sevenDaysAgo else { return nil }
+
+      let names = plan.studentIDs.compactMap { namesByID[$0] }
+      let description: String
+      if names.count == 1 {
+        description = "Plan '\(plan.title)' for \(names[0]) was updated"
+      } else if !names.isEmpty {
+        description = "Plan '\(plan.title)' for \(names.count) students was updated"
+      } else {
+        description = "Plan '\(plan.title)' for \(plan.studentIDs.count) students was updated"
+      }
+
+      return RecentActivity(
+        icon: "doc.fill",
+        title: "TMI Plan Updated",
+        description: description,
+        date: plan.metadata.updatedAt,
+        iconColor: .blue
+      )
+    }
+
+    let studentActivities = students.compactMap { student -> RecentActivity? in
+      guard student.metadata.createdAt > sevenDaysAgo else { return nil }
+
+      return RecentActivity(
+        icon: "person.crop.circle.badge.plus",
+        title: "Student Added",
+        description: "\(student.displayName) was added",
+        date: student.metadata.createdAt,
+        iconColor: .green
+      )
+    }
+
+    return (planActivities + studentActivities)
+      .sorted { $0.date > $1.date }
+      .prefix(10)
+      .map { $0 }
   }
   
   // MARK: - Role-Specific Data Generation

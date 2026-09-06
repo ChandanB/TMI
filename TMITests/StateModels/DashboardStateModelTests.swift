@@ -161,6 +161,48 @@ struct DashboardStateModelTests {
         #expect(model.value?.nextBestAction?.type == .pendingApproval)
         #expect(model.value?.nextBestAction?.targetPlanId == "plan-pending")
     }
+
+    @MainActor
+    @Test("Dashboard recent activity and role data are wired to canonical records")
+    func dashboardWiresRecentActivityAndRoleDataToCanonicalRecords() async {
+        let now = Date()
+        let studentRecord = makeStudentRecord(
+            id: "student-a",
+            displayName: "Ada Lovelace",
+            createdAt: now.addingTimeInterval(-30 * 24 * 60 * 60)
+        )
+        let activePlan = makePlanRecord(
+            id: "plan-active",
+            status: .active,
+            approvalStatus: .approved,
+            studentIDs: ["student-a"],
+            updatedAt: now
+        )
+        let pendingPlan = makePlanRecord(
+            id: "plan-pending",
+            status: .pendingApproval,
+            approvalStatus: .pending,
+            studentIDs: ["student-a"],
+            updatedAt: now
+        )
+        let planRepository = DashboardTestPlanRepository(
+            plans: [activePlan, pendingPlan]
+        )
+        let studentRepository = DashboardTestStudentRepository(records: [studentRecord])
+        let model = DashboardStateModel(
+            studentRepository: studentRepository,
+            planRepository: planRepository
+        )
+
+        await model.fetchWithMembership(membership(role: .teacher))
+
+        let updateActivity = model.value?.recentActivities.first {
+            $0.title == "TMI Plan Updated"
+        }
+        #expect(updateActivity != nil)
+        #expect(updateActivity?.description.contains("Ada Lovelace") == true)
+        #expect(model.value?.roleData?.classroomPlansActive == 1)
+    }
 }
 
 private extension DashboardStateModelTests {
@@ -238,7 +280,8 @@ private extension DashboardStateModelTests {
         id: String,
         status: PlanRecordStatus,
         approvalStatus: PlanApprovalState,
-        studentIDs: Set<String>
+        studentIDs: Set<String>,
+        updatedAt: Date = Date()
     ) -> PlanRecord {
         let now = Date()
         return PlanRecord(
@@ -260,7 +303,34 @@ private extension DashboardStateModelTests {
                 recordVersion: 1,
                 createdAt: now.addingTimeInterval(-604_800),
                 createdBy: "staff-1",
-                updatedAt: now,
+                updatedAt: updatedAt,
+                updatedBy: "staff-1"
+            )
+        )
+    }
+
+    func makeStudentRecord(
+        id: String,
+        displayName: String,
+        createdAt: Date
+    ) -> StudentRecord {
+        StudentRecord(
+            id: id,
+            districtID: "district-a",
+            schoolID: "school-a",
+            displayName: displayName,
+            grade: "5",
+            studentIdentifier: nil,
+            dateOfBirth: nil,
+            pronouns: nil,
+            assignedMemberIDs: ["staff-1"],
+            isArchived: false,
+            metadata: CanonicalRecordMetadata(
+                schemaVersion: 1,
+                recordVersion: 1,
+                createdAt: createdAt,
+                createdBy: "staff-1",
+                updatedAt: createdAt,
                 updatedBy: "staff-1"
             )
         )
@@ -292,8 +362,14 @@ private final class DashboardTestPlanRepository: PlanRecordRepository {
 }
 
 private struct DashboardTestStudentRepository: StudentRepository {
+    private let records: [StudentRecord]
+
+    init(records: [StudentRecord] = []) {
+        self.records = records
+    }
+
     func page(_ request: StudentPageRequest, member: MembershipContext) async throws -> StudentPage {
-        StudentPage(records: [], nextCursor: nil, source: .server)
+        StudentPage(records: records, nextCursor: nil, source: .server)
     }
     func student(id: String, member: MembershipContext) async throws -> StudentRecord {
         throw StudentRepositoryError.notFound
