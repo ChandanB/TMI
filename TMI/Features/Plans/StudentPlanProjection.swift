@@ -45,31 +45,38 @@ nonisolated enum StudentPlanProjectionBuilder {
     /// A plan that is not active has not been agreed yet, or has ended. Either
     /// way it is not something to show a child as their current work.
     static func projection(
+        studentID: String,
         plan: PlanRecord,
         goals: [GoalRecord],
         actions: [ActionRecord],
         progress: [ProgressRecord],
         now: Date = Date()
     ) -> StudentPlanProjection? {
-        guard plan.status == .active, plan.approvalStatus == .approved else { return nil }
+        guard !studentID.isEmpty, plan.studentIDs.contains(studentID),
+              plan.status == .active, plan.approvalStatus == .approved else { return nil }
 
-        let studentGoals = goals
-            .filter { $0.status != .discontinued }
+        let visibleGoals = goals.filter {
+            $0.planID == plan.id && $0.studentID == studentID
+                && $0.status != .discontinued
+                && $0.studentFacingTitle?.trimmed.isEmpty == false
+        }
+        let visibleGoalIDs = Set(visibleGoals.map(\.id))
+        let visibleActions = actions.filter {
+            $0.planID == plan.id && visibleGoalIDs.contains($0.goalID)
+                && $0.audience == .student && $0.status != .skipped
+                && $0.dueDate <= now
+        }
+        let studentGoals = visibleGoals
             .sorted { $0.dueDate == $1.dueDate ? $0.id < $1.id : $0.dueDate < $1.dueDate }
             .map { goal in
                 StudentPlanGoal(
                     id: goal.id,
-                    // Falls back to the staff title only when nobody wrote
-                    // student wording, so a student is never shown a blank.
-                    wording: goal.studentWording,
+                    // Goals without wording explicitly written for the student
+                    // were excluded above. Never substitute professional text.
+                    wording: goal.studentFacingTitle?.trimmed ?? "",
                     dueDate: goal.dueDate,
-                    actions: actions
-                        .filter {
-                            $0.goalID == goal.id
-                                && $0.audience == .student
-                                && $0.status != .skipped
-                                && $0.dueDate <= now
-                        }
+                    actions: visibleActions
+                        .filter { $0.goalID == goal.id }
                         .sorted { $0.dueDate == $1.dueDate ? $0.id < $1.id : $0.dueDate < $1.dueDate }
                         .map {
                             StudentPlanAction(
@@ -83,7 +90,10 @@ nonisolated enum StudentPlanProjectionBuilder {
             }
 
         let notes = progress
-            .filter { $0.visibility == .sharedWithStudent }
+             .filter {
+                $0.planID == plan.id && $0.studentID == studentID
+                    && $0.visibility == .sharedWithStudent
+            }
             .sorted {
                 $0.recordedAt == $1.recordedAt ? $0.id < $1.id : $0.recordedAt < $1.recordedAt
             }
@@ -99,9 +109,9 @@ nonisolated enum StudentPlanProjectionBuilder {
             planTitle: plan.model.rawValue,
             goals: studentGoals,
             progress: notes,
-            // The same count staff see, so nobody is working from a different
-            // number than the student is looking at.
-            completionPercentage: PlanCompletion.percentage(of: actions)
+            // Count exactly the student's displayed due actions. Staff work
+            // and another student's work must not influence this number.
+            completionPercentage: PlanCompletion.percentage(of: visibleActions)
         )
     }
 }

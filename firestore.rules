@@ -368,6 +368,7 @@ service cloud.firestore {
           request.resource.data
         )
         && request.resource.data.get('recordVersion', 0) == 1
+        && request.resource.data.get('linkedPlanIDs', []).size() == 0
         && request.resource.data.get('createdAt', null) == request.time
         && request.resource.data.get('updatedAt', null) == request.time
         && request.resource.data.get('createdBy', '') == request.auth.uid
@@ -838,6 +839,7 @@ service cloud.firestore {
         allow create: if canWritePlan(districtID, planID, request.resource.data)
           && request.resource.data.get('status', 'draft') == 'draft'
           && request.resource.data.get('approvalStatus', 'notRequested') == 'notRequested'
+          && request.resource.data.get('relatedCareerIDs', []).size() == 0
           && !request.resource.data.keys().hasAny(['approvedAt', 'approvedBy', 'approvalHistory', 'revisionSequence'])
           && request.auth.uid in request.resource.data.get('assignedMemberIDs', []);
         // Lifecycle, approvals and history belong to the trusted callable.
@@ -846,6 +848,13 @@ service cloud.firestore {
           && resource.data.get('status', '') in ['draft', 'changesRequested']
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'title', 'summary', 'modelID', 'startDate', 'targetDate',
+            'signalsReviewed', 'needTags', 'professionalNeed',
+            'interestsAndCareersReviewed', 'relatedInterestIDs',
+            'supportMaterialsReviewed',
+            'reviewDate', 'meetingCadence', 'studentVoice',
+            'familyCollaborationPermission', 'familyConsentID',
+            'modelSelectionSource', 'recommendationInputRecordIDs',
+            'recommendationRulesVersion',
             'recordVersion', 'updatedAt', 'updatedBy'
           ])
           && request.resource.data.recordVersion == resource.data.recordVersion + 1
@@ -1125,7 +1134,11 @@ service cloud.firestore {
       }
 
       match /recommendations/{recommendationID} {
-        allow read: if hasActiveMembership(districtID);
+        allow read: if canReadStudent(
+          districtID,
+          resource.data.studentId,
+          studentData(districtID, resource.data.studentId)
+        );
         allow create: if hasActiveMembership(districtID)
           && canCollaborateOnStudent(districtID, request.resource.data.studentId);
         allow update: if hasActiveMembership(districtID)

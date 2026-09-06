@@ -103,6 +103,7 @@ final class CanonicalPlanRepository: PlanRecordRepository {
                     throw PlanRecordRepositoryError.invalidDraft
                 }
                 var fields = Self.fields(from: draft, districtID: member.districtID)
+                fields["approverMemberIDs"] = [String]()
                 fields["status"] = PlanRecordStatus.draft.rawValue
                 fields["approvalStatus"] = PlanApprovalState.notRequested.rawValue
                 fields["schemaVersion"] = 1
@@ -160,6 +161,34 @@ final class CanonicalPlanRepository: PlanRecordRepository {
                 if draft.targetDate == nil {
                     fields["targetDate"] = FieldValue.delete()
                     result.removeValue(forKey: "targetDate")
+                }
+                if draft.professionalNeed == nil {
+                    fields["professionalNeed"] = FieldValue.delete()
+                    result.removeValue(forKey: "professionalNeed")
+                }
+                if draft.reviewDate == nil {
+                    fields["reviewDate"] = FieldValue.delete()
+                    result.removeValue(forKey: "reviewDate")
+                }
+                if draft.meetingCadence == nil {
+                    fields["meetingCadence"] = FieldValue.delete()
+                    result.removeValue(forKey: "meetingCadence")
+                }
+                if draft.studentVoice == nil {
+                    fields["studentVoice"] = FieldValue.delete()
+                    result.removeValue(forKey: "studentVoice")
+                }
+                if draft.familyConsentID == nil {
+                    fields["familyConsentID"] = FieldValue.delete()
+                    result.removeValue(forKey: "familyConsentID")
+                }
+                if draft.modelSelectionSource == nil {
+                    fields["modelSelectionSource"] = FieldValue.delete()
+                    result.removeValue(forKey: "modelSelectionSource")
+                }
+                if draft.recommendationRulesVersion == nil {
+                    fields["recommendationRulesVersion"] = FieldValue.delete()
+                    result.removeValue(forKey: "recommendationRulesVersion")
                 }
                 return CanonicalPlanMutation(
                     record: try Self.decode(id: id, data: result, member: member), fields: fields
@@ -239,15 +268,45 @@ final class CanonicalPlanRepository: PlanRecordRepository {
             "studentIDs": draft.studentIDs.sorted(),
             "schoolIDs": draft.schoolIDs.sorted(),
             "assignedMemberIDs": draft.assignedMemberIDs.sorted(),
+            "ownerMemberID": draft.ownerMemberID,
             "modelID": PlanModelIdentifier.identifier(for: draft.model),
             "title": draft.title,
-            "startDate": Timestamp(date: draft.startDate)
+            "startDate": Timestamp(date: draft.startDate),
+            "signalsReviewed": draft.signalsReviewed,
+            "needTags": draft.needTags.map(\.rawValue),
+            "interestsAndCareersReviewed": draft.interestsAndCareersReviewed,
+            "relatedInterestIDs": draft.relatedInterestIDs.sorted(),
+            "relatedCareerIDs": draft.relatedCareerIDs.sorted(),
+            "supportMaterialsReviewed": draft.supportMaterialsReviewed,
+            "familyCollaborationPermission": draft.familyCollaborationPermission.rawValue,
+            "recommendationInputRecordIDs": draft.recommendationInputRecordIDs.sorted(),
         ]
         if let summary = draft.summary {
             fields["summary"] = summary
         }
         if let targetDate = draft.targetDate {
             fields["targetDate"] = Timestamp(date: targetDate)
+        }
+        if let professionalNeed = draft.professionalNeed {
+            fields["professionalNeed"] = professionalNeed
+        }
+        if let reviewDate = draft.reviewDate {
+            fields["reviewDate"] = Timestamp(date: reviewDate)
+        }
+        if let meetingCadence = draft.meetingCadence {
+            fields["meetingCadence"] = meetingCadence.rawValue
+        }
+        if let studentVoice = draft.studentVoice {
+            fields["studentVoice"] = studentVoice
+        }
+        if let familyConsentID = draft.familyConsentID {
+            fields["familyConsentID"] = familyConsentID
+        }
+        if let modelSelectionSource = draft.modelSelectionSource {
+            fields["modelSelectionSource"] = modelSelectionSource.rawValue
+        }
+        if let recommendationRulesVersion = draft.recommendationRulesVersion {
+            fields["recommendationRulesVersion"] = recommendationRulesVersion
         }
         return fields
     }
@@ -264,10 +323,12 @@ final class CanonicalPlanRepository: PlanRecordRepository {
               let recordVersion = data["recordVersion"] as? Int, recordVersion > 0 else {
             return nil
         }
+        let ownerMemberID = (data["ownerMemberID"] as? String) ?? createdBy
         // Older records may omit metadata, but a present malformed value is
         // never treated as an absent optional or replaced with a default.
         guard !id.isEmpty, !districtID.isEmpty, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !createdBy.isEmpty,
+              !createdBy.isEmpty, !ownerMemberID.trimmed.isEmpty,
+              data["ownerMemberID"] == nil || data["ownerMemberID"] is String,
               data["summary"] == nil || data["summary"] is String,
               data["targetDate"] == nil || data["targetDate"] is Timestamp,
               data["startDate"] == nil || data["startDate"] is Timestamp,
@@ -275,6 +336,24 @@ final class CanonicalPlanRepository: PlanRecordRepository {
               data["updatedAt"] == nil || data["updatedAt"] is Timestamp,
               data["updatedBy"] == nil || data["updatedBy"] is String,
               data["assignedMemberIDs"] == nil || data["assignedMemberIDs"] is [String],
+              data["approverMemberIDs"] == nil || data["approverMemberIDs"] is [String],
+              data["signalsReviewed"] == nil || data["signalsReviewed"] is Bool,
+              data["needTags"] == nil || (data["needTags"] as? [String])?.allSatisfy({ PlanNeedTag(rawValue: $0) != nil }) == true,
+              data["interestsAndCareersReviewed"] == nil || data["interestsAndCareersReviewed"] is Bool,
+              data["relatedInterestIDs"] == nil || data["relatedInterestIDs"] is [String],
+              data["relatedCareerIDs"] == nil || data["relatedCareerIDs"] is [String],
+              data["supportMaterialsReviewed"] == nil || data["supportMaterialsReviewed"] is Bool,
+              data["professionalNeed"] == nil || data["professionalNeed"] is String,
+              data["reviewDate"] == nil || data["reviewDate"] is Timestamp,
+              data["meetingCadence"] == nil || (data["meetingCadence"] as? String).flatMap(ActionCadence.init(rawValue:)) != nil,
+              data["studentVoice"] == nil || data["studentVoice"] is String,
+              data["familyCollaborationPermission"] == nil || (data["familyCollaborationPermission"] as? String)
+                .flatMap(PlanFamilyCollaborationPermission.init(rawValue:)) != nil,
+              data["familyConsentID"] == nil || data["familyConsentID"] is String,
+              data["modelSelectionSource"] == nil || (data["modelSelectionSource"] as? String)
+                .flatMap(PlanModelSelectionSource.init(rawValue:)) != nil,
+              data["recommendationInputRecordIDs"] == nil || data["recommendationInputRecordIDs"] is [String],
+              data["recommendationRulesVersion"] == nil || (data["recommendationRulesVersion"] as? Int).map({ $0 > 0 }) == true,
               data["schemaVersion"] == nil || (data["schemaVersion"] as? Int).map({ $0 > 0 }) == true,
               data["approvalStatus"] == nil || (data["approvalStatus"] as? String)
                 .flatMap(PlanApprovalState.init(rawValue:)) != nil else {
@@ -290,6 +369,8 @@ final class CanonicalPlanRepository: PlanRecordRepository {
             studentIDs: Set(studentIDs),
             schoolIDs: Set(schoolIDs),
             assignedMemberIDs: Set((data["assignedMemberIDs"] as? [String]) ?? []),
+            ownerMemberID: ownerMemberID.trimmed,
+            approverMemberIDs: Set((data["approverMemberIDs"] as? [String]) ?? []),
             status: status,
             model: model,
             title: title,
@@ -304,7 +385,24 @@ final class CanonicalPlanRepository: PlanRecordRepository {
                 createdBy: createdBy,
                 updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue() ?? createdAt,
                 updatedBy: (data["updatedBy"] as? String) ?? createdBy
-            )
+            ),
+            signalsReviewed: (data["signalsReviewed"] as? Bool) ?? false,
+            needTags: ((data["needTags"] as? [String]) ?? []).compactMap(PlanNeedTag.init(rawValue:)),
+            professionalNeed: data["professionalNeed"] as? String,
+            interestsAndCareersReviewed: (data["interestsAndCareersReviewed"] as? Bool) ?? false,
+            relatedInterestIDs: Set((data["relatedInterestIDs"] as? [String]) ?? []),
+            relatedCareerIDs: Set((data["relatedCareerIDs"] as? [String]) ?? []),
+            supportMaterialsReviewed: (data["supportMaterialsReviewed"] as? Bool) ?? false,
+            reviewDate: (data["reviewDate"] as? Timestamp)?.dateValue(),
+            meetingCadence: (data["meetingCadence"] as? String).flatMap(ActionCadence.init(rawValue:)),
+            studentVoice: data["studentVoice"] as? String,
+            familyCollaborationPermission: (data["familyCollaborationPermission"] as? String)
+                .flatMap(PlanFamilyCollaborationPermission.init(rawValue:)) ?? .notRecorded,
+            familyConsentID: data["familyConsentID"] as? String,
+            modelSelectionSource: (data["modelSelectionSource"] as? String)
+                .flatMap(PlanModelSelectionSource.init(rawValue:)),
+            recommendationInputRecordIDs: Set((data["recommendationInputRecordIDs"] as? [String]) ?? []),
+            recommendationRulesVersion: data["recommendationRulesVersion"] as? Int
         )
     }
 

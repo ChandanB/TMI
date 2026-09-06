@@ -7,6 +7,7 @@ struct CareerDiscoveryUITestingContent: View {
     private let member: MembershipContext
     private let relationshipRepository: CareerDiscoveryUITestingRelationshipRepository
     private let careerRepository: CareerRepository
+    private let planRepository: CareerAttachmentUITestingPlanRepository
 
     init() {
         self.member = MembershipContext(
@@ -20,6 +21,7 @@ struct CareerDiscoveryUITestingContent: View {
             version: 1
         )
         self.relationshipRepository = CareerDiscoveryUITestingRelationshipRepository()
+        self.planRepository = CareerAttachmentUITestingPlanRepository()
         self.careerRepository = CareerRepository(
             catalog: CareerDiscoveryUITestingCatalog()
         )
@@ -35,6 +37,7 @@ struct CareerDiscoveryUITestingContent: View {
                     clusters: [],
                     member: member,
                     relationshipRepository: relationshipRepository,
+                    planRepository: planRepository,
                     repository: careerRepository
                 )
                 .padding(TMISpacing.lg)
@@ -64,6 +67,25 @@ struct CareerDiscoveryUITestingContent: View {
 
 @MainActor
 struct CareerDetailUITestingContent: View {
+    private let member: MembershipContext
+    private let planRepository: CareerAttachmentUITestingPlanRepository
+    private let planAttacher: CareerAttachmentUITestingAttacher
+
+    init() {
+        self.member = MembershipContext(
+            userID: "teacher-a",
+            districtID: "district-a",
+            schoolIDs: ["school-a"],
+            role: .teacher,
+            capabilities: [.studentReadDetail, .studentWriteDetail],
+            assignedStudentIDs: ["student-a"],
+            isActive: true,
+            version: 1
+        )
+        self.planRepository = CareerAttachmentUITestingPlanRepository()
+        self.planAttacher = CareerAttachmentUITestingAttacher()
+    }
+
     var body: some View {
         NavigationStack {
             CanonicalCareerDetailView(
@@ -77,6 +99,13 @@ struct CareerDetailUITestingContent: View {
                     matchedClusterIDs: [],
                     reasons: ["Matches interests you approved: Technology."],
                     algorithmVersion: CareerMatcher.algorithmVersion
+                ),
+                studentContext: CareerPlanAttachmentContext(
+                    studentID: "student-a",
+                    studentName: "Ava Stone",
+                    member: member,
+                    planRepository: planRepository,
+                    planAttacher: planAttacher
                 )
             )
         }
@@ -95,6 +124,52 @@ struct CareerDetailUITestingContent: View {
         salary: nil,
         outlook: nil
     )
+}
+
+@MainActor
+private final class CareerAttachmentUITestingAttacher: CareerPlanAttaching {
+    func attach(_ request: CareerPlanAttachmentRequest) async throws -> CareerPlanAttachmentRequest {
+        request
+    }
+}
+
+@MainActor
+private final class CareerAttachmentUITestingPlanRepository: PlanRecordRepository {
+    private var record = PlanRecord(
+        id: "plan-a",
+        districtID: "district-a",
+        studentIDs: ["student-a"],
+        schoolIDs: ["school-a"],
+        assignedMemberIDs: ["teacher-a"],
+        ownerMemberID: "teacher-a",
+        status: .draft,
+        model: .acknowledgeInterests,
+        title: "Technology confidence plan",
+        summary: nil,
+        startDate: Date(timeIntervalSince1970: 1_700_000_000),
+        targetDate: nil,
+        approvalStatus: .notRequested,
+        metadata: CanonicalRecordMetadata(
+            schemaVersion: 1,
+            recordVersion: 1,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            createdBy: "teacher-a",
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            updatedBy: "teacher-a"
+        )
+    )
+
+    func plans(member _: MembershipContext) async throws -> [PlanRecord] { [record] }
+    func plan(id _: String, member _: MembershipContext) async throws -> PlanRecord { record }
+    func create(_ draft: PlanDraft, operationID: UUID, member: MembershipContext) async throws -> PlanRecord {
+        throw PlanRecordRepositoryError.unavailable
+    }
+    func update(id: String, draft: PlanDraft, expectedVersion: Int, member: MembershipContext) async throws -> PlanRecord {
+        throw PlanRecordRepositoryError.unavailable
+    }
+    func transition(id: String, to status: PlanRecordStatus, expectedVersion: Int, member: MembershipContext) async throws -> PlanRecord {
+        throw PlanRecordRepositoryError.unavailable
+    }
 }
 
 @MainActor

@@ -11,6 +11,8 @@ nonisolated struct PlanRecord: Identifiable, Sendable, Equatable {
     var studentIDs: Set<String>
     var schoolIDs: Set<String>
     var assignedMemberIDs: Set<String>
+    var ownerMemberID: String = ""
+    var approverMemberIDs: Set<String> = []
     var status: PlanRecordStatus
     var model: TMIPlanModel
     var title: String
@@ -19,6 +21,45 @@ nonisolated struct PlanRecord: Identifiable, Sendable, Equatable {
     var targetDate: Date?
     var approvalStatus: PlanApprovalState
     var metadata: CanonicalRecordMetadata
+    var signalsReviewed: Bool = false
+    var needTags: [PlanNeedTag] = []
+    var professionalNeed: String? = nil
+    var interestsAndCareersReviewed: Bool = false
+    var relatedInterestIDs: Set<String> = []
+    var relatedCareerIDs: Set<String> = []
+    var supportMaterialsReviewed: Bool = false
+    var reviewDate: Date? = nil
+    var meetingCadence: ActionCadence? = nil
+    var studentVoice: String? = nil
+    var familyCollaborationPermission: PlanFamilyCollaborationPermission = .notRecorded
+    var familyConsentID: String? = nil
+    var modelSelectionSource: PlanModelSelectionSource? = nil
+    var recommendationInputRecordIDs: Set<String> = []
+    var recommendationRulesVersion: Int? = nil
+
+    /// Records created before explicit ownership used their creator as owner.
+    var effectiveOwnerMemberID: String {
+        ownerMemberID.trimmed.isEmpty ? metadata.createdBy : ownerMemberID
+    }
+}
+
+nonisolated enum PlanFamilyCollaborationPermission: String, Codable, Sendable, CaseIterable, Equatable {
+    case notRecorded
+    case notAuthorized
+    case authorized
+
+    var displayName: String {
+        switch self {
+        case .notRecorded: "Not recorded"
+        case .notAuthorized: "No authorized family collaboration"
+        case .authorized: "Authorized family collaboration"
+        }
+    }
+}
+
+nonisolated enum PlanModelSelectionSource: String, Codable, Sendable, Equatable {
+    case recommendation
+    case manual
 }
 
 nonisolated enum PlanRecordStatus: String, CaseIterable, Codable, Sendable {
@@ -108,20 +149,51 @@ nonisolated struct PlanDraft: Sendable, Equatable {
     var studentIDs: Set<String>
     var schoolIDs: Set<String>
     var assignedMemberIDs: Set<String>
+    var ownerMemberID: String = ""
     var model: TMIPlanModel
     var title: String
     var summary: String?
     var startDate: Date
     var targetDate: Date?
+    var signalsReviewed: Bool = false
+    var needTags: [PlanNeedTag] = []
+    var professionalNeed: String? = nil
+    var interestsAndCareersReviewed: Bool = false
+    var relatedInterestIDs: Set<String> = []
+    var relatedCareerIDs: Set<String> = []
+    var supportMaterialsReviewed: Bool = false
+    var reviewDate: Date? = nil
+    var meetingCadence: ActionCadence? = nil
+    var studentVoice: String? = nil
+    var familyCollaborationPermission: PlanFamilyCollaborationPermission = .notRecorded
+    var familyConsentID: String? = nil
+    var modelSelectionSource: PlanModelSelectionSource? = nil
+    var recommendationInputRecordIDs: Set<String> = []
+    var recommendationRulesVersion: Int? = nil
 
     var normalized: PlanDraft {
         var copy = self
         copy.title = title
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
+        copy.ownerMemberID = ownerMemberID.trimmed
+        if copy.ownerMemberID.isEmpty, assignedMemberIDs.count == 1 {
+            copy.ownerMemberID = assignedMemberIDs.first ?? ""
+        }
         copy.summary = summary?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty
+        copy.needTags = Array(Set(needTags.map(\.rawValue)))
+            .sorted()
+            .compactMap(PlanNeedTag.init(rawValue:))
+        copy.professionalNeed = professionalNeed?.trimmed.nilIfEmpty
+        copy.relatedInterestIDs = Set(relatedInterestIDs.map(\.trimmed).filter { !$0.isEmpty })
+        copy.relatedCareerIDs = Set(relatedCareerIDs.map(\.trimmed).filter { !$0.isEmpty })
+        copy.studentVoice = studentVoice?.trimmed.nilIfEmpty
+        copy.familyConsentID = familyConsentID?.trimmed.nilIfEmpty
+        copy.recommendationInputRecordIDs = Set(
+            recommendationInputRecordIDs.map(\.trimmed).filter { !$0.isEmpty }
+        )
         return copy
     }
 }
@@ -158,6 +230,11 @@ nonisolated enum PlanValidation {
         }
         if !draft.assignedMemberIDs.contains(member.userID) {
             issues.append("You must be assigned to a plan you create.")
+        }
+        if draft.ownerMemberID.isEmpty {
+            issues.append("A plan needs a responsible owner.")
+        } else if !draft.assignedMemberIDs.contains(draft.ownerMemberID) {
+            issues.append("The plan owner must be assigned to the plan.")
         }
         if let targetDate = draft.targetDate, targetDate < draft.startDate {
             issues.append("The target date cannot precede the start date.")
@@ -204,6 +281,7 @@ nonisolated enum PlanCreation {
             studentIDs: [studentID],
             schoolIDs: [schoolID],
             assignedMemberIDs: [member.userID],
+            ownerMemberID: member.userID,
             model: model,
             title: title,
             summary: summary,

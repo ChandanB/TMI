@@ -210,6 +210,26 @@ describe("canonical Firestore authorization", () => {
         updatedBy: "teacher-1",
       }),
     );
+    await assertFails(
+      setDoc(
+        doc(db, "districts/d1/students/student-1/careers/career-1"),
+        {
+          districtID: "d1",
+          studentID: "student-1",
+          careerID: "career-1",
+          isSaved: true,
+          isDismissed: false,
+          isCompared: false,
+          linkedPlanIDs: ["plan-unassigned"],
+          schemaVersion: 1,
+          recordVersion: 1,
+          createdAt: serverTimestamp(),
+          createdBy: "teacher-1",
+          updatedAt: serverTimestamp(),
+          updatedBy: "teacher-1",
+        },
+      ),
+    );
     await assertSucceeds(
       updateDoc(relationship, {
         isSaved: false,

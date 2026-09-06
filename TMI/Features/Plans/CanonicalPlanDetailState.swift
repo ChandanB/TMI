@@ -266,9 +266,10 @@ final class CanonicalPlanDetailState {
                     false
                 case .active where plan.status == .approved:
                     member.capabilities.contains(.studentWriteDetail)
-                        && plan.metadata.createdBy == member.userID
+                        && plan.effectiveOwnerMemberID == member.userID
                 case .approved, .changesRequested where plan.status == .pendingApproval:
                     member.capabilities.contains(.planApprove)
+                        && (plan.approverMemberIDs.isEmpty || plan.approverMemberIDs.contains(member.userID))
                 default:
                     member.capabilities.contains(.studentWriteDetail)
                 }

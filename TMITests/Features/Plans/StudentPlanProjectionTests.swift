@@ -11,6 +11,7 @@ struct StudentPlanProjectionTests {
         for status in PlanRecordStatus.allCases where status != .active {
             #expect(
                 StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
                     plan: plan(status: status), goals: [goal()], actions: [], progress: []
                 ) == nil,
                 "\(status) should not project"
@@ -18,6 +19,7 @@ struct StudentPlanProjectionTests {
         }
         #expect(
             StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
                 plan: plan(status: .active), goals: [goal()], actions: [], progress: []
             ) != nil
         )
@@ -30,6 +32,7 @@ struct StudentPlanProjectionTests {
 
         #expect(
             StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
                 plan: candidate, goals: [goal()], actions: [], progress: [], now: now
             ) == nil
         )
@@ -39,6 +42,7 @@ struct StudentPlanProjectionTests {
     func studentReadsTheirOwnWording() throws {
         let projection = try #require(
             StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
                 plan: plan(status: .active), goals: [goal()], actions: [], progress: []
             )
         )
@@ -52,6 +56,7 @@ struct StudentPlanProjectionTests {
     func staffActionsAreAbsent() throws {
         let projection = try #require(
             StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
                 plan: plan(status: .active),
                 goals: [goal()],
                 actions: [
@@ -71,6 +76,7 @@ struct StudentPlanProjectionTests {
     func staffPlanTitleIsAbsent() throws {
         let projection = try #require(
             StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
                 plan: plan(status: .active), goals: [goal()], actions: [], progress: [], now: now
             )
         )
@@ -83,6 +89,7 @@ struct StudentPlanProjectionTests {
     func onlyDueStudentActionsProject() throws {
         let projection = try #require(
             StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
                 plan: plan(status: .active),
                 goals: [goal()],
                 actions: [
@@ -118,6 +125,7 @@ struct StudentPlanProjectionTests {
     func staffNotesAreAbsent() throws {
         let projection = try #require(
             StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
                 plan: plan(status: .active),
                 goals: [goal()],
                 actions: [],
@@ -135,6 +143,7 @@ struct StudentPlanProjectionTests {
     func discontinuedGoalsAreAbsent() throws {
         let projection = try #require(
             StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
                 plan: plan(status: .active),
                 goals: [goal(), goal(id: "goal-2", status: .discontinued)],
                 actions: [],
@@ -144,7 +153,7 @@ struct StudentPlanProjectionTests {
         #expect(projection.goals.map(\.id) == ["goal-1"])
     }
 
-    @Test("The student sees the same completion number staff do")
+    @Test("Student completion counts only the due actions visible to that student")
     func completionMatchesStaff() throws {
         let actions = [
             action(id: "a1", audience: .student, title: "Invite someone", status: .done),
@@ -152,14 +161,68 @@ struct StudentPlanProjectionTests {
         ]
         let projection = try #require(
             StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
                 plan: plan(status: .active), goals: [goal()], actions: actions, progress: []
             )
         )
 
-        // Nobody is working from a different number than the student is
-        // looking at, even though the student sees only their own actions.
-        #expect(projection.completionPercentage == PlanCompletion.percentage(of: actions))
-        #expect(projection.completionPercentage == 50)
+        #expect(projection.completionPercentage == 100)
+    }
+
+    @Test("A student's projection excludes another student's goals and shared observations")
+    func foreignStudentRecordsAreAbsent() throws {
+        let otherGoal = GoalRecord(id: "other-goal", planID: "plan-1", studentID: "student-2",
+            title: "Private staff wording", studentFacingTitle: "Another student's goal",
+            measure: .count, baseline: "0", target: "1", dueDate: now,
+            responsibleMemberID: "teacher-1", status: .inProgress)
+        let otherNote = ProgressRecord(id: "other-note", planID: "plan-1", studentID: "student-2",
+            source: .goal, sourceID: otherGoal.id, measuredValue: nil,
+            note: "Another student's shared observation", visibility: .sharedWithStudent,
+            authorID: "teacher-1", recordedAt: now)
+        let result = try #require(StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
+            plan: plan(status: .active), goals: [goal(), otherGoal], actions: [], progress: [otherNote]))
+        #expect(result.goals.map(\.id) == ["goal-1"])
+        #expect(result.progress.isEmpty)
+    }
+
+    @Test("Missing student wording never falls back to a professional goal title")
+    func professionalGoalWordingIsAbsent() throws {
+        let staffGoal = GoalRecord(id: "staff-goal", planID: "plan-1", studentID: "student-1",
+            title: "Confidential professional need", studentFacingTitle: nil,
+            measure: .count, baseline: "0", target: "1", dueDate: now,
+            responsibleMemberID: "teacher-1", status: .inProgress)
+        let result = try #require(StudentPlanProjectionBuilder.projection(
+                    studentID: "student-1",
+            plan: plan(status: .active), goals: [staffGoal], actions: [], progress: []))
+        #expect(result.goals.isEmpty)
+    }
+
+    @Test("Multi-student plans require an explicit student and reject unrelated students")
+    func groupPlanIsScoped() throws {
+        var group = plan(status: .active)
+        group.studentIDs = ["student-1", "student-2"]
+        let secondGoal = GoalRecord(id: "goal-2", planID: group.id, studentID: "student-2",
+            title: "Professional wording", studentFacingTitle: "Try your next step",
+            measure: .count, baseline: "0", target: "1", dueDate: now,
+            responsibleMemberID: "teacher-1", status: .inProgress)
+        let result = try #require(StudentPlanProjectionBuilder.projection(
+            studentID: "student-2", plan: group, goals: [goal(), secondGoal], actions: [], progress: []))
+        #expect(result.goals.map(\.id) == ["goal-2"])
+        #expect(StudentPlanProjectionBuilder.projection(
+            studentID: "unrelated", plan: group, goals: [goal()], actions: [], progress: []) == nil)
+    }
+
+    @Test("A foreign plan action cannot enter a matching goal or completion count")
+    func foreignPlanActionIsAbsent() throws {
+        let wrongPlanAction = ActionRecord(id: "foreign", planID: "other-plan", goalID: "goal-1",
+            title: "Another plan's action", ownerMemberID: "teacher-1", audience: .student,
+            cadence: .once, dueDate: now, status: .done)
+        let result = try #require(StudentPlanProjectionBuilder.projection(
+            studentID: "student-1", plan: plan(status: .active), goals: [goal()],
+            actions: [wrongPlanAction], progress: [], now: now))
+        #expect(result.goals.flatMap(\.actions).isEmpty)
+        #expect(result.completionPercentage == 0)
     }
 
     // MARK: - Fixtures

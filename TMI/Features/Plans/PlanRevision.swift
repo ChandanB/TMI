@@ -116,6 +116,7 @@ nonisolated enum PlanRevisionHistory {
             studentIDs: plan.studentIDs,
             schoolIDs: plan.schoolIDs,
             assignedMemberIDs: plan.assignedMemberIDs,
+            ownerMemberID: plan.ownerMemberID,
             model: plan.model,
             title: plan.title,
             summary: plan.summary,

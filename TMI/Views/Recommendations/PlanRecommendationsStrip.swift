@@ -7,11 +7,11 @@ struct PlanRecommendationsStrip: View {
     let studentID: String
     let planID: String
 
-    @Environment(\.recommendationsStateModel) private var recommendationsStateModel
+    @State private var recommendationsStateModel = RecommendationsStateModel()
 
     var body: some View {
         content(model: recommendationsStateModel)
-            .task(id: planID) {
+            .task(id: "\(studentID):\(planID)") {
                 await recommendationsStateModel.setContext(studentId: studentID, planId: planID)
             }
     }

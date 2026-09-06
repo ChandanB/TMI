@@ -64,7 +64,9 @@ struct PlanResourceListSection: View {
                 ContentUnavailableView(
                     "No resources linked",
                     systemImage: "books.vertical",
-                    description: Text("Add a resource from the library to share it with this plan.")
+                    description: Text(canLink
+                        ? "Add a resource from the library to share it with this plan."
+                        : "No resources were linked before this plan left draft status.")
                 )
                 .accessibilityIdentifier("planResources.empty")
             } else {
@@ -81,6 +83,9 @@ struct PlanResourceListSection: View {
         }
         .task {
             await model.load(planID: planID, member: member)
+        }
+        .onChange(of: canLink) { _, allowed in
+            if !allowed { self.showingLibrary = false }
         }
         .sheet(isPresented: $showingLibrary) {
             NavigationStack {
@@ -117,7 +122,7 @@ struct PlanResourceListSection: View {
             List(available) { resource in
                 Button {
                     Task {
-                        guard let resourceID = resource.id else { return }
+                        guard self.canLink, let resourceID = resource.id else { return }
                         await model.linkFromLibrary(
                             resourceID: resourceID,
                             planID: planID,
@@ -135,6 +140,7 @@ struct PlanResourceListSection: View {
                             .lineLimit(2)
                     }
                 }
+                .disabled(!canLink || model.isLoading)
                 .accessibilityIdentifier("planResources.library.\(resource.id ?? resource.title)")
             }
         }

@@ -109,10 +109,20 @@ describe("canonical plan lifecycle", () => {
       const client = env.authenticatedContext("staff", trustedClaims("d1")).firestore();
       const ref = doc(client, plan.path);
       for (const patch of [{ status: "pendingApproval" }, { approvalStatus: "approved" }, { approvedBy: "staff" }, { recordVersion: 99 }, { approvalHistory: [] }, { revisionSequence: 99 }]) await assertFails(updateDoc(ref, patch));
+      await assertFails(updateDoc(ref, {
+        relatedCareerIDs: ["career-1"],
+        recordVersion: 2,
+        updatedBy: "staff",
+      }));
       await assertFails(setDoc(doc(client, `${plan.path}/revisions/fake`), { planID: "p1", frozenBy: "staff", sequence: 1 }));
       await assertFails(setDoc(doc(client, `${plan.path}/approvals/fake`), { approvedBy: "staff" }));
       await assertFails(setDoc(doc(client, "districts/d1/auditEvents/fake"), { actorUserID: "staff" }));
       await assertFails(setDoc(doc(client, "districts/d1/plans/forged"), { ...(await plan.get()).data(), startDate: new Date(), approvalStatus: "approved" }));
+      await assertFails(setDoc(doc(client, "districts/d1/plans/prelinked"), {
+        ...(await plan.get()).data(),
+        startDate: new Date(),
+        relatedCareerIDs: ["career-1"],
+      }));
       await assertSucceeds(updateDoc(ref, { title: "Edited draft", recordVersion: 2, updatedBy: "staff" }));
     }
   });

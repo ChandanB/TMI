@@ -16,6 +16,7 @@ struct CanonicalPlanRepositoryTests {
     private func draft() -> PlanDraft {
         PlanDraft(
             studentIDs: ["student-1"], schoolIDs: ["school-1"], assignedMemberIDs: ["teacher-1"],
+            ownerMemberID: "teacher-1",
             model: .chaseYourSpace, title: "A plan", summary: "Summary", startDate: date,
             targetDate: date.addingTimeInterval(1_000)
         )
@@ -141,6 +142,33 @@ struct CanonicalPlanRepositoryTests {
         await #expect(throws: PlanRecordRepositoryError.notFound) {
             try await repository.plan(id: "plan", member: self.member)
         }
+    }
+
+    @Test("Canonical plans persist an owner while legacy creator ownership remains readable")
+    func ownershipAndApprovalAssignment() async throws {
+        let transport = MemoryPlanTransport()
+        let repository = repository(transport)
+        let created = try await repository.create(draft(), operationID: UUID(), member: member)
+
+        #expect(created.ownerMemberID == "teacher-1")
+        #expect(created.approverMemberIDs.isEmpty)
+        #expect(transport.document?["ownerMemberID"] as? String == "teacher-1")
+        #expect(transport.document?["approverMemberIDs"] as? [String] == [])
+
+        transport.document?.removeValue(forKey: "ownerMemberID")
+        let legacy = try await repository.plan(id: created.id, member: member)
+        #expect(legacy.ownerMemberID == "teacher-1")
+
+        transport.document?["ownerMemberID"] = 123
+        await #expect(throws: PlanRecordRepositoryError.invalidResponse) {
+            try await repository.plan(id: created.id, member: self.member)
+        }
+
+        transport.document?["ownerMemberID"] = "teacher-1"
+        transport.document?["approverMemberIDs"] = ["approver-2", "approver-1"]
+        let refreshed = try await repository.plan(id: created.id, member: member)
+        #expect(refreshed.ownerMemberID == "teacher-1")
+        #expect(refreshed.approverMemberIDs == ["approver-1", "approver-2"])
     }
 
     @Test("Transition calls server before refreshing and reuses a stable key")

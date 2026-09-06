@@ -6,12 +6,16 @@ import SwiftUI
 /// stays visible, because every match on this screen is a claim about them
 /// specifically and it must never be ambiguous whose screen this is.
 struct StudentCareerDiscoveryView: View {
+    @Environment(\.appDependencies) private var dependencies
+
     let studentID: String
     let studentName: String
     let approvedInterests: [StudentInterest]
     let clusters: [InterestClusterScore]
     let member: MembershipContext?
     let relationshipRepository: (any CareerRelationshipProviding)?
+    var planRepository: (any PlanRecordRepository)? = nil
+    var planAttacher: (any CareerPlanAttaching)? = nil
     var repository: CareerRepository = CareerRepository()
 
     @State private var state = CareerDiscoveryState()
@@ -226,6 +230,7 @@ struct StudentCareerDiscoveryView: View {
                 CanonicalCareerDetailView(
                     career: career,
                     match: matchesByID[career.id],
+                    studentContext: attachmentContext,
                     onViewed: {
                         await persist(careerID: career.id, action: .view)
                     }
@@ -283,6 +288,42 @@ struct StudentCareerDiscoveryView: View {
         }
         .padding(TMISpacing.md)
         .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+    }
+
+    private var attachmentContext: CareerPlanAttachmentContext? {
+        guard let member,
+              member.isActive,
+              member.capabilities.contains(.studentWriteDetail),
+              member.assignedStudentIDs.contains(studentID),
+              let planRepository = planRepository ?? dependencies.planRepository else {
+            return nil
+        }
+        return CareerPlanAttachmentContext(
+            studentID: studentID,
+            studentName: studentName,
+            member: member,
+            planRepository: planRepository,
+            planAttacher: planAttacher,
+            onAttached: { await self.reloadRelationships() }
+        )
+    }
+
+    @MainActor
+    private func reloadRelationships() async {
+        guard let member, let relationshipRepository else { return }
+        do {
+            let loaded = try await relationshipRepository.relationships(
+                studentID: studentID,
+                member: member
+            )
+            relationships = Dictionary(
+                loaded.map { ($0.careerID, $0) },
+                uniquingKeysWith: { newest, _ in newest }
+            )
+            relationshipError = nil
+        } catch {
+            relationshipError = "The career was attached, but career choices could not be refreshed."
+        }
     }
 
     private enum RelationshipAction {

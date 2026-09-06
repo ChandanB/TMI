@@ -148,6 +148,36 @@ struct RecommendationsStateModelTests {
         #expect(model.recommendations.count == 1)
         #expect(model.recommendations.first?.id == "rec-1")
     }
+    @Test("Plan recommendations retain the selected student boundary on shared plans")
+    @MainActor
+    func sharedPlanDoesNotMixStudents() async {
+        let store = FakeRecommendationStore()
+        for student in ["s1", "s2"] {
+            store.seed(atCollectionPath: FirestorePaths.recommendations(districtID: districtID),
+                id: student, recommendation: makeRecommendation(id: student, studentId: student, planId: "shared"))
+        }
+        let service = RecommendationsService(store: store,
+            authorizationSessions: FakeAuthorizationSessionProvider(session: makeSession()), currentUserID: { userID })
+        let model = RecommendationsStateModel(recommendationsService: service)
+        await model.setContext(studentId: "s1", planId: "shared")
+        #expect(model.recommendations.map(\.studentId) == ["s1"])
+    }
+
+    @Test("Clearing recommendation context removes the previous student's results")
+    @MainActor
+    func clearingContextRemovesPrivateResults() async {
+        let store = FakeRecommendationStore()
+        store.seed(atCollectionPath: FirestorePaths.recommendations(districtID: districtID),
+            id: "rec-1", recommendation: makeRecommendation())
+        let service = RecommendationsService(store: store,
+            authorizationSessions: FakeAuthorizationSessionProvider(session: makeSession()), currentUserID: { userID })
+        let model = RecommendationsStateModel(recommendationsService: service)
+        await model.setContext(studentId: "s1", planId: nil)
+        #expect(model.recommendations.count == 1)
+        await model.setContext(studentId: nil, planId: nil)
+        #expect(model.recommendations.isEmpty)
+        #expect(model.pendingRecommendations.isEmpty)
+    }
 }
 
 // MARK: - Test doubles
