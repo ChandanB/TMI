@@ -536,7 +536,7 @@ private struct StudentOverviewSection: View {
                         .font(.headline)
                         .foregroundStyle(TMIColors.aubergine)
                     Text(
-                        "Review the verified profile and assigned team. Discovery activities become available in the next release."
+                        "Review the verified profile and assigned team, then explore this student's interests, careers, plans, and resources."
                     )
                     .font(.body)
                     .foregroundStyle(TMIColors.textSecondary)
@@ -620,7 +620,7 @@ private struct StudentOverviewSection: View {
         _ section: StudentDetailSectionProjection
     ) -> String {
         if section.itemIDs.isEmpty {
-            return "Planned for Release \(section.domain.nextAvailableRelease)."
+            return "No confirmed records yet."
         }
         return "\(section.itemIDs.count) confirmed \(section.itemIDs.count == 1 ? "record" : "records")"
     }

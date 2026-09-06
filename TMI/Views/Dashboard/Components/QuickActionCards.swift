@@ -102,7 +102,7 @@ struct QuickActionsGrid: View {
 
             QuickActionCard(
                 title: "TMI Plans",
-                subtitle: "Canonical plan workflows arrive in Release 3",
+                subtitle: "View and manage canonical TMI plans",
                 icon: "doc.text.fill",
                 iconColor: .tmiSecondary,
                 badge: data.activeTMIPlans == 0 ? nil : "\(data.activeTMIPlans)",

@@ -556,12 +556,11 @@ final class StudentDetailState {
         for domain: StudentDetailDomain,
         scope: StudentDetailSectionScope
     ) -> String {
-        let availability = "This area becomes available in Release \(domain.nextAvailableRelease)."
         switch scope {
         case .current:
-            return "\(availability) Until then, use the verified student profile and assigned team to prepare the next step."
+            return "No records have been added here yet. Use the verified student profile and assigned team to prepare the next step."
         case .history:
-            return "\(availability) Confirmed prior records will appear here without replacing completed work."
+            return "No confirmed prior records yet. They will appear here without replacing completed work."
         }
     }
 
