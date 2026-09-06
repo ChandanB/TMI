@@ -158,6 +158,20 @@ export interface TransitionPlanRequest extends PrivilegedBaseRequest {
   readonly note?: string;
 }
 
+export interface AttachCareerToPlanRequest {
+  readonly districtID: string;
+  readonly studentID: string;
+  readonly careerID: string;
+  readonly planID: string;
+}
+
+export interface AttachCareerToPlanResult {
+  readonly districtID: string;
+  readonly planID: string;
+  readonly careerID: string;
+  readonly studentID: string;
+}
+
 export interface IssueStudentModeSessionRequest
   extends PrivilegedBaseRequest {
   readonly studentID: string;
@@ -580,6 +594,22 @@ const parseTransitionPlanRequest = (value: unknown): TransitionPlanRequest => {
   }
   return { ...parseBaseRequest(data), planID: requireIdentifier(data.planID, "planID"), nextStatus,
     ...(note ? { note } : {}) };
+};
+
+const parseAttachCareerToPlanRequest = (
+  value: unknown,
+): AttachCareerToPlanRequest => {
+  const data = requireRecord(value);
+  rejectUnexpectedFields(
+    data,
+    new Set(["districtID", "studentID", "careerID", "planID"]),
+  );
+  return {
+    districtID: requireIdentifier(data.districtID, "districtID"),
+    studentID: requireIdentifier(data.studentID, "studentID"),
+    careerID: requireIdentifier(data.careerID, "careerID"),
+    planID: requireIdentifier(data.planID, "planID"),
+  };
 };
 
 const parseIssueStudentModeSessionRequest = (
@@ -2023,6 +2053,231 @@ const transitionPlanHandler = async (
       return { recordVersion: version };
     },
   });
+};
+
+const attachCareerToPlanHandler = async (
+  request: CallableRequest<AttachCareerToPlanRequest>,
+): Promise<AttachCareerToPlanResult> => {
+  const data = parseAttachCareerToPlanRequest(request.data);
+  const identity = parseTrustedCallableIdentity(request);
+  assertDistrict(identity, data.districtID);
+  const firestore = getFirestore();
+  const studentReference = firestore.doc(
+    `districts/${data.districtID}/students/${data.studentID}`,
+  );
+  const planReference = firestore.doc(
+    `districts/${data.districtID}/plans/${data.planID}`,
+  );
+  const careerReference = firestore.doc(
+    `catalogs/careers/items/${data.careerID}`,
+  );
+  const relationshipReference = studentReference.collection("careers")
+    .doc(data.careerID);
+  const operationID = `career-plan-${createHash("sha256").update([
+    data.districtID,
+    data.studentID,
+    data.careerID,
+    data.planID,
+  ].join("\u0000")).digest("hex")}`;
+  const auditReference = firestore.doc(
+    `districts/${data.districtID}/auditEvents/${operationID}`,
+  );
+
+  await firestore.runTransaction(async (transaction) => {
+    const membership = await requireTrustedMembership(
+      firestore,
+      transaction,
+      identity,
+    );
+    const student = requireExistingData(
+      await transaction.get(studentReference),
+      "Student",
+    );
+    const plan = requireExistingData(
+      await transaction.get(planReference),
+      "Plan",
+    );
+    const career = requireExistingData(
+      await transaction.get(careerReference),
+      "Career",
+    );
+    const relationshipSnapshot = await transaction.get(relationshipReference);
+    const auditSnapshot = await transaction.get(auditReference);
+
+    const schoolID = requireSchoolID(student, "Student");
+    if (
+      student.districtId !== data.districtID ||
+      !canReadStudentDetail(membership, data.studentID, schoolID) ||
+      !canWriteStudentDetail(membership, data.studentID, schoolID)
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "The student is outside the member's readable and writable scope.",
+      );
+    }
+
+    const planStudents = requireStoredIdentifierArray(
+      plan.studentIDs,
+      "plan.studentIDs",
+    );
+    const planSchools = requireStoredIdentifierArray(
+      plan.schoolIDs,
+      "plan.schoolIDs",
+    );
+    const planAssignees = requireStoredIdentifierArray(
+      plan.assignedMemberIDs,
+      "plan.assignedMemberIDs",
+    );
+    const status = requireEnum(
+      plan.status,
+      "plan.status",
+      allowedPlanStatuses,
+    );
+    if (
+      plan.districtId !== data.districtID ||
+      !planStudents.includes(data.studentID) ||
+      !planSchools.includes(schoolID) ||
+      !planAssignees.includes(identity.userID)
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "The plan is outside the student's assigned scope.",
+      );
+    }
+    if (status !== "draft" && status !== "changesRequested") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Careers can only be attached to editable plans.",
+      );
+    }
+    if (career.isApproved !== true || career.isActive === false) {
+      throw new HttpsError(
+        "failed-precondition",
+        "The catalog career is not approved and active.",
+      );
+    }
+
+    const planVersion = requireInteger(
+      plan.recordVersion,
+      "plan.recordVersion",
+      1,
+    );
+    const relatedCareerIDs = requireStoredIdentifierArray(
+      plan.relatedCareerIDs ?? [],
+      "plan.relatedCareerIDs",
+    );
+    const relationship = relationshipSnapshot.exists
+      ? requireExistingData(relationshipSnapshot, "Career relationship")
+      : undefined;
+    if (
+      relationship !== undefined &&
+      (
+        relationship.districtID !== data.districtID ||
+        relationship.studentID !== data.studentID ||
+        relationship.careerID !== data.careerID
+      )
+    ) {
+      throw new HttpsError(
+        "data-loss",
+        "The stored career relationship identity is inconsistent.",
+      );
+    }
+    const linkedPlanIDs = relationship === undefined
+      ? []
+      : requireStoredIdentifierArray(
+          relationship.linkedPlanIDs,
+          "careerRelationship.linkedPlanIDs",
+        );
+    const planHasCareer = relatedCareerIDs.includes(data.careerID);
+    const relationshipHasPlan = linkedPlanIDs.includes(data.planID);
+
+    if (auditSnapshot.exists) {
+      const audit = auditSnapshot.data() ?? {};
+      const details = requireRecord(audit.details, "career-plan audit details");
+      if (
+        audit.action !== "career.plan.attach" ||
+        audit.districtID !== data.districtID ||
+        details.studentID !== data.studentID ||
+        details.careerID !== data.careerID ||
+        details.planID !== data.planID
+      ) {
+        throw new HttpsError(
+          "data-loss",
+          "The stored career-plan audit identity is inconsistent.",
+        );
+      }
+    }
+
+    const stamp = FieldValue.serverTimestamp();
+    if (!relationshipHasPlan && relationship === undefined) {
+      transaction.create(relationshipReference, {
+        districtID: data.districtID,
+        studentID: data.studentID,
+        careerID: data.careerID,
+        isSaved: false,
+        isDismissed: false,
+        isCompared: false,
+        linkedPlanIDs: [data.planID],
+        lastViewedAt: null,
+        schemaVersion: 1,
+        recordVersion: 1,
+        createdAt: stamp,
+        createdBy: identity.userID,
+        updatedAt: stamp,
+        updatedBy: identity.userID,
+      });
+    } else if (!relationshipHasPlan && relationship !== undefined) {
+      const relationshipVersion = requireInteger(
+        relationship.recordVersion,
+        "careerRelationship.recordVersion",
+        1,
+      );
+      transaction.update(relationshipReference, {
+        linkedPlanIDs: [...linkedPlanIDs, data.planID].sort(),
+        recordVersion: relationshipVersion + 1,
+        updatedAt: stamp,
+        updatedBy: identity.userID,
+      });
+    }
+    if (!planHasCareer) {
+      transaction.update(planReference, {
+        relatedCareerIDs: [...relatedCareerIDs, data.careerID].sort(),
+        recordVersion: planVersion + 1,
+        updatedAt: stamp,
+        updatedBy: identity.userID,
+      });
+    }
+    if (!auditSnapshot.exists) {
+      transaction.create(auditReference, {
+        schemaVersion: 1,
+        recordVersion: 1,
+        action: "career.plan.attach",
+        actorUserID: identity.userID,
+        districtID: data.districtID,
+        targetPath: planReference.path,
+        reasonCode: "career-plan-attachment",
+        details: {
+          studentID: data.studentID,
+          careerID: data.careerID,
+          planID: data.planID,
+          relationshipPath: relationshipReference.path,
+        },
+        result: {
+          studentID: data.studentID,
+          careerID: data.careerID,
+          planID: data.planID,
+        },
+        createdAt: stamp,
+      });
+    }
+  });
+
+  return {
+    districtID: data.districtID,
+    planID: data.planID,
+    careerID: data.careerID,
+    studentID: data.studentID,
+  };
 };
 
 interface StudentModeDependencies {
@@ -5194,6 +5449,10 @@ export const drainStudentClaimRefresh = onDocumentCreated(
   },
 );
 export const transitionPlan = onCall(callableOptions, transitionPlanHandler);
+export const attachCareerToPlan = onCall(
+  callableOptions,
+  attachCareerToPlanHandler,
+);
 export const issueStudentModeSession = onCall(
   callableOptions,
   productionStudentModeHandlers.issueSession,

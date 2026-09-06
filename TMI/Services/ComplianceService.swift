@@ -7,27 +7,68 @@
 //
 
 import Foundation
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 import FirebaseAuth
 
 // MARK: - Compliance Service
 
+@MainActor
 final class ComplianceService {
     static let shared = ComplianceService()
     
-    private let db = Firestore.firestore()
-    
-    private init() {}
+    private let firestore: Firestore?
+    private let authorizationSessions: any AuthorizationSessionProviding
+    private let currentUserID: @Sendable () -> String?
+    private var db: Firestore { firestore ?? Firestore.firestore() }
+
+    init(
+        firestore: Firestore? = nil,
+        authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared,
+        currentUserID: @escaping @Sendable () -> String? = { Auth.auth().currentUser?.uid }
+    ) {
+        self.firestore = firestore
+        self.authorizationSessions = authorizationSessions
+        self.currentUserID = currentUserID
+    }
+
+    private func authorize(districtID: String, writing: Bool = false) throws -> AuthenticatedSession {
+        guard let userID = currentUserID(),
+              let session = authorizationSessions.session(authenticatedUserID: userID),
+              session.profile.userID == userID,
+              session.claim.userID == userID,
+              session.claim.accessClass == .staff,
+              session.membership.userID == userID,
+              session.claim.membershipVersion == session.membership.version,
+              session.membership.isActive else {
+            throw ComplianceServiceError.notAuthenticated
+        }
+        guard session.claim.districtID == districtID,
+              session.membership.districtID == districtID,
+              !writing || session.membership.role == .districtAdministrator else {
+            throw ComplianceServiceError.permissionDenied
+        }
+        return session
+    }
+
+    private func revalidate(_ session: AuthenticatedSession, districtID: String, writing: Bool = false) throws {
+        guard try authorize(districtID: districtID, writing: writing) == session else {
+            throw ComplianceServiceError.permissionDenied
+        }
+    }
     
     // MARK: - Settings Operations
     
     /// Fetch compliance settings for a district
     func fetchSettings(districtId: String) async throws -> ComplianceSettings? {
+        let session = try authorize(districtID: districtId)
         let docRef = db.document(FirestorePaths.complianceSettings(districtID: districtId))
-        let document = try await docRef.getDocument()
+        let document = try await withTimeout(seconds: 10) { try await docRef.getDocument() }
+        try revalidate(session, districtID: districtId)
         
         if document.exists {
-            return try? document.data(as: ComplianceSettings.self)
+            let settings = try document.data(as: ComplianceSettings.self)
+            guard settings.districtId == districtId else { throw ComplianceServiceError.invalidResponse }
+            return settings
         }
         
         return nil
@@ -35,18 +76,18 @@ final class ComplianceService {
     
     /// Update compliance settings for a district
     func updateSettings(districtId: String, settings: ComplianceSettings) async throws {
+        let session = try authorize(districtID: districtId, writing: true)
+        guard settings.districtId == districtId else { throw ComplianceServiceError.permissionDenied }
         let docRef = db.document(FirestorePaths.complianceSettings(districtID: districtId))
-        let data = settings.toFirestoreData()
-        
-        try await docRef.setData(data, merge: true)
-        
-        print("[ComplianceService] Updated compliance settings for district: \(districtId)")
+        try await docRef.setData(settings.toFirestoreData(), merge: true)
+        try revalidate(session, districtID: districtId, writing: true)
     }
     
     // MARK: - Audit Operations
     
     /// Get compliance audit results for a district
     func getAuditResults(districtId: String, dateRange: ClosedRange<Date>?) async throws -> [ComplianceAuditResult] {
+        let session = try authorize(districtID: districtId)
         var query: Query = db.collection(FirestorePaths.complianceAudits(districtID: districtId))
         
         if let dateRange = dateRange {
@@ -56,42 +97,21 @@ final class ComplianceService {
         }
         
         let snapshot = try await query.getDocuments()
-        return snapshot.documents.compactMap { parseAuditResult(from: $0) }
+        try revalidate(session, districtID: districtId)
+        return try snapshot.documents.map {
+            guard let record = self.parseAuditResult(from: $0), record.districtId == districtId else {
+                throw ComplianceServiceError.invalidResponse
+            }
+            return record
+        }
     }
     
     /// Run a compliance check
     func runComplianceCheck(districtId: String) async throws -> ComplianceAuditResult {
-        print("[ComplianceService] Running compliance check for district: \(districtId)")
-        
-        // In production, this would perform actual compliance checks
-        // For now, return a stub result
-        
-        let result = ComplianceAuditResult(
-            id: UUID().uuidString,
-            districtId: districtId,
-            auditDate: Date(),
-            overallScore: 0.85,
-            categories: [
-                ComplianceCategory(
-                    name: "Data Privacy",
-                    score: 0.9,
-                    issues: [],
-                    recommendations: ["Consider enabling additional encryption options"]
-                ),
-                ComplianceCategory(
-                    name: "Student Records",
-                    score: 0.8,
-                    issues: ["Some records missing required fields"],
-                    recommendations: ["Review student intake process"]
-                )
-            ],
-            summary: "Overall compliance is good with minor areas for improvement."
-        )
-        
-        // Save the audit result
-        try await saveAuditResult(districtId: districtId, result: result)
-        
-        return result
+        _ = try authorize(districtID: districtId, writing: true)
+        // A settings read is not a regulatory audit. Never persist or display
+        // a compliance score without a verified evidence-based evaluator.
+        throw ComplianceServiceError.auditUnavailable
     }
     
     // MARK: - Consent Operations
@@ -126,14 +146,6 @@ final class ComplianceService {
     }
     
     // MARK: - Private Helpers
-    
-    private func saveAuditResult(districtId: String, result: ComplianceAuditResult) async throws {
-        let collection = db.collection(FirestorePaths.complianceAudits(districtID: districtId))
-        let data = result.toFirestoreData()
-        
-        try await collection.document(result.id).setData(data)
-    }
-    
     
     private func parseAuditResult(from document: DocumentSnapshot) -> ComplianceAuditResult? {
         guard let data = document.data() else { return nil }
@@ -171,11 +183,26 @@ final class ComplianceService {
     }
 }
 
-enum ComplianceServiceError: LocalizedError {
+enum ComplianceServiceError: LocalizedError, Equatable {
     case studentConsentMigrationPending
+    case notAuthenticated
+    case permissionDenied
+    case invalidResponse
+    case auditUnavailable
 
     var errorDescription: String? {
-        "Student consent records will be available after their canonical data migration."
+        switch self {
+        case .studentConsentMigrationPending:
+            "Student consent records will be available after their canonical data migration."
+        case .notAuthenticated:
+            "Sign in with a verified staff account to access district settings."
+        case .permissionDenied:
+            "You do not have permission to access or change these district settings."
+        case .invalidResponse:
+            "The district settings or audit records could not be verified."
+        case .auditUnavailable:
+            "An evidence-based compliance audit is not available. No audit result was created."
+        }
     }
 }
 

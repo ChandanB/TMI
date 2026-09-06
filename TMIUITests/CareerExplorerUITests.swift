@@ -29,10 +29,19 @@ final class CareerExplorerUITests: XCTestCase {
         XCTAssertTrue(element("careerComparison.screen", in: app).waitForExistence(timeout: 5))
     }
 
-    func testDetailSharesAndKeepsPlanAttachmentDisabled() {
+    func testDetailSharesAndAttachesCareerToStudentPlan() {
         let app = launchFixture(named: "career-detail")
         XCTAssertTrue(app.buttons["Share career"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Attach to a plan"].isEnabled)
+        XCTAssertTrue(app.buttons["Attach to a plan"].isEnabled)
+        app.buttons["Attach to a plan"].tap()
+
+        XCTAssertTrue(element("careerAttachment.sheet", in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Frontend Developer for Ava Stone"].exists)
+        element("careerAttachment.plan.plan-a", in: app).tap()
+        XCTAssertTrue(
+            app.staticTexts["Frontend Developer was attached to Technology confidence plan."]
+                .waitForExistence(timeout: 5)
+        )
     }
 
     private func launchFixture(named fixture: String = "career-discovery") -> XCUIApplication {

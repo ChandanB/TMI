@@ -366,7 +366,8 @@ struct CanonicalPlanDetailView: View {
                     .foregroundStyle(TMIColors.textSecondary)
                     .accessibilityIdentifier("planDetail.student")
             }
-            if plan.status.isEditable, plan.metadata.createdBy == member.userID,
+            if plan.status.isEditable,
+               (plan.effectiveOwnerMemberID == member.userID || plan.assignedMemberIDs.contains(member.userID)),
                member.capabilities.contains(.studentWriteDetail) {
                 Button("Edit plan", systemImage: "pencil") { self.isEditingPlan = true }
                     .buttonStyle(.bordered)

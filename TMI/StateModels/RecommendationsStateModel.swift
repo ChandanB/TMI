@@ -92,6 +92,7 @@ final class RecommendationsStateModel: BaseStateModel<[Recommendation], Identifi
     // MARK: - Dependencies
     
     private let recommendationsService: RecommendationsService
+    private var loadGeneration = UUID()
     
     // MARK: - State
     
@@ -166,33 +167,37 @@ final class RecommendationsStateModel: BaseStateModel<[Recommendation], Identifi
     
     @MainActor
     override func fetch() async {
-        guard contextStudentId != nil || contextPlanId != nil else {
-            print("[RecommendationsStateModel] No context set, skipping fetch")
+        loadGeneration = UUID()
+        let generation = loadGeneration
+        let studentID = contextStudentId
+        let planID = contextPlanId
+        recommendations = []
+        selectedRecommendation = nil
+        updateDerivedCollections()
+        guard studentID != nil || planID != nil else {
+            updateState(.loaded([]))
             return
         }
-        
         updateState(.loading)
-        
         do {
             let fetched: [Recommendation]
-            
-            if let planId = contextPlanId {
-                fetched = try await recommendationsService.fetchRecommendations(forPlanId: planId)
-            } else if let studentId = contextStudentId {
-                fetched = try await recommendationsService.fetchRecommendations(forStudentId: studentId)
+            if let studentID {
+                fetched = try await recommendationsService.fetchRecommendations(forStudentId: studentID)
+            } else if let planID {
+                fetched = try await recommendationsService.fetchRecommendations(forPlanId: planID)
             } else {
                 fetched = []
             }
-            
-            recommendations = fetched
+            guard self.loadGeneration == generation, !Task.isCancelled else { return }
+            recommendations = fetched.filter {
+                (studentID == nil || $0.studentId == studentID)
+                    && (planID == nil || $0.planId == planID)
+            }
             updateDerivedCollections()
             updateState(.loaded(recommendations))
-            
-            print("[RecommendationsStateModel] Fetched \(recommendations.count) recommendations")
         } catch {
-            let identifiableError = IdentifiableError(message: error.localizedDescription)
-            updateState(.error(identifiableError))
-            print("[RecommendationsStateModel] Error fetching recommendations: \(error.localizedDescription)")
+            guard self.loadGeneration == generation, !Task.isCancelled else { return }
+            updateState(.error(IdentifiableError(message: "Recommendations could not be loaded. Try again.")))
         }
     }
     

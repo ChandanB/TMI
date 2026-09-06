@@ -77,6 +77,7 @@ extension StudentPlanProjectionRepository {
                     let actions = try await children.actions(planID: plan.id, member: member)
                     let progress = try await children.progress(planID: plan.id, member: member)
                     if let projection = StudentPlanProjectionBuilder.projection(
+                        studentID: grant.scope.studentID,
                         plan: plan,
                         goals: goals,
                         actions: actions,

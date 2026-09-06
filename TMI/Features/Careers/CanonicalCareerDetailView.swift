@@ -7,7 +7,10 @@ import SwiftUI
 struct CanonicalCareerDetailView: View {
     let career: CareerRecord
     let match: CareerMatch?
+    var studentContext: CareerPlanAttachmentContext?
     var onViewed: @MainActor () async -> Void = {}
+
+    @State private var attachmentShown = false
 
     var body: some View {
         ScrollView {
@@ -70,10 +73,13 @@ struct CanonicalCareerDetailView: View {
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("careerDetail.share")
 
-                Button("Attach to a plan", systemImage: "link") {}
+                if studentContext != nil {
+                    Button("Attach to a plan", systemImage: "link") {
+                        attachmentShown = true
+                    }
                     .buttonStyle(.bordered)
-                    .disabled(true)
-                    .accessibilityIdentifier("careerDetail.planAttachmentUnavailable")
+                    .accessibilityIdentifier("careerDetail.planAttachment")
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(TMISpacing.lg)
@@ -82,6 +88,19 @@ struct CanonicalCareerDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("careerDetail.screen")
         .task { await onViewed() }
+        .sheet(isPresented: $attachmentShown) {
+            if let studentContext {
+                CareerPlanAttachmentSheet(
+                    studentID: studentContext.studentID,
+                    studentName: studentContext.studentName,
+                    career: career,
+                    member: studentContext.member,
+                    repository: studentContext.planRepository,
+                    attacher: studentContext.planAttacher ?? FirebaseCareerPlanAttacher(),
+                    onAttached: studentContext.onAttached
+                )
+            }
+        }
     }
 
     private var shareText: String {
@@ -124,6 +143,16 @@ struct CanonicalCareerDetailView: View {
             .map { $0.capitalized }
             .joined(separator: " ")
     }
+}
+
+@MainActor
+struct CareerPlanAttachmentContext {
+    let studentID: String
+    let studentName: String
+    let member: MembershipContext
+    let planRepository: any PlanRecordRepository
+    var planAttacher: (any CareerPlanAttaching)?
+    var onAttached: @MainActor () async -> Void = {}
 }
 
 extension CareerEducationLevel {
