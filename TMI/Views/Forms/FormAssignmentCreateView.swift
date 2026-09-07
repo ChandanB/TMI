@@ -10,6 +10,7 @@ import SwiftUI
 struct FormAssignmentCreateView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.authStateModel) private var authStateModel
+  @Environment(\.appDependencies) private var dependencies
   let viewModel: FormAssignmentViewModel
 
   // Form state
@@ -28,6 +29,11 @@ struct FormAssignmentCreateView: View {
   @State private var showingTemplatePicker = false
   @State private var availableTemplates: [FormTemplate] = []
   @State private var isLoadingTemplates = false
+
+  // Cohort resolution data
+  @State private var availableSchools: [School] = []
+  @State private var isLoadingSchools = false
+  @State private var showingStudentPicker = false
 
   // Services
   @State private var templateService = FormTemplateService()
@@ -125,8 +131,19 @@ struct FormAssignmentCreateView: View {
         )
         .tmiSheetStyle()
       }
+      .sheet(isPresented: $showingStudentPicker) {
+        if let member = authStateModel.currentMembership {
+          FormAssignmentStudentPickerView(
+            selection: $selectedStudents,
+            member: member,
+            repository: dependencies.studentRepository
+          )
+          .tmiSheetStyle()
+        }
+      }
       .task {
         await loadTemplates()
+        await loadSchools()
       }
     }
   }
@@ -142,11 +159,24 @@ struct FormAssignmentCreateView: View {
         .foregroundColor(.secondary)
 
     case .school:
-      Picker("School", selection: $selectedSchool) {
-        Text("Select School").tag(nil as String?)
-        // Would fetch schools from DistrictService
-        Text("Lincoln High School").tag("school_001" as String?)
-        Text("Washington Middle School").tag("school_002" as String?)
+      if isLoadingSchools {
+        HStack(spacing: 8) {
+          ProgressView()
+          Text("Loading schools…")
+            .font(.caption)
+            .foregroundColor(.secondary)
+        }
+      } else if availableSchools.isEmpty {
+        Text("No schools are available for your district.")
+          .font(.caption)
+          .foregroundColor(.secondary)
+      } else {
+        Picker("School", selection: $selectedSchool) {
+          Text("Select School").tag(nil as String?)
+          ForEach(availableSchools) { school in
+            Text(school.name).tag(school.id as String?)
+          }
+        }
       }
 
     case .grade:
@@ -158,9 +188,22 @@ struct FormAssignmentCreateView: View {
       }
 
     case .specificStudents:
-      Text("Student selection feature coming soon")
-        .font(.caption)
-        .foregroundColor(.secondary)
+      Button {
+        showingStudentPicker = true
+      } label: {
+        HStack {
+          Text("Selected Students")
+            .foregroundColor(.primary)
+          Spacer()
+          if selectedStudents.isEmpty {
+            Text("Select…")
+              .foregroundColor(.blue)
+          } else {
+            Text("\(selectedStudents.count) selected")
+              .foregroundColor(.secondary)
+          }
+        }
+      }
     }
   }
 
@@ -197,6 +240,27 @@ struct FormAssignmentCreateView: View {
     isLoadingTemplates = false
   }
 
+  private func loadSchools() async {
+    guard let districtId = authStateModel.currentMembership?.districtID else { return }
+    isLoadingSchools = true
+    defer { isLoadingSchools = false }
+    do {
+      let fetched = try await DistrictService.shared.fetchSchools(for: districtId)
+      // Only offer schools the member is scoped to; an empty scope (e.g. a
+      // district administrator) may assign across every school in the district.
+      let memberSchoolIDs = authStateModel.currentMembership?.schoolIDs ?? []
+      let scoped = memberSchoolIDs.isEmpty
+        ? fetched
+        : fetched.filter { school in
+            guard let id = school.id else { return false }
+            return memberSchoolIDs.contains(id)
+          }
+      availableSchools = scoped.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    } catch {
+      print("[FormAssignmentCreateView] Error loading schools: \(error.localizedDescription)")
+    }
+  }
+
   private func createAssignment() async {
     guard let template = selectedTemplate else { return }
     guard let user = authStateModel.currentUser,
@@ -207,7 +271,8 @@ struct FormAssignmentCreateView: View {
       case .allStudents:
         return .allStudents
       case .school:
-        return .school(schoolId: selectedSchool ?? "", schoolName: "Selected School")
+        let schoolName = availableSchools.first { $0.id == selectedSchool }?.name ?? "Selected School"
+        return .school(schoolId: selectedSchool ?? "", schoolName: schoolName)
       case .grade:
         return .grade(grade: selectedGrade ?? "9")
       case .specificStudents:
@@ -311,6 +376,166 @@ struct FormTemplatePickerView: View {
         }
       }
     }
+  }
+}
+
+// MARK: - Student Picker
+
+/// Multi-select roster picker used to build a `.specificStudents` cohort.
+/// Reuses the canonical `StudentListState` so search, paging, and access
+/// policy match the main Students roster.
+struct FormAssignmentStudentPickerView: View {
+  @Environment(\.dismiss) private var dismiss
+  @Binding var selection: Set<String>
+  let member: MembershipContext
+  let repository: any StudentRepository
+
+  @State private var state: StudentListState?
+  @State private var workingSelection: Set<String> = []
+
+  var body: some View {
+    NavigationStack {
+      Group {
+        if let state {
+          FormAssignmentStudentPickerContent(
+            state: state,
+            workingSelection: $workingSelection
+          )
+        } else {
+          ProgressView("Loading students…")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+      }
+      .navigationTitle("Select Students")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { dismiss() }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Done") {
+            selection = workingSelection
+            dismiss()
+          }
+        }
+      }
+    }
+    .task {
+      guard state == nil else { return }
+      workingSelection = selection
+      let newState = StudentListState(repository: repository, member: member)
+      state = newState
+      await newState.load()
+    }
+  }
+}
+
+private struct FormAssignmentStudentPickerContent: View {
+  @Bindable var state: StudentListState
+  @Binding var workingSelection: Set<String>
+
+  var body: some View {
+    Group {
+      switch state.phase {
+      case .idle, .loading:
+        ProgressView("Loading students…")
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+      case .empty:
+        ContentUnavailableView(
+          "No Students",
+          systemImage: "person.2.slash",
+          description: Text("No students match your search or you don't have access to any roster records.")
+        )
+
+      case .permissionDenied:
+        ContentUnavailableView(
+          "Access Unavailable",
+          systemImage: "lock",
+          description: Text("A verified staff membership is required to view students.")
+        )
+
+      case .failed(let message):
+        ContentUnavailableView(
+          "Couldn't Load Students",
+          systemImage: "exclamationmark.triangle",
+          description: Text(message)
+        )
+
+      case .loaded, .refreshing, .offline:
+        studentList
+      }
+    }
+    .searchable(text: $state.searchText, prompt: "Search students")
+  }
+
+  private var studentList: some View {
+    List {
+      if !workingSelection.isEmpty {
+        Section {
+          HStack {
+            Text("\(workingSelection.count) selected")
+              .font(.subheadline.weight(.medium))
+              .foregroundColor(.secondary)
+            Spacer()
+            Button("Clear") { workingSelection.removeAll() }
+              .font(.subheadline)
+          }
+        }
+      }
+
+      Section {
+        ForEach(state.students) { record in
+          studentRow(record)
+            .onAppear {
+              if record.id == state.students.last?.id, state.canLoadNextPage {
+                Task { await state.loadNextPage() }
+              }
+            }
+        }
+
+        if state.isLoadingNextPage {
+          HStack {
+            Spacer()
+            ProgressView()
+            Spacer()
+          }
+        }
+      }
+    }
+    .listStyle(.plain)
+    .refreshable { await state.refresh() }
+  }
+
+  private func studentRow(_ record: StudentRecord) -> some View {
+    let isSelected = workingSelection.contains(record.id)
+    return Button {
+      if isSelected {
+        workingSelection.remove(record.id)
+      } else {
+        workingSelection.insert(record.id)
+      }
+    } label: {
+      HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 2) {
+          Text(record.displayName)
+            .font(.body)
+            .foregroundColor(.primary)
+          Text("Grade \(record.grade)")
+            .font(.caption)
+            .foregroundColor(.secondary)
+        }
+        Spacer()
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+          .font(.system(size: 20))
+          .foregroundColor(isSelected ? TMIColors.teal : Color.secondary.opacity(0.5))
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(record.displayName)
+    .accessibilityValue(isSelected ? "Selected" : "Not selected")
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
   }
 }
 

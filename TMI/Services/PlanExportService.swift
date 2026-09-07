@@ -968,7 +968,7 @@ class PlanExportService {
     func exportMultiplePlans(_ plans: [TMIPlan], title: String) async throws -> URL {
         // For simplicity, we'll create separate PDFs and note this in documentation
         // A full implementation would merge PDFs or create one multi-plan PDF
-        throw PlanExportError.notImplemented("Bulk export coming in future release")
+        throw PlanExportError.notImplemented("Bulk export coming soon")
     }
 }
 

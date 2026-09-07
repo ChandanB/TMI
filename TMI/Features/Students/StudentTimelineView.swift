@@ -14,7 +14,7 @@ struct StudentTimelineView: View {
                 .foregroundStyle(TMIColors.textPrimary)
                 .accessibilityAddTraits(.isHeader)
 
-            if let nextAvailableRelease {
+            if nextAvailableRelease != nil {
                 VStack(spacing: TMISpacing.sm) {
                     Image(systemName: "clock.badge.questionmark")
                         .font(.title)
@@ -22,7 +22,7 @@ struct StudentTimelineView: View {
                         .accessibilityHidden(true)
 
                     Text(
-                        "Timeline available in Release \(nextAvailableRelease)"
+                        "Timeline not available yet"
                     )
                     .font(.headline)
                     .foregroundStyle(TMIColors.textPrimary)
@@ -32,7 +32,7 @@ struct StudentTimelineView: View {
                     )
 
                     Text(
-                        "Private staff notes and student reflections are not loaded in this release."
+                        "Private staff notes and student reflections are not available yet."
                     )
                     .font(.body)
                     .foregroundStyle(TMIColors.textSecondary)

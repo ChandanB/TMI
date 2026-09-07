@@ -17,47 +17,48 @@ struct StaffAssignmentListView: View {
   private let assignmentService = FormAssignmentService()
 
   var body: some View {
-    NavigationStack {
-      ZStack {
-        TMIBackgroundView(variant: .dashboard)
-        
-        if isLoading && assignments.isEmpty {
-          ProgressView("Loading Assignments...")
-        } else if assignments.isEmpty {
-          emptyStateView
-        } else {
-          List(assignments) { assignment in
-            NavigationLink(destination: StaffAnalyticsView(assignment: assignment)) {
-              AssignmentRow(assignment: assignment)
-            }
-          }
-          #if canImport(UIKit)
-          .listStyle(.insetGrouped)
-          #else
-          .listStyle(.inset)
-          #endif
-          .refreshable {
-              await loadAssignments()
+    // Presented by pushing onto an existing navigation stack (e.g. from
+    // Settings), so this view must not introduce its own `NavigationStack`;
+    // a nested stack collapses the parent's navigation back to its root.
+    ZStack {
+      TMIBackgroundView(variant: .dashboard)
+
+      if isLoading && assignments.isEmpty {
+        ProgressView("Loading Assignments...")
+      } else if assignments.isEmpty {
+        emptyStateView
+      } else {
+        List(assignments) { assignment in
+          NavigationLink(destination: StaffAnalyticsView(assignment: assignment)) {
+            AssignmentRow(assignment: assignment)
           }
         }
-      }
-      .navigationTitle("Assignments")
-      .toolbar {
-        ToolbarItem(placement: .primaryAction) {
-          Button {
-            showingCreationSheet = true
-          } label: {
-            Image(systemName: "plus")
-          }
+        #if canImport(UIKit)
+        .listStyle(.insetGrouped)
+        #else
+        .listStyle(.inset)
+        #endif
+        .refreshable {
+            await loadAssignments()
         }
       }
-      .task {
-        await loadAssignments()
+    }
+    .navigationTitle("Assignments")
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          showingCreationSheet = true
+        } label: {
+          Image(systemName: "plus")
+        }
       }
-      .sheet(isPresented: $showingCreationSheet) {
-          AssignmentCreationView()
-              .tmiSheetStyle()
-      }
+    }
+    .task {
+      await loadAssignments()
+    }
+    .sheet(isPresented: $showingCreationSheet) {
+        AssignmentCreationView()
+            .tmiSheetStyle()
     }
   }
   

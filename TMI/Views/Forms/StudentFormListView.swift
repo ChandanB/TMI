@@ -147,7 +147,7 @@ struct StudentFormListView: View {
     guard FeatureFlags.production.independentStudentAccounts else {
       assignments = []
       submissions = []
-      errorMessage = "Student Mode is not available in this release."
+      errorMessage = "Student Mode is not available yet."
       isLoading = false
       return
     }

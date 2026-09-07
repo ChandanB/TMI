@@ -10,7 +10,8 @@ import SwiftUI
 struct AssignmentCreationView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.authStateModel) private var authStateModel
-  
+  @Environment(\.appDependencies) private var dependencies
+
   // Dependencies
   private let assignmentService = FormAssignmentService()
   private let templateService = FormTemplateService()
@@ -30,17 +31,21 @@ struct AssignmentCreationView: View {
   // Cohort Selection
   @State private var selectedCohortType: CohortType = .allStudents
   @State private var targetGrade = ""
-  @State private var targetClassName = ""
+  @State private var selectedSchoolId: String?
+  @State private var selectedStudents: Set<String> = []
+  @State private var availableSchools: [School] = []
+  @State private var isLoadingSchools = false
+  @State private var showingStudentPicker = false
   @State private var isSubmitting = false
   @State private var errorMessage: String?
-  
+
   // Helper Enum for UI Picker
   enum CohortType: String, CaseIterable, Identifiable {
       case allStudents = "All Students"
-      case grade = "Specific Grade"
-      case customClass = "Custom Class"
-      // case school, specificStudents omitted for MVP simplicity
-      
+      case grade = "Grade"
+      case school = "School"
+      case specificStudents = "Students"
+
       var id: String { rawValue }
   }
 
@@ -109,6 +114,7 @@ struct AssignmentCreationView: View {
       }
       .task {
           await loadTemplates()
+          await loadSchools()
       }
       .alert("Error", isPresented: .constant(errorMessage != nil)) {
           Button("OK") { errorMessage = nil }
@@ -182,23 +188,77 @@ struct AssignmentCreationView: View {
                   }
               }
               .pickerStyle(.segmented)
-              
-              if selectedCohortType == .grade {
-                  TextField("Grade Level (e.g. 9, 10)", text: $targetGrade)
-                      .keyboardType(.numberPad)
-              }
-              
-              if selectedCohortType == .customClass {
-                  TextField("Class Name (e.g. Homeroom 101)", text: $targetClassName)
+
+              switch selectedCohortType {
+              case .allStudents:
+                  Text("Every student you're authorized to assign to.")
+                      .font(.caption)
+                      .foregroundColor(.secondary)
+
+              case .grade:
+                  Picker("Grade", selection: $targetGrade) {
+                      Text("Select Grade").tag("")
+                      ForEach(["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"], id: \.self) { grade in
+                          Text("Grade \(grade)").tag(grade)
+                      }
+                  }
+
+              case .school:
+                  if isLoadingSchools {
+                      HStack(spacing: 8) {
+                          ProgressView()
+                          Text("Loading schools…")
+                              .font(.caption)
+                              .foregroundColor(.secondary)
+                      }
+                  } else if availableSchools.isEmpty {
+                      Text("No schools are available for your district.")
+                          .font(.caption)
+                          .foregroundColor(.secondary)
+                  } else {
+                      Picker("School", selection: $selectedSchoolId) {
+                          Text("Select School").tag(nil as String?)
+                          ForEach(availableSchools) { school in
+                              Text(school.name).tag(school.id as String?)
+                          }
+                      }
+                  }
+
+              case .specificStudents:
+                  Button {
+                      showingStudentPicker = true
+                  } label: {
+                      HStack {
+                          Text("Selected Students")
+                              .foregroundColor(.primary)
+                          Spacer()
+                          if selectedStudents.isEmpty {
+                              Text("Select…").foregroundColor(.blue)
+                          } else {
+                              Text("\(selectedStudents.count) selected")
+                                  .foregroundColor(.secondary)
+                          }
+                      }
+                  }
               }
           }
-          
+
           Section("Summary") {
               if let template = selectedTemplate {
                   LabeledContent("Template", value: template.name)
               }
               LabeledContent("Due Date", value: dueDate.formatted(date: .abbreviated, time: .shortened))
               LabeledContent("Cohort", value: cohortDescription)
+          }
+      }
+      .sheet(isPresented: $showingStudentPicker) {
+          if let member = authStateModel.currentMembership {
+              FormAssignmentStudentPickerView(
+                  selection: $selectedStudents,
+                  member: member,
+                  repository: dependencies.studentRepository
+              )
+              .tmiSheetStyle()
           }
       }
   }
@@ -215,20 +275,30 @@ struct AssignmentCreationView: View {
   
   private var cohortDescription: String {
       switch selectedCohortType {
-      case .allStudents: return "All Students in District/School"
-      case .grade: return "Grade \(targetGrade)"
-      case .customClass: return "Class: \(targetClassName)"
+      case .allStudents:
+          return "All Students in District/School"
+      case .grade:
+          return targetGrade.isEmpty ? "No grade selected" : "Grade \(targetGrade)"
+      case .school:
+          let name = availableSchools.first { $0.id == selectedSchoolId }?.name
+          return name ?? "No school selected"
+      case .specificStudents:
+          if selectedStudents.isEmpty { return "No students selected" }
+          return "\(selectedStudents.count) student\(selectedStudents.count == 1 ? "" : "s")"
       }
   }
-  
+
   private func canProceed() -> Bool {
       switch currentStep {
       case 0: return selectedTemplate != nil
       case 1: return !instructions.isEmpty
       case 2:
-          if selectedCohortType == .grade { return !targetGrade.isEmpty }
-          if selectedCohortType == .customClass { return !targetClassName.isEmpty }
-          return true
+          switch selectedCohortType {
+          case .allStudents: return true
+          case .grade: return !targetGrade.isEmpty
+          case .school: return selectedSchoolId != nil
+          case .specificStudents: return !selectedStudents.isEmpty
+          }
       default: return false
       }
   }
@@ -245,7 +315,30 @@ struct AssignmentCreationView: View {
           errorMessage = "Failed to load templates: \(error.localizedDescription)"
       }
   }
-  
+
+  private func loadSchools() async {
+      guard let membership = authStateModel.currentMembership else { return }
+      isLoadingSchools = true
+      defer { isLoadingSchools = false }
+      do {
+          let fetched = try await DistrictService.shared.fetchSchools(for: membership.districtID)
+          // Only offer schools the member is scoped to; an empty scope (e.g. a
+          // district administrator) may assign across every school.
+          let memberSchoolIDs = membership.schoolIDs
+          let scoped = memberSchoolIDs.isEmpty
+              ? fetched
+              : fetched.filter { school in
+                  guard let id = school.id else { return false }
+                  return memberSchoolIDs.contains(id)
+              }
+          availableSchools = scoped.sorted {
+              $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+          }
+      } catch {
+          print("[AssignmentCreationView] Error loading schools: \(error.localizedDescription)")
+      }
+  }
+
   private func createAssignment() async {
       guard let template = selectedTemplate,
             let templateId = template.id,
@@ -261,12 +354,13 @@ struct AssignmentCreationView: View {
           cohort = .allStudents
       case .grade:
           cohort = .grade(grade: targetGrade)
-      case .customClass:
-          // NOTE: In a real app we'd likely select from existing classes or get student IDs
-          // For now, we mock it with an empty student list or assume the service handles lookup
-          cohort = .customClass(className: targetClassName, studentIds: [])
+      case .school:
+          let schoolName = availableSchools.first { $0.id == selectedSchoolId }?.name ?? "Selected School"
+          cohort = .school(schoolId: selectedSchoolId ?? "", schoolName: schoolName)
+      case .specificStudents:
+          cohort = .specificStudents(studentIds: Array(selectedStudents), count: selectedStudents.count)
       }
-      
+
       let assignment = FormAssignment(
           templateId: templateId,
           templateName: template.name,
@@ -278,7 +372,7 @@ struct AssignmentCreationView: View {
           allowLateSubmissions: allowLateSubmissions,
           requiresReview: requiresReview,
           districtId: membership.districtID,
-          schoolId: membership.schoolIDs.sorted().first
+          schoolId: selectedCohortType == .school ? selectedSchoolId : membership.schoolIDs.sorted().first
       )
       
       do {

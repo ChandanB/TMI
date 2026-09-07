@@ -458,7 +458,7 @@ enum DistrictAnalyticsError: LocalizedError {
         case .exportNotImplemented:
             return "Export functionality is not yet implemented"
         case .serverMetricsUnavailable:
-            return "District metrics will be available after the server-owned analytics release."
+            return "District metrics will be available once server-owned analytics are enabled."
         }
     }
 }

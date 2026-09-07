@@ -1035,7 +1035,7 @@ struct DashboardView: View {
 
     private func releaseOneStatusCard(_ data: DashboardData) -> some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
-            Label("Release 1 workspace", systemImage: "checkmark.shield")
+            Label("Workspace", systemImage: "checkmark.shield")
                 .font(.tmiTitle3.bold())
                 .foregroundColor(.tmiPrimary)
 
@@ -1043,7 +1043,7 @@ struct DashboardView: View {
                 .font(.tmiBody)
                 .foregroundColor(.tmiTextPrimary)
 
-            Text("Engagement, survey, interest, and support-alert metrics appear only after their canonical data releases. No placeholder scores are shown.")
+            Text("Engagement, survey, interest, and support-alert metrics appear only once their canonical data is available. No placeholder scores are shown.")
                 .font(.tmiCaption)
                 .foregroundColor(.tmiTextSecondary)
         }

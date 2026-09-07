@@ -141,7 +141,7 @@ struct StudentSelectorForPlanView: View {
     var body: some View {
         TMIEmptyState(
             icon: "calendar.badge.clock",
-            title: "Plan creation arrives in Release 3",
+            title: "Plan creation coming soon",
             message: "The secure roster is ready. Plan creation will reopen when plans use the same canonical district records.",
             action: { dismiss() },
             actionLabel: "Done"
