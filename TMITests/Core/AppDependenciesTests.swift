@@ -277,6 +277,44 @@ struct AppDependenciesTests {
         #expect(!shellSource.contains("TMI Plans Arrive in Release 3"))
     }
 
+    @Test("Authenticated startup avoids Firestore paths denied by canonical rules")
+    func authenticatedStartupAvoidsDeniedLegacyPaths() throws {
+        let appSource = try self.source(
+            "TMI/App/TMIApp.swift",
+            root: self.repositoryRoot
+        )
+        let shellSource = try self.source(
+            "TMI/Views/MainTabView.swift",
+            root: self.repositoryRoot
+        )
+        let notificationSource = try self.source(
+            "TMI/Services/NotificationService.swift",
+            root: self.repositoryRoot
+        )
+        let compactNotifications = notificationSource.removingWhitespace
+        let preferenceBody = try #require(
+            notificationSource.range(of: "func updatePreferences(").map { range in
+                String(notificationSource[range.lowerBound...].prefix(900))
+            }
+        )
+
+        #expect(!appSource.contains("AppBootstrapService.shared.warmStart"))
+        #expect(shellSource.contains("notificationService.startListening(member: member)"))
+        #expect(shellSource.contains("notificationService.fetchNotifications(member: member)"))
+        #expect(shellSource.contains(".task(id: member)"))
+        #expect(notificationSource.contains("FirestorePaths.notifications(districtID: member.districtID)"))
+        #expect(notificationSource.contains(
+            #".whereField("recipientUserID", isEqualTo: member.userID)"#
+        ))
+        #expect(!compactNotifications.contains(
+            #".collection("users").document(userId).collection("notifications")"#
+        ))
+        #expect(notificationSource.contains("isLocalDebugMembership(member)"))
+        #expect(notificationSource.contains("private func clearNotificationState()"))
+        #expect(preferenceBody.contains("guard let member = activeMembership"))
+        #expect(preferenceBody.contains("guard !isLocalDebugMembership(member) else { return }"))
+    }
+
     @Test("Plan snapshots derive only from canonical roster records")
     func planSnapshotsAreCanonical() {
         let birthDate = Date(timeIntervalSince1970: 1_325_376_000)

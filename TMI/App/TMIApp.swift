@@ -433,8 +433,6 @@ struct ContentView: View {
 
         hasBootstrapped = true
         
-        await AppBootstrapService.shared.warmStart(membership: membership)
-        
         // Load district context if applicable
         if membership.role == .districtAdministrator,
            AuthorizationPolicy.canViewAggregate(

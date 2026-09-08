@@ -1,8 +1,8 @@
 .superpowers/
 .worktrees/
-firebase/node_modules/
-firebase/lib/
-firebase/*-debug.log
+functions/node_modules/
+functions/lib/
+functions/*-debug.log
 .firebase/
 firebase-debug.log
 

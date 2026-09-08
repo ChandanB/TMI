@@ -56,7 +56,7 @@ final class DebugStaffInvitationProvisioner: StaffInvitationProvisioning {
     nonisolated static let invitationAlias = "TMI-DEBUG-ACCESS-2026"
     nonisolated static let allowedEmail = "tmi-debug@example.com"
     nonisolated static let districtID = "district-debug"
-    nonisolated static let schoolID = "school-debug"
+    nonisolated static let schoolID = "Lincoln Elementary"
 
     private let delegate: any StaffInvitationProvisioning
 

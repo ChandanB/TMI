@@ -72,6 +72,11 @@ if (getApps().length === 0) {
 const callableOptions = {
   enforceAppCheck: true,
   region: "us-central1",
+  memory: "256MiB",
+  // Restore 1st-gen (fractional) CPU allocation so the full function set fits
+  // within the project's Cloud Run "total CPU allocation, per region" quota.
+  // These callables are lightweight Firestore operations; sub-vCPU is ample.
+  cpu: "gcf_gen1",
 } as const;
 
 const baseFields = [
@@ -5440,6 +5445,8 @@ export const drainStudentClaimRefresh = onDocumentCreated(
     region: "us-central1",
     retry: true,
     timeoutSeconds: 540,
+    memory: "256MiB",
+    cpu: "gcf_gen1",
   },
   async (event) => {
     await productionStudentClaimRefreshHandler({

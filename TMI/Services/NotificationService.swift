@@ -119,6 +119,12 @@ struct NotificationPreferences: Codable, Sendable {
 @Observable
 @MainActor
 class NotificationService {
+    enum ServiceError: Error {
+        case unauthorized
+        case unavailable
+        case serverManaged
+    }
+
     static let shared = NotificationService()
     
     // State
@@ -130,6 +136,7 @@ class NotificationService {
     // Dependencies
     private let db = Firestore.firestore()
     private var listenerRegistration: ListenerRegistration?
+    private var activeMembership: MembershipContext?
     
     private init() {
         Task {
@@ -164,51 +171,108 @@ class NotificationService {
     
     // MARK: - Fetching Notifications
     
-    func fetchNotifications() async throws {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
-        
-        let snapshot = try await db.collection("users")
-            .document(userId)
-            .collection("notifications")
-            .order(by: "timestamp", descending: true)
+    func fetchNotifications(member: MembershipContext) async throws {
+        try authorize(member)
+        activeMembership = member
+
+        if isLocalDebugMembership(member) {
+            notifications = []
+            updateUnreadCount()
+            return
+        }
+
+        let snapshot = try await notificationCollection(member: member)
+            .whereField("recipientUserID", isEqualTo: member.userID)
             .limit(to: 50)
             .getDocuments()
-        
-        notifications = snapshot.documents.compactMap { doc in
-            try? doc.data(as: InAppNotification.self)
-        }
-        
+
+        guard activeMembership == member else { return }
+        notifications = decodedNotifications(snapshot)
         updateUnreadCount()
     }
-    
-    func startListening() {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
-        
-        listenerRegistration = db.collection("users")
-            .document(userId)
-            .collection("notifications")
-            .order(by: "timestamp", descending: true)
+
+    func fetchNotifications() async throws {
+        guard let activeMembership else {
+            throw ServiceError.unavailable
+        }
+        try await fetchNotifications(member: activeMembership)
+    }
+
+    func startListening(member: MembershipContext) {
+        stopListening()
+        guard (try? authorize(member)) != nil else {
+            return
+        }
+        activeMembership = member
+
+        if isLocalDebugMembership(member) {
+            notifications = []
+            updateUnreadCount()
+            return
+        }
+
+        listenerRegistration = notificationCollection(member: member)
+            .whereField("recipientUserID", isEqualTo: member.userID)
             .limit(to: 50)
             .addSnapshotListener { [weak self] snapshot, error in
-                guard let self = self, let snapshot = snapshot else {
-                    print("[NotificationService] Listener error: \(String(describing: error))")
+                guard let self, let snapshot else {
+                    Log.firebase.warning(
+                        "notification_listener_failed",
+                        metadata: ["error": error?.localizedDescription ?? "unknown"]
+                    )
                     return
                 }
-                
+
                 Task { @MainActor in
-                    self.notifications = snapshot.documents.compactMap { doc in
-                        try? doc.data(as: InAppNotification.self)
-                    }
+                    guard self.activeMembership == member else { return }
+                    self.notifications = self.decodedNotifications(snapshot)
                     self.updateUnreadCount()
                 }
             }
     }
-    
+
+    private func decodedNotifications(_ snapshot: QuerySnapshot) -> [InAppNotification] {
+        snapshot.documents
+            .compactMap { document in
+                try? document.data(as: InAppNotification.self)
+            }
+            .sorted { $0.timestamp > $1.timestamp }
+    }
+
+    private func notificationCollection(member: MembershipContext) -> CollectionReference {
+        db.collection(FirestorePaths.notifications(districtID: member.districtID))
+    }
+
+    private func authorize(_ member: MembershipContext) throws {
+        guard member.isActive,
+              member.version > 0,
+              TrustedIdentifier.isValid(member.districtID),
+              TrustedIdentifier.isValid(member.userID),
+              Auth.auth().currentUser?.uid == member.userID else {
+            throw ServiceError.unauthorized
+        }
+    }
+
+    private func isLocalDebugMembership(_ member: MembershipContext) -> Bool {
+#if DEBUG
+        DebugPlanRepository.isDebug(member)
+#else
+        false
+#endif
+    }
+
     func stopListening() {
         listenerRegistration?.remove()
         listenerRegistration = nil
+        activeMembership = nil
+        clearNotificationState()
     }
-    
+
+    private func clearNotificationState() {
+        notifications = []
+        unreadCount = 0
+    }
+
     private func updateUnreadCount() {
         unreadCount = notifications.filter { !$0.isRead }.count
     }
@@ -223,39 +287,26 @@ class NotificationService {
         targetId: String? = nil,
         forUserId: String? = nil
     ) async throws {
-        let userId = forUserId ?? Auth.auth().currentUser?.uid
-        guard let userId = userId else { return }
-        
-        let notification = InAppNotification(
-            type: type,
-            title: title,
-            message: message,
-            actionUrl: actionUrl,
-            targetId: targetId
-        )
-        
-        try await db.collection("users")
-            .document(userId)
-            .collection("notifications")
-            .document(notification.id)
-            .setModel(notification)
-        
-        // Also schedule local notification if enabled
-        if preferences.pushEnabled && preferences.shouldNotify(for: type) {
-            await scheduleLocalNotification(notification)
-        }
+        // Canonical notification records are institution-owned and server-created.
+        // Client writes are deliberately denied by firestore.rules.
+        throw ServiceError.serverManaged
     }
     
     // MARK: - Marking as Read
     
     func markAsRead(_ notificationId: String) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
-        
-        try await db.collection("users")
-            .document(userId)
-            .collection("notifications")
+        guard let member = activeMembership else {
+            throw ServiceError.unavailable
+        }
+        try authorize(member)
+        guard !isLocalDebugMembership(member) else { return }
+
+        try await notificationCollection(member: member)
             .document(notificationId)
-            .updateData(["isRead": true])
+            .updateData([
+                "isRead": true,
+                "readAt": FieldValue.serverTimestamp(),
+            ])
         
         // Update local state
         if let index = notifications.firstIndex(where: { $0.id == notificationId }) {
@@ -265,16 +316,24 @@ class NotificationService {
     }
     
     func markAllAsRead() async throws {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+        guard let member = activeMembership else {
+            throw ServiceError.unavailable
+        }
+        try authorize(member)
+        guard !isLocalDebugMembership(member) else { return }
         
         let batch = db.batch()
         
         for notification in notifications where !notification.isRead {
-            let ref = db.collection("users")
-                .document(userId)
-                .collection("notifications")
+            let ref = notificationCollection(member: member)
                 .document(notification.id)
-            batch.updateData(["isRead": true], forDocument: ref)
+            batch.updateData(
+                [
+                    "isRead": true,
+                    "readAt": FieldValue.serverTimestamp(),
+                ],
+                forDocument: ref
+            )
         }
         
         try await batch.commit()
@@ -360,19 +419,30 @@ class NotificationService {
     // MARK: - Preferences
     
     func updatePreferences(_ newPreferences: NotificationPreferences) async throws {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
-        
+        guard let member = activeMembership else {
+            throw ServiceError.unavailable
+        }
+        try authorize(member)
         preferences = newPreferences
-        
-        try await db.collection("users")
-            .document(userId)
-            .setData(["notificationPreferences": try Firestore.Encoder().encode(newPreferences)], merge: true)
+        guard !isLocalDebugMembership(member) else { return }
+
+        try await db.document(FirestorePaths.preferences(userID: member.userID))
+            .setData(
+                ["notificationPreferences": try Firestore.Encoder().encode(newPreferences)],
+                merge: true
+            )
     }
     
     func loadPreferences() async throws {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
-        
-        let doc = try await db.collection("users").document(userId).getDocument()
+        guard let member = activeMembership else {
+            throw ServiceError.unavailable
+        }
+        try authorize(member)
+        guard !isLocalDebugMembership(member) else { return }
+
+        let doc = try await db.document(
+            FirestorePaths.preferences(userID: member.userID)
+        ).getDocument()
         
         if let data = doc.data()?["notificationPreferences"] as? [String: Any],
            let prefsData = try? JSONSerialization.data(withJSONObject: data),

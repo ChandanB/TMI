@@ -100,9 +100,19 @@ nonisolated struct AppDependencies: Sendable {
         let plans: any PlanRecordRepository = firebasePlans
         let planChildren: any PlanChildRepositoryProtocol = firebasePlanChildren
 #endif
-        let resources: any ResourceRepository = FirebaseResourceRepository(
+        let firebaseResources = FirebaseResourceRepository(
             transport: FirebaseResourceTransport(firestore: firestore)
         )
+        let firebaseCareers = CareerRelationshipRepository(firestore: firestore)
+#if DEBUG
+        // Keep the Debug tenant fully local: its synthesized claim never reaches
+        // Firestore, so real reads here would fail with permission-denied.
+        let resources: any ResourceRepository = DebugResourceRepository(delegate: firebaseResources)
+        let careers: any CareerRelationshipProviding = DebugCareerRelationshipRepository(delegate: firebaseCareers)
+#else
+        let resources: any ResourceRepository = firebaseResources
+        let careers: any CareerRelationshipProviding = firebaseCareers
+#endif
 
         return AppDependencies(
             runtime: .production,
@@ -115,9 +125,7 @@ nonisolated struct AppDependencies: Sendable {
             planRepository: plans,
             planChildRepository: planChildren,
             planExportAuditing: FirebasePlanExportAuditing(),
-            careerRelationshipRepository: CareerRelationshipRepository(
-                firestore: firestore
-            ),
+            careerRelationshipRepository: careers,
             resourceRepository: resources,
             logger: .production
         )

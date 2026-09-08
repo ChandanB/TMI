@@ -8,7 +8,7 @@
   },
   "functions": [
     {
-      "source": "firebase",
+      "source": "functions",
       "codebase": "default",
       "runtime": "nodejs22",
       "ignore": [

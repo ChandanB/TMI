@@ -119,6 +119,7 @@ struct MainTabView: View {
         macStaffNavigation
             .modifier(StaffShellModifier(
                 notificationService: notificationService,
+                member: authStateModel.currentMembership,
                 showingSignOutConfirmation: $showingSignOutConfirmation,
                 showingSignOutFailure: $showingSignOutFailure,
                 attemptSignOut: attemptSignOut
@@ -127,6 +128,7 @@ struct MainTabView: View {
         mobileStaffNavigation
             .modifier(StaffShellModifier(
                 notificationService: notificationService,
+                member: authStateModel.currentMembership,
                 showingSignOutConfirmation: $showingSignOutConfirmation,
                 showingSignOutFailure: $showingSignOutFailure,
                 attemptSignOut: attemptSignOut
@@ -474,6 +476,7 @@ private struct CanonicalStudentEditRoute: View {
 private struct StaffShellModifier: ViewModifier {
     @Environment(AppRouter.self) private var router
     let notificationService: NotificationService?
+    let member: MembershipContext?
     @Binding var showingSignOutConfirmation: Bool
     @Binding var showingSignOutFailure: Bool
     let attemptSignOut: @MainActor () -> Void
@@ -504,12 +507,16 @@ private struct StaffShellModifier: ViewModifier {
         } message: {
             Text("Your account is still signed in. Check your connection and try again.")
         }
-        .onAppear {
+        .task(id: member) {
             guard let notificationService else {
                 return
             }
-            notificationService.startListening()
-            Task { try? await notificationService.fetchNotifications() }
+            guard let member else {
+                notificationService.stopListening()
+                return
+            }
+            notificationService.startListening(member: member)
+            try? await notificationService.fetchNotifications(member: member)
         }
         .onDisappear {
             notificationService?.stopListening()
