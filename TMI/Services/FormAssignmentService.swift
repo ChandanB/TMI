@@ -245,17 +245,11 @@ class FormAssignmentService {
     let session = try authorizedSession()
     let stored = try await fetchAssignmentDocument(id: assignmentId)
     _ = try await requireAssignmentAccess(stored)
-
-    let submissionsCollection = db.collection("users")
-      .document(session.membership.userID)
-      .collection("formSubmissions")
-    let querySnapshot = try await submissionsCollection
-      .whereField("assignmentId", isEqualTo: assignmentId)
-      .getDocuments()
-
-    return querySnapshot.documents.compactMap {
-      try? $0.data(as: FormSubmission.self)
-    }
+    return try await CanonicalFormResponses.submissions(
+      firestore: db,
+      districtID: session.membership.districtID,
+      assignmentID: assignmentId
+    )
   }
 
   // MARK: - Authorization Helpers

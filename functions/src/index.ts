@@ -55,6 +55,7 @@ import {
 import { requireCareerProgram, resolveSiteProgram } from "./program.js";
 import { createRecordInterestObservationHandler } from "./observations.js";
 import { createRecordFamilyInputHandler } from "./familyInput.js";
+import { createFormHandlers } from "./forms.js";
 import {
   createAdministrationHandlers,
   requireCapabilityCeiling,
@@ -5663,4 +5664,22 @@ export const adminCreateInvitation = onCall(callableOptions, (request) =>
 );
 export const adminRevokeInvitation = onCall(callableOptions, (request) =>
   administrationHandlers().revokeInvitation(request),
+);
+
+const formHandlers = () => createFormHandlers(() => getFirestore());
+
+export const listStudentForms = onCall(callableOptions, (request) =>
+  formHandlers().listStudentForms(request),
+);
+export const loadFormResponse = onCall(callableOptions, (request) =>
+  formHandlers().loadFormResponse(request),
+);
+export const saveFormDraft = onCall(callableOptions, (request) =>
+  formHandlers().saveFormDraft(request),
+);
+export const submitFormResponse = onCall(callableOptions, (request) =>
+  formHandlers().submitFormResponse(request),
+);
+export const reviewFormResponse = onCall(callableOptions, (request) =>
+  formHandlers().reviewFormResponse(request),
 );

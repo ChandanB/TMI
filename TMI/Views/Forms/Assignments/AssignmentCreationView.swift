@@ -39,6 +39,15 @@ struct AssignmentCreationView: View {
   @State private var isSubmitting = false
   @State private var errorMessage: String?
 
+  /// Opens the wizard already targeting specific students, e.g. from a
+  /// student's Forms section.
+  init(preselectedStudentIDs: Set<String> = []) {
+    if !preselectedStudentIDs.isEmpty {
+      _selectedCohortType = State(initialValue: .specificStudents)
+      _selectedStudents = State(initialValue: preselectedStudentIDs)
+    }
+  }
+
   // Helper Enum for UI Picker
   enum CohortType: String, CaseIterable, Identifiable {
       case allStudents = "All Students"

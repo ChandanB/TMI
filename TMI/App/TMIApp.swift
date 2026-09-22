@@ -226,6 +226,19 @@ struct TMIApp: App {
                 .dynamicTypeSize(uiTestingConfiguration.contentSize == .accessibility5 ? .accessibility5 : .large)
         case .planDetailsFailure:
             PlanWorkflowUITestingContent(failsDetails: true)
+        case .studentForms:
+            NavigationStack {
+                ScrollView {
+                    StudentFormsSection(
+                        districtID: "district-fixture",
+                        studentID: "student-fixture",
+                        studentName: "Kai Rivera",
+                        repository: InMemoryFormResponseRepository()
+                    )
+                    .padding()
+                }
+                .navigationTitle("Forms")
+            }
         case .staffAdministration:
             NavigationStack {
                 StaffAdministrationView(

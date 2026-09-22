@@ -41,20 +41,19 @@ class FormSubmissionService {
   }
 
   /// Fetch submissions for a specific assignment
+  /// Canonical responses for an assignment (written by the form callables).
   func fetchAssignmentSubmissions(assignmentId: String) async throws -> [FormSubmission] {
-    guard let collection = userSubmissionsCollection else {
+    guard let session = TrustedAuthorizationSessionStore.shared.session(
+      authenticatedUserID: Auth.auth().currentUser?.uid
+    ) else {
       throw FormSubmissionError.userNotAuthenticated
     }
-
-    let querySnapshot = try await collection
-      .whereField("assignmentId", isEqualTo: assignmentId)
-      .order(by: "submissionDate", descending: true)
-      .getDocuments()
-
-    let submissions = querySnapshot.documents.compactMap { try? $0.data(as: FormSubmission.self) }
-    print("[FormSubmissionService] Fetched \(submissions.count) submissions for assignment: \(assignmentId)")
-
-    return submissions
+    return try await CanonicalFormResponses.submissions(
+      firestore: db,
+      districtID: session.membership.districtID,
+      assignmentID: assignmentId
+    )
+    .sorted { $0.submissionDate > $1.submissionDate }
   }
 
   /// Fetch submissions for a specific student

@@ -1080,8 +1080,18 @@ service cloud.firestore {
           );
         allow delete: if false;
 
+        // One response per student, written only by the form callables.
+        // Readable by staff who can read that student, or by the assigner.
         match /respondents/{respondentID} {
-          allow read: if hasActiveMembership(districtID);
+          allow read: if hasActiveMembership(districtID)
+            && (
+              get(/databases/$(database)/documents/districts/$(districtID)/formAssignments/$(assignmentID)).data.get('assignedBy', '') == request.auth.uid
+              || canReadStudent(
+                districtID,
+                respondentID,
+                studentData(districtID, respondentID)
+              )
+            );
           allow write: if false;
         }
       }
