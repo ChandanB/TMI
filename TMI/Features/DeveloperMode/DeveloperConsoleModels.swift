@@ -118,34 +118,7 @@ nonisolated struct DevMembershipDraft: Sendable, Equatable {
 /// Mirrors `defaultCapabilitiesByRole` in `functions/src/developerConsole.ts`.
 nonisolated enum DeveloperConsoleDefaults {
     static func capabilities(for role: StaffRole) -> [Capability] {
-        switch role {
-        case .teacher, .counselor:
-            [.studentReadDetail, .studentWriteDetail]
-        case .socialWorker:
-            [.studentReadDetail]
-        case .schoolAdministrator:
-            [.studentReadDetail, .studentWriteDetail, .staffManage, .reportExport]
-        case .districtAdministrator:
-            [
-                .studentReadDetail, .studentWriteDetail, .studentRestrictedRead,
-                .planApprove, .staffManage, .reportExport, .auditRead,
-            ]
-        }
-    }
-}
-
-extension Capability {
-    nonisolated var displayName: String {
-        switch self {
-        case .studentReadDetail: "Read student detail"
-        case .studentWriteDetail: "Edit student detail"
-        case .studentRestrictedRead: "Read restricted records"
-        case .studentRestrictedWrite: "Write restricted records"
-        case .planApprove: "Approve plans"
-        case .staffManage: "Manage staff"
-        case .reportExport: "Export reports"
-        case .auditRead: "Read audit events"
-        }
+        role.defaultCapabilities
     }
 }
 #endif

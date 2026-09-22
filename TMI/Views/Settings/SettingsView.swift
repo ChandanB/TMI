@@ -39,6 +39,14 @@ struct SettingsView: View {
         )
     }
     
+    private var canManageStaff: Bool {
+        currentMembership.map(AuthorizationPolicy.canManageStaff) ?? false
+    }
+
+    private var canReadAudit: Bool {
+        currentMembership.map(AuthorizationPolicy.canReadAudit) ?? false
+    }
+
     private var isStudent: Bool {
         false
     }
@@ -64,8 +72,9 @@ struct SettingsView: View {
                         .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1), value: isLoaded)
                     
                     VStack(spacing: 16) {
-                        // District admin-only sections
-                        if isDistrictAdmin {
+                        // Administration: compliance for district admins,
+                        // staff for staff.manage, audit for audit.read.
+                        if isDistrictAdmin || canManageStaff || canReadAudit {
                             districtAdminSection
                                 .opacity(isLoaded ? 1 : 0)
                                 .offset(y: isLoaded ? 0 : 20)
@@ -145,32 +154,38 @@ struct SettingsView: View {
     // MARK: - Role-Specific Sections
 
     private var districtAdminSection: some View {
-        settingsSectionCard(title: "District Administration", icon: "building.2") {
+        settingsSectionCard(title: "Administration", icon: "building.2") {
             VStack(spacing: 0) {
-                settingsRow(icon: "checkmark.seal", title: "Compliance Settings") {
-                    if let currentMembership {
-                        ComplianceSettingsView(districtId: currentMembership.districtID)
-                    } else {
-                        ContentUnavailableView("Unavailable", systemImage: "lock", description: Text("No active district membership."))
+                if canManageStaff, let currentMembership {
+                    settingsRow(icon: "person.2.badge.gearshape", title: "Staff Management") {
+                        StaffAdministrationView(member: currentMembership)
                     }
+                    .accessibilityIdentifier("settings.staffManagement")
                 }
 
-                Divider().background(Color.white.opacity(0.1))
-
-                settingsRow(icon: "doc.text.magnifyingglass", title: "Audit Configuration") {
-                    // Audit settings
+                if canReadAudit, let currentMembership {
+                    Divider().background(Color.white.opacity(0.1))
+                    settingsRow(icon: "doc.text.magnifyingglass", title: "Audit Log") {
+                        AuditLogView(member: currentMembership)
+                    }
+                    .accessibilityIdentifier("settings.auditLog")
                 }
 
-                Divider().background(Color.white.opacity(0.1))
+                if isDistrictAdmin {
+                    Divider().background(Color.white.opacity(0.1))
+                    settingsRow(icon: "checkmark.seal", title: "Compliance Settings") {
+                        if let currentMembership {
+                            ComplianceSettingsView(districtId: currentMembership.districtID)
+                        } else {
+                            ContentUnavailableView("Unavailable", systemImage: "lock", description: Text("No active district membership."))
+                        }
+                    }
 
-                settingsRow(icon: "person.2.badge.gearshape", title: "Staff Management") {
-                    // Staff management
-                }
+                    Divider().background(Color.white.opacity(0.1))
 
-                Divider().background(Color.white.opacity(0.1))
-
-                settingsRow(icon: "person.text.rectangle", title: "Consent Management") {
-                    ConsentManagementView()
+                    settingsRow(icon: "person.text.rectangle", title: "Consent Management") {
+                        ConsentManagementView()
+                    }
                 }
             }
         }

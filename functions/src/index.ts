@@ -56,6 +56,10 @@ import { requireCareerProgram, resolveSiteProgram } from "./program.js";
 import { createRecordInterestObservationHandler } from "./observations.js";
 import { createRecordFamilyInputHandler } from "./familyInput.js";
 import {
+  createAdministrationHandlers,
+  requireCapabilityCeiling,
+} from "./administration.js";
+import {
   createDeveloperConsoleHandlers,
   isDeveloperConsoleEnabled,
   type DeveloperConsoleUser,
@@ -911,6 +915,7 @@ const mutateMembershipHandler = async (
           data.role,
           data.schoolIDs,
         );
+        requireCapabilityCeiling(membership, data.capabilities);
         const reference = firestore.doc(
           `districts/${data.districtID}/members/${data.targetUserID}`,
         );
@@ -961,6 +966,7 @@ const mutateMembershipHandler = async (
           schemaVersion: 1,
           recordVersion: nextVersion,
           version: nextVersion,
+          userID: data.targetUserID,
           districtID: data.districtID,
           schoolIDs: [...data.schoolIDs],
           role: data.role,
@@ -5624,4 +5630,37 @@ export const recordInterestObservation = onCall(
 export const recordFamilyInput = onCall(
   callableOptions,
   createRecordFamilyInputHandler(() => getFirestore()),
+);
+
+const administrationHandlers = () =>
+  createAdministrationHandlers({
+    firestore: getFirestore(),
+    now: () => new Date(),
+    getUsers: async (userIDs) => {
+      const users = [];
+      for (let index = 0; index < userIDs.length; index += 100) {
+        const result = await getAuth().getUsers(
+          userIDs.slice(index, index + 100).map((uid) => ({ uid })),
+        );
+        users.push(...result.users.map((user) => ({
+          userID: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+        })));
+      }
+      return users;
+    },
+  });
+
+export const adminListStaff = onCall(callableOptions, (request) =>
+  administrationHandlers().listStaff(request),
+);
+export const adminListInvitations = onCall(callableOptions, (request) =>
+  administrationHandlers().listInvitations(request),
+);
+export const adminCreateInvitation = onCall(callableOptions, (request) =>
+  administrationHandlers().createInvitation(request),
+);
+export const adminRevokeInvitation = onCall(callableOptions, (request) =>
+  administrationHandlers().revokeInvitation(request),
 );

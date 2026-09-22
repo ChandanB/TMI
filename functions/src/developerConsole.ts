@@ -272,7 +272,7 @@ const stringArray = (value: unknown): string[] =>
     ? value.filter((item): item is string => typeof item === "string")
     : [];
 
-const requireExistingSchools = async (
+export const requireExistingSchools = async (
   firestore: Firestore,
   transaction: Transaction,
   districtID: string,
@@ -531,7 +531,7 @@ export const invitationStatus = (
   return "active";
 };
 
-const invitationSummary = (
+export const invitationSummary = (
   invitationID: string,
   data: DocumentData,
   now: Date,
@@ -627,6 +627,34 @@ export const parseCreateInvitationRequest = (
     },
   );
 
+/**
+ * The stored invitation document. Shared by the developer console and the
+ * district-administrator callables so both produce records the provisioning
+ * callable accepts. The code and recipient email are never stored.
+ */
+export const buildInvitationRecord = (
+  data: CreateInvitationRequest,
+  invitationCode: string,
+  createdBy: string,
+  timestamp: Timestamp,
+  expiresAt: Timestamp,
+) => ({
+  schemaVersion: 1,
+  recordVersion: 1,
+  districtID: data.districtID,
+  recipientEmailHash: hashInvitationRecipientEmail(invitationCode, data.recipientEmail),
+  role: data.role,
+  schoolIDs: [...data.schoolIDs],
+  capabilities: [...data.capabilities],
+  isActive: true,
+  expiresAt,
+  consumedByUserID: null,
+  consumedAt: null,
+  label: data.label,
+  createdAt: timestamp,
+  createdBy,
+});
+
 export interface CreatedInvitation {
   readonly invitationID: string;
   readonly invitationCode: string;
@@ -660,25 +688,10 @@ const createInvitation = async (
       data.districtID,
       data.schoolIDs,
     );
-    transaction.create(reference, {
-      schemaVersion: 1,
-      recordVersion: 1,
-      districtID: data.districtID,
-      recipientEmailHash: hashInvitationRecipientEmail(
-        invitationCode,
-        data.recipientEmail,
-      ),
-      role: data.role,
-      schoolIDs: [...data.schoolIDs],
-      capabilities: [...data.capabilities],
-      isActive: true,
-      expiresAt,
-      consumedByUserID: null,
-      consumedAt: null,
-      label: data.label,
-      createdAt: timestamp,
-      createdBy: operator.userID,
-    });
+    transaction.create(
+      reference,
+      buildInvitationRecord(data, invitationCode, operator.userID, timestamp, expiresAt),
+    );
     writeOperatorAudit(
       transaction,
       firestore,

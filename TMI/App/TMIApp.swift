@@ -226,6 +226,22 @@ struct TMIApp: App {
                 .dynamicTypeSize(uiTestingConfiguration.contentSize == .accessibility5 ? .accessibility5 : .large)
         case .planDetailsFailure:
             PlanWorkflowUITestingContent(failsDetails: true)
+        case .staffAdministration:
+            NavigationStack {
+                StaffAdministrationView(
+                    member: MembershipContext(
+                        userID: "admin-fixture",
+                        districtID: "district-fixture",
+                        schoolIDs: ["school-fixture"],
+                        role: .schoolAdministrator,
+                        capabilities: Set(StaffRole.schoolAdministrator.defaultCapabilities),
+                        assignedStudentIDs: [],
+                        isActive: true,
+                        version: 2
+                    ),
+                    repository: InMemoryStaffAdministrationRepository()
+                )
+            }
         case .developerMode:
             NavigationStack {
                 DeveloperModeView(repository: InMemoryDeveloperConsoleRepository())

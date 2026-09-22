@@ -28,6 +28,7 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
         case planWorkflow = "plan-workflow"
         case planDetailsFailure = "plan-details-failure"
         case developerMode = "developer-mode"
+        case staffAdministration = "staff-administration"
     }
 
     nonisolated enum ContentSize: String, Sendable, Equatable {
