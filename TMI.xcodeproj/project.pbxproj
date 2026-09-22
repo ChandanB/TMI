@@ -11,6 +11,7 @@
 		1185DAEE2C93A75C004616D5 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DAED2C93A75C004616D5 /* FirebaseFirestore */; };
 		1185DAF02C93A75C004616D5 /* FirebaseFirestoreCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DAEF2C93A75C004616D5 /* FirebaseFirestoreCombine-Community */; };
 		1185DAF22C93A75C004616D5 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DAF12C93A75C004616D5 /* FirebaseFunctions */; };
+		A1C0FFEE2E80000000000001 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = A1C0FFEE2E80000000000002 /* FirebaseAppCheck */; };
 		1185DB022C93A75C004616D5 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DB012C93A75C004616D5 /* FirebaseStorage */; };
 		1185DB0A2C93A7CC004616D5 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DB092C93A7CC004616D5 /* SDWebImageSwiftUI */; };
 		1185DB0C2C93AA92004616D5 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 1185DB0B2C93AA91004616D5 /* GoogleService-Info.plist */; };
@@ -62,6 +63,7 @@
 				1185DB0A2C93A7CC004616D5 /* SDWebImageSwiftUI in Frameworks */,
 				1185DB022C93A75C004616D5 /* FirebaseStorage in Frameworks */,
 				1185DAF22C93A75C004616D5 /* FirebaseFunctions in Frameworks */,
+				A1C0FFEE2E80000000000001 /* FirebaseAppCheck in Frameworks */,
 				1185DAF02C93A75C004616D5 /* FirebaseFirestoreCombine-Community in Frameworks */,
 				1185DAEE2C93A75C004616D5 /* FirebaseFirestore in Frameworks */,
 				11B2387B2F29F4A000CA2BBE /* FirebaseCore in Frameworks */,
@@ -132,6 +134,7 @@
 				1185DAED2C93A75C004616D5 /* FirebaseFirestore */,
 				1185DAEF2C93A75C004616D5 /* FirebaseFirestoreCombine-Community */,
 				1185DAF12C93A75C004616D5 /* FirebaseFunctions */,
+				A1C0FFEE2E80000000000002 /* FirebaseAppCheck */,
 				1185DB012C93A75C004616D5 /* FirebaseStorage */,
 				1185DB092C93A7CC004616D5 /* SDWebImageSwiftUI */,
 				11C813C62DB57544005477FC /* SwiftSoup */,
@@ -716,6 +719,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1185DAD82C93A75C004616D5 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = "FirebaseFirestoreCombine-Community";
+		};
+		A1C0FFEE2E80000000000002 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1185DAD82C93A75C004616D5 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
 		};
 		1185DAF12C93A75C004616D5 /* FirebaseFunctions */ = {
 			isa = XCSwiftPackageProductDependency;

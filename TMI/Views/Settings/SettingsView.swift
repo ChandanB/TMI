@@ -97,6 +97,13 @@ struct SettingsView: View {
                         }
 
 
+#if DEBUG
+                        developerSection
+                            .opacity(isLoaded ? 1 : 0)
+                            .offset(y: isLoaded ? 0 : 20)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.5), value: isLoaded)
+#endif
+
                         // Account Actions Section - visible to all
                         dangerousActionsSection
                             .opacity(isLoaded ? 1 : 0)
@@ -223,6 +230,20 @@ struct SettingsView: View {
         }
     }
 
+
+#if DEBUG
+    /// DEBUG builds only. The console itself is authorized server-side.
+    private var developerSection: some View {
+        settingsSectionCard(title: "Developer", icon: "hammer") {
+            VStack(spacing: 0) {
+                settingsRow(icon: "wrench.and.screwdriver", title: "Developer Mode") {
+                    DeveloperModeView()
+                }
+            }
+        }
+        .accessibilityIdentifier("settings.developerMode")
+    }
+#endif
 
     // MARK: - Helper Views
     

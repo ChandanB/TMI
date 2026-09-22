@@ -46,6 +46,23 @@ nonisolated enum DebugStaffAccessRegistry {
         UserDefaults.standard.removeObject(forKey: defaultsKey)
     }
 
+    /// Emails routed into the synthetic Debug tenant on this device, beyond the
+    /// built-in allowed email. Shown and editable in Developer Mode.
+    static func registeredEmails() -> [String] {
+        storedEmails().sorted()
+    }
+
+    static func remove(_ email: String) {
+        guard let email = normalized(email) else {
+            return
+        }
+        var emails = storedEmails()
+        guard emails.remove(email) != nil else {
+            return
+        }
+        UserDefaults.standard.set(Array(emails), forKey: defaultsKey)
+    }
+
     private static func storedEmails() -> Set<String> {
         Set(UserDefaults.standard.stringArray(forKey: defaultsKey) ?? [])
     }
@@ -265,6 +282,9 @@ nonisolated struct DebugStudentPersistence: Sendable {
             }
         )
     }
+
+    /// Location of the durable Debug roster, surfaced in Developer Mode.
+    static var standardURL: URL { defaultURL }
 
     private static var defaultURL: URL {
         let base = (try? FileManager.default.url(

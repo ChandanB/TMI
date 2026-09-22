@@ -18,9 +18,7 @@ struct FirebaseManager {
   static let shared = FirebaseManager()
 
   private init() {
-    if FirebaseApp.app() == nil {
-      FirebaseApp.configure()
-    }
+    FirebaseBootstrap.configureIfNeeded()
     auth = Auth.auth()
     storage = Storage.storage()
     firestore = Firestore.firestore()

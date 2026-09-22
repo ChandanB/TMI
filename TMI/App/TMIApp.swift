@@ -55,9 +55,7 @@ struct TMIApp: App {
                 automaticallyStart: false
             )
         } else {
-            if FirebaseApp.app() == nil {
-                FirebaseApp.configure()
-            }
+            FirebaseBootstrap.configureIfNeeded()
 
             let firebaseManager = FirebaseManager.shared
             dependencies = .production(firestore: firebaseManager.firestore)
@@ -206,6 +204,11 @@ struct TMIApp: App {
                 .dynamicTypeSize(uiTestingConfiguration.contentSize == .accessibility5 ? .accessibility5 : .large)
         case .planDetailsFailure:
             PlanWorkflowUITestingContent(failsDetails: true)
+        case .developerMode:
+            NavigationStack {
+                DeveloperModeView(repository: InMemoryDeveloperConsoleRepository())
+            }
+            .environment(\.authStateModel, authStateModel)
         case nil:
             ContentUnavailableView(
                 "UI Test Fixture Unavailable",
