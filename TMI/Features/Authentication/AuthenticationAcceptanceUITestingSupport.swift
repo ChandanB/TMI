@@ -124,6 +124,7 @@ private final class AuthenticationAcceptanceUITestingRepository: AuthenticationP
 }
 
 private struct AuthenticationAcceptanceUITestingProfileProvider: UserProfileProviding {
+    @MainActor
     func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
         guard let email = AuthenticationAcceptanceFixture.email(for: identity.userID),
               let displayName = AuthenticationAcceptanceFixture.displayName(
@@ -165,6 +166,7 @@ private final class AuthenticationAvailabilityProfileProvider: UserProfileProvid
         self.initialMode = initialMode
     }
 
+    @MainActor
     func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser? {
         if isProvisioned {
             return TMIUser(

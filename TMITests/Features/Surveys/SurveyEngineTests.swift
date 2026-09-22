@@ -50,7 +50,7 @@ struct SurveyDefinitionTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("firebase/fixtures/survey-v1.json")
+            .appendingPathComponent("functions/fixtures/survey-v1.json")
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let fixtureData = try Data(contentsOf: fixtureURL)
@@ -1421,7 +1421,7 @@ private func surveyDefinitionContract() throws -> SurveyDefinitionContract {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-        .appendingPathComponent("firebase/fixtures/survey-contract-v1.json")
+        .appendingPathComponent("functions/fixtures/survey-contract-v1.json")
     return try JSONDecoder().decode(
         SurveyDefinitionContract.self,
         from: Data(contentsOf: url)

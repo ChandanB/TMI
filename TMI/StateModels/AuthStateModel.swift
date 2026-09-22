@@ -482,7 +482,7 @@ final class FirebaseAuthenticationIdentityProvider: AuthenticationIdentityProvid
   }
 }
 
-protocol UserProfileProviding: Sendable {
+nonisolated protocol UserProfileProviding: Sendable {
   func profile(for identity: AuthenticatedIdentity) async throws -> TMIUser?
 }
 

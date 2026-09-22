@@ -1004,7 +1004,7 @@ final class FormValidator {
 
 // MARK: - Extensions for Common Types
 
-extension String {
+nonisolated extension String {
     /// Quick validation using ValidationRules
     func validate(as rule: ValidationRule) -> ValidationResult {
         switch rule.ruleType {
@@ -1026,7 +1026,7 @@ extension String {
     }
 }
 
-extension Int {
+nonisolated extension Int {
     /// Quick age validation
     func validateAsStudentAge() -> ValidationResult {
         return ValidationRules.studentAge(self)
@@ -1038,7 +1038,7 @@ extension Int {
     }
 }
 
-extension Array {
+nonisolated extension Array {
     /// Quick collection size validation
     func validateSize(min: Int = 0, max: Int = Int.max, fieldName: String) -> ValidationResult {
         return ValidationRules.collectionSize(self, min: min, max: max, fieldName: fieldName)

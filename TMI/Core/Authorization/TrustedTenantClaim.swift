@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 nonisolated enum TrustedAccessClass: String, Codable, Sendable, CaseIterable, Equatable {
     case staff
@@ -70,15 +71,8 @@ nonisolated struct TrustedTenantClaim: Sendable, Equatable {
     }
 
     private static func integralClaimValue(_ value: Any?) -> Int? {
-        guard let value, !(value is Bool) else {
-            return nil
-        }
-
-        if let integer = value as? Int {
-            return integer
-        }
-
-        guard let number = value as? NSNumber else {
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else {
             return nil
         }
         let double = number.doubleValue

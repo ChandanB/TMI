@@ -252,7 +252,7 @@ struct DebugStaffInvitationProvisionerTests {
             membership == MembershipContext(
                 userID: identity.userID,
                 districtID: "district-debug",
-                schoolIDs: ["Lincoln Elementary"],
+                schoolIDs: ["school-debug"],
                 role: .teacher,
                 capabilities: [.studentReadDetail, .studentWriteDetail],
                 assignedStudentIDs: [],

@@ -61,6 +61,20 @@ struct MembershipRepositoryTests {
         }
     }
 
+    @Test("Firebase NSNumber claims preserve integral membership versions")
+    func firebaseNSNumberMembershipVersionIsAccepted() throws {
+        let claim = try TrustedTenantClaim(
+            userID: "user-1",
+            tokenClaims: [
+                "tmiDistrictID": "district-1" as NSString,
+                "tmiAccessClass": "staff" as NSString,
+                "tmiMembershipVersion": NSNumber(value: 1),
+            ]
+        )
+
+        #expect(claim.membershipVersion == 1)
+    }
+
     @Test("Missing and malformed trusted claims fail closed")
     func malformedClaimsFailClosed() {
         let invalidClaims: [[String: Any]] = [
