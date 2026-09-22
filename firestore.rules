@@ -1196,6 +1196,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Developer console authority and its audit trail are written only by
+    // the Admin SDK (manage-operator script and dev* callables).
+    match /platformOperators/{userID} {
+      allow read, write: if false;
+    }
+
+    match /operatorAuditEvents/{eventID} {
+      allow read, write: if false;
+    }
+
+    match /staffInvitations/{invitationID} {
+      allow read, write: if false;
+    }
+
     match /{unmatched=**} {
       allow read, write: if false;
     }

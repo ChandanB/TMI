@@ -25,6 +25,8 @@
  *     --district tmi-pilot \
  *     --school tmi-pilot-school \
  *     --role teacher \
+ *     [--district-name "Riverside USD"] [--school-name "Lincoln Elementary"] \
+ *     [--program-type k12|earlyChildhood] \
  *     [--project tmi-education] \
  *     [--dry-run]
  *
@@ -110,6 +112,10 @@ const main = async () => {
   if (!IDENTIFIER.test(districtID)) fail("--district must be a valid identifier");
   if (!IDENTIFIER.test(schoolID)) fail("--school must be a valid identifier");
   if (!ROLES.has(role)) fail(`--role must be one of: ${[...ROLES].join(", ")}`);
+  const programType = args["program-type"];
+  if (programType && !["k12", "earlyChildhood"].includes(programType)) {
+    fail("--program-type must be k12 or earlyChildhood");
+  }
 
   if (
     !process.env.GOOGLE_APPLICATION_CREDENTIALS &&
@@ -185,12 +191,30 @@ const main = async () => {
     return;
   }
 
-  await firestore.doc(`districts/${districtID}`).set(
-    { districtID, name: districtID, updatedAt: FieldValue.serverTimestamp() },
+  // Keep any friendly names (and program types) set earlier, e.g. from the
+  // in-app developer console; only fill them in for brand-new tenants.
+  const districtRef = firestore.doc(`districts/${districtID}`);
+  const schoolRef = firestore.doc(`districts/${districtID}/schools/${schoolID}`);
+  const [districtSnapshot, schoolSnapshot] = await Promise.all([
+    districtRef.get(),
+    schoolRef.get(),
+  ]);
+  await districtRef.set(
+    {
+      districtID,
+      ...(districtSnapshot.get("name") ? {} : { name: args["district-name"] ?? districtID }),
+      ...(programType ? { programType } : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
     { merge: true },
   );
-  await firestore.doc(`districts/${districtID}/schools/${schoolID}`).set(
-    { schoolID, districtID, name: schoolID, updatedAt: FieldValue.serverTimestamp() },
+  await schoolRef.set(
+    {
+      schoolID,
+      districtID,
+      ...(schoolSnapshot.get("name") ? {} : { name: args["school-name"] ?? schoolID }),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
     { merge: true },
   );
   await membershipRef.set(membership, { merge: true });

@@ -52,6 +52,11 @@ import {
   createProductionProvisionStaffMembershipHandler,
   type ProvisionStaffMembershipRequest,
 } from "./invitations.js";
+import {
+  createDeveloperConsoleHandlers,
+  isDeveloperConsoleEnabled,
+  type DeveloperConsoleUser,
+} from "./developerConsole.js";
 
 export type { DeletePersonalAccountDataRequest } from "./accountDeletion.js";
 export type { ProvisionStaffMembershipRequest } from "./invitations.js";
@@ -5515,4 +5520,93 @@ export const requestSensitiveExport = onCall(
 export const recordPrivilegedAuditEvent = onCall(
   callableOptions,
   recordPrivilegedAuditEventHandler,
+);
+
+const developerConsoleUser = (user: {
+  readonly uid: string;
+  readonly email?: string;
+  readonly displayName?: string;
+  readonly customClaims?: Record<string, unknown>;
+}): DeveloperConsoleUser => ({
+  userID: user.uid,
+  email: user.email,
+  displayName: user.displayName,
+  customClaims: user.customClaims ?? {},
+});
+
+const developerConsoleProjectID =
+  process.env.GCLOUD_PROJECT ??
+  process.env.GCP_PROJECT ??
+  (process.env.FIRESTORE_EMULATOR_HOST === undefined ? "unknown" : "demo-tmi");
+
+let productionDeveloperConsoleHandlers:
+  | ReturnType<typeof createDeveloperConsoleHandlers>
+  | undefined;
+
+const developerConsoleHandlers = () => {
+  productionDeveloperConsoleHandlers ??= createDeveloperConsoleHandlers({
+    firestore: getFirestore(),
+    now: () => new Date(),
+    projectID: developerConsoleProjectID,
+    isEnabled: isDeveloperConsoleEnabled(
+      developerConsoleProjectID,
+      process.env.TMI_DEVELOPER_CONSOLE,
+    ),
+    getUser: async (userID) => developerConsoleUser(await getAuth().getUser(userID)),
+    getUserByEmail: async (email) => {
+      try {
+        return developerConsoleUser(await getAuth().getUserByEmail(email));
+      } catch (error) {
+        if ((error as { code?: string }).code === "auth/user-not-found") {
+          return null;
+        }
+        throw error;
+      }
+    },
+    getUsers: async (userIDs) => {
+      const users: DeveloperConsoleUser[] = [];
+      for (let index = 0; index < userIDs.length; index += 100) {
+        const result = await getAuth().getUsers(
+          userIDs.slice(index, index + 100).map((uid) => ({ uid })),
+        );
+        users.push(...result.users.map(developerConsoleUser));
+      }
+      return users;
+    },
+    setCustomUserClaims: async (userID, claims) => {
+      await getAuth().setCustomUserClaims(userID, claims);
+    },
+  });
+  return productionDeveloperConsoleHandlers;
+};
+
+export const devConsoleStatus = onCall(callableOptions, (request) =>
+  developerConsoleHandlers().status(request),
+);
+export const devListTenants = onCall(callableOptions, (request) =>
+  developerConsoleHandlers().listTenants(request),
+);
+export const devUpsertDistrict = onCall(callableOptions, (request) =>
+  developerConsoleHandlers().upsertDistrict(request),
+);
+export const devUpsertSchool = onCall(callableOptions, (request) =>
+  developerConsoleHandlers().upsertSchool(request),
+);
+export const devListInvitations = onCall(callableOptions, (request) =>
+  developerConsoleHandlers().listInvitations(request),
+);
+export const devCreateInvitation = onCall(callableOptions, (request) =>
+  developerConsoleHandlers().createInvitation(request),
+);
+export const devRevokeInvitation = onCall(callableOptions, (request) =>
+  developerConsoleHandlers().revokeInvitation(request),
+);
+export const devDeleteInvitation = onCall(callableOptions, (request) =>
+  developerConsoleHandlers().deleteInvitation(request),
+);
+export const devListMembers = onCall(callableOptions, (request) =>
+  developerConsoleHandlers().listMembers(request),
+);
+export const devUpsertMembership = onCall(callableOptions, (request) =>
+  developerConsoleHandlers().upsertMembership(request),
 );
