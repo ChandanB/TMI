@@ -3,6 +3,7 @@ import SwiftUI
 struct StudentListView: View {
     @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) private var authStateModel
+    @Environment(\.programContext) private var programContext
 
     @State private var state: StudentListState?
     @State private var loadedAuthority: Authority?
@@ -39,7 +40,7 @@ struct StudentListView: View {
             }
         }
         .background(TMIColors.background)
-        .navigationTitle("Students")
+        .navigationTitle(programContext.shell.terminology.learners)
         .task(id: authority) {
             await configureState()
         }
@@ -91,6 +92,7 @@ struct StudentListView: View {
 private struct StudentRosterContent: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.programContext) private var programContext
 
     @Bindable var state: StudentListState
     let member: MembershipContext
@@ -118,7 +120,7 @@ private struct StudentRosterContent: View {
         .searchable(
             text: $state.searchText,
             placement: .automatic,
-            prompt: "Search by student name or identifier"
+            prompt: "Search by \(programContext.shell.terminology.learner.lowercased()) name or identifier"
         )
         .toolbar { rosterToolbar }
         .safeAreaInset(edge: .bottom) {
@@ -286,18 +288,18 @@ private struct StudentRosterContent: View {
                     .foregroundStyle(TMIColors.textSecondary)
                     .accessibilityHidden(true)
 
-                Text("No Students Yet")
+                Text("No \(programContext.shell.terminology.learners) Yet")
                     .font(.title2.bold())
                     .foregroundStyle(TMIColors.textPrimary)
 
-                Text("Add the first student record for this roster, or adjust the active filters.")
+                Text("Add the first \(programContext.shell.terminology.learner.lowercased()) record for this roster, or adjust the active filters.")
                     .font(.body)
                     .foregroundStyle(TMIColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 440)
 
                 if canCreateStudent {
-                    Button("Add Student", systemImage: "plus", action: presentCreateEditor)
+                    Button("Add \(programContext.shell.terminology.learner)", systemImage: "plus", action: presentCreateEditor)
                         .buttonStyle(.borderedProminent)
                         .tint(TMIColors.teal)
                         .frame(minHeight: 44)
@@ -817,8 +819,13 @@ private struct StudentRosterCard: View {
 
 private struct StudentRosterCardLabel: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.programContext) private var programContext
 
     let record: StudentRecord
+
+    private var terminology: Terminology {
+        programContext.profile(forSchoolID: record.schoolID).terminology
+    }
 
     var body: some View {
         let layout = dynamicTypeSize.isAccessibilitySize
@@ -849,20 +856,20 @@ private struct StudentRosterCardLabel: View {
                 }
 
                 if dynamicTypeSize.isAccessibilitySize {
-                    Text("Grade: \(record.grade)")
+                    Text("\(terminology.gradeLabel): \(record.grade)")
                         .font(.subheadline)
                         .foregroundStyle(TMIColors.textSecondary)
-                    Text("School: \(record.schoolID)")
+                    Text("\(terminology.site): \(programContext.siteName(record.schoolID))")
                         .font(.subheadline)
                         .foregroundStyle(TMIColors.textSecondary)
                 } else {
-                    Text("Grade \(record.grade) • \(record.schoolID)")
+                    Text("\(terminology.gradeDescription(record.grade)) • \(programContext.siteName(record.schoolID))")
                         .font(.subheadline)
                         .foregroundStyle(TMIColors.textSecondary)
                 }
 
                 if let studentIdentifier = record.studentIdentifier {
-                    Text("Student ID: \(studentIdentifier)")
+                    Text("\(terminology.learner) ID: \(studentIdentifier)")
                         .font(.footnote)
                         .foregroundStyle(TMIColors.textSecondary)
                 }

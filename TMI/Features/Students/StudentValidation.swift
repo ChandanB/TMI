@@ -2,8 +2,17 @@ import Foundation
 
 nonisolated struct StudentValidationPolicy: Sendable, Equatable {
     let requiresStudentIdentifier: Bool
+    /// Early-childhood sites need a date of birth so age groups make sense.
+    var requiresDateOfBirth: Bool = false
 
     static let standard = StudentValidationPolicy(requiresStudentIdentifier: false)
+
+    func applying(_ profile: ProgramProfile) -> StudentValidationPolicy {
+        StudentValidationPolicy(
+            requiresStudentIdentifier: requiresStudentIdentifier,
+            requiresDateOfBirth: requiresDateOfBirth || profile.requiresDateOfBirth
+        )
+    }
 }
 
 nonisolated enum StudentValidation {
@@ -30,6 +39,19 @@ nonisolated enum StudentValidation {
     struct Issue: Sendable, Equatable {
         let field: Field
         let message: String
+
+        /// The message in the site's own vocabulary ("Child name is required.").
+        func message(using terminology: Terminology) -> String {
+            guard terminology != .k12 else { return message }
+            return message
+                .replacingOccurrences(of: "Student", with: terminology.learner)
+                .replacingOccurrences(of: "student", with: terminology.learner.lowercased())
+                .replacingOccurrences(of: "Grade", with: terminology.gradeLabel)
+                .replacingOccurrences(of: "grade", with: terminology.gradeLabel.lowercased())
+                .replacingOccurrences(of: "School", with: terminology.site)
+                .replacingOccurrences(of: "school", with: terminology.site.lowercased())
+                .replacingOccurrences(of: "district", with: terminology.organization.lowercased())
+        }
     }
 
     static func issues(
@@ -102,6 +124,12 @@ nonisolated enum StudentValidation {
                     )
                 )
             }
+        }
+
+        if policy.requiresDateOfBirth, draft.dateOfBirth == nil {
+            issues.append(
+                Issue(field: .dateOfBirth, message: "Date of birth is required for this program.")
+            )
         }
 
         if let dateOfBirth = draft.dateOfBirth, dateOfBirth > now {

@@ -52,6 +52,7 @@ import {
   createProductionProvisionStaffMembershipHandler,
   type ProvisionStaffMembershipRequest,
 } from "./invitations.js";
+import { requireCareerProgram, resolveSiteProgram } from "./program.js";
 import {
   createDeveloperConsoleHandlers,
   isDeveloperConsoleEnabled,
@@ -2160,6 +2161,9 @@ const attachCareerToPlanHandler = async (
         "Careers can only be attached to editable plans.",
       );
     }
+    requireCareerProgram(
+      await resolveSiteProgram(firestore, transaction, data.districtID, schoolID),
+    );
     if (career.isApproved !== true || career.isActive === false) {
       throw new HttpsError(
         "failed-precondition",

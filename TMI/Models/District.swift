@@ -19,6 +19,9 @@ struct District: Codable, Identifiable, Equatable, Sendable {
   var createdAt: Date
   var settings: DistrictSettings
   var metadata: [String: String]
+  var organizationKind: OrganizationKind
+  /// Organization-wide default program; sites may override it.
+  var programType: ProgramType
 
   init(
     id: String? = nil,
@@ -28,7 +31,9 @@ struct District: Codable, Identifiable, Equatable, Sendable {
     region: String? = nil,
     createdAt: Date = Date(),
     settings: DistrictSettings = DistrictSettings(),
-    metadata: [String: String] = [:]
+    metadata: [String: String] = [:],
+    organizationKind: OrganizationKind = .schoolDistrict,
+    programType: ProgramType = .k12
   ) {
     self.id = id
     self.name = name
@@ -38,6 +43,8 @@ struct District: Codable, Identifiable, Equatable, Sendable {
     self.createdAt = createdAt
     self.settings = settings
     self.metadata = metadata
+    self.organizationKind = organizationKind
+    self.programType = programType
   }
 
   enum CodingKeys: String, CodingKey {
@@ -49,6 +56,32 @@ struct District: Codable, Identifiable, Equatable, Sendable {
     case createdAt
     case settings
     case metadata
+    case organizationKind
+    case programType
+  }
+
+  private enum CanonicalKeys: String, CodingKey {
+    case districtID
+    case updatedAt
+  }
+
+  /// Decodes both the legacy shape and the canonical server-written shape
+  /// (`{districtID, name, organizationKind?, programType?, updatedAt}`).
+  init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let canonical = try decoder.container(keyedBy: CanonicalKeys.self)
+    _id = try container.decodeIfPresent(DocumentID<String>.self, forKey: .id) ?? DocumentID(wrappedValue: nil)
+    let districtID = try canonical.decodeIfPresent(String.self, forKey: .districtID)
+    name = try container.decodeIfPresent(String.self, forKey: .name) ?? districtID ?? ""
+    districtCode = try container.decodeIfPresent(String.self, forKey: .districtCode) ?? districtID ?? ""
+    state = try container.decodeIfPresent(String.self, forKey: .state) ?? ""
+    region = try container.decodeIfPresent(String.self, forKey: .region)
+    createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+      ?? canonical.decodeIfPresent(Date.self, forKey: .updatedAt) ?? .distantPast
+    settings = (try? container.decodeIfPresent(DistrictSettings.self, forKey: .settings)) ?? DistrictSettings()
+    metadata = (try? container.decodeIfPresent([String: String].self, forKey: .metadata)) ?? [:]
+    organizationKind = (try? container.decodeIfPresent(OrganizationKind.self, forKey: .organizationKind)) ?? .schoolDistrict
+    programType = (try? container.decodeIfPresent(ProgramType.self, forKey: .programType)) ?? .k12
   }
 }
 

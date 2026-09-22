@@ -29,10 +29,12 @@ struct TMIApp: App {
     @State private var meetingsStateModel: MeetingsStateModel?
     @State private var districtStateModel: DistrictStateModel?
     @State private var recommendationsStateModel: RecommendationsStateModel?
+    @State private var programContext: ProgramContextStore
 
     init() {
         let dependencies: AppDependencies
         let authStateModel: AuthStateModel
+        let organizationDirectory: any OrganizationDirectory
 
         let isRunningUnitTests = Self.isRunningUnitTests
         let usesInMemoryDependencies: Bool
@@ -49,6 +51,7 @@ struct TMIApp: App {
 
         if usesInMemoryDependencies {
             dependencies = .preview()
+            organizationDirectory = StaticOrganizationDirectory(program: .k12)
             authStateModel = AuthStateModel(
                 membershipProvider: dependencies.membership,
                 featureFlags: dependencies.flags,
@@ -59,6 +62,13 @@ struct TMIApp: App {
 
             let firebaseManager = FirebaseManager.shared
             dependencies = .production(firestore: firebaseManager.firestore)
+#if DEBUG
+            organizationDirectory = DebugOrganizationDirectory(
+                delegate: FirestoreOrganizationDirectory(firestore: firebaseManager.firestore)
+            )
+#else
+            organizationDirectory = FirestoreOrganizationDirectory(firestore: firebaseManager.firestore)
+#endif
 #if DEBUG
             let firebaseIdentityProvider = FirebaseAuthenticationIdentityProvider(
                 auth: firebaseManager.auth
@@ -124,6 +134,7 @@ struct TMIApp: App {
         _recommendationsStateModel = State(
             initialValue: usesInMemoryDependencies ? nil : RecommendationsStateModel()
         )
+        _programContext = State(initialValue: ProgramContextStore(directory: organizationDirectory))
     }
 
     private static var isRunningUnitTests: Bool {
@@ -158,8 +169,19 @@ struct TMIApp: App {
     }
 
 #if DEBUG
-    @ViewBuilder
     private var uiTestingRootContent: some View {
+        uiTestingFixtureContent
+            .environment(
+                \.programContext,
+                ProgramContextStore.fixture(
+                    program: uiTestingConfiguration.program,
+                    schoolIDs: ["school-fixture"]
+                )
+            )
+    }
+
+    @ViewBuilder
+    private var uiTestingFixtureContent: some View {
         switch uiTestingConfiguration.fixture {
         case .signedOut:
             signedOutUITestingContent
@@ -280,6 +302,10 @@ struct TMIApp: App {
                 .environment(\.meetingsStateModel, meetingsStateModel)
                 .environment(\.districtStateModel, districtStateModel)
                 .environment(\.recommendationsStateModel, recommendationsStateModel)
+                .environment(\.programContext, programContext)
+                .task(id: authStateModel.currentMembership) {
+                    await programContext.load(for: authStateModel.currentMembership)
+                }
 
                 .tint(TMIColors.teal)
                 .preferredColorScheme(.light)

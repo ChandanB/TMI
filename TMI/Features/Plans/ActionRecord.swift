@@ -3,12 +3,22 @@ import Foundation
 nonisolated enum ActionAudience: String, Codable, Sendable, CaseIterable, Equatable {
     case staff
     case student
+    /// Early childhood: something the family does at home. Never shown in
+    /// Student Mode, which only shows `.student` actions.
+    case family
 
     var displayName: String {
         switch self {
         case .staff: "Staff"
         case .student: "Student"
+        case .family: "Family"
         }
+    }
+
+    /// Who an action can be for in a program. Pre-readers don't act on their
+    /// own plan; caregivers and families do.
+    static func choices(for profile: ProgramProfile) -> [ActionAudience] {
+        profile.learnerSelfReports ? [.staff, .student] : [.staff, .family]
     }
 }
 

@@ -191,6 +191,17 @@ describe("trusted career-to-plan attachment", () => {
     },
   );
 
+  it("rejects career links for early-childhood sites (site override or organization default)", async () => {
+    await db.doc("districts/d1/schools/school-1").set({ programType: "earlyChildhood" });
+    await expect(attach(request())).rejects.toMatchObject({ code: "failed-precondition" });
+    await db.doc("districts/d1/schools/school-1").set({ name: "School One" });
+    await db.doc("districts/d1").set({ programType: "earlyChildhood" });
+    await expect(attach(request())).rejects.toMatchObject({ code: "failed-precondition" });
+    await db.doc("districts/d1/schools/school-1").set({ programType: "k12" });
+    await expect(attach(request())).resolves.toMatchObject({ careerID: "career-1" });
+    expect((await relationship.get()).exists).toBe(true);
+  });
+
   it("allows changes-requested plans", async () => {
     await plan.update({ status: "changesRequested" });
     await expect(attach(request())).resolves.toEqual({

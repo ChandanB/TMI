@@ -49,6 +49,8 @@ nonisolated struct GoalRecord: Identifiable, Codable, Sendable, Equatable {
     let dueDate: Date
     let responsibleMemberID: String
     let status: GoalRecordStatus
+    /// Early-childhood goals are organized by developmental domain.
+    var developmentalDomain: DevelopmentalDomain? = nil
 
     var studentWording: String { studentFacingTitle ?? title }
 }

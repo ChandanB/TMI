@@ -181,6 +181,7 @@ struct StudentDetailView: View {
 
 private struct StudentOperationalHubContent: View {
     @Environment(\.appDependencies) private var dependencies
+    @Environment(\.programContext) private var programContext
     @Bindable var state: StudentDetailState
     @Binding var selectedDestination: StudentHubDestination
 
@@ -349,14 +350,18 @@ private struct StudentOperationalHubContent: View {
         }
     }
 
+    private var programProfile: ProgramProfile {
+        programContext.profile(forSchoolID: state.header?.schoolID ?? state.student?.schoolID)
+    }
+
     private var destinationPicker: some View {
         ScrollView(.horizontal) {
             HStack(spacing: TMISpacing.sm) {
-                ForEach(StudentHubDestination.allCases) { destination in
+                ForEach(StudentHubDestination.destinations(for: programProfile)) { destination in
                     Button {
                         selectedDestination = destination
                     } label: {
-                        Label(destination.title, systemImage: destination.systemImage)
+                        Label(destination.title(for: programProfile), systemImage: destination.systemImage)
                             .font(.subheadline.weight(.semibold))
                             .padding(.horizontal, TMISpacing.md)
                             .frame(minHeight: 44)
@@ -510,6 +515,21 @@ private enum StudentHubDestination: Hashable, Identifiable, CaseIterable {
         }
     }
 
+    /// Early-childhood hubs have no career exploration, and discovery is
+    /// observation and family input rather than student surveys.
+    static func destinations(for profile: ProgramProfile) -> [StudentHubDestination] {
+        allCases.filter { destination in
+            destination != .domain(.careers) || profile.showsCareers
+        }
+    }
+
+    func title(for profile: ProgramProfile) -> String {
+        if !profile.learnerSelfReports, self == .domain(.surveysAndForms) {
+            return "Observations & Forms"
+        }
+        return title
+    }
+
     var systemImage: String {
         switch self {
         case .overview: "rectangle.grid.2x2"
@@ -519,6 +539,7 @@ private enum StudentHubDestination: Hashable, Identifiable, CaseIterable {
 }
 
 private struct StudentOverviewSection: View {
+    @Environment(\.programContext) private var programContext
     let header: StudentHeaderProjection?
     let currentSections: [StudentDetailSectionProjection]
     var member: MembershipContext?
@@ -536,7 +557,9 @@ private struct StudentOverviewSection: View {
                         .font(.headline)
                         .foregroundStyle(TMIColors.aubergine)
                     Text(
-                        "Review the verified profile and assigned team, then explore this student's interests, careers, plans, and resources."
+                        programContext.profile(forSchoolID: header?.schoolID).showsCareers
+                            ? "Review the verified profile and assigned team, then explore this student's interests, careers, plans, and resources."
+                            : "Review the child's profile and care team, record what you observe them enjoying, invite the family's input, then build a plan."
                     )
                     .font(.body)
                     .foregroundStyle(TMIColors.textSecondary)

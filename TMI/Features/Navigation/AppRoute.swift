@@ -17,6 +17,15 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Program-appropriate tab title ("Children", "Organization").
+    func title(for terminology: Terminology) -> String {
+        switch self {
+        case .students: terminology.learners
+        case .district: terminology.organization
+        case .dashboard, .plans: title
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .dashboard: "chart.bar.fill"

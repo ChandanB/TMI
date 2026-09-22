@@ -7,6 +7,8 @@ import SwiftUI
 /// Inspects and resets the synthetic `district-debug` tenant that lives only on
 /// this device and never touches Firestore.
 struct DeveloperLocalTenantView: View {
+    @Environment(\.programContext) private var programContext
+    @State private var debugProgram = DebugOrganizationDirectory.debugProgram
     @State private var emails = DebugStaffAccessRegistry.registeredEmails()
     @State private var rosterSummary = Self.rosterSummary()
     @State private var didReset = false
@@ -23,6 +25,22 @@ struct DeveloperLocalTenantView: View {
                 Text("Synthetic tenant")
             } footer: {
                 Text("Any account registered with the alias is routed into this local tenant on this device instead of Firestore.")
+            }
+
+            Section {
+                Picker("Program", selection: $debugProgram) {
+                    ForEach(ProgramType.allCases, id: \.self) { program in
+                        Text(program.displayName).tag(program)
+                    }
+                }
+                .onChange(of: debugProgram) { _, newValue in
+                    DebugOrganizationDirectory.debugProgram = newValue
+                    Task { await programContext.reload() }
+                }
+            } header: {
+                Text("Program preview")
+            } footer: {
+                Text("Switches the local tenant between the K-12 and early-childhood flows (terminology, age groups, no careers, observation-based discovery).")
             }
 
             Section("Accounts routed to the local tenant") {

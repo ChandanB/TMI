@@ -22,6 +22,8 @@ struct School: Codable, Identifiable, Equatable, Sendable {
   var staffCount: Int
   var createdAt: Date
   var isActive: Bool
+  /// Per-site program override; nil inherits the organization default.
+  var programType: ProgramType?
 
   init(
     id: String? = nil,
@@ -34,7 +36,8 @@ struct School: Codable, Identifiable, Equatable, Sendable {
     studentCount: Int = 0,
     staffCount: Int = 0,
     createdAt: Date = Date(),
-    isActive: Bool = true
+    isActive: Bool = true,
+    programType: ProgramType? = nil
   ) {
     self.id = id
     self.name = name
@@ -47,6 +50,7 @@ struct School: Codable, Identifiable, Equatable, Sendable {
     self.staffCount = staffCount
     self.createdAt = createdAt
     self.isActive = isActive
+    self.programType = programType
   }
 
   enum CodingKeys: String, CodingKey {
@@ -61,6 +65,36 @@ struct School: Codable, Identifiable, Equatable, Sendable {
     case staffCount
     case createdAt
     case isActive
+    case programType
+  }
+
+  private enum CanonicalKeys: String, CodingKey {
+    case schoolID
+    case districtID
+    case updatedAt
+  }
+
+  /// Decodes both the legacy shape and the canonical server-written shape
+  /// (`{schoolID, districtID, name, programType?, updatedAt}`), which omits
+  /// most legacy fields.
+  init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let canonical = try decoder.container(keyedBy: CanonicalKeys.self)
+    _id = try container.decodeIfPresent(DocumentID<String>.self, forKey: .id) ?? DocumentID(wrappedValue: nil)
+    let schoolID = try canonical.decodeIfPresent(String.self, forKey: .schoolID)
+    name = try container.decodeIfPresent(String.self, forKey: .name) ?? schoolID ?? ""
+    districtId = try container.decodeIfPresent(String.self, forKey: .districtId)
+      ?? canonical.decodeIfPresent(String.self, forKey: .districtID) ?? ""
+    schoolCode = try container.decodeIfPresent(String.self, forKey: .schoolCode) ?? schoolID ?? ""
+    address = try container.decodeIfPresent(String.self, forKey: .address)
+    principal = try container.decodeIfPresent(String.self, forKey: .principal)
+    grades = try container.decodeIfPresent([String].self, forKey: .grades) ?? []
+    studentCount = try container.decodeIfPresent(Int.self, forKey: .studentCount) ?? 0
+    staffCount = try container.decodeIfPresent(Int.self, forKey: .staffCount) ?? 0
+    createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+      ?? canonical.decodeIfPresent(Date.self, forKey: .updatedAt) ?? .distantPast
+    isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+    programType = try? container.decodeIfPresent(ProgramType.self, forKey: .programType)
   }
 }
 

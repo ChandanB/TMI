@@ -15,6 +15,21 @@ struct ActionEditorView: View {
 
     @Environment(\.appDependencies) private var dependencies
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.programContext) private var programContext
+
+    private var audienceFooter: String {
+        switch audience {
+        case .student: "The student will read this, so write it to them."
+        case .family: "Something the family can do at home. Shared with the family only when a family summary is exported."
+        case .staff: "Staff-facing. The student does not see this wording."
+        }
+    }
+
+    /// Program-appropriate audiences, always keeping the saved value selectable.
+    private var audienceChoices: [ActionAudience] {
+        let choices = ActionAudience.choices(for: programContext.shell)
+        return choices.contains(audience) ? choices : choices + [audience]
+    }
 
     @State private var title = ""
     @State private var audience: ActionAudience = .staff
@@ -49,7 +64,7 @@ struct ActionEditorView: View {
 
                 Section {
                     Picker("Who it is for", selection: $audience) {
-                        ForEach(ActionAudience.allCases, id: \.self) { audience in
+                        ForEach(audienceChoices, id: \.self) { audience in
                             Text(audience.displayName).tag(audience)
                         }
                     }
@@ -57,9 +72,7 @@ struct ActionEditorView: View {
                         .disabled(statusOnly)
                     LabeledContent("Owner", value: member.userID)
                 } footer: {
-                    Text(audience == .student
-                        ? "The student will read this, so write it to them."
-                        : "Staff-facing. The student does not see this wording.")
+                    Text(audienceFooter)
                 }
 
                 Section("Status") {

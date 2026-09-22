@@ -229,7 +229,7 @@ final class PlanChildRepository: PlanChildRepositoryProtocol {
 
 nonisolated extension PlanChildRepository {
     static func fields(_ goal: GoalRecord) -> [String: Any] {
-        [
+        var fields: [String: Any] = [
             "schemaVersion": 1,
             "planID": goal.planID,
             "studentID": goal.studentID,
@@ -242,6 +242,11 @@ nonisolated extension PlanChildRepository {
             "responsibleMemberID": goal.responsibleMemberID,
             "status": goal.status.rawValue,
         ]
+        // Only early-childhood goals carry a domain; K-12 documents are unchanged.
+        if let domain = goal.developmentalDomain {
+            fields["developmentalDomain"] = domain.rawValue
+        }
+        return fields
     }
 
     static func fields(_ action: ActionRecord) -> [String: Any] {
@@ -319,7 +324,8 @@ nonisolated extension PlanChildRepository {
             target: target,
             dueDate: dueDate,
             responsibleMemberID: responsibleMemberID,
-            status: status
+            status: status,
+            developmentalDomain: (data["developmentalDomain"] as? String).flatMap(DevelopmentalDomain.init(rawValue:))
         )
     }
 

@@ -2,8 +2,15 @@ import SwiftUI
 
 struct StudentHeaderView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.programContext) private var programContext
 
     let header: StudentHeaderProjection
+
+    private var programProfile: ProgramProfile {
+        programContext.profile(forSchoolID: header.schoolID)
+    }
+
+    private var terminology: Terminology { programProfile.terminology }
     let isOffline: Bool
     let isMutating: Bool
     let onEdit: (() -> Void)?
@@ -55,11 +62,11 @@ struct StudentHeaderView: View {
                         .bold()
                         .foregroundStyle(TMIColors.textPrimary)
 
-                    Text("Grade: \(header.grade)")
+                    Text("\(terminology.gradeLabel): \(header.grade)")
                         .font(.body)
                         .foregroundStyle(TMIColors.textSecondary)
 
-                    Text("School: \(header.schoolID)")
+                    Text("\(terminology.site): \(programContext.siteName(header.schoolID))")
                         .font(.body)
                         .foregroundStyle(TMIColors.textSecondary)
 
@@ -193,9 +200,11 @@ struct StudentHeaderView: View {
                     .font(.title3)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: TMISpacing.xxs) {
-                    Text("Student Mode")
+                    Text(terminology.learnerMode)
                         .font(.headline)
-                    Text("One student and one assigned activity")
+                    Text(programProfile.learnerSelfReports
+                        ? "One student and one assigned activity"
+                        : "A caregiver-held picture activity for one child")
                         .font(.subheadline)
                 }
                 Spacer(minLength: 0)

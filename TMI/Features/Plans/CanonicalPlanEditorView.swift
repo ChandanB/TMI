@@ -55,6 +55,11 @@ private struct PlanEditorWorkflowView: View {
     let onFinished: (PlanRecord) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.programContext) private var programContext
+
+    private var programProfile: ProgramProfile {
+        programContext.profile(forSchoolID: state.schoolID)
+    }
     @State private var step: PlanEditorState.Step = .student
 
     var body: some View {
@@ -102,7 +107,7 @@ private struct PlanEditorWorkflowView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(TMIColors.teal)
                 Spacer()
-                Text(step.title)
+                Text(step.title(for: programProfile))
                     .font(.caption)
                     .foregroundStyle(TMIColors.textSecondary)
             }
@@ -195,15 +200,20 @@ private struct PlanEditorWorkflowView: View {
                 Divider()
                 Picker("Manual model choice", selection: manualModelBinding) {
                     Text("Choose a model").tag(TMIPlanModel?.none)
-                    ForEach(TMIPlanModel.allCases, id: \.self) { model in
+                    ForEach(TMIPlanModel.available(for: programProfile, grade: nil), id: \.self) { model in
                         Text(model.rawValue).tag(Optional(model))
                     }
                 }
                 .accessibilityIdentifier("planEditor.model")
                 if let selectedModel = state.selectedModel {
-                    Text(selectedModel.description)
+                    Text(selectedModel.description(for: programProfile))
                         .font(.footnote)
                         .foregroundStyle(TMIColors.textSecondary)
+                    if programProfile.program == .earlyChildhood, TMIPlanModel.earlyChildhoodGuidanceIsDraft {
+                        Label("Early-childhood guidance is a draft pending product-owner approval.", systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(TMIColors.textSecondary)
+                    }
                 }
             }
 
@@ -218,10 +228,14 @@ private struct PlanEditorWorkflowView: View {
             }
 
         case .interestsAndCareers:
-            editorCard(title: "Interests & careers", icon: "sparkles") {
-                Text("Use the student's approved interests, hobbies, strengths, and saved career exploration to shape the intervention activities.")
+            editorCard(title: step.title(for: programProfile), icon: "sparkles") {
+                Text(programProfile.showsCareers
+                    ? "Use the student's approved interests, hobbies, strengths, and saved career exploration to shape the intervention activities."
+                    : "Use what caregivers observe the child choosing in play, and what the family shares, to shape everyday activities.")
                     .foregroundStyle(TMIColors.textSecondary)
-                Toggle("I reviewed the student's current interests and career connections", isOn: savingBinding(\.interestsAndCareersReviewed))
+                Toggle(programProfile.showsCareers
+                    ? "I reviewed the student's current interests and career connections"
+                    : "I reviewed the child's observed interests and family input", isOn: savingBinding(\.interestsAndCareersReviewed))
                     .accessibilityIdentifier("planEditor.interestsReviewed")
             }
 
@@ -233,7 +247,7 @@ private struct PlanEditorWorkflowView: View {
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("planEditor.action.title")
                 Picker("Audience", selection: immediateActionAudienceBinding) {
-                    ForEach(ActionAudience.allCases, id: \.self) { audience in
+                    ForEach(ActionAudience.choices(for: programProfile), id: \.self) { audience in
                         Text(audience.displayName).tag(audience)
                     }
                 }
@@ -252,8 +266,19 @@ private struct PlanEditorWorkflowView: View {
                 TextField("Goal", text: goalTitleBinding)
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("planEditor.goal.title")
-                TextField("Student-facing wording (optional)", text: goalStudentTitleBinding)
-                    .textFieldStyle(.roundedBorder)
+                if programProfile.learnerSelfReports {
+                    TextField("Student-facing wording (optional)", text: goalStudentTitleBinding)
+                        .textFieldStyle(.roundedBorder)
+                }
+                if programProfile.usesDevelopmentalDomains {
+                    Picker("Developmental domain", selection: goalDomainBinding) {
+                        Text("Choose a domain").tag(DevelopmentalDomain?.none)
+                        ForEach(DevelopmentalDomain.allCases) { domain in
+                            Label(domain.displayName, systemImage: domain.systemImage).tag(Optional(domain))
+                        }
+                    }
+                    .accessibilityIdentifier("planEditor.goal.domain")
+                }
                 Picker("Measure", selection: goalMeasureBinding) {
                     Text("Choose measure").tag(GoalMeasure?.none)
                     ForEach(GoalMeasure.allCases, id: \.self) { measure in
@@ -320,8 +345,15 @@ private struct PlanEditorWorkflowView: View {
             }
 
         case .studentVoiceAndFamily:
-            editorCard(title: "Student voice & family collaboration", icon: "quote.bubble") {
-                TextField("Student voice — in the student's own words", text: savingBinding(\.studentVoice), axis: .vertical)
+            editorCard(title: step.title(for: programProfile), icon: "quote.bubble") {
+                if !programProfile.learnerSelfReports {
+                    Text("Describe what the child shows you they enjoy or need — through play, gestures, or words — and anything the family shares. Note who observed it.")
+                        .font(.footnote)
+                        .foregroundStyle(TMIColors.textSecondary)
+                }
+                TextField(programProfile.learnerSelfReports
+                    ? "Student voice — in the student's own words"
+                    : "Observed preferences and family perspective", text: savingBinding(\.studentVoice), axis: .vertical)
                     .lineLimit(3...8)
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("planEditor.studentVoice")
@@ -346,13 +378,13 @@ private struct PlanEditorWorkflowView: View {
     private var reviewStep: some View {
         VStack(alignment: .leading, spacing: TMISpacing.lg) {
             editorCard(title: "Review the plan", icon: "checklist") {
-                reviewRow("Student", state.studentName)
+                reviewRow(programProfile.terminology.learner, state.studentName)
                 reviewRow("Model", state.selectedModel?.rawValue ?? "Not selected")
                 reviewRow("Professional need", state.professionalNeed.trimmed.isEmpty ? "Not recorded" : state.professionalNeed.trimmed)
                 reviewRow("Plan owner", state.planOwnerMemberID.trimmed.isEmpty ? "Not assigned" : state.planOwnerMemberID.trimmed)
                 reviewRow("Immediate action", state.immediateAction.title.trimmed.isEmpty ? "Not recorded" : state.immediateAction.title.trimmed)
                 reviewRow("Goal", state.goal.title.trimmed.isEmpty ? "Not recorded" : state.goal.title.trimmed)
-                reviewRow("Student voice", state.studentVoice.trimmed.isEmpty ? "Not recorded" : state.studentVoice.trimmed)
+                reviewRow(programProfile.learnerSelfReports ? "Student voice" : "Child's voice", state.studentVoice.trimmed.isEmpty ? "Not recorded" : state.studentVoice.trimmed)
                 Toggle("I reviewed this plan and it is ready for approval", isOn: savingBinding(\.reviewedForSubmission))
                     .accessibilityIdentifier("planEditor.reviewedForSubmission")
             }
@@ -360,7 +392,7 @@ private struct PlanEditorWorkflowView: View {
             if !state.submissionIssues.isEmpty {
                 editorCard(title: "Still needed", icon: "exclamationmark.circle") {
                     ForEach(state.submissionIssues, id: \.self) { issue in
-                        Label(issue.message, systemImage: "circle")
+                        Label(issue.message(for: programProfile), systemImage: "circle")
                             .font(.footnote)
                             .foregroundStyle(TMIColors.textSecondary)
                     }
@@ -423,7 +455,7 @@ private struct PlanEditorWorkflowView: View {
                 .disabled(step == .student)
                 .accessibilityIdentifier("planEditor.back")
             Spacer()
-            Text(step.title)
+            Text(step.title(for: programProfile))
                 .font(.footnote)
                 .foregroundStyle(TMIColors.textSecondary)
             Spacer()
@@ -544,6 +576,9 @@ private struct PlanEditorWorkflowView: View {
     }
     private var goalStudentTitleBinding: Binding<String> {
         Binding(get: { state.goal.studentFacingTitle }, set: { state.goal.studentFacingTitle = $0; state.scheduleAutosave() })
+    }
+    private var goalDomainBinding: Binding<DevelopmentalDomain?> {
+        Binding(get: { state.goal.developmentalDomain }, set: { state.goal.developmentalDomain = $0; state.scheduleAutosave() })
     }
     private var goalMeasureBinding: Binding<GoalMeasure?> {
         Binding(get: { state.goal.measure }, set: { state.goal.measure = $0; state.scheduleAutosave() })

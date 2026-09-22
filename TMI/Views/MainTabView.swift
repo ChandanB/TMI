@@ -17,6 +17,7 @@ struct MainTabView: View {
     @Environment(\.studentContext) private var studentContext
     @Environment(AppRouter.self) private var router
     @Environment(\.notificationService) private var notificationService
+    @Environment(\.programContext) private var programContext
     
     // Student Mode
     @State private var studentModeSession = StudentModeSession()
@@ -144,13 +145,13 @@ struct MainTabView: View {
                 ForEach(router.availableTabs) { tab in
                     destinationView(for: tab)
                         .tabItem {
-                            Label(tab.title, systemImage: tab.systemImage)
+                            Label(tab.title(for: programContext.shell.terminology), systemImage: tab.systemImage)
                         }
                         .tag(tab)
                 }
             }
             .tabViewStyle(.sidebarAdaptable)
-            .navigationTitle(router.selectedTab.title)
+            .navigationTitle(router.selectedTab.title(for: programContext.shell.terminology))
             .navigationDestination(for: AppRoute.self) { route in
                 routeDestination(route)
             }
@@ -168,7 +169,7 @@ struct MainTabView: View {
                     Button {
                         try? router.select(tab)
                     } label: {
-                        Label(tab.title, systemImage: tab.systemImage)
+                        Label(tab.title(for: programContext.shell.terminology), systemImage: tab.systemImage)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .buttonStyle(.plain)
@@ -190,7 +191,7 @@ struct MainTabView: View {
         } detail: {
             NavigationStack(path: $router.path) {
                 destinationView(for: router.selectedTab)
-                    .navigationTitle(router.selectedTab.title)
+                    .navigationTitle(router.selectedTab.title(for: programContext.shell.terminology))
                     .navigationDestination(for: AppRoute.self) { route in
                         routeDestination(route)
                     }

@@ -28,6 +28,7 @@ struct StudentEditorView: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.programContext) private var programContext
 
     let mode: Mode
     let member: MembershipContext
@@ -95,7 +96,7 @@ struct StudentEditorView: View {
         }
         .disabled(queued)
         .formStyle(.grouped)
-        .navigationTitle(mode.title)
+        .navigationTitle(title)
         .accessibilityIdentifier("studentEditor.screen")
         .safeAreaInset(edge: .bottom) {
             if !visibleDuplicateCandidateIDs.isEmpty {
@@ -117,9 +118,22 @@ struct StudentEditorView: View {
         .interactiveDismissDisabled(submissionInFlight)
     }
 
+    private var title: String {
+        switch mode {
+        case .create: "Add \(terminology.learner)"
+        case .edit: "Edit \(terminology.learner)"
+        }
+    }
+
+    private var programProfile: ProgramProfile {
+        programContext.profile(forSchoolID: schoolID.isEmpty ? member.schoolIDs.sorted().first : schoolID)
+    }
+
+    private var terminology: Terminology { programProfile.terminology }
+
     private var identitySection: some View {
-        Section("Student record") {
-            TextField("Student name", text: $displayName)
+        Section(terminology.learnerRecord) {
+            TextField("\(terminology.learner) name", text: $displayName)
                 .textContentType(.name)
                 .accessibilityIdentifier("studentEditor.name")
             fieldError(for: .displayName)
@@ -127,28 +141,51 @@ struct StudentEditorView: View {
             schoolField
             fieldError(for: .schoolID)
 
-            TextField("Grade", text: $grade)
-                .accessibilityIdentifier("studentEditor.grade")
+            gradeField
             fieldError(for: .grade)
 
-            TextField("Student identifier (optional)", text: $studentIdentifier)
+            TextField("\(terminology.learner) identifier (optional)", text: $studentIdentifier)
                 .textContentType(.username)
                 .accessibilityIdentifier("studentEditor.identifier")
             fieldError(for: .studentIdentifier)
         }
     }
 
+    @ViewBuilder
+    private var gradeField: some View {
+        if programProfile.program == .earlyChildhood {
+            Picker(terminology.gradeLabel, selection: $grade) {
+                Text("Select an age group").tag("")
+                ForEach(AgeGroup.allCases) { group in
+                    Text("\(group.displayName) (\(group.typicalAges))").tag(group.rawValue)
+                }
+                if !grade.isEmpty, AgeGroup(rawValue: grade) == nil {
+                    Text(grade).tag(grade)
+                }
+            }
+            .accessibilityIdentifier("studentEditor.ageGroup")
+            .onChange(of: dateOfBirth) { _, newValue in
+                if grade.isEmpty {
+                    grade = AgeGroup.suggested(forDateOfBirth: newValue).rawValue
+                }
+            }
+        } else {
+            TextField(terminology.gradeLabel, text: $grade)
+                .accessibilityIdentifier("studentEditor.grade")
+        }
+    }
+
     private var schoolField: some View {
         Group {
             if member.schoolIDs.count > 1 {
-                Picker("School", selection: $schoolID) {
-                    Text("Select a school").tag("")
+                Picker(terminology.site, selection: $schoolID) {
+                    Text("Select a \(terminology.site.lowercased())").tag("")
                     ForEach(member.schoolIDs.sorted(), id: \.self) { schoolID in
-                        Text(schoolID).tag(schoolID)
+                        Text(programContext.siteName(schoolID)).tag(schoolID)
                     }
                 }
             } else if let authorizedSchoolID = member.schoolIDs.first {
-                LabeledContent("School", value: authorizedSchoolID)
+                LabeledContent(terminology.site, value: programContext.siteName(authorizedSchoolID))
                     .onAppear {
                         if schoolID.isEmpty {
                             schoolID = authorizedSchoolID
@@ -162,15 +199,17 @@ struct StudentEditorView: View {
     }
 
     private var optionalDetailsSection: some View {
-        Section("Optional details") {
+        Section(programProfile.requiresDateOfBirth ? "Details" : "Optional details") {
             TextField("Pronouns", text: $pronouns)
                 .accessibilityIdentifier("studentEditor.pronouns")
             fieldError(for: .pronouns)
 
-            Toggle("Include date of birth", isOn: $hasDateOfBirth)
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("studentEditor.hasDateOfBirth")
-            if hasDateOfBirth {
+            if !programProfile.requiresDateOfBirth {
+                Toggle("Include date of birth", isOn: $hasDateOfBirth)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("studentEditor.hasDateOfBirth")
+            }
+            if hasDateOfBirth || programProfile.requiresDateOfBirth {
                 DatePicker(
                     "Date of birth",
                     selection: $dateOfBirth,
@@ -268,7 +307,7 @@ struct StudentEditorView: View {
             schoolID: schoolID,
             grade: grade,
             studentIdentifier: studentIdentifier,
-            dateOfBirth: hasDateOfBirth ? dateOfBirth : nil,
+            dateOfBirth: (hasDateOfBirth || programProfile.requiresDateOfBirth) ? dateOfBirth : nil,
             pronouns: pronouns,
             assignedMemberIDs: assignedMemberIDs
         )
@@ -297,7 +336,7 @@ struct StudentEditorView: View {
         StudentValidation.issues(
             for: draft,
             districtID: member.districtID,
-            policy: validationPolicy
+            policy: validationPolicy.applying(programProfile)
         )
     }
 
@@ -330,7 +369,7 @@ struct StudentEditorView: View {
     @ViewBuilder
     private func fieldError(for field: StudentValidation.Field) -> some View {
         if let issue = validationIssues.first(where: { $0.field == field }) {
-            Text(issue.message)
+            Text(issue.message(using: terminology))
                 .font(.footnote)
                 .foregroundStyle(TMIColors.errorText)
                 .accessibilityIdentifier("studentEditor.error.\(field.rawValue)")

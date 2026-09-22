@@ -37,12 +37,15 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
     let isUITesting: Bool
     let fixture: Fixture?
     let contentSize: ContentSize?
+    /// `-program earlyChildhood` renders any fixture as an early-childhood site.
+    let program: ProgramType
 
     init(arguments: [String]) {
         guard arguments.contains("-uiTesting") else {
             self.isUITesting = false
             self.fixture = nil
             self.contentSize = nil
+            self.program = .k12
             return
         }
         self.isUITesting = true
@@ -60,6 +63,7 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
 
         self.fixture = value(after: "-fixture").flatMap(Fixture.init(rawValue:))
         self.contentSize = value(after: "-content-size").flatMap(ContentSize.init(rawValue:))
+        self.program = value(after: "-program").flatMap(ProgramType.init(rawValue:)) ?? .k12
     }
 }
 #endif

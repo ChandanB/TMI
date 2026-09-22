@@ -36,6 +36,19 @@ final class PlanEditorState {
             case .reviewAndSubmit: "Review & submit"
             }
         }
+
+        /// Early-childhood plans draw on observed interests rather than career
+        /// exploration, and record the child's observed preferences rather than
+        /// words a pre-verbal child cannot give.
+        func title(for profile: ProgramProfile) -> String {
+            switch self {
+            case .student: profile.terminology.learner
+            case .interestsAndCareers where !profile.showsCareers: "Interests & play"
+            case .studentVoiceAndFamily where !profile.learnerSelfReports:
+                "Child's voice & family partnership"
+            default: title
+            }
+        }
     }
 
     enum ModelSelection: Equatable, Sendable {
@@ -125,6 +138,16 @@ final class PlanEditorState {
             case .finalReviewRequired: "Complete the final review before submitting."
             }
         }
+
+        func message(for profile: ProgramProfile) -> String {
+            guard !profile.learnerSelfReports else { return message }
+            switch self {
+            case .signalsReviewRequired: return "Review the child's observations and data sources."
+            case .interestsAndCareersReviewRequired: return "Review the child's observed interests and family input."
+            case .studentVoiceRequired: return "Record the child's observed preferences and the family's perspective."
+            default: return message
+            }
+        }
     }
 
     struct ImmediateActionDraft: Equatable, Sendable {
@@ -143,6 +166,7 @@ final class PlanEditorState {
         var target = ""
         var dueDate: Date?
         var responsibleMemberID = ""
+        var developmentalDomain: DevelopmentalDomain?
     }
 
     struct Conflict: Equatable, Sendable {
@@ -517,7 +541,8 @@ final class PlanEditorState {
             target: goal.target.trimmed,
             dueDate: dueDate,
             responsibleMemberID: goal.responsibleMemberID.trimmed,
-            status: .notStarted
+            status: .notStarted,
+            developmentalDomain: goal.developmentalDomain
         )
     }
 
