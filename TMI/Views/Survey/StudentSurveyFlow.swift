@@ -107,6 +107,11 @@ struct StudentSurveyFlow: View {
         }
     }
 
+    /// Every question is a picture question: a caregiver-held activity.
+    private func isPictureActivity(_ definition: SurveyDefinition) -> Bool {
+        !definition.questions.isEmpty && definition.questions.allSatisfy { $0.kind == .imageChoice }
+    }
+
     private func welcome(definition: SurveyDefinition) -> some View {
         VStack(spacing: TMISpacing.xl) {
             Image(systemName: "hand.wave.fill")
@@ -116,7 +121,9 @@ struct StudentSurveyFlow: View {
             Text("Let’s learn what you like")
                 .font(.largeTitle.bold())
                 .multilineTextAlignment(.center)
-            Text("There are no wrong answers. Pick what feels most like you, and you can go back anytime.")
+            Text(isPictureActivity(definition)
+                ? "A grown-up will read each question. Point to the picture you like best — every answer is a good answer."
+                : "There are no wrong answers. Pick what feels most like you, and you can go back anytime.")
                 .font(.title3)
                 .foregroundStyle(TMIColors.textSecondary)
                 .multilineTextAlignment(.center)

@@ -3,6 +3,16 @@ import SwiftUI
 struct StudentInterestsSection: View {
     let districtID: String
     let studentID: String
+    var schoolID: String? = nil
+    var studentName: String = "the child"
+    var observationRecorder: (any InterestObservationRecording)? = nil
+
+    @Environment(\.programContext) private var programContext
+    @State private var isRecordingObservation = false
+    @State private var isCollectingFamilyInput = false
+    @State private var familyOperationID = UUID().uuidString
+    @State private var familyInputs: [FamilyInputSummary] = []
+    @State private var observationOperationID = UUID().uuidString
 
     @State private var interests: [StudentInterest] = []
     @State private var pendingReviews: [StudentInterestReview] = []
@@ -13,13 +23,26 @@ struct StudentInterestsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             HStack {
-                Text("Approved interests")
+                Text(isObservationProgram ? "Observed interests" : "Approved interests")
                     .font(.headline)
                 Spacer()
                 if isLoading {
                     ProgressView()
                         .controlSize(.small)
                 }
+                if isObservationProgram {
+                    Button("Record observation", systemImage: "eye") {
+                        observationOperationID = UUID().uuidString
+                        isRecordingObservation = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(TMIColors.teal)
+                    .accessibilityIdentifier("studentInterests.recordObservation")
+                }
+            }
+
+            if isObservationProgram {
+                familySection
             }
 
             // A submission only becomes interests once a reviewer approves it,
@@ -54,9 +77,11 @@ struct StudentInterestsSection: View {
                 .buttonStyle(.bordered)
             } else if interests.isEmpty, !isLoading {
                 ContentUnavailableView(
-                    "No approved interests",
-                    systemImage: "star",
-                    description: Text("Survey proposals appear here after staff approval.")
+                    isObservationProgram ? "No observed interests yet" : "No approved interests",
+                    systemImage: isObservationProgram ? "eye" : "star",
+                    description: Text(isObservationProgram
+                        ? "Record what you see the child choose during free play. Picture Choice results appear here after staff approval."
+                        : "Survey proposals appear here after staff approval.")
                 )
             } else {
                 ForEach(interests) { interest in
@@ -82,6 +107,29 @@ struct StudentInterestsSection: View {
         .task(id: "\(districtID)/\(studentID)") {
             await load()
         }
+        .sheet(isPresented: $isRecordingObservation) {
+            InterestObservationSheet(childName: studentName) { draft in
+                let recorder = observationRecorder ?? FirebaseInterestObservationRecorder()
+                try await recorder.record(
+                    draft,
+                    districtID: districtID,
+                    studentID: studentID,
+                    operationID: observationOperationID
+                )
+                await load()
+            }
+        }
+        .sheet(isPresented: $isCollectingFamilyInput) {
+            FamilyInputSheet(childName: studentName) { draft in
+                try await FirebaseFamilyInputRecorder().record(
+                    draft,
+                    districtID: districtID,
+                    studentID: studentID,
+                    operationID: familyOperationID
+                )
+                await loadFamilyInputs()
+            }
+        }
         .sheet(item: $reviewInProgress) { review in
             StaffSurveyInterestReviewView(
                 definition: review.definition,
@@ -92,6 +140,54 @@ struct StudentInterestsSection: View {
                 Task { await load() }
             }
         }
+    }
+
+    private var familySection: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            HStack {
+                Text("Family input")
+                    .font(.headline)
+                Spacer()
+                Button("Add family input", systemImage: "house") {
+                    familyOperationID = UUID().uuidString
+                    isCollectingFamilyInput = true
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("studentInterests.familyInput")
+            }
+            if familyInputs.isEmpty {
+                Text("Invite the family to share what their child loves, what comforts them, and their routines at home.")
+                    .font(.subheadline)
+                    .foregroundStyle(TMIColors.textSecondary)
+            }
+            ForEach(familyInputs) { input in
+                VStack(alignment: .leading, spacing: TMISpacing.xs) {
+                    Text("\(input.relationship ?? "Family") · \(input.submittedAt.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.subheadline.weight(.semibold))
+                    ForEach(FamilyInputDraft.questions.filter { input.answers[$0.id] != nil }) { question in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(question.prompt).font(.caption).foregroundStyle(TMIColors.textSecondary)
+                            Text(input.answers[question.id] ?? "").font(.body)
+                        }
+                    }
+                }
+                .padding(TMISpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .task(id: "\(districtID)/\(studentID)/family") { await loadFamilyInputs() }
+    }
+
+    @MainActor
+    private func loadFamilyInputs() async {
+        guard isObservationProgram else { return }
+        familyInputs = (try? await FamilyInputReader.load(districtID: districtID, studentID: studentID)) ?? []
+    }
+
+    private var isObservationProgram: Bool {
+        !programContext.profile(forSchoolID: schoolID).learnerSelfReports
     }
 
     @MainActor

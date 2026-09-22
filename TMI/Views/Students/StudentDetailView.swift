@@ -415,7 +415,9 @@ private struct StudentOperationalHubContent: View {
             if domain == .interests, let student = state.student {
                 StudentInterestsSection(
                     districtID: student.districtID,
-                    studentID: student.id
+                    studentID: student.id,
+                    schoolID: student.schoolID,
+                    studentName: student.displayName
                 )
             } else if domain == .careers, let student = state.student {
                 // Matching is a claim about this student, so it is read where

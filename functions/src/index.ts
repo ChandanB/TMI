@@ -53,6 +53,8 @@ import {
   type ProvisionStaffMembershipRequest,
 } from "./invitations.js";
 import { requireCareerProgram, resolveSiteProgram } from "./program.js";
+import { createRecordInterestObservationHandler } from "./observations.js";
+import { createRecordFamilyInputHandler } from "./familyInput.js";
 import {
   createDeveloperConsoleHandlers,
   isDeveloperConsoleEnabled,
@@ -5613,4 +5615,13 @@ export const devListMembers = onCall(callableOptions, (request) =>
 );
 export const devUpsertMembership = onCall(callableOptions, (request) =>
   developerConsoleHandlers().upsertMembership(request),
+);
+
+export const recordInterestObservation = onCall(
+  callableOptions,
+  createRecordInterestObservationHandler(() => getFirestore()),
+);
+export const recordFamilyInput = onCall(
+  callableOptions,
+  createRecordFamilyInputHandler(() => getFirestore()),
 );

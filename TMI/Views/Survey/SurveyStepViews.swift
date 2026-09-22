@@ -5,14 +5,28 @@ struct SurveyQuestionView: View {
     let answer: SurveyAnswer?
     let onAnswer: (SurveyAnswer) -> Void
 
+    @State private var narrator = PromptNarrator()
+
     var body: some View {
         VStack(alignment: .leading, spacing: TMISpacing.lg) {
-            Text(question.prompt)
-                .font(.title2.bold())
-                .foregroundStyle(TMIColors.textPrimary)
-                .accessibilityAddTraits(.isHeader)
+            HStack(alignment: .top, spacing: TMISpacing.md) {
+                Text(question.prompt)
+                    .font(.title2.bold())
+                    .foregroundStyle(TMIColors.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                if question.kind == .imageChoice {
+                    ReadAloudButton(text: readAloudText, narrator: narrator)
+                }
+            }
             switch question.kind {
-            case .singleChoice, .imageChoice:
+            case .imageChoice:
+                PictureChoiceGrid(
+                    options: question.options,
+                    isSelected: isSelected,
+                    onChoose: { choose($0, allowsMultiple: false) }
+                )
+            case .singleChoice:
                 optionGrid(allowsMultiple: false)
             case .multiSelect:
                 optionGrid(allowsMultiple: true)
@@ -34,6 +48,11 @@ struct SurveyQuestionView: View {
             }
         }
         .frame(maxWidth: 680, alignment: .leading)
+        .onDisappear { narrator.stop() }
+    }
+
+    private var readAloudText: String {
+        ([question.prompt] + question.options.map(\.label)).joined(separator: ". ")
     }
 
     private func optionGrid(allowsMultiple: Bool) -> some View {

@@ -253,7 +253,7 @@ struct StudentModeView: View {
     }
 
     private var studentModeTitle: some View {
-        Text("Student Mode")
+        Text(AgeGroup(rawValue: profile.grade) == nil ? "Student Mode" : Terminology.earlyChildhood.learnerMode)
             .font(.headline)
             .foregroundStyle(Color.tmiTextPrimary)
     }
@@ -291,7 +291,8 @@ struct StudentModeView: View {
                     .foregroundStyle(Color.tmiTextPrimary)
 
                 if !profile.grade.isEmpty {
-                    Text("Grade \(profile.grade)")
+                    // Early-childhood age groups read on their own ("Pre-K 4s").
+                    Text(AgeGroup(rawValue: profile.grade) == nil ? "Grade \(profile.grade)" : profile.grade)
                         .font(.body.weight(.medium))
                         .foregroundStyle(Color.tmiTextSecondary)
                 }
@@ -402,15 +403,19 @@ struct StudentModeSurveyUITestingContent: View {
     @State private var session: StudentModeSession
     private let activity: SurveyActivity?
     private let repository: SurveyRepository?
-    private let profile = StudentModeProfile(
-        studentID: "student-ui",
-        displayName: "Taylor Morgan",
-        grade: "8",
-        pronouns: nil
-    )
+    private let profile: StudentModeProfile
     private let grant: StudentModeGrant?
 
-    init() {
+    init(program: ProgramType = .k12) {
+        profile = StudentModeProfile(
+            studentID: "student-ui",
+            displayName: program == .earlyChildhood ? "Kai Rivera" : "Taylor Morgan",
+            grade: program == .earlyChildhood ? AgeGroup.preK4.rawValue : "8",
+            pronouns: nil
+        )
+        let fixtureDefinition = program == .earlyChildhood
+            ? EarlyChildhoodSurveyContent.pictureChoice()
+            : Self.makeDefinition()
         let session = StudentModeSession(
             authenticateStaff: { true },
             securelyEndRespondentSession: { _ in },
@@ -423,11 +428,11 @@ struct StudentModeSurveyUITestingContent: View {
             attemptID: "attempt-ui",
             districtID: "district-ui",
             studentID: "student-ui",
-            definitionID: "interest-discovery",
+            definitionID: fixtureDefinition?.id ?? "interest-discovery",
             definitionVersion: 1,
             state: .active,
             assignedAt: Date(timeIntervalSince1970: 1_735_689_600)
-        ), let definition = Self.makeDefinition(),
+        ), let definition = fixtureDefinition,
         let scope = try? StudentModeScope(
             districtID: "district-ui",
             studentID: "student-ui",

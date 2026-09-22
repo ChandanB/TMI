@@ -202,9 +202,7 @@ struct StudentHeaderView: View {
                 VStack(alignment: .leading, spacing: TMISpacing.xxs) {
                     Text(terminology.learnerMode)
                         .font(.headline)
-                    Text(programProfile.learnerSelfReports
-                        ? "One student and one assigned activity"
-                        : "A caregiver-held picture activity for one child")
+                    Text(studentModeSubtitle)
                         .font(.subheadline)
                 }
                 Spacer(minLength: 0)
@@ -224,11 +222,26 @@ struct StudentHeaderView: View {
             }
         }
         .buttonStyle(.plain)
-        .disabled(isOffline || isMutating || onLaunchStudentMode == nil)
+        .disabled(isOffline || isMutating || onLaunchStudentMode == nil || !isOldEnoughForLearnerMode)
         .accessibilityLabel("Student Mode")
         .accessibilityValue(studentModeAccessibilityValue)
         .accessibilityHint("Opens the secure Student Mode activity picker.")
         .accessibilityIdentifier("studentDetail.studentMode")
+    }
+
+    /// Infants, toddlers, and twos are observed by caregivers, never asked.
+    private var isOldEnoughForLearnerMode: Bool {
+        guard !programProfile.learnerSelfReports else { return true }
+        return AgeGroup(rawValue: header.grade)?.supportsPictureChoice ?? true
+    }
+
+    private var studentModeSubtitle: String {
+        if programProfile.learnerSelfReports {
+            return "One student and one assigned activity"
+        }
+        return isOldEnoughForLearnerMode
+            ? "A caregiver-held picture activity for one child"
+            : "Starts at age 3 — record interest observations instead"
     }
 
     private var initials: String {
@@ -272,7 +285,7 @@ struct StudentHeaderView: View {
     private var studentModeAccessibilityValue: String {
         switch header.studentModeAvailability {
         case .availableInRelease2:
-            onLaunchStudentMode == nil ? "Unavailable" : "Available"
+            onLaunchStudentMode == nil || !isOldEnoughForLearnerMode ? "Unavailable" : "Available"
         }
     }
 

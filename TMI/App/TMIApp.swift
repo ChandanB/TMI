@@ -214,7 +214,7 @@ struct TMIApp: App {
                 studentDetailUITestingContent(fixture: fixture)
             }
         case .studentModeSurvey:
-            StudentModeSurveyUITestingContent()
+            StudentModeSurveyUITestingContent(program: uiTestingConfiguration.program)
         case .careerDiscovery:
             CareerDiscoveryUITestingContent()
         case .careerDetail:

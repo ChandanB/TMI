@@ -720,6 +720,28 @@ service cloud.firestore {
           allow create, update, delete: if false;
         }
 
+        // Family "All About My Child" input (early childhood), written
+        // immutably by the recordFamilyInput callable.
+        match /familyInputs/{inputID} {
+          allow read: if canReadStudent(
+              districtID,
+              studentID,
+              studentData(districtID, studentID)
+            );
+          allow create, update, delete: if false;
+        }
+
+        // Caregiver observations (early childhood) are written immutably by
+        // the recordInterestObservation callable.
+        match /observations/{observationID} {
+          allow read: if canReadStudent(
+              districtID,
+              studentID,
+              studentData(districtID, studentID)
+            );
+          allow create, update, delete: if false;
+        }
+
         match /careers/{careerID} {
           allow read: if canReadStudent(
               districtID,
