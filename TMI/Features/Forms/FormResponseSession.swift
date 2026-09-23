@@ -16,6 +16,8 @@ final class FormResponseSession {
         case idle
         case saving
         case saved
+        /// Offline: kept on this device and sent when a connection returns.
+        case savedOnDevice
         case failed(FormResponseError)
     }
 
@@ -40,6 +42,16 @@ final class FormResponseSession {
     private var reviewOperationID = UUID().uuidString
     private var autosaveTask: Task<Void, Never>?
     private var hasUnsavedChanges = false
+    /// Set once a draft was queued offline: the server version moves when it replays.
+    private var needsVersionRefresh = false
+
+    /// Draft answers are queued here when the device is offline.
+    var sync: SyncCoordinator?
+
+    private var draftKey: String { SyncAggregate.formDraft(assignmentID: assignmentID, studentID: studentID) }
+    private var queuedDraft: SyncOperation? {
+        sync?.operations(forAggregate: draftKey).last { $0.kind == .saveFormDraft }
+    }
 
     init(
         districtID: String,
@@ -75,6 +87,13 @@ final class FormResponseSession {
             if let type = loaded.respondentType { respondentType = type }
             hasUnsavedChanges = false
             saveStatus = .idle
+            // Answers saved on this device but not yet sent win over the server copy.
+            if !loaded.state.isFrozen, let queued = queuedDraft,
+               let payload = try? queued.decodePayload(FormDraftSyncPayload.self) {
+                answers = payload.answers
+                needsVersionRefresh = true
+                saveStatus = queued.isPending ? .savedOnDevice : .failed(.conflict)
+            }
             phase = .ready
         } catch {
             phase = .failed(FormResponseError.map(error))
@@ -106,15 +125,43 @@ final class FormResponseSession {
         saveStatus = .saving
         let snapshot = answers
         do {
-            recordVersion = try await repository.saveDraft(
+            try await refreshVersionIfNeeded()
+            guard let sync else {
+                recordVersion = try await repository.saveDraft(
+                    districtID: districtID, assignmentID: assignmentID, studentID: studentID,
+                    answers: snapshot, expectedRecordVersion: recordVersion
+                )
+                if snapshot == answers { hasUnsavedChanges = false }
+                saveStatus = .saved
+                return
+            }
+            let payload = FormDraftSyncPayload(
                 districtID: districtID, assignmentID: assignmentID, studentID: studentID,
                 answers: snapshot, expectedRecordVersion: recordVersion
             )
+            let result = try await sync.perform(
+                .saveFormDraft, aggregateKey: draftKey, summary: "Form answers",
+                districtID: districtID, payload: payload
+            ) { _ in
+                self.recordVersion = try await self.repository.saveDraft(
+                    districtID: self.districtID, assignmentID: self.assignmentID, studentID: self.studentID,
+                    answers: snapshot, expectedRecordVersion: payload.expectedRecordVersion
+                )
+            }
             if snapshot == answers { hasUnsavedChanges = false }
-            saveStatus = .saved
+            if result == .savedOnDevice { needsVersionRefresh = true }
+            saveStatus = result == .sent ? .saved : .savedOnDevice
         } catch {
             saveStatus = .failed(FormResponseError.map(error))
         }
+    }
+
+    /// After a queued draft replays, the server's version has moved on.
+    private func refreshVersionIfNeeded() async throws {
+        guard needsVersionRefresh, queuedDraft == nil else { return }
+        let latest = try await repository.load(districtID: districtID, assignmentID: assignmentID, studentID: studentID)
+        recordVersion = latest.recordVersion
+        needsVersionRefresh = false
     }
 
     @discardableResult
@@ -127,7 +174,16 @@ final class FormResponseSession {
         guard isEditable, missingRequired.isEmpty, !isSubmitting else { return false }
         isSubmitting = true
         defer { isSubmitting = false }
+        // Submitting is online-only; queued answers must reach the server first.
+        if queuedDraft != nil {
+            await sync?.syncNow()
+            if queuedDraft != nil {
+                actionError = .rejected("Your answers are saved on this device. Connect to the internet to submit.")
+                return false
+            }
+        }
         do {
+            try await refreshVersionIfNeeded()
             recordVersion = try await repository.submit(
                 districtID: districtID, assignmentID: assignmentID, studentID: studentID,
                 answers: answers, respondentType: respondentType,

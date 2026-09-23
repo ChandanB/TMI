@@ -300,64 +300,6 @@ final class RecommendationsStateModel: BaseStateModel<[Recommendation], Identifi
         print("[RecommendationsStateModel] Added feedback to recommendation: \(recommendation.id)")
     }
     
-    // MARK: - Actions
-    
-    /// Apply a recommendation (execute its action)
-    @MainActor
-    func applyRecommendation(_ recommendation: Recommendation) async throws {
-        // Execute the action based on type
-        switch recommendation.actionType {
-        case .assignResource:
-            if let resourceId = recommendation.actionPayload?["resourceId"],
-               let studentId = contextStudentId {
-                // Fetch resource details first
-                if let resource = try? await ResourceLibraryService.shared.fetchResource(id: resourceId) {
-                    try await ResourceAssignmentService.shared.assignResource(
-                        resourceId: resourceId,
-                        studentId: studentId,
-                        planId: contextPlanId,
-                        resourceTitle: resource.title,
-                        resourceCategory: resource.category.rawValue,
-                        resourceURL: resource.url
-                    )
-                }
-            }
-            
-        case .createGoal:
-            if let description = recommendation.actionPayload?["description"],
-               let planId = contextPlanId {
-                // Would create goal via GoalsRepository
-                print("[RecommendationsStateModel] Would create goal: \(description) for plan: \(planId)")
-            }
-            
-        case .scheduleMeeting:
-            // Would open scheduling flow
-            print("[RecommendationsStateModel] Would open meeting scheduler")
-            
-        case .exploreCareer:
-            if let careerId = recommendation.actionPayload?["careerId"] {
-                print("[RecommendationsStateModel] Would navigate to career: \(careerId)")
-            }
-            
-        case .addInterest:
-            if let interestId = recommendation.actionPayload?["interestId"],
-               let studentId = contextStudentId {
-                try await StudentInterestService.shared.addInterest(
-                    studentId: studentId,
-                    interestId: interestId,
-                    level: 3,
-                    source: .staff
-                )
-            }
-            
-        case .viewContent:
-            // Would navigate to content
-            print("[RecommendationsStateModel] Would navigate to content")
-        }
-        
-        try await markAsApplied(recommendation)
-    }
-    
     // MARK: - Selection
     
     @MainActor

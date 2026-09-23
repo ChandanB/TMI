@@ -49,6 +49,33 @@ struct FormTemplateEditorView: View {
           TextField("Category", text: Binding(get: { template.category ?? "" }, set: { template.category = $0 }))
           Toggle("Active", isOn: $template.isActive)
         }
+
+        Section {
+          Toggle("Scored form", isOn: Binding(
+            get: { template.isScored == true },
+            set: { template.isScored = $0 }
+          ))
+          if template.isScored == true {
+            ForEach(Binding(get: { template.scoreBands ?? [] }, set: { template.scoreBands = $0 })) { $band in
+              HStack {
+                TextField("Label", text: $band.label)
+                Stepper("From \(band.minimum.formatted())", value: $band.minimum, in: 0...1_000, step: 1)
+                  .fixedSize()
+              }
+            }
+            .onDelete { template.scoreBands?.remove(atOffsets: $0) }
+            Button("Add score band", systemImage: "plus") {
+              let next = (template.scoreBands?.map(\.minimum).max() ?? -5) + 5
+              template.scoreBands = (template.scoreBands ?? []) + [FormScoreBand(minimum: next, label: "")]
+            }
+          }
+        } header: {
+          Text("Scoring")
+        } footer: {
+          Text(template.isScored == true
+            ? "The server adds up points from choice, checkbox, and rating questions when a response is submitted. Bands label score ranges."
+            : "Turn on to score submissions from points you set on each question.")
+        }
         
         ForEach(Array($template.sections.enumerated()), id: \.element.id) { index, $section in
           Section {
@@ -59,7 +86,7 @@ struct FormTemplateEditorView: View {
                   VStack(alignment: .leading) {
                       Text(field.label)
                           .font(.body)
-                      Text(field.type.rawValue.capitalized)
+                      Text([field.type.rawValue.capitalized, scoringSummary(field)].compactMap { $0 }.joined(separator: " · "))
                           .font(.caption)
                           .foregroundColor(.secondary)
                   }
@@ -114,7 +141,7 @@ struct FormTemplateEditorView: View {
         }
       }
       .sheet(isPresented: $showingFieldSheet) {
-          FieldEditorSheet { newField in
+          FieldEditorSheet(isScored: template.isScored == true) { newField in
               guard let index = currentSectionIndex else { return }
               template.sections[index].fields.append(newField)
           }
@@ -128,6 +155,17 @@ struct FormTemplateEditorView: View {
     }
   }
   
+  private func scoringSummary(_ field: FormField) -> String? {
+      guard template.isScored == true else { return nil }
+      if let points = field.optionPoints, !points.isEmpty {
+          return "up to \(points.max()?.formatted() ?? "0") pts"
+      }
+      if let points = field.points {
+          return field.type == .rating ? "rating × \(points.formatted())" : "\(points.formatted()) pts"
+      }
+      return nil
+  }
+
   private func saveTemplate() async {
       isSaving = true
       guard let user = authStateModel.currentUser,
@@ -165,46 +203,106 @@ struct FormTemplateEditorView: View {
 
 struct FieldEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
+    var isScored = false
     var onSave: (FormField) -> Void
-    
+
     @State private var label = ""
     @State private var type: FieldType = .text
     @State private var isRequired = false
     @State private var placeholder = ""
-    
+    @State private var options: [ChoiceOption] = [ChoiceOption(), ChoiceOption()]
+    @State private var points: Double = 1
+
+    struct ChoiceOption: Identifiable {
+        let id = UUID()
+        var text = ""
+        var points: Double = 0
+    }
+
+    private var addableTypes: [FieldType] {
+        FieldType.allCases.filter { $0 != .allCases && $0 != .table && $0 != .file }
+    }
+
+    private var cleanedOptions: [ChoiceOption] {
+        options.filter { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
+
+    private var isValid: Bool {
+        !label.trimmingCharacters(in: .whitespaces).isEmpty && (!type.requiresOptions || cleanedOptions.count >= 2)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Field Label", text: $label)
+                    TextField("Question", text: $label)
                     Picker("Type", selection: $type) {
-                        ForEach(FieldType.allCases, id: \.self) { type in
+                        ForEach(addableTypes, id: \.self) { type in
                             Text(type.rawValue.capitalized).tag(type)
                         }
                     }
-                    TextField("Placeholder", text: $placeholder)
+                    if !type.requiresOptions && type != .checkbox && type != .rating {
+                        TextField("Placeholder", text: $placeholder)
+                    }
                     Toggle("Required", isOn: $isRequired)
                 }
+                if type.requiresOptions {
+                    Section {
+                        ForEach($options) { $option in
+                            HStack {
+                                TextField("Option", text: $option.text)
+                                if isScored {
+                                    Stepper("\(option.points.formatted()) pts", value: $option.points, in: 0...100, step: 1)
+                                        .fixedSize()
+                                }
+                            }
+                        }
+                        .onDelete { options.remove(atOffsets: $0) }
+                        Button("Add option", systemImage: "plus") { options.append(ChoiceOption()) }
+                    } header: {
+                        Text("Options")
+                    } footer: {
+                        Text("Add at least two options.")
+                    }
+                } else if isScored && (type == .checkbox || type == .rating) {
+                    Section {
+                        Stepper(
+                            type == .checkbox ? "Checked scores \(points.formatted()) pts" : "Each star scores \(points.formatted()) pts",
+                            value: $points, in: 0...100, step: 1
+                        )
+                    } header: {
+                        Text("Points")
+                    }
+                }
             }
-            .navigationTitle("Add Field")
+            .formStyle(.grouped)
+            .navigationTitle("Add Question")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        let field = FormField(
-                            label: label,
-                            type: type,
-                            isRequired: isRequired,
-                            placeholder: placeholder.isEmpty ? nil : placeholder
-                        )
-                        onSave(field)
+                        onSave(makeField())
                         dismiss()
                     }
-                    .disabled(label.isEmpty)
+                    .disabled(!isValid)
                 }
             }
         }
+    }
+
+    private func makeField() -> FormField {
+        let choices = cleanedOptions
+        return FormField(
+            label: label.trimmingCharacters(in: .whitespaces),
+            type: type,
+            isRequired: isRequired,
+            options: type.requiresOptions ? choices.map { $0.text.trimmingCharacters(in: .whitespaces) } : nil,
+            placeholder: placeholder.isEmpty ? nil : placeholder,
+            optionPoints: isScored && type.requiresOptions ? choices.map(\.points) : nil,
+            points: isScored && (type == .checkbox || type == .rating) ? points : nil
+        )
     }
 }

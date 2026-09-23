@@ -207,11 +207,11 @@ nonisolated extension TMIPlan: Validatable {
         let maxStudentAge = studentAges.max() ?? 0
         
         if minStudentAge < ageRequirement.min {
-            throw TMIPlanServiceError.saveFailed("Some students are too young for the '\(model.rawValue)' model (minimum age: \(ageRequirement.min))")
+            throw ValidationError.validationFailed(field: "students", message: "Some students are too young for the '\(model.rawValue)' model (minimum age: \(ageRequirement.min))")
         }
         
         if maxStudentAge > ageRequirement.max {
-            throw TMIPlanServiceError.saveFailed("Some students are too old for the '\(model.rawValue)' model (maximum age: \(ageRequirement.max))")
+            throw ValidationError.validationFailed(field: "students", message: "Some students are too old for the '\(model.rawValue)' model (maximum age: \(ageRequirement.max))")
         }
     }
     
@@ -232,7 +232,7 @@ nonisolated extension TMIPlan: Validatable {
                     
                     // Check for date overlap
                     if dateRange.overlaps(existingRange) && existingPlan.id != self.id {
-                        throw TMIPlanServiceError.saveFailed("Student '\(student.name)' already has an active TMI plan during this time period")
+                        throw ValidationError.validationFailed(field: "students", message: "Student '\(student.name)' already has an active TMI plan during this time period")
                     }
                 }
             }

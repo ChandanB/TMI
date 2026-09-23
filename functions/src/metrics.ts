@@ -517,7 +517,7 @@ export const computeDistrictReport = async (
 
 // CSV ------------------------------------------------------------------------
 
-const csvCell = (value: unknown): string => {
+export const csvCell = (value: unknown): string => {
   const text = value === null || value === undefined ? "" : String(value);
   // Neutralise spreadsheet formula injection as well as quoting.
   const safe = /^[=+\-@\t\r]/u.test(text) ? `'${text}` : text;

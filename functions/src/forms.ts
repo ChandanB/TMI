@@ -27,6 +27,7 @@ import {
   type TrustedMembership,
 } from "./authz.js";
 import { enqueueNotification } from "./collaboration.js";
+import { csvCell } from "./metrics.js";
 
 /**
  * Canonical form completion and review.
@@ -55,6 +56,22 @@ export interface CanonicalFormField {
   readonly isRequired: boolean;
   readonly options: readonly string[];
   readonly isAnswerable: boolean;
+  /** Points per option, parallel to `options` (choice fields in scored forms). */
+  readonly optionPoints?: readonly number[];
+  /** Points for a checked checkbox, or the multiplier applied to a rating. */
+  readonly points?: number;
+}
+
+export interface ScoreBand {
+  readonly minimum: number;
+  readonly label: string;
+}
+
+export interface FormScore {
+  readonly score: number;
+  readonly maxScore: number;
+  readonly band: string | null;
+  readonly bands: readonly ScoreBand[];
 }
 
 export type FormAnswer = string | number | boolean;
@@ -87,9 +104,60 @@ export const canonicalFields = (template: DocumentData): CanonicalFormField[] =>
           ? field.options.filter((option: unknown): option is string => typeof option === "string")
           : [],
         isAnswerable: (answerableFieldTypes as readonly string[]).includes(type),
+        ...scoringOf(field),
       };
     });
   });
+};
+
+const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+
+const scoringOf = (field: DocumentData): { optionPoints?: number[]; points?: number } => {
+  const result: { optionPoints?: number[]; points?: number } = {};
+  if (Array.isArray(field?.optionPoints) && field.optionPoints.every(finite)) {
+    result.optionPoints = field.optionPoints;
+  }
+  if (finite(field?.points)) result.points = field.points;
+  return result;
+};
+
+/**
+ * The score for a scored template, computed only from the template's
+ * published scoring definition. Returns null for unscored forms.
+ *
+ * - Choice fields score the points of the chosen option.
+ * - Checkboxes score `points` when checked.
+ * - Ratings score the rating times `points` (only when `points` is set).
+ * Unanswered questions score zero but still count toward the maximum.
+ */
+export const scoreAnswers = (
+  template: DocumentData,
+  fields: readonly CanonicalFormField[],
+  answers: Readonly<Record<string, FormAnswer>>,
+): FormScore | null => {
+  if (template.isScored !== true) return null;
+  let score = 0;
+  let maxScore = 0;
+  for (const field of fields) {
+    const answer = answers[field.key];
+    if ((field.type === "dropdown" || field.type === "multipleChoice") && field.optionPoints !== undefined) {
+      maxScore += Math.max(0, ...field.optionPoints);
+      const index = typeof answer === "string" ? field.options.indexOf(answer) : -1;
+      score += index >= 0 ? field.optionPoints[index] ?? 0 : 0;
+    } else if (field.type === "checkbox" && field.points !== undefined) {
+      maxScore += Math.max(0, field.points);
+      score += answer === true ? field.points : 0;
+    } else if (field.type === "Rating" && field.points !== undefined) {
+      maxScore += 5 * Math.max(0, field.points);
+      score += typeof answer === "number" ? answer * field.points : 0;
+    }
+  }
+  const bands: ScoreBand[] = (Array.isArray(template.scoreBands) ? template.scoreBands : [])
+    .filter((band: DocumentData) => finite(band?.minimum) && typeof band?.label === "string")
+    .map((band: DocumentData) => ({ minimum: band.minimum as number, label: band.label as string }))
+    .sort((left: ScoreBand, right: ScoreBand) => left.minimum - right.minimum);
+  const band = [...bands].reverse().find((item) => score >= item.minimum)?.label ?? null;
+  return { score: Math.round(score * 100) / 100, maxScore: Math.round(maxScore * 100) / 100, band, bands };
 };
 
 const isBlank = (value: FormAnswer | undefined): boolean =>
@@ -236,6 +304,82 @@ const stateOf = (respondent: DocumentData | undefined): ResponseState =>
 const iso = (value: unknown): string | null =>
   value instanceof Timestamp ? value.toDate().toISOString() : null;
 
+interface AssignmentRow {
+  readonly studentID: string;
+  readonly displayName: string;
+  readonly schoolID: string;
+  readonly state: ResponseState;
+  readonly submittedAt: string | null;
+  readonly score: number | null;
+  readonly maxScore: number | null;
+  readonly band: string | null;
+  readonly reviewOutcome: string | null;
+  readonly answers: Readonly<Record<string, FormAnswer>> | null;
+}
+
+/**
+ * Loads one assignment for staff reporting. The caller must be able to read
+ * at least one assigned student; rows are limited to those students.
+ */
+const assignmentOverview = async (
+  db: Firestore,
+  transaction: Transaction,
+  identity: ReturnType<typeof parseTrustedCallableIdentity>,
+  districtID: string,
+  assignmentID: string,
+) => {
+  const membership = await requireTrustedMembership(db, transaction, identity);
+  const assignmentReference = db.doc(`districts/${districtID}/formAssignments/${assignmentID}`);
+  const assignmentSnapshot = await transaction.get(assignmentReference);
+  if (!assignmentSnapshot.exists) throw new HttpsError("not-found", "The form assignment was not found.");
+  const assignment = assignmentSnapshot.data() ?? {};
+  const studentIDs = (Array.isArray(assignment.studentIDs) ? assignment.studentIDs : [])
+    .filter((id: unknown): id is string => isValidIdentifier(id))
+    .slice(0, 500);
+  const students = studentIDs.length === 0
+    ? []
+    : await transaction.getAll(...studentIDs.map((id: string) => db.doc(`districts/${districtID}/students/${id}`)));
+  const visible = students.filter((student) =>
+    student.exists && canReadStudentDetail(membership, student.id, student.data()?.schoolId));
+  if (visible.length === 0 && assignment.assignedBy !== identity.userID) {
+    throw new HttpsError("permission-denied", "This assignment is outside your access.");
+  }
+  const respondents = visible.length === 0
+    ? []
+    : await transaction.getAll(...visible.map((student) => assignmentReference.collection("respondents").doc(student.id)));
+  const templateID = assignment.templateId;
+  const template = isValidIdentifier(templateID)
+    ? (await transaction.get(db.doc(`districts/${districtID}/formTemplates/${templateID}`))).data() ?? {}
+    : {};
+  const frozenFields = respondents.map((item) => item.data()?.fields).find(Array.isArray) as CanonicalFormField[] | undefined;
+  const rows: AssignmentRow[] = visible.map((student, index) => {
+    const respondent = respondents[index]?.exists ? respondents[index]?.data() : undefined;
+    const state = stateOf(respondent);
+    const frozen = state === "submitted" || state === "reviewed";
+    return {
+      studentID: student.id,
+      displayName: typeof student.data()?.displayName === "string" ? student.data()?.displayName as string : "Student",
+      schoolID: student.data()?.schoolId as string,
+      state,
+      submittedAt: iso(respondent?.submittedAt),
+      score: frozen && typeof respondent?.scoring?.score === "number" ? respondent.scoring.score : null,
+      maxScore: frozen && typeof respondent?.scoring?.maxScore === "number" ? respondent.scoring.maxScore : null,
+      band: frozen && typeof respondent?.scoring?.band === "string" ? respondent.scoring.band : null,
+      reviewOutcome: typeof respondent?.review?.outcome === "string" ? respondent.review.outcome : null,
+      answers: frozen ? (respondent?.answers ?? {}) : null,
+    };
+  }).sort((left, right) => left.displayName.localeCompare(right.displayName));
+  return {
+    membership,
+    templateName: typeof template.name === "string" ? template.name : typeof assignment.templateName === "string" ? assignment.templateName : "Form",
+    requiresReview: assignment.requiresReview === true,
+    dueDate: iso(assignment.dueDate),
+    isScored: template.isScored === true,
+    fields: frozenFields ?? canonicalFields(template),
+    rows,
+  };
+};
+
 // MARK: - Requests
 
 const locator = (data: Record<string, unknown>) => ({
@@ -301,6 +445,8 @@ export const createFormHandlers = (firestore: () => Firestore) => ({
             state: stateOf(respondent),
             submittedAt: iso(respondent?.submittedAt),
             reviewedAt: iso(respondent?.review?.reviewedAt),
+            score: respondent?.scoring?.score ?? null,
+            maxScore: respondent?.scoring?.maxScore ?? null,
             recordVersion: typeof respondent?.recordVersion === "number" ? respondent.recordVersion : 0,
           };
         }).sort((left, right) => (left.dueDate ?? "9999").localeCompare(right.dueDate ?? "9999")),
@@ -331,6 +477,7 @@ export const createFormHandlers = (firestore: () => Firestore) => ({
         respondentType: context.respondent?.respondentType ?? null,
         recordVersion: typeof context.respondent?.recordVersion === "number" ? context.respondent.recordVersion : 0,
         submittedAt: iso(context.respondent?.submittedAt),
+        scoring: frozen ? context.respondent?.scoring ?? null : null,
         review: context.respondent?.review
           ? {
               outcome: context.respondent.review.outcome,
@@ -431,6 +578,8 @@ export const createFormHandlers = (firestore: () => Firestore) => ({
         const currentVersion = typeof context.respondent?.recordVersion === "number" ? context.respondent.recordVersion : 0;
         assertRecordVersion(currentVersion, data.expectedRecordVersion);
         const answers = validateAnswers(context.fields, data.answers, true);
+        // Scores are computed here from the published definition, never accepted from clients.
+        const scoring = scoreAnswers(context.template, context.fields, answers);
         const now = Timestamp.now();
         const nextVersion = currentVersion + 1;
         transaction.set(db.doc(paths(data.districtID, data.assignmentID, data.studentID).respondent), {
@@ -445,6 +594,7 @@ export const createFormHandlers = (firestore: () => Firestore) => ({
           respondentType: data.respondentType,
           answers,
           fields: context.fields,
+          scoring,
           submittedAt: now,
           submittedBy: identity.userID,
           createdAt: context.respondent?.createdAt ?? now,
@@ -471,6 +621,83 @@ export const createFormHandlers = (firestore: () => Firestore) => ({
         return { recordVersion: nextVersion };
       },
     });
+  },
+
+  /**
+   * Per-assignment progress for staff: one row per assigned student the caller
+   * can open, with response state and any computed score.
+   */
+  listAssignmentResponses: async (request: CallableRequest<unknown>) => {
+    const data = requireRecord(request.data);
+    rejectUnexpectedFields(data, new Set(["districtID", "assignmentID"]));
+    const districtID = requireIdentifier(data.districtID, "districtID");
+    const assignmentID = requireIdentifier(data.assignmentID, "assignmentID");
+    const identity = parseTrustedCallableIdentity(request);
+    assertDistrict(identity, districtID);
+    const db = firestore();
+    const overview = await db.runTransaction(
+      (transaction) => assignmentOverview(db, transaction, identity, districtID, assignmentID),
+      { readOnly: true },
+    );
+    const scored = overview.rows.filter((row) => row.score !== null);
+    return {
+      templateName: overview.templateName,
+      requiresReview: overview.requiresReview,
+      dueDate: overview.dueDate,
+      isScored: overview.isScored,
+      counts: {
+        assigned: overview.rows.length,
+        notStarted: overview.rows.filter((row) => row.state === "notStarted").length,
+        draft: overview.rows.filter((row) => row.state === "draft").length,
+        submitted: overview.rows.filter((row) => row.state === "submitted").length,
+        reviewed: overview.rows.filter((row) => row.state === "reviewed").length,
+      },
+      averageScore: scored.length === 0
+        ? null
+        : Math.round((scored.reduce((total, row) => total + (row.score ?? 0), 0) / scored.length) * 100) / 100,
+      rows: overview.rows.map(({ answers: _answers, ...row }) => row),
+    };
+  },
+
+  /** Audited CSV of submitted answers for the students the caller can open. */
+  exportAssignmentResponses: async (request: CallableRequest<unknown>) => {
+    const data = requireRecord(request.data);
+    rejectUnexpectedFields(data, new Set(["districtID", "assignmentID"]));
+    const districtID = requireIdentifier(data.districtID, "districtID");
+    const assignmentID = requireIdentifier(data.assignmentID, "assignmentID");
+    const identity = parseTrustedCallableIdentity(request);
+    assertDistrict(identity, districtID);
+    const db = firestore();
+    const overview = await db.runTransaction(async (transaction) => {
+      const result = await assignmentOverview(db, transaction, identity, districtID, assignmentID);
+      if (!result.membership.capabilities.has("report.export")) {
+        throw new HttpsError("permission-denied", "The report.export capability is required.");
+      }
+      return result;
+    }, { readOnly: true });
+    const fields = overview.fields.filter((field) => field.isAnswerable);
+    const header = ["Student", "State", "Submitted at", "Score", "Max score", "Band", "Review", ...fields.map((field) => field.label)];
+    const lines = overview.rows.map((row) => [
+      row.displayName, row.state, row.submittedAt ?? "", row.score ?? "", row.maxScore ?? "", row.band ?? "", row.reviewOutcome ?? "",
+      ...fields.map((field) => row.answers?.[field.key] ?? ""),
+    ]);
+    await db.collection(`districts/${districtID}/auditEvents`).add({
+      schemaVersion: 1,
+      recordVersion: 1,
+      action: "form.responses.export",
+      actorUserID: identity.userID,
+      districtID,
+      targetPath: `districts/${districtID}/formAssignments/${assignmentID}/respondents`,
+      reasonCode: "formExport",
+      // The audit names who was included, never what they answered.
+      details: { assignmentID, studentIDs: overview.rows.filter((row) => row.answers !== null).map((row) => row.studentID) },
+      result: { recordVersion: 0 },
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return {
+      csv: `${[header, ...lines].map((line) => line.map(csvCell).join(",")).join("\r\n")}\r\n`,
+      fileName: `${overview.templateName.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/gu, "").slice(0, 60) || "form"}-responses.csv`,
+    };
   },
 
   /** Records a staff review without touching the frozen answers. */

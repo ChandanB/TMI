@@ -212,6 +212,7 @@ struct MainTabView: View {
             }
         }
         ToolbarItemGroup(placement: .automatic) {
+            SyncStatusButton { try? router.open(.sync) }
             Button {
                 showingSearch = true
             } label: {
@@ -389,6 +390,8 @@ struct MainTabView: View {
             SettingsView()
         case .tasks:
             TaskListView()
+        case .sync:
+            SyncStatusView()
         }
     }
 }

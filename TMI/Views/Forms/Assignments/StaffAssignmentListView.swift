@@ -29,7 +29,7 @@ struct StaffAssignmentListView: View {
         emptyStateView
       } else {
         List(assignments) { assignment in
-          NavigationLink(destination: StaffAnalyticsView(assignment: assignment)) {
+          NavigationLink(destination: AssignmentResponsesView(assignmentID: assignment.id ?? "", fallbackTitle: assignment.templateName)) {
             AssignmentRow(assignment: assignment)
           }
         }

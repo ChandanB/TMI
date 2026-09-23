@@ -393,11 +393,9 @@ struct AccountDeletionUIWiringTests {
         #expect(!source.contains("All TMI plans"))
     }
 
-    @Test("Legacy authentication service no longer owns deletion")
+    @Test("Legacy authentication service no longer exists")
     func unsafeLegacyMethodRemoved() throws {
-        let source = try source(at: "TMI/Services/AuthenticationService.swift")
-        #expect(!source.contains("func deleteAccount(password: String)"))
-        #expect(!source.contains("case deletionFailed"))
+        #expect(throws: (any Error).self) { try source(at: "TMI/Services/AuthenticationService.swift") }
     }
 
     @Test("Account deletion works without the trusted callable")

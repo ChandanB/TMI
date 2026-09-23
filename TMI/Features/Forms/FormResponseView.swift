@@ -9,6 +9,7 @@ struct FormResponseView: View {
     let summary: StudentFormSummary
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.syncCoordinator) private var sync
     @State private var session: FormResponseSession
     @State private var isHandedOff = false
     @State private var handoffMessage: String?
@@ -41,7 +42,10 @@ struct FormResponseView: View {
         }
         .tmiSheetStyle()
         .interactiveDismissDisabled(isHandedOff || session.isSubmitting)
-        .task { await session.load() }
+        .task {
+            session.sync = sync
+            await session.load()
+        }
         .alert(
             "Couldn't complete that",
             isPresented: Binding(get: { session.actionError != nil }, set: { if !$0 { session.actionError = nil } }),
@@ -137,6 +141,10 @@ struct FormResponseView: View {
                 if let submittedAt = document.submittedAt.flatMap(FormDates.parse) {
                     LabeledContent("Submitted", value: submittedAt.formatted(date: .abbreviated, time: .shortened))
                 }
+                if let scoring = document.scoring {
+                    LabeledContent("Score", value: scoring.summary)
+                        .accessibilityIdentifier("formResponse.score")
+                }
                 if let respondent = document.respondentType, document.state.isFrozen {
                     LabeledContent("Completed by", value: respondent == .staff ? "Staff" : respondent == .family ? "Family" : "Student")
                 }
@@ -230,6 +238,7 @@ struct FormResponseView: View {
         case .idle: EmptyView()
         case .saving: Label("Saving…", systemImage: "arrow.triangle.2.circlepath").labelStyle(.titleAndIcon).font(.caption)
         case .saved: Label("Saved", systemImage: "checkmark.icloud").font(.caption)
+        case .savedOnDevice: Label("Saved on this device", systemImage: "icloud.slash").font(.caption).foregroundStyle(TMIColors.warningText)
         case .failed: Label("Not saved", systemImage: "exclamationmark.icloud").font(.caption).foregroundStyle(TMIColors.errorText)
         }
     }

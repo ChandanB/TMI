@@ -237,21 +237,6 @@ class FormAssignmentService {
     ).compactMap(\.id)
   }
 
-  // MARK: - Submissions Query
-
-  private func fetchSubmissionsForAssignment(
-    _ assignmentId: String
-  ) async throws -> [FormSubmission] {
-    let session = try authorizedSession()
-    let stored = try await fetchAssignmentDocument(id: assignmentId)
-    _ = try await requireAssignmentAccess(stored)
-    return try await CanonicalFormResponses.submissions(
-      firestore: db,
-      districtID: session.membership.districtID,
-      assignmentID: assignmentId
-    )
-  }
-
   // MARK: - Authorization Helpers
 
   private struct AssignmentAccess {

@@ -98,10 +98,10 @@ struct AppDependenciesTests {
     @Test("Sample seeding is debug-only and authentication never fabricates success")
     func productionHasNoImplicitFixtures() throws {
         let root = repositoryRoot
-        let seederSource = try source("TMI/Utilities/SampleDataSeeder.swift", root: root)
         let firebaseSource = try source("TMI/Services/FirebaseManager.swift", root: root)
 
-        #expect(seederSource.contains("#if DEBUG"))
+        // The sample-data seeder was removed entirely.
+        #expect(!FileManager.default.fileExists(atPath: root.appending(path: "TMI/Utilities/SampleDataSeeder.swift").path))
         #expect(!firebaseSource.contains("seedInitialEducatorDataIfNeeded"))
         #expect(!firebaseSource.contains("comprehensiveSampleStudents"))
         #expect(!firebaseSource.contains("expandedSampleInterests"))
@@ -231,28 +231,11 @@ struct AppDependenciesTests {
         )
     }
 
-    @Test("Release 1 import rejects institutional student records")
-    func releaseOneImportRejectsStudentRecords() throws {
-        #expect(throws: DataImportPayloadPolicy.PolicyError.studentRecordsUnsupported) {
-            try DataImportPayloadPolicy.validate([
-                "students": [
-                    ["id": "legacy-student"],
-                ],
-                "resources": [],
-            ])
-        }
-
-        try DataImportPayloadPolicy.validate([
-            "resources": [],
-            "forms": [],
-        ])
-
-        let importSource = try self.source(
-            "TMI/Views/Settings/DataImportView.swift",
-            root: self.repositoryRoot
-        )
-        #expect(!importSource.contains("studentsImported"))
-        #expect(!importSource.contains(#""students", "tmiPlans""#))
+    @Test("Legacy personal import and export screens are removed")
+    func legacyImportExportRemoved() throws {
+        let settings = try self.source("TMI/Views/Settings/SettingsView.swift", root: self.repositoryRoot)
+        #expect(!settings.contains("DataImportView"))
+        #expect(!settings.contains("DataExportView"))
     }
 
     @Test("Release 1 dashboard is independent of denied legacy plan storage")
@@ -391,8 +374,6 @@ struct AppDependenciesTests {
         let files = [
             "TMI/App/TMIApp.swift",
             "TMI/Views/MainTabView.swift",
-            "TMI/Services/AuthenticationService.swift",
-            "TMI/Services/TMIAuthService.swift",
             "TMI/Services/FirebaseManager.swift",
             "TMI/Services/FirebaseConfigurationHelper.swift",
             "TMI/Services/AccountDeletionService.swift",

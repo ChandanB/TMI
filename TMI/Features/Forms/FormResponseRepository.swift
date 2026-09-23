@@ -40,6 +40,8 @@ nonisolated struct StudentFormSummary: Codable, Sendable, Equatable, Identifiabl
     let submittedAt: String?
     let reviewedAt: String?
     let recordVersion: Int
+    var score: Double? = nil
+    var maxScore: Double? = nil
 
     var id: String { assignmentID }
 
@@ -107,6 +109,17 @@ nonisolated struct FormReview: Codable, Sendable, Equatable {
     let reviewedAt: String?
 }
 
+nonisolated struct FormScoring: Codable, Sendable, Equatable {
+    let score: Double
+    let maxScore: Double
+    let band: String?
+
+    var summary: String {
+        let base = "\(score.formatted()) of \(maxScore.formatted())"
+        return band.map { "\(base) · \($0)" } ?? base
+    }
+}
+
 nonisolated struct FormResponseDocument: Codable, Sendable, Equatable {
     let templateName: String
     let instructions: String?
@@ -118,6 +131,8 @@ nonisolated struct FormResponseDocument: Codable, Sendable, Equatable {
     let submittedAt: String?
     let review: FormReview?
     let canEdit: Bool
+    /// Computed by the server at submission for scored forms; frozen with the answers.
+    var scoring: FormScoring? = nil
 
     /// Required, answerable fields that are still blank.
     func missingRequiredFields(in answers: [String: FormAnswerValue]) -> [FormFieldDescriptor] {
@@ -186,6 +201,46 @@ protocol FormResponseRepository: AnyObject {
     func saveDraft(districtID: String, assignmentID: String, studentID: String, answers: [String: FormAnswerValue], expectedRecordVersion: Int) async throws -> Int
     func submit(districtID: String, assignmentID: String, studentID: String, answers: [String: FormAnswerValue], respondentType: FormRespondentType, expectedRecordVersion: Int, operationID: String) async throws -> Int
     func review(districtID: String, assignmentID: String, studentID: String, outcome: FormReviewOutcome, comment: String?, expectedRecordVersion: Int, operationID: String) async throws -> Int
+    func assignmentResponses(districtID: String, assignmentID: String) async throws -> AssignmentResponses
+    func exportAssignmentResponses(districtID: String, assignmentID: String) async throws -> AssignmentResponsesExport
+}
+
+/// One assignment's progress across the students the caller can open.
+nonisolated struct AssignmentResponses: Codable, Sendable, Equatable {
+    struct Counts: Codable, Sendable, Equatable {
+        let assigned: Int
+        let notStarted: Int
+        let draft: Int
+        let submitted: Int
+        let reviewed: Int
+    }
+
+    struct Row: Codable, Sendable, Equatable, Identifiable {
+        let studentID: String
+        let displayName: String
+        let schoolID: String
+        let state: FormResponseState
+        let submittedAt: String?
+        let score: Double?
+        let maxScore: Double?
+        let band: String?
+        let reviewOutcome: String?
+
+        var id: String { studentID }
+    }
+
+    let templateName: String
+    let requiresReview: Bool
+    let dueDate: String?
+    let isScored: Bool
+    let counts: Counts
+    let averageScore: Double?
+    let rows: [Row]
+}
+
+nonisolated struct AssignmentResponsesExport: Codable, Sendable, Equatable {
+    let csv: String
+    let fileName: String
 }
 
 @MainActor
@@ -231,6 +286,14 @@ final class FirebaseFormResponseRepository: FormResponseRepository {
         return response.recordVersion
     }
 
+    func assignmentResponses(districtID: String, assignmentID: String) async throws -> AssignmentResponses {
+        try await call("listAssignmentResponses", AssignmentRequest(districtID: districtID, assignmentID: assignmentID))
+    }
+
+    func exportAssignmentResponses(districtID: String, assignmentID: String) async throws -> AssignmentResponsesExport {
+        try await call("exportAssignmentResponses", AssignmentRequest(districtID: districtID, assignmentID: assignmentID))
+    }
+
     private func call<Request: Encodable & Sendable, Response: Decodable & Sendable>(
         _ name: String, _ request: Request
     ) async throws -> Response {
@@ -257,6 +320,7 @@ private nonisolated struct StudentRequest: Encodable, Sendable { let districtID:
 private nonisolated struct LocatorRequest: Encodable, Sendable { let districtID: String; let assignmentID: String; let studentID: String }
 private nonisolated struct FormsResponse: Decodable, Sendable { let forms: [StudentFormSummary] }
 private nonisolated struct VersionResponse: Decodable, Sendable { let recordVersion: Int }
+private nonisolated struct AssignmentRequest: Encodable, Sendable { let districtID: String; let assignmentID: String }
 
 private nonisolated struct DraftRequest: Encodable, Sendable {
     let districtID: String

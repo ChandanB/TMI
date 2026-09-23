@@ -22,8 +22,6 @@ struct SettingsView: View {
     @State private var showingLogoutAlert = false
     @State private var showingSignOutFailure = false
     @State private var showingDeleteAccountSheet = false
-    @State private var showingExportSheet = false
-    @State private var showingImportSheet = false
     @State private var isLoaded = false
     
     // Role-based visibility
@@ -315,14 +313,6 @@ struct SettingsView: View {
             .padding(.vertical, 14)
             .padding(.horizontal, 16)
         }
-        .sheet(isPresented: $showingExportSheet) {
-            DataExportView()
-                .tmiSheetStyle()
-        }
-        .sheet(isPresented: $showingImportSheet) {
-            DataImportView()
-                .tmiSheetStyle()
-        }
     }
 }
 
@@ -428,24 +418,10 @@ extension SettingsView {
 
     private var dataManagementSection: some View {
         SettingsSection(title: "Data Management", icon: "folder.fill") {
-            SettingsRow(
-                title: "Export Data",
-                subtitle: "Download your TMI data",
-                icon: "square.and.arrow.up.fill",
-                action: {
-                    showingExportSheet = true
-                }
-            )
-            
-            SettingsRow(
-                title: "Import Data",
-                subtitle: "Upload data from other sources",
-                icon: "square.and.arrow.down.fill",
-                action: {
-                    showingImportSheet = true
-                }
-            )
-            
+            settingsRow(icon: "arrow.triangle.2.circlepath.icloud", title: "Sync") {
+                SyncStatusView()
+            }
+
             SettingsRow(
                 title: "Clear Cache",
                 subtitle: "Free up storage space",

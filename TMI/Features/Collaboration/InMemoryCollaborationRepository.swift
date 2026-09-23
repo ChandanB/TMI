@@ -19,7 +19,7 @@ final class InMemoryCollaborationRepository: CollaborationRepository {
         (storedNotes, true)
     }
 
-    func saveNote(districtID: String, studentID: String, noteID: String?, category: NoteCategory, body: String, expectedRecordVersion: Int) async throws {
+    func saveNote(districtID: String, studentID: String, noteID: String?, category: NoteCategory, body: String, expectedRecordVersion: Int, operationID: String) async throws {
         if let noteID, let index = storedNotes.firstIndex(where: { $0.noteID == noteID }) {
             let note = storedNotes[index]
             guard note.isAuthor else { throw CollaborationError.permissionDenied("Only the author can revise a note.") }
@@ -43,12 +43,12 @@ final class InMemoryCollaborationRepository: CollaborationRepository {
         storedTasks.filter { (studentID == nil || $0.studentID == studentID) && (includeClosed || $0.status == .open) }
     }
 
-    func createTask(districtID: String, draft: TaskDraft) async throws {
+    func createTask(districtID: String, draft: TaskDraft, operationID: String) async throws {
         guard draft.isValid else { throw CollaborationError.rejected("A task needs a title and an owner.") }
         storedTasks.append(FollowUpTask(taskID: "t\(storedTasks.count + 1)", title: draft.title, details: draft.details.isEmpty ? nil : draft.details, status: .open, assigneeUserID: draft.assigneeUserID, createdBy: "me", dueDate: draft.hasDueDate ? ISO8601DateFormatter().string(from: draft.dueDate) : nil, studentID: draft.studentID, planID: draft.planID, meetingID: draft.meetingID, outcome: nil, completedAt: nil, recordVersion: 1, isOverdue: false))
     }
 
-    func updateTask(districtID: String, task: FollowUpTask, status: TaskStatus, outcome: String?, assigneeUserID: String?) async throws {
+    func updateTask(districtID: String, task: FollowUpTask, status: TaskStatus, outcome: String?, assigneeUserID: String?, operationID: String) async throws {
         guard let index = storedTasks.firstIndex(where: { $0.taskID == task.taskID }) else { throw CollaborationError.rejected("Task was not found.") }
         let current = storedTasks[index]
         guard current.recordVersion == task.recordVersion else { throw CollaborationError.conflict }

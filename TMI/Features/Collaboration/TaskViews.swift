@@ -8,6 +8,7 @@ struct StudentTasksSection: View {
     let member: MembershipContext?
     var repository: (any CollaborationRepository)? = nil
 
+    @Environment(\.syncCoordinator) private var sync
     @State private var tasks: [FollowUpTask] = []
     @State private var showClosed = false
     @State private var isCreating = false
@@ -28,6 +29,7 @@ struct StudentTasksSection: View {
             }
             Toggle("Show completed", isOn: $showClosed)
                 .font(.subheadline)
+            PendingSyncList(prefixes: [SyncAggregate.newTask(studentID: studentID)] + tasks.map { SyncAggregate.task($0.taskID) })
             if let errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle").foregroundStyle(TMIColors.errorText)
             } else if tasks.isEmpty {
@@ -50,8 +52,8 @@ struct StudentTasksSection: View {
         }
         .sheet(item: $completing) { task in
             TaskCompletionSheet(task: task) { status, outcome in
-                try await resolved.updateTask(districtID: districtID, task: task, status: status, outcome: outcome, assigneeUserID: nil)
-                await load()
+                let result = try await sync.updateTask(task, districtID: districtID, status: status, outcome: outcome, repository: resolved)
+                if result == .sent { await load() }
             }
         }
     }
@@ -79,6 +81,7 @@ struct TaskListView: View {
     @State private var errorMessage: String?
     @State private var isCreating = false
     @State private var completing: FollowUpTask?
+    @Environment(\.syncCoordinator) private var sync
 
     private var resolved: any CollaborationRepository { repository ?? FirebaseCollaborationRepository() }
     private var member: MembershipContext? { memberOverride ?? authStateModel.currentMembership }
@@ -90,6 +93,7 @@ struct TaskListView: View {
     var body: some View {
         List {
             Toggle("Show completed", isOn: $showClosed)
+            PendingSyncList(prefixes: ["task-new:"] + tasks.map { SyncAggregate.task($0.taskID) })
             if let errorMessage {
                 ContentUnavailableView("Tasks unavailable", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
             } else if tasks.isEmpty, !isLoading {
@@ -124,9 +128,9 @@ struct TaskListView: View {
         .sheet(item: $completing) { task in
             TaskCompletionSheet(task: task) { status, outcome in
                 if let member {
-                    try await resolved.updateTask(districtID: member.districtID, task: task, status: status, outcome: outcome, assigneeUserID: nil)
+                    let result = try await sync.updateTask(task, districtID: member.districtID, status: status, outcome: outcome, repository: resolved)
+                    if result == .sent { await load() }
                 }
-                await load()
             }
         }
     }
@@ -205,6 +209,7 @@ struct TaskEditorSheet: View {
     let onCreated: @MainActor () async -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.syncCoordinator) private var sync
     @State private var draft = TaskDraft()
     @State private var colleagues: [Colleague] = []
     @State private var isSaving = false
@@ -246,8 +251,17 @@ struct TaskEditorSheet: View {
                         Task {
                             defer { isSaving = false }
                             do {
-                                try await repository.createTask(districtID: districtID, draft: draft)
-                                await onCreated()
+                                let payload = CreateTaskSyncPayload(districtID: districtID, draft: draft)
+                                let result = try await sync.perform(
+                                    .createTask,
+                                    aggregateKey: SyncAggregate.newTask(studentID: draft.studentID),
+                                    summary: "New task: \(draft.title.prefix(60))",
+                                    districtID: districtID,
+                                    payload: payload
+                                ) { operationID in
+                                    try await repository.createTask(districtID: payload.districtID, draft: payload.draft, operationID: operationID)
+                                }
+                                if result == .sent { await onCreated() }
                                 dismiss()
                             } catch {
                                 errorMessage = CollaborationError.map(error).localizedDescription

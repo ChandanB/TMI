@@ -32,14 +32,14 @@ struct CollaborationTests {
         let repository = InMemoryCollaborationRepository()
         let colleagueNote = try #require(repository.storedNotes.first)
         await #expect(throws: CollaborationError.self) {
-            try await repository.saveNote(districtID: "d", studentID: "s", noteID: colleagueNote.noteID, category: .general, body: "x", expectedRecordVersion: 1)
+            try await repository.saveNote(districtID: "d", studentID: "s", noteID: colleagueNote.noteID, category: .general, body: "x", expectedRecordVersion: 1, operationID: UUID().uuidString)
         }
-        try await repository.saveNote(districtID: "d", studentID: "s", noteID: nil, category: .academic, body: "Mine", expectedRecordVersion: 0)
+        try await repository.saveNote(districtID: "d", studentID: "s", noteID: nil, category: .academic, body: "Mine", expectedRecordVersion: 0, operationID: UUID().uuidString)
         let mine = try #require(repository.storedNotes.first { $0.isAuthor })
         await #expect(throws: CollaborationError.conflict) {
-            try await repository.saveNote(districtID: "d", studentID: "s", noteID: mine.noteID, category: .academic, body: "Edit", expectedRecordVersion: 9)
+            try await repository.saveNote(districtID: "d", studentID: "s", noteID: mine.noteID, category: .academic, body: "Edit", expectedRecordVersion: 9, operationID: UUID().uuidString)
         }
-        try await repository.saveNote(districtID: "d", studentID: "s", noteID: mine.noteID, category: .academic, body: "Edit", expectedRecordVersion: mine.recordVersion)
+        try await repository.saveNote(districtID: "d", studentID: "s", noteID: mine.noteID, category: .academic, body: "Edit", expectedRecordVersion: mine.recordVersion, operationID: UUID().uuidString)
         #expect(repository.storedNotes.first { $0.noteID == mine.noteID }?.revisionCount == 1)
     }
 
@@ -47,7 +47,7 @@ struct CollaborationTests {
     func completeTask() async throws {
         let repository = InMemoryCollaborationRepository()
         let task = try #require(try await repository.tasks(districtID: "d", studentID: nil, includeClosed: false).first)
-        try await repository.updateTask(districtID: "d", task: task, status: .done, outcome: "Family agreed", assigneeUserID: nil)
+        try await repository.updateTask(districtID: "d", task: task, status: .done, outcome: "Family agreed", assigneeUserID: nil, operationID: UUID().uuidString)
         #expect(try await repository.tasks(districtID: "d", studentID: nil, includeClosed: false).allSatisfy { $0.taskID != task.taskID })
         let closed = try #require(try await repository.tasks(districtID: "d", studentID: nil, includeClosed: true).first { $0.taskID == task.taskID })
         #expect(closed.outcome == "Family agreed")

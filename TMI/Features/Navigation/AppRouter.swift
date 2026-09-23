@@ -322,7 +322,7 @@ final class AppRouter {
                 throw NavigationError.unauthorizedRoute
             }
 
-        case .profile, .settings, .tasks:
+        case .profile, .settings, .tasks, .sync:
             guard policy.role != nil else {
                 throw NavigationError.unauthorizedRoute
             }

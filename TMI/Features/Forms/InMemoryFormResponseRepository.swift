@@ -72,6 +72,30 @@ final class InMemoryFormResponseRepository: FormResponseRepository {
         stored[assignmentID] = value
         return value.recordVersion
     }
+
+    private(set) var exportCount = 0
+
+    func assignmentResponses(districtID: String, assignmentID: String) async throws -> AssignmentResponses {
+        let value = stored[assignmentID] ?? Stored()
+        let rows = [
+            AssignmentResponses.Row(studentID: "student-fixture", displayName: "Kai Rivera", schoolID: "school-fixture", state: value.state, submittedAt: value.submittedAt, score: value.state.isFrozen ? 7 : nil, maxScore: value.state.isFrozen ? 10 : nil, band: value.state.isFrozen ? "Moderate" : nil, reviewOutcome: value.review?.outcome),
+            AssignmentResponses.Row(studentID: "student-2", displayName: "Maya Thompson", schoolID: "school-fixture", state: .reviewed, submittedAt: "2026-09-20T15:00:00Z", score: 3, maxScore: 10, band: "Low", reviewOutcome: "accepted"),
+            AssignmentResponses.Row(studentID: "student-3", displayName: "Jordan Lee", schoolID: "school-fixture", state: .notStarted, submittedAt: nil, score: nil, maxScore: nil, band: nil, reviewOutcome: nil),
+        ]
+        func count(_ state: FormResponseState) -> Int { rows.filter { $0.state == state }.count }
+        let scores = rows.compactMap(\.score)
+        return AssignmentResponses(
+            templateName: "Weekly family check-in", requiresReview: true, dueDate: "2026-10-01T15:00:00Z", isScored: true,
+            counts: .init(assigned: rows.count, notStarted: count(.notStarted), draft: count(.draft), submitted: count(.submitted), reviewed: count(.reviewed)),
+            averageScore: scores.isEmpty ? nil : scores.reduce(0, +) / Double(scores.count),
+            rows: rows
+        )
+    }
+
+    func exportAssignmentResponses(districtID: String, assignmentID: String) async throws -> AssignmentResponsesExport {
+        exportCount += 1
+        return AssignmentResponsesExport(csv: "Student,State\r\nMaya Thompson,reviewed\r\n", fileName: "Weekly-family-check-in-responses.csv")
+    }
 }
 
 #Preview("Student forms") {

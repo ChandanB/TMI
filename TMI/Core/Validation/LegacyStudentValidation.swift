@@ -86,30 +86,8 @@ nonisolated extension Student: Validatable {
         // This would typically involve a database query
         logger.debug("Validating business rules for student")
         
-        // Load interests via edge collection (migration helpers)
-        let interests: [Interest] = (try? await self.fetchInterestsFromEdgeCollection()) ?? []
-        let interestCount: Int = (try? await self.getInterestCount()) ?? interests.count
-        
-        // Enforce maximum interests rule (moved from synchronous batch validation)
-        if interestCount > 20 {
-            throw ValidationError.validationFailed(
-                field: "interests",
-                message: "Too many interests selected (maximum 20)"
-            )
-        }
-        
-        // Example: Validate that student is not too young for selected interests
-        let hasAgeRestrictedInterests = interests.contains { interest in
-            (interest.careerPathways?.contains(CareerPathway.business) == true) ||
-            (interest.category.contains(InterestCategory.technology))
-        }
-        
-        if age < 13 && hasAgeRestrictedInterests {
-            throw ValidationError.validationFailed(
-                field: "interests",
-                message: "Some selected interests are not appropriate for students under 13"
-            )
-        }
+        // Interests are approved server-side from survey responses, which
+        // enforces their limits; nothing to check on-device.
         
         // Validate engagement history consistency
         if let engagementHistory = engagementHistory {

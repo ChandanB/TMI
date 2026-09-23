@@ -61,7 +61,7 @@ struct StudentContextStateModelTests {
         )
 
         #expect(source.contains("async let interests = Self.loadPrefetchedInterests(for: studentId)"))
-        #expect(source.contains("async let plans = Self.loadPrefetchedPlans(for: studentId)"))
+        #expect(source.contains("async let plans = Self.loadPrefetchedPlans(for: studentId, membership: self.membership)"))
         #expect(source.contains("let (loadedInterests, loadedPlans) = await"))
         #expect(source.contains("@MainActor\n    private static func loadPrefetchedInterests"))
         #expect(source.contains("@MainActor\n    private static func loadPrefetchedPlans"))

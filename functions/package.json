@@ -20,7 +20,8 @@
     "fixture:release2": "node scripts/generate-release2-fixture.mjs",
     "operator:grant": "node scripts/manage-operator.mjs grant",
     "operator:revoke": "node scripts/manage-operator.mjs revoke",
-    "operator:list": "node scripts/manage-operator.mjs list"
+    "operator:list": "node scripts/manage-operator.mjs list",
+    "migrate:form-submissions": "npm run build && node scripts/migrate-legacy-form-submissions.mjs"
   },
   "dependencies": {
     "firebase-admin": "14.2.0",

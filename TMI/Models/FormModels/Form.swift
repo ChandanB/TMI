@@ -11,77 +11,6 @@ import Foundation
 import CoreTransferable
 @preconcurrency import FirebaseFirestore
 
-struct FormSubmission: Codable, Identifiable, @unchecked Sendable { // @unchecked Sendable retained for potential cross-actor usage
-    @DocumentID var id: String?
-    var formId: String
-    var data: [String: AnyCodable]
-    var submissionDate: Date = Date()
-
-    // Phase 1: Enhanced fields for assignment workflow
-    var assignmentId: String?
-    var studentId: String?
-    var status: String = "draft" // draft, submitted, reviewed
-    var updatedAt: Date?
-    var score: Double?
-    var maxScore: Double?
-    var reviewedBy: String?
-    var reviewedByName: String?
-    var reviewedAt: Date?
-    var feedback: String?
-
-    init(
-        id: String? = nil,
-        formId: String,
-        data: [String: AnyCodable],
-        submissionDate: Date = Date(),
-        assignmentId: String? = nil,
-        studentId: String? = nil,
-        status: String = "draft",
-        updatedAt: Date? = nil,
-        score: Double? = nil,
-        maxScore: Double? = nil,
-        reviewedBy: String? = nil,
-        reviewedByName: String? = nil,
-        reviewedAt: Date? = nil,
-        feedback: String? = nil
-    ) {
-        self.id = id
-        self.formId = formId
-        self.data = data
-        self.submissionDate = submissionDate
-        self.assignmentId = assignmentId
-        self.studentId = studentId
-        self.status = status
-        self.updatedAt = updatedAt
-        self.score = score
-        self.maxScore = maxScore
-        self.reviewedBy = reviewedBy
-        self.reviewedByName = reviewedByName
-        self.reviewedAt = reviewedAt
-        self.feedback = feedback
-    }
-
-    var completionPercentage: Double {
-        let totalFields = data.count
-        guard totalFields > 0 else { return 0 }
-
-        let filledFields = data.values.filter { value in
-            if let string = value.value as? String {
-                return !string.isEmpty
-            }
-            return true
-        }.count
-
-        return Double(filledFields) / Double(totalFields) * 100
-    }
-
-    var isOverdue: Bool {
-        guard status != "submitted" && status != "reviewed" else { return false }
-        // Would need assignment due date to determine this
-        return false
-    }
-}
-
 struct FormSection: Codable, Identifiable, Transferable, @unchecked Sendable {
     @DocumentID var id: String?
     var title: String
@@ -112,7 +41,12 @@ struct FormField: Codable, Identifiable, Transferable, @unchecked Sendable {
     var placeholder: String?
     var defaultValue: AnyCodable?
 
-    init(id: String? = nil, label: String, type: FieldType, isRequired: Bool, validationRules: [ValidationRule] = [], options: [String]? = nil, placeholder: String? = nil, defaultValue: AnyCodable? = nil) {
+    /// Scored forms: points for each option, parallel to `options`.
+    var optionPoints: [Double]?
+    /// Scored forms: points for a checked checkbox, or the multiplier for a rating.
+    var points: Double?
+
+    init(id: String? = nil, label: String, type: FieldType, isRequired: Bool, validationRules: [ValidationRule] = [], options: [String]? = nil, placeholder: String? = nil, defaultValue: AnyCodable? = nil, optionPoints: [Double]? = nil, points: Double? = nil) {
         self.id = id
         self.label = label
         self.type = type
@@ -121,6 +55,8 @@ struct FormField: Codable, Identifiable, Transferable, @unchecked Sendable {
         self.options = options
         self.placeholder = placeholder
         self.defaultValue = defaultValue
+        self.optionPoints = optionPoints
+        self.points = points
     }
     
     static var transferRepresentation: some TransferRepresentation {
@@ -152,6 +88,11 @@ struct FormTemplate: Codable, Identifiable, @unchecked Sendable {
     var schoolId: String?
     var version: Int = 1
     var createdBy: String?
+
+    /// When true, the server scores submissions from each field's points.
+    var isScored: Bool?
+    /// Labels for score ranges; each applies from its minimum upward.
+    var scoreBands: [FormScoreBand]?
 
     // Computed helper to turn the hex into a SwiftUI Color
     var themeColor: Color {
@@ -221,7 +162,17 @@ struct FormTemplate: Codable, Identifiable, @unchecked Sendable {
         case schoolId
         case version
         case createdBy
+        case isScored
+        case scoreBands
     }
+}
+
+/// A named score range for a scored form ("Low", "Moderate", …).
+nonisolated struct FormScoreBand: Codable, Hashable, Sendable, Identifiable {
+    var minimum: Double
+    var label: String
+
+    var id: String { "\(minimum)-\(label)" }
 }
 
 // MARK: - Parental Incarceration Support Module Template

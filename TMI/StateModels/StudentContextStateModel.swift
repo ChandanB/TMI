@@ -10,6 +10,7 @@ import Foundation
 import Observation
 import SwiftUI
 import Combine
+import FirebaseFirestore
 
 // MARK: - Context Scope
 
@@ -59,10 +60,13 @@ final class StudentContextStateModel {
     private(set) var prefetchingStudentId: String?
     
     /// Prefetched student interests (from edge collection)
-    private(set) var prefetchedInterests: [Interest] = []
+    private(set) var prefetchedInterests: [StudentInterest] = []
     
-    /// Prefetched student plans
-    private(set) var prefetchedPlans: [TMIPlan] = []
+    /// Prefetched canonical plans that name the student.
+    private(set) var prefetchedPlans: [PlanRecord] = []
+
+    /// The signed-in membership, used to read canonical plans in scope.
+    var membership: MembershipContext?
     
     private var prefetchTask: Task<Void, Never>?
     
@@ -281,7 +285,7 @@ final class StudentContextStateModel {
             Log.student.debug("student_context_prefetch_started")
 
             async let interests = Self.loadPrefetchedInterests(for: studentId)
-            async let plans = Self.loadPrefetchedPlans(for: studentId)
+            async let plans = Self.loadPrefetchedPlans(for: studentId, membership: self.membership)
 
             let (loadedInterests, loadedPlans) = await (
                 interests,
@@ -302,14 +306,10 @@ final class StudentContextStateModel {
     }
 
     @MainActor
-    private static func loadPrefetchedInterests(for studentId: String) async -> [Interest] {
+    private static func loadPrefetchedInterests(for studentId: String) async -> [StudentInterest] {
         do {
-            let edges = try await StudentInterestService.shared.getStudentInterests(
-                studentId: studentId
-            )
-            let interestIds = Set(edges.map(\.interestId))
-            let allInterests = try await InterestLibraryService.shared.fetchAllInterests()
-            return allInterests.filter { interestIds.contains($0.id ?? "") }
+            // Approved interest edges carry their own names; no catalog lookup needed.
+            return try await StudentInterestService.shared.getStudentInterests(studentId: studentId)
         } catch is CancellationError {
             return []
         } catch {
@@ -318,12 +318,11 @@ final class StudentContextStateModel {
     }
 
     @MainActor
-    private static func loadPrefetchedPlans(for studentId: String) async -> [TMIPlan] {
+    private static func loadPrefetchedPlans(for studentId: String, membership: MembershipContext?) async -> [PlanRecord] {
+        guard let membership else { return [] }
         do {
-            let allPlans = try await TMIPlanService.shared.fetchPlans()
-            return allPlans.filter { plan in
-                plan.students.contains(where: { $0.id == studentId })
-            }
+            let plans = try await CanonicalPlanRepository(firestore: .firestore()).plans(member: membership)
+            return plans.filter { $0.studentIDs.contains(studentId) }
         } catch is CancellationError {
             return []
         } catch {

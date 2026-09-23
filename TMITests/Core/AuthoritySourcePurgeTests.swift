@@ -78,7 +78,6 @@ struct AuthoritySourcePurgeTests {
     func registrationWritersOmitAuthority() throws {
         let root = repositoryRoot
         let files = [
-            root.appending(path: "TMI/Services/AuthenticationService.swift"),
             root.appending(path: "TMI/Services/FirebaseManager.swift"),
         ]
 
@@ -92,9 +91,7 @@ struct AuthoritySourcePurgeTests {
     func servicesDoNotFetchProfileAuthority() throws {
         let root = repositoryRoot
         let files = [
-            "TMI/Services/TMIPlanService.swift",
             "TMI/Services/FormAssignmentService.swift",
-            "TMI/Services/AuditLogService.swift",
         ]
         let source = try files.map {
             try String(contentsOf: root.appending(path: $0), encoding: .utf8)
@@ -110,7 +107,6 @@ struct AuthoritySourcePurgeTests {
         let root = repositoryRoot
         let files = [
             "TMI/Services/FormTemplateService.swift",
-            "TMI/Services/PlanTemplateService.swift",
         ]
 
         for file in files {

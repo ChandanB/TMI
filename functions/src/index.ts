@@ -5689,6 +5689,12 @@ export const submitFormResponse = onCall(callableOptions, (request) =>
 export const reviewFormResponse = onCall(callableOptions, (request) =>
   formHandlers().reviewFormResponse(request),
 );
+export const listAssignmentResponses = onCall(callableOptions, (request) =>
+  formHandlers().listAssignmentResponses(request),
+);
+export const exportAssignmentResponses = onCall(callableOptions, (request) =>
+  formHandlers().exportAssignmentResponses(request),
+);
 
 const collaborationHandlers = () =>
   createCollaborationHandlers({ firestore: () => getFirestore(), now: () => new Date() });

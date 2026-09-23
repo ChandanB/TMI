@@ -7,39 +7,6 @@
 
 import SwiftUI
 
-// MARK: - Associated Data Types
-
-struct InterestAssociatedData {
-    let associatedStudents: [Student]
-    let connectedTMIPlans: [TMIPlan]
-    let engagementMetrics: EngagementMetrics?
-}
-
-struct HobbyAssociatedData {
-    let associatedStudents: [Student]
-    let connectedTMIPlans: [TMIPlan]
-    let engagementMetrics: EngagementMetrics?
-}
-
-struct EngagementMetrics {
-    let averageEngagement: Double
-    let totalInteractions: Int
-    let lastUpdated: Date
-}
-
-// MARK: - Environment Key
-
-struct InterestsStateModelKey: EnvironmentKey {
-    static let defaultValue = InterestsAndHobbiesStateModel()
-}
-
-extension EnvironmentValues {
-    var interestsStateModel: InterestsAndHobbiesStateModel {
-        get { self[InterestsStateModelKey.self] }
-        set { self[InterestsStateModelKey.self] = newValue }
-    }
-}
-
 // MARK: - Helper Functions
 
 /// Creates a two-way binding to a property on an observable object

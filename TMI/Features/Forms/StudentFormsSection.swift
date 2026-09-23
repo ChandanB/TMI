@@ -120,7 +120,10 @@ private struct StudentFormRow: View {
         switch form.state {
         case .submitted where form.requiresReview: "Submitted — awaiting review"
         case .submitted, .reviewed:
-            form.submittedAt.flatMap(FormDates.parse).map { "Submitted \($0.formatted(date: .abbreviated, time: .omitted))" } ?? "Submitted"
+            [
+                form.submittedAt.flatMap(FormDates.parse).map { "Submitted \($0.formatted(date: .abbreviated, time: .omitted))" } ?? "Submitted",
+                form.score.map { score in "Score \(score.formatted())\(form.maxScore.map { " of \($0.formatted())" } ?? "")" },
+            ].compactMap { $0 }.joined(separator: " · ")
         case .notStarted, .draft:
             form.due.map { "Due \($0.formatted(date: .abbreviated, time: .omitted))" } ?? "No due date"
         }

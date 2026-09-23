@@ -25,10 +25,18 @@ struct TMIApp: App {
     @State private var notificationService: NotificationService?
     @State private var scheduleMeetingCoordinator: ScheduleMeetingCoordinator?
     @State private var dashboardStateModel: DashboardStateModel?
-    @State private var interestsStateModel: InterestsAndHobbiesStateModel?
     @State private var meetingsStateModel: MeetingsStateModel?
     @State private var recommendationsStateModel: RecommendationsStateModel?
     @State private var programContext: ProgramContextStore
+    @State private var syncCoordinator: SyncCoordinator = {
+        let coordinator = SyncCoordinator(store: FileSyncOutboxStore())
+        coordinator.registerDefaultHandlers(
+            collaboration: { FirebaseCollaborationRepository() },
+            forms: { FirebaseFormResponseRepository() }
+        )
+        return coordinator
+    }()
+    @Environment(\.scenePhase) private var scenePhase
 #if DEBUG
     @State private var collaborationFixture = InMemoryCollaborationRepository()
     @State private var reportingFixture = InMemoryReportingRepository()
@@ -124,9 +132,6 @@ struct TMIApp: App {
                     studentRepository: dependencies.studentRepository,
                     planRepository: dependencies.planRepository
                   )
-        )
-        _interestsStateModel = State(
-            initialValue: usesInMemoryDependencies ? nil : InterestsAndHobbiesStateModel()
         )
         _meetingsStateModel = State(
             initialValue: usesInMemoryDependencies ? nil : MeetingsStateModel()
@@ -256,6 +261,15 @@ struct TMIApp: App {
                 )
             }
             .environment(appRouter)
+        case .assignmentResponses:
+            NavigationStack {
+                AssignmentResponsesView(
+                    assignmentID: "assignment-1",
+                    fallbackTitle: "Weekly family check-in",
+                    repository: InMemoryFormResponseRepository(),
+                    memberOverride: MembershipContext(userID: "me", districtID: "district-fixture", schoolIDs: ["school-fixture"], role: .counselor, capabilities: [.studentReadDetail, .studentWriteDetail, .reportExport], assignedStudentIDs: ["student-fixture"], isActive: true, version: 1)
+                )
+            }
         case .studentForms:
             NavigationStack {
                 ScrollView {
@@ -342,7 +356,6 @@ struct TMIApp: App {
         if let notificationService,
            let scheduleMeetingCoordinator,
            let dashboardStateModel,
-           let interestsStateModel,
            let meetingsStateModel,
            let recommendationsStateModel {
             ContentView()
@@ -356,12 +369,21 @@ struct TMIApp: App {
                 
                 // Domain state models
                 .environment(\.dashboardStateModel, dashboardStateModel)
-                .environment(\.interestsStateModel, interestsStateModel)
                 .environment(\.meetingsStateModel, meetingsStateModel)
                 .environment(\.recommendationsStateModel, recommendationsStateModel)
                 .environment(\.programContext, programContext)
+                .environment(\.syncCoordinator, syncCoordinator)
                 .task(id: authStateModel.currentMembership) {
-                    await programContext.load(for: authStateModel.currentMembership)
+                    let membership = authStateModel.currentMembership
+                    studentContext.membership = membership
+                    // Each account sees and replays only its own queued work.
+                    syncCoordinator.activate(accountID: membership?.userID, districtID: membership?.districtID)
+                    syncCoordinator.startMonitoring()
+                    await syncCoordinator.syncNow()
+                    await programContext.load(for: membership)
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { Task { await syncCoordinator.syncNow() } }
                 }
 
                 .tint(TMIColors.teal)
@@ -475,8 +497,12 @@ struct ContentView: View {
         Group {
             switch access.destination {
             case .student:
-                StudentMainView()
-                    .environment(\.studentAccessMode, .signedInStudent)
+                // Students use staff-issued Student Mode sessions, not their own accounts.
+                AccountUnavailableView(
+                    title: "Student Account Unavailable",
+                    description: "Students use TMI through Student Mode on a staff device.",
+                    signOutAction: authStateModel.signOut
+                )
             case .staff:
                 MainTabView()
                     .environment(\.studentAccessMode, .staffViewing)

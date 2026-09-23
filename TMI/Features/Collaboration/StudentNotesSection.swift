@@ -9,6 +9,7 @@ struct StudentNotesSection: View {
     let member: MembershipContext?
     var repository: (any CollaborationRepository)? = nil
 
+    @Environment(\.syncCoordinator) private var sync
     @State private var notes: [TeamNote] = []
     @State private var canWrite = false
     @State private var names: [String: String] = [:]
@@ -35,6 +36,8 @@ struct StudentNotesSection: View {
                         .accessibilityIdentifier("studentNotes.add")
                 }
             }
+
+            PendingSyncList(prefixes: [SyncAggregate.notes(studentID: studentID)])
 
             if let errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle")
@@ -78,17 +81,30 @@ struct StudentNotesSection: View {
         .task(id: "\(districtID)/\(studentID)") { await load() }
         .sheet(item: $editing) { target in
             NoteEditorSheet(target: target) { category, body in
-                switch target {
-                case .new:
-                    try await resolved.saveNote(districtID: districtID, studentID: studentID, noteID: nil, category: category, body: body, expectedRecordVersion: 0)
-                case .existing(let note):
-                    try await resolved.saveNote(districtID: districtID, studentID: studentID, noteID: note.noteID, category: category, body: body, expectedRecordVersion: note.recordVersion)
+                let existing: TeamNote? = if case .existing(let note) = target { note } else { nil }
+                let payload = NoteSyncPayload(
+                    districtID: districtID, studentID: studentID, noteID: existing?.noteID,
+                    category: category, body: body, expectedRecordVersion: existing?.recordVersion ?? 0
+                )
+                let result = try await sync.perform(
+                    .saveNote,
+                    aggregateKey: SyncAggregate.note(studentID: studentID, noteID: existing?.noteID),
+                    summary: existing == nil ? "New note: \(body.prefix(60))" : "Edited note: \(body.prefix(60))",
+                    districtID: districtID,
+                    payload: payload
+                ) { operationID in
+                    try await resolved.saveNote(
+                        districtID: payload.districtID, studentID: payload.studentID, noteID: payload.noteID,
+                        category: payload.category, body: payload.body,
+                        expectedRecordVersion: payload.expectedRecordVersion, operationID: operationID
+                    )
                 }
-                await load()
+                if result == .sent { await load() }
             }
         }
         .sheet(isPresented: $isAddingRestricted) {
             NoteEditorSheet(target: .new, isRestricted: true) { category, body in
+                // Restricted records are online-only: they are never kept on the device.
                 try await resolved.createRestrictedRecord(districtID: districtID, studentID: studentID, category: category.rawValue, body: body)
                 if restricted != nil { await loadRestricted() }
             }

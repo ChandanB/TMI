@@ -14,7 +14,6 @@ struct SignOutCallSiteTests {
     func everyVisibleSignOutFlowHandlesFailure() throws {
         let paths = [
             "TMI/Views/MainTabView.swift",
-            "TMI/Views/Students/StudentMainView.swift",
             "TMI/Views/Settings/SettingsView.swift",
             "TMI/Views/Settings/DeleteAccountView.swift",
         ]

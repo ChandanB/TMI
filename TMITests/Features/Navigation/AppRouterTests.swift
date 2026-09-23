@@ -335,14 +335,8 @@ struct AppRouterTests {
         let quickActionsSource = try sourceFile(
             at: "TMI/Views/Dashboard/Components/QuickActionCards.swift"
         )
-        let planApprovalSource = try sourceFile(
-            at: "TMI/Services/PlanApprovalService.swift"
-        )
         let notificationSource = try sourceFile(
             at: "TMI/Services/NotificationService.swift"
-        )
-        let interestDetailSource = try sourceFile(
-            at: "TMI/Views/InterestsAndHobbies/InterestDetailView.swift"
         )
         #expect(studentListSource.contains("router.open(record)"))
         #expect(!studentListSource.contains("NavigationLink(destination: StudentDetailView"))
@@ -358,10 +352,8 @@ struct AppRouterTests {
         #expect(!quickActionsSource.contains("NavigationLink(destination: StudentDetailView"))
         #expect(mainTabSource.contains("@SceneStorage(\"tmi.staff.selectedTab\")"))
         #expect(mainTabSource.contains("if contextMatchesRouter {\n                    HStack(spacing:"))
-        #expect(!planApprovalSource.contains("tmi://plans/"))
         #expect(!notificationSource.contains("tmi://plans/"))
         // The legacy plan detail view that this guarded is retired.
-        #expect(!interestDetailSource.contains("StudentDetailView(studentId:"))
     }
 
     private func policy(

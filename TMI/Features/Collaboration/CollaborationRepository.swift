@@ -75,7 +75,7 @@ nonisolated struct FollowUpTask: Codable, Sendable, Equatable, Identifiable {
     var due: Date? { dueDate.flatMap(FormDates.parse) }
 }
 
-nonisolated struct TaskDraft: Sendable, Equatable {
+nonisolated struct TaskDraft: Codable, Sendable, Equatable {
     var title = ""
     var details = ""
     var assigneeUserID = ""
@@ -158,12 +158,12 @@ nonisolated enum CollaborationError: LocalizedError, Equatable, Sendable {
 @MainActor
 protocol CollaborationRepository: AnyObject {
     func notes(districtID: String, studentID: String) async throws -> (notes: [TeamNote], canWrite: Bool)
-    func saveNote(districtID: String, studentID: String, noteID: String?, category: NoteCategory, body: String, expectedRecordVersion: Int) async throws
+    func saveNote(districtID: String, studentID: String, noteID: String?, category: NoteCategory, body: String, expectedRecordVersion: Int, operationID: String) async throws
     func restrictedRecords(districtID: String, studentID: String) async throws -> [RestrictedRecord]
     func createRestrictedRecord(districtID: String, studentID: String, category: String, body: String) async throws
     func tasks(districtID: String, studentID: String?, includeClosed: Bool) async throws -> [FollowUpTask]
-    func createTask(districtID: String, draft: TaskDraft) async throws
-    func updateTask(districtID: String, task: FollowUpTask, status: TaskStatus, outcome: String?, assigneeUserID: String?) async throws
+    func createTask(districtID: String, draft: TaskDraft, operationID: String) async throws
+    func updateTask(districtID: String, task: FollowUpTask, status: TaskStatus, outcome: String?, assigneeUserID: String?, operationID: String) async throws
     func colleagues(districtID: String, studentID: String?) async throws -> [Colleague]
     func search(districtID: String, query: String, includeCareers: Bool) async throws -> WorkspaceSearchResults
 }
@@ -181,9 +181,9 @@ final class FirebaseCollaborationRepository: CollaborationRepository {
         return (response.notes, response.canWrite)
     }
 
-    func saveNote(districtID: String, studentID: String, noteID: String?, category: NoteCategory, body: String, expectedRecordVersion: Int) async throws {
+    func saveNote(districtID: String, studentID: String, noteID: String?, category: NoteCategory, body: String, expectedRecordVersion: Int, operationID: String) async throws {
         let _: OperationResponse = try await call("saveStudentNote", SaveNoteRequest(
-            districtID: districtID, expectedRecordVersion: expectedRecordVersion, idempotencyKey: Self.operationID(),
+            districtID: districtID, expectedRecordVersion: expectedRecordVersion, idempotencyKey: operationID,
             reasonCode: "student-note", studentID: studentID, noteID: noteID, category: category,
             body: body.trimmingCharacters(in: .whitespacesAndNewlines)
         ))
@@ -210,10 +210,10 @@ final class FirebaseCollaborationRepository: CollaborationRepository {
         return response.tasks
     }
 
-    func createTask(districtID: String, draft: TaskDraft) async throws {
+    func createTask(districtID: String, draft: TaskDraft, operationID: String) async throws {
         let details = draft.details.trimmingCharacters(in: .whitespacesAndNewlines)
         let _: OperationResponse = try await call("createTask", CreateTaskRequest(
-            districtID: districtID, expectedRecordVersion: 0, idempotencyKey: Self.operationID(),
+            districtID: districtID, expectedRecordVersion: 0, idempotencyKey: operationID,
             reasonCode: "follow-up-task", title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
             details: details.isEmpty ? nil : details, assigneeUserID: draft.assigneeUserID,
             dueDate: draft.hasDueDate ? ISO8601DateFormatter().string(from: draft.dueDate) : nil,
@@ -221,10 +221,10 @@ final class FirebaseCollaborationRepository: CollaborationRepository {
         ))
     }
 
-    func updateTask(districtID: String, task: FollowUpTask, status: TaskStatus, outcome: String?, assigneeUserID: String?) async throws {
+    func updateTask(districtID: String, task: FollowUpTask, status: TaskStatus, outcome: String?, assigneeUserID: String?, operationID: String) async throws {
         let trimmed = outcome?.trimmingCharacters(in: .whitespacesAndNewlines)
         let _: OperationResponse = try await call("updateTask", UpdateTaskRequest(
-            districtID: districtID, expectedRecordVersion: task.recordVersion, idempotencyKey: Self.operationID(),
+            districtID: districtID, expectedRecordVersion: task.recordVersion, idempotencyKey: operationID,
             reasonCode: "follow-up-task", taskID: task.taskID, status: status,
             outcome: (trimmed?.isEmpty ?? true) ? nil : trimmed, assigneeUserID: assigneeUserID
         ))

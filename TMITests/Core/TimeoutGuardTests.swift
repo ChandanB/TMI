@@ -11,12 +11,7 @@ struct TimeoutGuardTests {
     }
 
     private static let sourceContracts: [SourceContract] = [
-        .init(path: "TMI/Services/Library/InterestLibraryService.swift", tenSecondGuards: 2, fifteenSecondGuards: 0),
-        .init(path: "TMI/Services/Library/ResourceLibraryService.swift", tenSecondGuards: 2, fifteenSecondGuards: 0),
-        .init(path: "TMI/Services/StudentData/PlanResourceLinkService.swift", tenSecondGuards: 2, fifteenSecondGuards: 0),
         .init(path: "TMI/Services/StudentData/StudentInterestService.swift", tenSecondGuards: 3, fifteenSecondGuards: 0),
-        .init(path: "TMI/Services/TMIAuthService.swift", tenSecondGuards: 1, fifteenSecondGuards: 0),
-        .init(path: "TMI/StateModels/InterestsAndHobbiesStateModel.swift", tenSecondGuards: 1, fifteenSecondGuards: 0),
     ]
 
     @Test("Fast operations complete before their deadline")
@@ -74,14 +69,8 @@ struct TimeoutGuardTests {
             contentsOf: projectRoot.appending(path: "TMI/Helpers/ConcurrencyHelpers.swift"),
             encoding: .utf8
         )
-        let interestsStateSource = try String(
-            contentsOf: projectRoot.appending(path: "TMI/StateModels/InterestsAndHobbiesStateModel.swift"),
-            encoding: .utf8
-        )
         #expect(helperSource.contains("operation: @escaping @MainActor @Sendable"))
-        #expect(interestsStateSource.contains("catch ConcurrencyError.timeout"))
-        #expect(interestsStateSource.contains("IdentifiableError(message: \"Fetch timed out\")"))
-        #expect(totalGuards == 11)
+        #expect(totalGuards == 3)
     }
 }
 
