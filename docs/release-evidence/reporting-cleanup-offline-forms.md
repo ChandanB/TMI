@@ -90,9 +90,9 @@ Known gap: forms need a connection to open (fields come from the server).
   migration, and all earlier suites).
 - Swift: 686 Swift Testing tests plus 164 XCTest passing (3 pre-existing skips);
   iOS Simulator and macOS builds succeed.
-- Not deployed yet: the new callables (`getMetricDictionary`, `getDistrictReport`,
+- Deployed to `tmi-education` on 2026-09-23 (59 functions live) and pushed as 44c6cf7: the new callables (`getMetricDictionary`, `getDistrictReport`,
   `exportDistrictReport`, `listStudentsNeedingAttention`,
   `listAssignmentResponses`, `exportAssignmentResponses`) and the updated
-  `transitionPlan` and form callables need a deploy to `tmi-education`.
+  `transitionPlan` and form callables.
 - Screens checked in the Simulator: `-uiTesting -fixture district-report`,
   `-fixture assignment-responses`.
