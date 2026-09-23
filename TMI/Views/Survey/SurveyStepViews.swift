@@ -34,8 +34,7 @@ struct SurveyQuestionView: View {
                 HStack(spacing: TMISpacing.sm) {
                     ForEach(minimum...maximum, id: \.self) { value in
                         Button("\(value)") { onAnswer(.rating(value)) }
-                            .buttonStyle(.borderedProminent)
-                            .tint(isRatingSelected(value) ? TMIColors.teal : TMIColors.interactiveBorder)
+                            .buttonStyle(TMIActionButtonStyle(prominence: isRatingSelected(value) ? .primary : .secondary))
                             .frame(minWidth: 52, minHeight: 52)
                             .accessibilityIdentifier("studentSurvey.rating.\(value)")
                     }
@@ -85,7 +84,7 @@ struct SurveyQuestionView: View {
                                 in: RoundedRectangle(cornerRadius: TMIRadius.lg))
                     .overlay {
                         RoundedRectangle(cornerRadius: TMIRadius.lg)
-                            .stroke(selected ? TMIColors.teal : TMIColors.interactiveBorder,
+                            .stroke(selected ? TMIColors.accent : TMIColors.interactiveBorder,
                                     lineWidth: selected ? 3 : 1)
                     }
                 }

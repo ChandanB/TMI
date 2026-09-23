@@ -14,14 +14,14 @@ struct AuthenticationRecoveryView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     Image(systemName: "building.2.crop.circle")
-                        .font(.system(size: 56, weight: .semibold))
-                        .foregroundStyle(TMIColors.aubergine)
+                        .font(.largeTitle.weight(.semibold))
+                        .foregroundStyle(TMIColors.accent)
                         .accessibilityHidden(true)
 
                     VStack(spacing: 12) {
                         Text("We couldn’t verify your organization access")
                             .font(.title2.bold())
-                            .foregroundStyle(TMIColors.aubergine)
+                            .foregroundStyle(TMIColors.accent)
                             .multilineTextAlignment(.center)
 
                         Text("Check your connection and try again. You can also sign out to use a different account.")

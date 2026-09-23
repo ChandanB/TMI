@@ -96,7 +96,7 @@ struct AssignmentResponsesView: View {
                 }
             }
             ProgressView(value: Double(done), total: Double(max(counts.assigned, 1)))
-                .tint(TMIColors.teal)
+                .tint(TMIColors.accent)
             Text([
                 "\(counts.notStarted) not started",
                 "\(counts.draft) in progress",
@@ -119,7 +119,7 @@ struct AssignmentResponsesView: View {
         if !bands.isEmpty {
             Chart(bands.sorted { $0.key < $1.key }, id: \.key) { band in
                 BarMark(x: .value("Students", band.value), y: .value("Band", band.key))
-                    .foregroundStyle(TMIColors.aubergine)
+                    .foregroundStyle(TMIColors.accent)
                     .annotation(position: .trailing) { Text("\(band.value)").font(.caption) }
             }
             .frame(height: CGFloat(bands.count) * 32 + 16)

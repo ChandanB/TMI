@@ -104,16 +104,6 @@ nonisolated enum TMIColors {
     ]
     static let goldenHourText = Color(light: 0x1C1917, dark: 0xFFF7EA)
     static let goldenHourSecondaryText = Color(light: 0x6A5438, dark: 0xE6D2B6)
-
-    // MARK: - Legacy names (pre-Golden Hour). Kept so existing screens inherit the new palette.
-
-    /// Was the aubergine brand. Now the amber ink accent.
-    static let aubergine = accent
-    static let aubergineForeground = onAccent
-    static let aubergineSoft = accentSoft
-    /// Was the teal action color. Now the amber ink accent.
-    static let teal = accent
-    static let tealForeground = onAccent
 }
 
 // MARK: - Adaptive color construction

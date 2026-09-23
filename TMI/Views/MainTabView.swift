@@ -217,6 +217,24 @@ struct MainTabView: View {
                             .tag(tab)
                     }
                 }
+                Section("Forms & meetings") {
+                    Button {
+                        try? router.open(.formAssignments)
+                    } label: {
+                        Label("Form Assignments", systemImage: "list.bullet.rectangle")
+                    }
+                    Button {
+                        try? router.open(.meetings)
+                    } label: {
+                        Label("Meetings", systemImage: "calendar")
+                    }
+                    Button {
+                        try? router.open(.formTemplates)
+                    } label: {
+                        Label("Form Templates", systemImage: "doc.on.doc")
+                    }
+                }
+                .buttonStyle(.plain)
                 Section("You") {
                     Button {
                         try? router.open(.tasks)
@@ -475,6 +493,12 @@ struct MainTabView: View {
             TaskListView()
         case .sync:
             SyncStatusView()
+        case .formAssignments:
+            StaffAssignmentListView()
+        case .formTemplates:
+            FormTemplateLibraryView()
+        case .meetings:
+            MeetingsHubView()
         }
     }
 }
@@ -766,7 +790,7 @@ struct WorkspacePanelView: View {
                         router.clearActiveStudent()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
+                            .font(.title2)
                             .foregroundColor(.tmiTextSecondary)
                     }
                 }
@@ -796,7 +820,7 @@ struct WorkspacePanelView: View {
         TMICard(style: .default) {
             VStack(spacing: TMISpacing.md) {
                 Image(systemName: "person.crop.circle.badge.questionmark")
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
                     .foregroundColor(.tmiTextSecondary)
                 
                 Text("No Student Selected")
@@ -872,7 +896,7 @@ private struct DataIndicator: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .foregroundColor(.tmiPrimary)
             
             Text("\(count) \(label)")
@@ -891,11 +915,11 @@ private struct QuickStatCard: View {
         VStack(spacing: 4) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundColor(.tmiPrimary)
                 
                 Text(value)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.body.weight(.bold))
                     .foregroundColor(Color.tmiTextPrimary)
             }
             

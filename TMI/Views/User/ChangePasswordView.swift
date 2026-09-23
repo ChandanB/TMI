@@ -7,214 +7,128 @@
 
 import SwiftUI
 import FirebaseAuth
-import Observation
 
-// MARK: - Password Change Data Model
+/// Changes the signed-in staff member's password.
+///
+/// Field state is local to the view. (The previous state model started idle
+/// and was never loaded, so every keystroke was dropped.)
+struct ChangePasswordView: View {
+    @Environment(\.dismiss) private var dismiss
 
-struct PasswordChangeData: Equatable {
-    var currentPassword: String = ""
-    var newPassword: String = ""
-    var confirmPassword: String = ""
-}
-
-// MARK: - Environment Key
-extension EnvironmentValues {
-    @Entry var changePasswordStateModel: ChangePasswordStateModel = ChangePasswordStateModel()
-}
-
-// MARK: - State Model
-
-@Observable
-final class ChangePasswordStateModel: BaseStateModel<PasswordChangeData, IdentifiableError> {
-    // MARK: - Dependencies
     private let firebaseManager: FirebaseManager
-    
-    // MARK: - Initialization
-    
+
+    @State private var currentPassword = ""
+    @State private var newPassword = ""
+    @State private var confirmPassword = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+    @State private var didSucceed = false
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable { case current, new, confirm }
+
     init(firebaseManager: FirebaseManager = FirebaseManager.shared) {
         self.firebaseManager = firebaseManager
-        super.init()
     }
-    
-    override func fetch() async {
-        // Initialize state
-        updateState(.loaded(PasswordChangeData()))
-    }
-    
-    // MARK: - Form Field Update Methods
-    
-    @MainActor func updateCurrentPassword(_ newValue: String) {
-        guard var data = state.value else { return }
-        data.currentPassword = newValue
-        updateState(.loaded(data))
-    }
-    
-    @MainActor func updateNewPassword(_ newValue: String) {
-        guard var data = state.value else { return }
-        data.newPassword = newValue
-        updateState(.loaded(data))
-    }
-    
-    @MainActor func updateConfirmPassword(_ newValue: String) {
-        guard var data = state.value else { return }
-        data.confirmPassword = newValue
-        updateState(.loaded(data))
-    }
-    
-    // MARK: - Password Update Method
-    
-    @MainActor
-    func updatePassword(onSuccess: @escaping () -> Void) async {
-        guard let data = state.value else {
-            handleError(FirebaseError.missingData("No password data available"),
-                        userFriendlyMessage: "No password data available")
-            return
-        }
-        
-        // Validate passwords
-        guard data.newPassword == data.confirmPassword else {
-            handleError(FirebaseError.missingData("New passwords don't match"),
-                        userFriendlyMessage: "New passwords don't match")
-            return
-        }
-        
-        guard data.newPassword.count >= 8 else {
-            handleError(FirebaseError.missingData("Password must be at least 8 characters"),
-                        userFriendlyMessage: "Password must be at least 8 characters")
-            return
-        }
-        
-        updateState(.loading)
-        
-        do {
-            // First re-authenticate the user
-            try await firebaseManager.reauthenticate(with: data.currentPassword)
-            
-            // Then update the password
-            if let user = Auth.auth().currentUser {
-                try await user.updatePassword(to: data.newPassword)
-                
-                // Clear password data
-                updateState(.loaded(PasswordChangeData()))
-                
-                // Show success message
-                ui.alertMessage = "Password updated successfully"
-                ui.isShowingAlert = true
-                
-                // Call success callback
-                onSuccess()
-            }
-        } catch {
-            handleError(error, userFriendlyMessage: "Failed to update password")
-        }
-    }
-    
-    // MARK: - Validation Methods
-    
-    var isFormValid: Bool {
-        guard let data = state.value else { return false }
-        return !data.currentPassword.isEmpty &&
-        !data.newPassword.isEmpty &&
-        !data.confirmPassword.isEmpty &&
-        data.newPassword == data.confirmPassword &&
-        data.newPassword.count >= 8
-    }
-}
 
+    private var newIsLongEnough: Bool { newPassword.count >= 8 }
+    private var confirmationMatches: Bool { !confirmPassword.isEmpty && newPassword == confirmPassword }
+    private var isFormValid: Bool { !currentPassword.isEmpty && newIsLongEnough && confirmationMatches }
 
-struct ChangePasswordView: View {
-    @Environment(\.changePasswordStateModel) private var stateModel
-    @Environment(\.dismiss) private var dismiss
-    
     var body: some View {
-        Group {
-            switch stateModel.state {
-            case .idle:
-                passwordChangeForm(PasswordChangeData())
-                
-            case .loaded(let passwordData):
-                passwordChangeForm(passwordData)
-                
-            case .loading:
-                ProgressView()
-                    .scaleEffect(1.5)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.2))
-                
-            case .error(let error):
-                VStack(spacing: 16) {
-                    Text("Error")
-                        .font(.headline)
-                    
-                    Text(error.message)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                    
-                    Button("Try Again") {
-                        stateModel.resetState()
-                    }
-                    .buttonStyle(.borderedProminent)
+        Form {
+            Section {
+                SecureField("Current password", text: $currentPassword)
+                    .textContentType(.password)
+                    .focused($focusedField, equals: .current)
+                    .submitLabel(.next)
+                    .onSubmit { focusedField = .new }
+                    .accessibilityIdentifier("changePassword.current")
+            }
+
+            Section {
+                SecureField("New password", text: $newPassword)
+                    .textContentType(.newPassword)
+                    .focused($focusedField, equals: .new)
+                    .submitLabel(.next)
+                    .onSubmit { focusedField = .confirm }
+                    .accessibilityIdentifier("changePassword.new")
+                SecureField("Confirm new password", text: $confirmPassword)
+                    .textContentType(.newPassword)
+                    .focused($focusedField, equals: .confirm)
+                    .submitLabel(.done)
+                    .onSubmit { Task { await save() } }
+                    .accessibilityIdentifier("changePassword.confirm")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    requirement("At least 8 characters", met: newIsLongEnough)
+                    requirement("Both new passwords match", met: confirmationMatches)
                 }
-                .padding()
+                .padding(.top, 4)
+            }
+
+            if let errorMessage {
+                Section {
+                    Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                        .foregroundStyle(TMIColors.errorText)
+                        .accessibilityIdentifier("changePassword.error")
+                }
             }
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .tmiScreenBackground()
+        .disabled(isSaving)
         .navigationTitle("Change Password")
         .navigationBarTitleDisplayMode(.inline)
-        .alert(isPresented: binding(stateModel, \.ui.isShowingAlert)) {
-            Alert(
-                title: Text("Success"),
-                message: Text(stateModel.ui.alertMessage),
-                dismissButton: .default(Text("OK")) {
-                    // Dismiss the view after acknowledging success
-                    dismiss()
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                if isSaving {
+                    ProgressView()
+                } else {
+                    Button("Save") { Task { await save() } }
+                        .disabled(!isFormValid)
+                        .accessibilityIdentifier("changePassword.save")
                 }
-            )
+            }
         }
+        .onAppear { focusedField = .current }
+        .alert("Password Updated", isPresented: $didSucceed) {
+            Button("OK") { dismiss() }
+        } message: {
+            Text("Use your new password the next time you sign in.")
+        }
+        .sensoryFeedback(.success, trigger: didSucceed)
+        .sensoryFeedback(.error, trigger: errorMessage) { _, new in new != nil }
     }
-    
-    @ViewBuilder
-    func passwordChangeForm(_ data: PasswordChangeData) -> some View {
-        Form {
-            Section(header: Text("Change Password")) {
-                SecureField("Current Password", text: Binding(
-                    get: { data.currentPassword },
-                    set: { stateModel.updateCurrentPassword($0) }
-                ))
-                
-                SecureField("New Password", text: Binding(
-                    get: { data.newPassword },
-                    set: { stateModel.updateNewPassword($0) }
-                ))
-                
-                SecureField("Confirm New Password", text: Binding(
-                    get: { data.confirmPassword },
-                    set: { stateModel.updateConfirmPassword($0) }
-                ))
+
+    private func requirement(_ text: String, met: Bool) -> some View {
+        Label(text, systemImage: met ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(met ? TMIColors.successText : TMIColors.textTertiary)
+            .contentTransition(.symbolEffect(.replace))
+            .animation(TMIAnimation.snappy, value: met)
+    }
+
+    private func save() async {
+        guard isFormValid, !isSaving else { return }
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            try await firebaseManager.reauthenticate(with: currentPassword)
+            guard let user = Auth.auth().currentUser else {
+                errorMessage = "You're signed out. Sign in again, then change your password."
+                return
             }
-            
-            if data.newPassword.count > 0 && data.newPassword.count < 8 {
-                Text("Password must be at least 8 characters")
-                    .foregroundColor(.red)
-                    .font(.callout)
-            }
-            
-            if data.confirmPassword.count > 0 && data.newPassword != data.confirmPassword {
-                Text("New passwords don't match")
-                    .foregroundColor(.red)
-                    .font(.callout)
-            }
-            
-            Button("Update Password") {
-                Task {
-                    await stateModel.updatePassword {
-                        // Success callback - will dismiss after a delay
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            dismiss()
-                        }
-                    }
-                }
-            }
-            .disabled(!stateModel.isFormValid)
+            try await user.updatePassword(to: newPassword)
+            currentPassword = ""
+            newPassword = ""
+            confirmPassword = ""
+            didSucceed = true
+        } catch {
+            // Keep what was typed; only the current password is usually wrong.
+            errorMessage = "Your current password wasn't accepted, or the new one was rejected. Check them and try again."
+            focusedField = .current
         }
     }
 }

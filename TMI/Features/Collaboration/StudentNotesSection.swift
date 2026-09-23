@@ -54,7 +54,7 @@ struct StudentNotesSection: View {
                     HStack {
                         Text(note.category.displayName)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(TMIColors.aubergine)
+                            .foregroundStyle(TMIColors.accent)
                         Spacer()
                         if note.isAuthor {
                             Button("Edit") { editing = .existing(note) }

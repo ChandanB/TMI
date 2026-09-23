@@ -43,12 +43,15 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case settings
     case tasks
     case sync
+    case formAssignments
+    case formTemplates
+    case meetings
 
     var tab: AppTab? {
         switch self {
         case .student, .editStudent: .students
         case .plan: .plans
-        case .profile, .settings, .tasks, .sync: nil
+        case .profile, .settings, .tasks, .sync, .formAssignments, .formTemplates, .meetings: nil
         }
     }
 }

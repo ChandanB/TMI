@@ -33,7 +33,7 @@ struct InterestObservationSheet: View {
                                                 in: RoundedRectangle(cornerRadius: TMIRadius.md))
                                     .overlay {
                                         RoundedRectangle(cornerRadius: TMIRadius.md)
-                                            .stroke(selected ? TMIColors.teal : TMIColors.interactiveBorder, lineWidth: selected ? 2 : 1)
+                                            .stroke(selected ? TMIColors.accent : TMIColors.interactiveBorder, lineWidth: selected ? 2 : 1)
                                     }
                             }
                             .buttonStyle(.plain)

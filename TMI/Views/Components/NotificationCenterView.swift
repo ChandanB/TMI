@@ -90,7 +90,7 @@ struct NotificationCenterView: View {
     private var emptyState: some View {
         VStack(spacing: TMISpacing.md) {
             Image(systemName: "bell.slash")
-                .font(.system(size: 48))
+                .font(.largeTitle)
                 .foregroundColor(.tmiTextTertiary)
             
             Text("No Notifications")
@@ -128,7 +128,7 @@ struct NotificationRow: View {
                 .frame(width: 40, height: 40)
                 .overlay(
                     Image(systemName: notification.type.icon)
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.body.weight(.medium))
                         .foregroundColor(iconColor)
                 )
             
@@ -184,11 +184,11 @@ struct NotificationBadge: View {
     var body: some View {
         if let unreadCount = notificationService?.unreadCount, unreadCount > 0 {
             Text("\(min(unreadCount, 99))")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(Color.tmiTextPrimary)
+                .font(.caption2.weight(.bold).monospacedDigit())
+                .foregroundStyle(TMIColors.onBrand)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Color.red)
+                .background(TMIColors.brand)
                 .clipShape(Capsule())
         }
     }
@@ -205,18 +205,17 @@ struct NotificationBellButton: View {
             showingNotifications = true
         } label: {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: "bell.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(.tmiTextPrimary)
+                Image(systemName: "bell")
+                    .foregroundStyle(TMIColors.textPrimary)
                 
                 if let unreadCount = notificationService?.unreadCount, unreadCount > 0 {
                     Circle()
-                        .fill(Color.red)
+                        .fill(TMIColors.brand)
                         .frame(width: 12, height: 12)
                         .overlay(
                             Text("\(min(unreadCount, 9))")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(Color.tmiTextPrimary)
+                                .font(.system(size: 8, weight: .bold).monospacedDigit())
+                                .foregroundStyle(TMIColors.onBrand)
                         )
                         .offset(x: 4, y: -4)
                 }

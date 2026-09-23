@@ -270,6 +270,45 @@ struct TMIButton: View {
 
 // MARK: - Text Input Components
 
+/// What a field holds, so AutoFill and the keyboard can help.
+enum TMITextFieldContent: Sendable {
+    case automatic
+    case username
+    case password
+    case newPassword
+    case name
+    case oneTimeCode
+
+    /// The legacy default: secure fields are passwords, others unspecified.
+    static func legacy(isSecure: Bool) -> TMITextFieldContent { isSecure ? .password : .automatic }
+}
+
+private struct TMITextContentTypeModifier: ViewModifier {
+    let content: TMITextFieldContent
+
+    func body(content view: Content) -> some View {
+#if os(iOS)
+        switch content {
+        case .automatic: view
+        case .username: view.textContentType(.username)
+        case .password: view.textContentType(.password)
+        case .newPassword: view.textContentType(.newPassword)
+        case .name: view.textContentType(.name)
+        case .oneTimeCode: view.textContentType(.oneTimeCode)
+        }
+#elseif os(macOS)
+        switch content {
+        case .automatic, .name: view
+        case .username: view.textContentType(.username)
+        case .password, .newPassword: view.textContentType(.password)
+        case .oneTimeCode: view.textContentType(.oneTimeCode)
+        }
+#else
+        view
+#endif
+    }
+}
+
 /// Unified text field component — warm-light redesign
 struct TMITextField: View {
     let icon: String
@@ -280,15 +319,18 @@ struct TMITextField: View {
     var capitalization: TMITextInputAutocapitalization? = nil
     var onSubmit: (() -> Void)? = nil
     var focus: Binding<Bool>? = nil
+    /// Nil keeps the legacy behavior (secure fields are `.password`).
+    var content: TMITextFieldContent? = nil
+    var submitLabel: SubmitLabel? = nil
 
     @FocusState private var isFocused: Bool
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var iconWidth: CGFloat = 20
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .foregroundStyle(isFocused ? TMIColors.accent : TMIColors.textTertiary)
-                .frame(width: 20)
+                .frame(width: iconWidth)
                 .animation(.easeOut(duration: 0.2), value: isFocused)
 
             Group {
@@ -312,9 +354,9 @@ struct TMITextField: View {
             .foregroundStyle(TMIColors.textPrimary)
             .autocorrectionDisabled()
             .tmiTextInputAutocapitalization(effectiveCapitalization)
-            .textContentType(isSecure ? .password : nil)
+            .modifier(TMITextContentTypeModifier(content: content ?? .legacy(isSecure: isSecure)))
             .keyboardType(keyboardType)
-            .submitLabel(isSecure ? .done : .next)
+            .submitLabel(submitLabel ?? (isSecure ? .done : .next))
             .onSubmit {
                 onSubmit?()
             }

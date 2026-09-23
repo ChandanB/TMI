@@ -116,7 +116,7 @@ struct StudentSurveyFlow: View {
         VStack(spacing: TMISpacing.xl) {
             Image(systemName: "hand.wave.fill")
                 .font(.largeTitle)
-                .foregroundStyle(TMIColors.teal)
+                .foregroundStyle(TMIColors.accent)
                 .accessibilityHidden(true)
             Text("Let’s learn what you like")
                 .font(.largeTitle.bold())
@@ -127,14 +127,11 @@ struct StudentSurveyFlow: View {
                 .font(.title3)
                 .foregroundStyle(TMIColors.textSecondary)
                 .multilineTextAlignment(.center)
-            Text("Activity version \(definition.version)")
-                .font(.caption)
-                .foregroundStyle(TMIColors.textSecondary)
             Button("Start", systemImage: "arrow.right") {
                 onActivity()
                 phase = .questions
             }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.tmiPrimary)
                 .controlSize(.large)
                 .accessibilityIdentifier("studentSurvey.begin")
         }
@@ -164,7 +161,7 @@ struct StudentSurveyFlow: View {
             Text("Step \(questionIndex + 1) of \(max(visibleQuestionIDs.count, 1))")
                 .font(.headline)
             ProgressView(value: Double(questionIndex + 1), total: Double(max(visibleQuestionIDs.count, 1)))
-                .tint(TMIColors.teal)
+                .tint(TMIColors.accent)
         }
         .padding(.horizontal, TMISpacing.xl)
         .padding(.top, TMISpacing.md)
@@ -181,7 +178,7 @@ struct StudentSurveyFlow: View {
                     .disabled(questionIndex == 0 || isSaving)
                     .accessibilityIdentifier("studentSurvey.back")
                 Button("Next", systemImage: "chevron.right") { moveNext(definition: definition) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.tmiPrimary)
                     .controlSize(.large)
                     .disabled(!canContinue(definition: definition) || isSaving)
                     .accessibilityIdentifier("studentSurvey.next")
@@ -226,7 +223,7 @@ struct StudentSurveyFlow: View {
                     Button("Send my answers") {
                         Task { await submit(assignment: assignment, definition: definition, grant: grant, repository: repository) }
                     }
-                    .buttonStyle(.borderedProminent).controlSize(.large)
+                    .buttonStyle(.tmi(.primary, fullWidth: true))
                     .disabled(isSaving)
                     .accessibilityIdentifier("studentSurvey.submit")
                 }
@@ -239,12 +236,12 @@ struct StudentSurveyFlow: View {
 
     private var paused: some View {
         VStack(spacing: TMISpacing.lg) {
-            Image(systemName: "checkmark.circle.fill").font(.largeTitle).foregroundStyle(TMIColors.teal)
+            Image(systemName: "checkmark.circle.fill").font(.largeTitle).foregroundStyle(TMIColors.accent)
             Text("Your answers are saved.").font(.title.bold())
             Text("You can come back and keep going when you’re ready.")
                 .font(.title3).foregroundStyle(TMIColors.textSecondary)
             Button("Keep going") { phase = .questions }
-                .buttonStyle(.borderedProminent).controlSize(.large)
+                .buttonStyle(.tmi(.primary, fullWidth: true))
                 .accessibilityIdentifier("studentSurvey.resume")
         }
         .padding(TMISpacing.xl)

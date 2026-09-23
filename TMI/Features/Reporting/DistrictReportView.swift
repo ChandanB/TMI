@@ -620,8 +620,8 @@ struct ExportReadySheet: View {
         NavigationStack {
             VStack(spacing: TMISpacing.lg) {
                 Image(systemName: file.format.systemImage)
-                    .font(.system(size: 44))
-                    .foregroundStyle(TMIColors.aubergine)
+                    .font(.largeTitle)
+                    .foregroundStyle(TMIColors.accent)
                     .accessibilityHidden(true)
                 Text(file.url.lastPathComponent).font(.headline)
                 Text("The export was recorded in the audit log. Share it only with people allowed to see these figures.")
@@ -632,7 +632,7 @@ struct ExportReadySheet: View {
                     Label("Share or save", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.tmiPrimary)
                 .accessibilityIdentifier("report.share")
             }
             .padding(TMISpacing.xl)

@@ -172,8 +172,7 @@ struct FormResponseView: View {
                 Label(session.isSubmitting ? "Submitting…" : "Submit", systemImage: "paperplane.fill")
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(TMIColors.teal)
+            .buttonStyle(.tmiPrimary)
             .disabled(!session.canSubmit)
             .accessibilityIdentifier("formResponse.submit")
         } footer: {
@@ -323,7 +322,7 @@ struct FormFieldEditor: View {
                         let selected = currentRating == score
                         Button("\(score)") { onChange(.number(Double(score))) }
                             .buttonStyle(.bordered)
-                            .tint(selected ? TMIColors.teal : TMIColors.interactiveBorder)
+                            .tint(selected ? TMIColors.accent : TMIColors.interactiveBorder)
                             .frame(minWidth: 44, minHeight: 44)
                             .accessibilityAddTraits(selected ? .isSelected : [])
                             .accessibilityLabel("\(score) of 5")

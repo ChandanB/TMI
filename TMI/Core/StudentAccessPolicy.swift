@@ -261,7 +261,7 @@ struct RestrictedAccessPlaceholder: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "lock.shield")
-                .font(.system(size: 48))
+                .font(.largeTitle)
                 .foregroundColor(.tmiTextTertiary)
             
             Text("Access Restricted")

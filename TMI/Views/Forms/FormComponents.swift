@@ -25,17 +25,17 @@ struct SectionPreviewCard: View {
         } label: {
           HStack {
             Text(section.title)
-              .font(.system(size: 16, weight: .semibold))
+              .font(.body.weight(.semibold))
               .foregroundColor(Color.tmiTextPrimary)
 
             Spacer()
 
             Text("\(section.fields.count) fields")
-              .font(.system(size: 14))
+              .font(.subheadline)
               .foregroundColor(Color.tmiTextSecondary)
 
             Image(systemName: "chevron.right")
-              .font(.system(size: 14, weight: .medium))
+              .font(.subheadline.weight(.medium))
               .foregroundColor(Color.tmiTextSecondary)
               .rotationEffect(Angle(degrees: isExpanded ? 90 : 0))
           }
@@ -68,33 +68,33 @@ struct FieldPreviewRow: View {
       // Field type icon
       ZStack {
         Circle()
-          .fill(Color.white.opacity(0.05))
+          .fill(TMIColors.fill)
           .frame(width: 36, height: 36)
 
         Image(systemName: field.type.iconName)
-          .font(.system(size: 16))
+          .font(.body)
           .foregroundColor(Color.tmiTextSecondary)
       }
 
       // Field label and type
       VStack(alignment: .leading, spacing: 4) {
         Text(field.label)
-          .font(.system(size: 15))
+          .font(.subheadline)
           .foregroundColor(Color.tmiTextPrimary)
 
         HStack(spacing: 8) {
           Text(field.type.rawValue)
-            .font(.system(size: 12))
+            .font(.caption)
             .foregroundColor(Color.tmiTextSecondary)
 
           if field.isRequired {
             Text("Required")
-              .font(.system(size: 12, weight: .medium))
+              .font(.caption.weight(.medium))
               .padding(.horizontal, 6)
               .padding(.vertical, 2)
               .background(
                 Capsule()
-                  .fill(Color.red.opacity(0.2))
+                  .fill(TMIColors.errorSurface)
               )
               .foregroundColor(.red.opacity(0.8))
           }
@@ -126,13 +126,13 @@ struct DynamicFieldView: View {
         // Field label
         HStack(spacing: 4) {
           Text(field.label)
-            .font(.system(size: 16, weight: .semibold))
+            .font(.body.weight(.semibold))
             .foregroundColor(Color.tmiTextPrimary)
 
           if field.isRequired {
             Text("*")
-              .font(.system(size: 16, weight: .bold))
-              .foregroundColor(.red)
+              .font(.body.weight(.bold))
+              .foregroundStyle(TMIColors.errorText)
           }
         }
 
@@ -162,7 +162,7 @@ struct DynamicFieldView: View {
         .padding(8)
         .background(
           RoundedRectangle(cornerRadius: 8)
-            .fill(Color.white.opacity(0.05))
+            .fill(TMIColors.fill)
         )
         .foregroundColor(Color.tmiTextPrimary)
         .frame(height: 120)
@@ -210,7 +210,7 @@ struct DynamicFieldView: View {
               HStack {
                 Image(systemName: selectedOption == option ? "circle.inset.filled" : "circle")
                   .foregroundColor(
-                    selectedOption == option ? Color.tmiSecondary : .white.opacity(0.6))
+                    selectedOption == option ? Color.tmiSecondary : TMIColors.interactiveBorder)
 
                 Text(option)
                   .foregroundColor(Color.tmiTextPrimary)
@@ -244,7 +244,7 @@ struct DynamicFieldView: View {
                   systemName: selectedOptions.contains(option) ? "checkmark.square.fill" : "square"
                 )
                 .foregroundColor(
-                  selectedOptions.contains(option) ? Color.tmiSecondary : .white.opacity(0.6))
+                  selectedOptions.contains(option) ? Color.tmiSecondary : TMIColors.interactiveBorder)
 
                 Text(option)
                   .foregroundColor(Color.tmiTextPrimary)
@@ -299,7 +299,7 @@ struct DynamicFieldView: View {
             onValueChange(rating)
           } label: {
             Image(systemName: rating <= ratingValue ? "star.fill" : "star")
-              .font(.system(size: 24))
+              .font(.title2)
               .foregroundColor(rating <= ratingValue ? .yellow : Color.tmiTextTertiary)
           }
           .buttonStyle(.plain)
@@ -323,7 +323,7 @@ struct DynamicFieldView: View {
         .frame(maxWidth: .infinity)
         .background(
           RoundedRectangle(cornerRadius: 8)
-            .fill(Color.white.opacity(0.05))
+            .fill(TMIColors.fill)
         )
     case .dateTime:
       DatePicker("", selection: $dateValue, displayedComponents: [.date, .hourAndMinute])
@@ -388,13 +388,13 @@ struct FormsProgressIndicator: View {
       // Text indicator
       HStack {
         Text("Section \(current) of \(total)")
-          .font(.system(size: 14))
+          .font(.subheadline)
           .foregroundColor(Color.tmiTextSecondary)
 
         Spacer()
 
         Text("\(Int(progress * 100))%")
-          .font(.system(size: 14, weight: .medium))
+          .font(.subheadline.weight(.medium))
           .foregroundColor(Color.tmiTextPrimary)
       }
     }
@@ -444,7 +444,7 @@ struct FormLoadingIndicator: View {
 
       // Form icon
       Image(systemName: "doc.text.fill")
-        .font(.system(size: 24, weight: .medium))
+        .font(.title2.weight(.medium))
         .foregroundColor(Color.tmiTextPrimary)
     }
     .onAppear {

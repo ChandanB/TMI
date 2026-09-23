@@ -84,7 +84,7 @@ final class AppRouter {
             guard policy.role != nil else {
                 throw NavigationError.unauthorizedRoute
             }
-        case .editStudent, .profile, .settings, .tasks, .sync:
+        case .editStudent, .profile, .settings, .tasks, .sync, .formAssignments, .formTemplates, .meetings:
             try validate(route)
         }
         try push(route, switchingTab: !staysOnCurrentTab)
@@ -346,7 +346,7 @@ final class AppRouter {
                 throw NavigationError.unauthorizedRoute
             }
 
-        case .profile, .settings, .tasks, .sync:
+        case .profile, .settings, .tasks, .sync, .formAssignments, .formTemplates, .meetings:
             guard policy.role != nil else {
                 throw NavigationError.unauthorizedRoute
             }

@@ -284,6 +284,13 @@ struct UserProfileView: View {
     @State private var showingDeleteAccount = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.authStateModel) private var authStateModel
+    @Environment(\.studentContext) private var studentContext
+    @Environment(AppRouter.self) private var router
+    @State private var showingSignOutConfirmation = false
+    /// The Change Email sheet keeps showing this while a save is in flight
+    /// (the live state is `.loading`, which used to blank the sheet).
+    @State private var lastLoadedProfile: UserProfileData?
+    @State private var showingSignOutFailure = false
 
     var body: some View {
         ZStack {
@@ -306,7 +313,8 @@ struct UserProfileView: View {
                         showingPrivacyPolicy: $showingPrivacyPolicy,
                         showingTermsOfService: $showingTermsOfService,
                         showingDeleteAccount: $showingDeleteAccount,
-                        roleDisplayName: authStateModel.currentMembership?.role.displayName
+                        roleDisplayName: authStateModel.currentMembership?.role.displayName,
+                        onSignOut: { showingSignOutConfirmation = true }
                     )
 
                 case .error(let error):
@@ -316,7 +324,7 @@ struct UserProfileView: View {
                             .foregroundColor(Color.tmiTextPrimary)
 
                         Text(error.message)
-                            .foregroundColor(.red)
+                            .foregroundStyle(TMIColors.errorText)
                             .multilineTextAlignment(.center)
 
                         TMIButton(
@@ -351,12 +359,27 @@ struct UserProfileView: View {
                 }
             }
         }
-        .alert(isPresented: binding(stateModel, \.ui.isShowingAlert)) {
-            Alert(
-                title: Text(stateModel.ui.alertMessage.contains("Error") ? "Error" : "Success"),
-                message: Text(stateModel.ui.alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
+        // The title no longer guesses from the message text ("Failed to upload
+        // photo" used to appear under "Success").
+        .onChange(of: stateModel.isChangingEmail) { _, isChanging in
+            if isChanging { lastLoadedProfile = stateModel.state.value }
+        }
+        .alert("Profile", isPresented: binding(stateModel, \.ui.isShowingAlert)) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(stateModel.ui.alertMessage)
+        }
+        .alert("Sign Out", isPresented: $showingSignOutConfirmation) {
+            Button("Sign Out", role: .destructive, action: attemptSignOut)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to sign out?")
+        }
+        .alert("Couldn’t Sign Out", isPresented: $showingSignOutFailure) {
+            Button("Retry", action: attemptSignOut)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Your account is still signed in. Check your connection and try again.")
         }
         .sheet(
             isPresented: Binding(
@@ -364,7 +387,7 @@ struct UserProfileView: View {
                 set: { stateModel.isChangingEmail = $0 }
             )
         ) {
-            if case .loaded(let profileData) = stateModel.state {
+            if let profileData = stateModel.state.value ?? lastLoadedProfile {
                 ChangeEmailView(stateModel: stateModel, profileData: profileData)
                     .tmiSheetStyle()
             }
@@ -410,6 +433,18 @@ struct UserProfileView: View {
             }
         }
     }
+
+    /// Signs out through AuthStateModel (invalidating the trusted session),
+    /// exactly like the shell — the old path called Firebase directly.
+    @MainActor
+    private func attemptSignOut() {
+        guard authStateModel.signOut() else {
+            showingSignOutFailure = true
+            return
+        }
+        studentContext.clearContext()
+        router.reset()
+    }
 }
 
 @ViewBuilder
@@ -420,7 +455,8 @@ private func userProfileForm(
     showingPrivacyPolicy: Binding<Bool>,
     showingTermsOfService: Binding<Bool>,
     showingDeleteAccount: Binding<Bool>,
-    roleDisplayName: String?
+    roleDisplayName: String?,
+    onSignOut: @escaping () -> Void
 ) -> some View {
     ScrollView {
         VStack(spacing: 20) {
@@ -574,12 +610,12 @@ private func userProfileForm(
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "person.crop.circle.badge.minus")
-                                .foregroundStyle(.red)
+                                .foregroundStyle(TMIColors.errorText)
                                 .frame(width: 24)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Delete Account")
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(TMIColors.errorText)
                                 Text("Permanently delete your account and personal data")
                                     .font(.caption)
                                     .foregroundStyle(Color.tmiTextSecondary)
@@ -645,17 +681,13 @@ private func userProfileForm(
                     text: "Sign Out",
                     icon: "rectangle.portrait.and.arrow.right",
                     style: .destructive,
-                    action: {
-                        Task { @MainActor in
-                            stateModel.signOut()
-                            dismiss()
-                        }
-                    }
+                    action: onSignOut
                 )
             }
         }
         .padding(20)
     }
+
 }
 
 struct ChangeEmailView: View {

@@ -421,7 +421,7 @@ struct AuthenticationAcceptanceUITestingContent: View {
         .environment(\.authStateModel, authStateModel)
         .environment(\.studentContext, studentContext)
         .environment(appRouter)
-        .tint(TMIColors.teal)
+        .tint(TMIColors.accent)
     }
 }
 
@@ -507,7 +507,7 @@ struct AuthenticationAvailabilityUITestingContent: View {
         .environment(\.authStateModel, authStateModel)
         .environment(\.studentContext, studentContext)
         .environment(appRouter)
-        .tint(TMIColors.teal)
+        .tint(TMIColors.accent)
         .task {
             guard identityProvider.currentIdentity == nil else {
                 return

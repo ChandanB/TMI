@@ -61,8 +61,6 @@ struct TMIColorsTests {
     func legacyAliases() {
         assertSameColor(.tmiPrimary, TMIColors.accent)
         assertSameColor(.tmiSecondary, TMIColors.accent)
-        assertSameColor(TMIColors.aubergine, TMIColors.accent)
-        assertSameColor(TMIColors.teal, TMIColors.accent)
         assertSameColor(.tmiBackground, TMIColors.background)
         assertSameColor(.tmiTextPrimary, TMIColors.textPrimary)
         assertSameColor(.tmiTextSecondary, TMIColors.textSecondary)

@@ -167,8 +167,8 @@ private struct FormAssignmentStudentPickerContent: View {
         }
         Spacer()
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-          .font(.system(size: 20))
-          .foregroundColor(isSelected ? TMIColors.teal : Color.secondary.opacity(0.5))
+          .font(.title3)
+          .foregroundColor(isSelected ? TMIColors.accent : Color.secondary.opacity(0.5))
       }
       .contentShape(Rectangle())
     }

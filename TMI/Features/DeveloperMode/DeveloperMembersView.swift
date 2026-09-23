@@ -114,7 +114,7 @@ private struct DeveloperMemberRow: View {
                 Text("v\(member.version) · \(member.capabilities.count) capabilities · \(member.assignedStudentCount) assigned")
                 if member.claimDistrictID != districtID {
                     Label("Claims point elsewhere", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(TMIColors.warningText)
                 }
             }
             .font(.caption2)

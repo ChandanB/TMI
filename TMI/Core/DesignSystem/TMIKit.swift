@@ -731,3 +731,31 @@ extension View {
 #endif
     }
 }
+
+// MARK: - Chip button style
+
+/// Filter-chip look for any `Button`: amber wash when selected, quiet fill otherwise.
+struct TMIChipButtonStyle: ButtonStyle {
+    var isSelected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.medium))
+            .lineLimit(1)
+            .foregroundStyle(isSelected ? TMIColors.accent : TMIColors.textPrimary)
+            .padding(.horizontal, TMISpacing.ms)
+            .padding(.vertical, 7)
+            .background(isSelected ? TMIColors.accentSoft : TMIColors.fill, in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(isSelected ? TMIColors.accent.opacity(0.35) : Color.clear, lineWidth: 1)
+            }
+            .opacity(configuration.isPressed ? 0.75 : 1)
+            .padding(.vertical, 4)
+            .contentShape(Capsule())
+            .animation(TMIAnimation.snappy, value: isSelected)
+    }
+}
+
+extension ButtonStyle where Self == TMIChipButtonStyle {
+    static func tmiChip(isSelected: Bool) -> TMIChipButtonStyle { TMIChipButtonStyle(isSelected: isSelected) }
+}

@@ -188,7 +188,7 @@ struct FormTemplateLibraryView: View {
           } label: {
             Label("Clear", systemImage: "xmark.circle.fill")
             .font(.subheadline)
-            .foregroundColor(.red)
+            .foregroundStyle(TMIColors.errorText)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(TMIColors.fill)
@@ -247,7 +247,7 @@ struct FormTemplateLibraryView: View {
   private var emptyState: some View {
     VStack(spacing: 16) {
       Image(systemName: "doc.text.magnifyingglass")
-        .font(.system(size: 60))
+        .font(.largeTitle)
         .foregroundColor(.secondary)
 
       Text("No Templates Found")
@@ -289,7 +289,7 @@ struct FormTemplateLibraryView: View {
         }
       } label: {
         Image(systemName: "ellipsis.circle")
-          .font(.system(size: 22))
+          .font(.title2)
       }
     }
   }

@@ -22,7 +22,7 @@ struct AccountUnavailableView: View {
             Text(description)
         } actions: {
             Button("Sign Out", action: attemptSignOut)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.tmiPrimary)
         }
         .alert("Couldn’t Sign Out", isPresented: $isShowingSignOutError) {
             Button("Retry", action: attemptSignOut)

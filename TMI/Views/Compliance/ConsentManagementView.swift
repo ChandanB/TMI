@@ -141,7 +141,7 @@ struct ConsentManagementView: View {
                         .foregroundColor(selectedFilter == filter ? Color.tmiTextOnPrimary : Color.tmiTextSecondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(selectedFilter == filter ? Color.cyan : Color.tmiInputBackground)
+                        .background(selectedFilter == filter ? TMIColors.accent : Color.tmiInputBackground)
                         .cornerRadius(20)
                     }
                 }
@@ -225,7 +225,7 @@ struct ConsentManagementView: View {
     private var emptyView: some View {
         VStack(spacing: 16) {
             Image(systemName: "person.crop.circle.badge.questionmark")
-                .font(.system(size: 60))
+                .font(.largeTitle)
                 .foregroundColor(Color.tmiTextTertiary)
 
             Text(searchText.isEmpty ? "No students found" : "No results")
@@ -247,7 +247,7 @@ struct ConsentManagementView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.5)
-                .tint(.white)
+                .tint(TMIColors.accent)
 
             Text("Loading consent records...")
                 .font(.headline)
@@ -260,7 +260,7 @@ struct ConsentManagementView: View {
     private var unavailableView: some View {
         VStack(spacing: 16) {
             Image(systemName: "lock.shield.fill")
-                .font(.system(size: 60))
+                .font(.largeTitle)
                 .foregroundStyle(Color.tmiTextTertiary)
 
             Text("Consent Management Is Unavailable")
@@ -417,7 +417,7 @@ struct StudentConsentDetailView: View {
                 if isLoading {
                     ProgressView()
                         .scaleEffect(1.5)
-                        .tint(.white)
+                        .tint(TMIColors.accent)
                 } else {
                     ScrollView {
                         VStack(spacing: 16) {
@@ -476,12 +476,12 @@ struct StudentConsentDetailView: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(Color.cyan.opacity(0.2))
+                        .fill(TMIColors.accentSoft)
                         .frame(width: 60, height: 60)
 
                     Text(student.initials)
                         .font(.title2.bold())
-                        .foregroundColor(.cyan)
+                        .foregroundStyle(TMIColors.accent)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -618,7 +618,7 @@ private struct ConsentTypeCard: View {
                                 .foregroundColor(Color.tmiTextPrimary)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
-                                .background(Color.red.opacity(0.8))
+                                .background(TMIColors.errorText)
                                 .cornerRadius(8)
                         }
                     } else {
@@ -628,7 +628,7 @@ private struct ConsentTypeCard: View {
                                 .foregroundColor(Color.tmiTextPrimary)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
-                                .background(Color.green.opacity(0.8))
+                                .background(TMIColors.successText)
                                 .cornerRadius(8)
                         }
                     }
@@ -689,18 +689,18 @@ private struct GrantConsentView: View {
                                     .textFieldStyle(.plain)
                                     .foregroundColor(Color.tmiTextPrimary)
                                     .padding()
-                                    .background(Color.white.opacity(0.1))
+                                    .background(TMIColors.separator)
                                     .cornerRadius(8)
 
                                 Toggle(isOn: $expirationEnabled) {
                                     Text("Set Expiration Date")
                                         .foregroundColor(Color.tmiTextPrimary)
                                 }
-                                .tint(.cyan)
+                                .tint(TMIColors.accent)
 
                                 if expirationEnabled {
                                     Stepper(value: $expirationDays, in: 30...1825, step: 30) {
-                                        Text("\(expirationDays) days (\(expirationDays / 365) year\(expirationDays / 365 == 1 ? "" : "s"))")
+                                        Text(ComplianceDuration.describe(days: expirationDays))
                                             .foregroundColor(Color.tmiTextSecondary)
                                     }
                                 }
@@ -712,7 +712,7 @@ private struct GrantConsentView: View {
                             TMICard(style: .default) {
                                 HStack(spacing: 12) {
                                     Image(systemName: "exclamationmark.triangle.fill")
-                                        .foregroundColor(.orange)
+                                        .foregroundStyle(TMIColors.warningText)
                                     Text(errorMessage)
                                         .font(.caption)
                                         .foregroundColor(Color.tmiTextPrimary)

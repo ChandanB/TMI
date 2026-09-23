@@ -14,7 +14,7 @@ struct SurveyResultsView: View {
             VStack(spacing: TMISpacing.xl) {
                 Image(systemName: "sparkles")
                     .font(.largeTitle.bold())
-                    .foregroundStyle(TMIColors.teal)
+                    .foregroundStyle(TMIColors.accent)
                     .accessibilityHidden(true)
                 Text("Nice work!").font(.largeTitle.bold())
                 Text("Here are some things you said you enjoy.")
@@ -58,7 +58,7 @@ struct SurveyResultsView: View {
                         .foregroundStyle(TMIColors.errorText)
                 }
                 Button("Finish", action: onFinish)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.tmiPrimary)
                     .controlSize(.large)
                     .accessibilityIdentifier("studentSurvey.finish")
             }
@@ -168,7 +168,7 @@ struct StaffSurveyInterestReviewView: View {
                     Button("Approve selected interests") {
                         Task { await approve() }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.tmiPrimary)
                     .disabled(selectedInterestIDs.isEmpty || isApproving || !isApprovable)
                 }
             }

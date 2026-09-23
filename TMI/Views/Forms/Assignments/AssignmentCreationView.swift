@@ -164,7 +164,7 @@ struct AssignmentCreationView: View {
                   Spacer()
                   if selectedTemplate?.id == template.id {
                       Image(systemName: "checkmark.circle.fill")
-                          .foregroundColor(.blue)
+                          .foregroundStyle(TMIColors.infoText)
                   }
               }
               .contentShape(Rectangle())
@@ -248,7 +248,7 @@ struct AssignmentCreationView: View {
                               .foregroundColor(.primary)
                           Spacer()
                           if selectedStudents.isEmpty {
-                              Text("Select…").foregroundColor(.blue)
+                              Text("Select…").foregroundStyle(TMIColors.infoText)
                           } else {
                               Text("\(selectedStudents.count) selected")
                                   .foregroundColor(.secondary)

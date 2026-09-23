@@ -61,7 +61,7 @@ struct DeveloperModeView: View {
         }
         .navigationTitle("Developer Mode")
         .navigationBarTitleDisplayMode(.inline)
-        .tint(TMIColors.teal)
+        .tint(TMIColors.accent)
         .task { await state.load() }
         .refreshable { await state.load() }
     }
@@ -102,7 +102,7 @@ private struct DeveloperEnvironmentSection: View {
                 }
             case .failed(let error):
                 Label(error.localizedDescription, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(TMIColors.warningText)
                 Button("Retry") { Task { await state.load() } }
             }
             DeveloperEnvironmentPicker()

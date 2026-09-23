@@ -33,11 +33,11 @@ struct FormTemplateDetailView: View {
           TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
               Text("Description")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundColor(Color.tmiTextPrimary)
 
               Text(template.templateDescription)
-                .font(.system(size: 16))
+                .font(.body)
                 .foregroundColor(Color.tmiTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -117,7 +117,7 @@ struct FormTemplateDetailView: View {
             .frame(width: 80, height: 80)
 
           Image(systemName: categoryIcon)
-            .font(.system(size: 36))
+            .font(.largeTitle)
             .foregroundColor(template.themeColor)
         }
 
@@ -130,7 +130,7 @@ struct FormTemplateDetailView: View {
               .foregroundColor(Color.tmiTextPrimary)
 
             Text("Sections")
-              .font(.system(size: 14))
+              .font(.subheadline)
               .foregroundColor(Color.tmiTextSecondary)
           }
 
@@ -141,18 +141,18 @@ struct FormTemplateDetailView: View {
               .foregroundColor(Color.tmiTextPrimary)
 
             Text("Fields")
-              .font(.system(size: 14))
+              .font(.subheadline)
               .foregroundColor(Color.tmiTextSecondary)
           }
 
           // Created
           VStack(spacing: 4) {
             Text(template.createdAt ?? Date(), style: .date)
-              .font(.system(size: 16, weight: .medium))
+              .font(.body.weight(.medium))
               .foregroundColor(Color.tmiTextPrimary)
 
             Text("Created")
-              .font(.system(size: 14))
+              .font(.subheadline)
               .foregroundColor(Color.tmiTextSecondary)
           }
         }
@@ -164,7 +164,7 @@ struct FormTemplateDetailView: View {
   private var formPreview: some View {
     VStack(alignment: .leading, spacing: 20) {
       Text("Form Structure")
-        .font(.system(size: 20, weight: .semibold))
+        .font(.title3.weight(.semibold))
         .foregroundColor(Color.tmiTextPrimary)
 
       ForEach(template.sections) { section in

@@ -267,7 +267,7 @@ private struct StudentOperationalHubContent: View {
         case .permissionDenied:
             VStack(spacing: TMISpacing.md) {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 48))
+                    .font(.largeTitle)
                     .foregroundStyle(TMIColors.textSecondary)
                     .accessibilityHidden(true)
                 Text("Student Access Changed")

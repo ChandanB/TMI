@@ -52,7 +52,6 @@ final class StudentDetailUITests: XCTestCase {
             unavailable.waitForExistence(timeout: 5),
             app.debugDescription
         )
-        XCTAssertTrue(element("studentDetail.timeline.unavailable", in: app).exists)
         XCTAssertFalse(element("studentDetail.timeline.empty", in: app).exists)
     }
 

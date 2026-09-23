@@ -277,7 +277,7 @@ struct CareerPlanAttachmentSheet: View {
                 }
             }
         }
-        .frame(minWidth: 420, minHeight: 360)
+        .tmiMacSheetFrame(minWidth: 420, minHeight: 360)
         .task(id: studentID) { await self.load() }
         .accessibilityIdentifier("careerAttachment.sheet")
     }

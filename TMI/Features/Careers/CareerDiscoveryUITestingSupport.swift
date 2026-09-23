@@ -44,7 +44,7 @@ struct CareerDiscoveryUITestingContent: View {
             }
             .navigationTitle("Career discovery")
         }
-        .tint(TMIColors.teal)
+        .tint(TMIColors.accent)
     }
 
     private static let technologyInterest = StudentInterest(
@@ -109,7 +109,7 @@ struct CareerDetailUITestingContent: View {
                 )
             )
         }
-        .tint(TMIColors.teal)
+        .tint(TMIColors.accent)
     }
 
     private static let career = CareerRecord(

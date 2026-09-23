@@ -26,8 +26,8 @@ nonisolated enum AccountType: String, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
-        case .teacher, .administrator: return TMIColors.aubergine
-        case .counselor, .socialWorker: return TMIColors.teal
+        case .teacher, .administrator: return TMIColors.accent
+        case .counselor, .socialWorker: return TMIColors.accent
         }
     }
 
@@ -73,7 +73,7 @@ struct SimplifiedRegistrationView: View {
     @FocusState private var focusedField: Field?
 
     enum Field: Hashable {
-        case displayName, email, invitationCode
+        case displayName, email, invitationCode, password, confirmPassword
     }
 
     init(
@@ -95,15 +95,15 @@ struct SimplifiedRegistrationView: View {
                         // Header
                         VStack(spacing: 8) {
                             Image(systemName: "person.crop.circle.badge.plus")
-                                .font(.system(size: 50))
+                                .font(.largeTitle)
                                 .foregroundColor(.tmiPrimary)
 
                             Text("Create Account")
-                                .font(.system(size: 28, weight: .bold))
+                                .font(.title.weight(.bold))
                                 .foregroundColor(Color.tmiTextPrimary)
 
                             Text("Create an account with your staff invitation")
-                                .font(.system(size: 16))
+                                .font(.body)
                                 .foregroundColor(Color.tmiTextSecondary)
                         }
                         .padding(.top, 20)
@@ -111,7 +111,7 @@ struct SimplifiedRegistrationView: View {
                         // Account Type Selection
                         VStack(alignment: .leading, spacing: 12) {
                             Text("I am a...")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.subheadline.weight(.medium))
                                 .foregroundColor(Color.tmiTextSecondary)
                                 .padding(.horizontal, 20)
 
@@ -134,8 +134,10 @@ struct SimplifiedRegistrationView: View {
                                     icon: "person.fill",
                                     placeholder: "Full Name",
                                     text: $displayName,
+                                    capitalization: .words,
                                     onSubmit: { focusedField = .email },
-                                    focus: focusBinding(for: .displayName)
+                                    focus: focusBinding(for: .displayName),
+                                    content: .name
                                 )
                                 .accessibilityIdentifier("authentication.registration.name")
 
@@ -145,7 +147,8 @@ struct SimplifiedRegistrationView: View {
                                     text: $email,
                                     keyboardType: .emailAddress,
                                     onSubmit: { focusedField = .invitationCode },
-                                    focus: focusBinding(for: .email)
+                                    focus: focusBinding(for: .email),
+                                    content: .username
                                 )
                                 .accessibilityIdentifier("authentication.registration.email")
 
@@ -153,8 +156,9 @@ struct SimplifiedRegistrationView: View {
                                     icon: "building.2.crop.circle",
                                     placeholder: "Staff Invitation Code",
                                     text: $invitationCode,
-                                    onSubmit: { focusedField = nil },
-                                    focus: focusBinding(for: .invitationCode)
+                                    onSubmit: { focusedField = .password },
+                                    focus: focusBinding(for: .invitationCode),
+                                    content: .oneTimeCode
                                 )
                                 .accessibilityIdentifier("authentication.registration.invitation")
 
@@ -163,7 +167,10 @@ struct SimplifiedRegistrationView: View {
                                     placeholder: "Password (min 8 characters)",
                                     text: $password,
                                     isSecure: true,
-                                    onSubmit: { focusedField = nil }
+                                    onSubmit: { focusedField = .confirmPassword },
+                                    focus: focusBinding(for: .password),
+                                    content: .newPassword,
+                                    submitLabel: .next
                                 )
                                 .accessibilityIdentifier("authentication.registration.password")
 
@@ -172,7 +179,10 @@ struct SimplifiedRegistrationView: View {
                                     placeholder: "Confirm Password",
                                     text: $confirmPassword,
                                     isSecure: true,
-                                    onSubmit: { register() }
+                                    onSubmit: { register() },
+                                    focus: focusBinding(for: .confirmPassword),
+                                    content: .newPassword,
+                                    submitLabel: .join
                                 )
                                 .accessibilityIdentifier(
                                     "authentication.registration.confirmPassword"
@@ -180,8 +190,8 @@ struct SimplifiedRegistrationView: View {
 
                                 if let errorMessage {
                                     Text(errorMessage)
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.red.opacity(0.9))
+                                        .font(.subheadline)
+                                        .foregroundStyle(TMIColors.errorText)
                                         .multilineTextAlignment(.center)
                                         .transition(.opacity)
                                 }
@@ -390,7 +400,7 @@ struct AccountTypeButton: View {
             VStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(isSelected ? type.color.opacity(0.2) : Color.white.opacity(0.05))
+                        .fill(isSelected ? type.color.opacity(0.2) : TMIColors.fill)
                         .frame(width: 60, height: 60)
 
                     if isSelected {
@@ -400,7 +410,7 @@ struct AccountTypeButton: View {
                     }
 
                     Image(systemName: type.icon)
-                        .font(.system(size: 24))
+                        .font(.title2)
                         .foregroundColor(isSelected ? type.color : Color.tmiTextTertiary)
                 }
 

@@ -96,7 +96,7 @@ struct FormTemplateCard: View {
         if template.isPublic {
           Label("Public", systemImage: "globe")
             .font(.caption2)
-            .foregroundColor(.blue)
+            .foregroundStyle(TMIColors.infoText)
         }
 
         Spacer()
@@ -121,8 +121,8 @@ struct FormTemplateCard: View {
                 .font(.caption2)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.blue.opacity(0.1))
-                .foregroundColor(.blue)
+                .background(TMIColors.infoSurface)
+                .foregroundStyle(TMIColors.infoText)
                 .cornerRadius(8)
             }
           }

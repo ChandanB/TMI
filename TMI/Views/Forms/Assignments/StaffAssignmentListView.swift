@@ -67,7 +67,7 @@ struct StaffAssignmentListView: View {
   private var emptyStateView: some View {
       VStack(spacing: 20) {
           Image(systemName: "doc.text.magnifyingglass")
-              .font(.system(size: 60))
+              .font(.largeTitle)
               .foregroundColor(.secondary)
           Text("No Assignments Yet")
               .font(.title2)
@@ -80,7 +80,7 @@ struct StaffAssignmentListView: View {
           Button("Create Assignment") {
               showingCreationSheet = true
           }
-          .buttonStyle(.borderedProminent)
+          .buttonStyle(.tmiPrimary)
       }
   }
   
@@ -137,7 +137,7 @@ struct AssignmentRow: View {
                .font(.caption2)
                
                ProgressView(value: Double(assignment.totalSubmitted), total: Double(max(1, assignment.totalAssigned)))
-                   .tint(.blue)
+                   .tint(TMIColors.infoText)
             }
             .padding(.top, 4)
         }

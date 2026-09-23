@@ -26,7 +26,7 @@ struct StudentListView: View {
                     StudentRosterContent(state: state, member: member)
                 } else {
                     ProgressView("Loading student access…")
-                        .tint(TMIColors.teal)
+                        .tint(TMIColors.accent)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .accessibilityIdentifier("studentRoster.loading")
                 }
@@ -1208,8 +1208,7 @@ private struct StudentBulkSelectionBar: View {
                 .foregroundStyle(TMIColors.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button("Assign Staff", systemImage: "person.badge.plus", action: assign)
-                .buttonStyle(.borderedProminent)
-                .tint(TMIColors.teal)
+                .buttonStyle(.tmiPrimary)
                 .disabled(selectedCount == 0 || !canAssign)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("studentRoster.bulkAssignment")

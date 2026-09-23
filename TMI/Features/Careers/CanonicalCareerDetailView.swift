@@ -67,23 +67,27 @@ struct CanonicalCareerDetailView: View {
                         .font(.body)
                 }
 
-                ShareLink(item: shareText) {
-                    Label("Share career", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("careerDetail.share")
-
-                if studentContext != nil {
-                    Button("Attach to a plan", systemImage: "link") {
-                        attachmentShown = true
+                HStack(spacing: TMISpacing.sm) {
+                    if studentContext != nil {
+                        Button("Attach to a plan", systemImage: "link") {
+                            attachmentShown = true
+                        }
+                        .buttonStyle(.tmiPrimary)
+                        .accessibilityIdentifier("careerDetail.planAttachment")
                     }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("careerDetail.planAttachment")
+                    ShareLink(item: shareText) {
+                        Label("Share career", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.tmiSecondary)
+                    .accessibilityIdentifier("careerDetail.share")
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(TMISpacing.lg)
+            .frame(maxWidth: TMISizing.readableWidth, alignment: .leading)
+            .padding(.horizontal, TMISpacing.screenPadding)
+            .padding(.vertical, TMISpacing.md)
+            .frame(maxWidth: .infinity)
         }
+        .tmiScreenBackground()
         .navigationTitle(career.title)
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("careerDetail.screen")
@@ -108,16 +112,29 @@ struct CanonicalCareerDetailView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: TMISpacing.xxs) {
-            Text(career.title)
-                .font(.largeTitle.bold())
-            Text(Self.readable(career.category))
-                .font(.headline)
-                .foregroundStyle(TMIColors.aubergine)
-            if let subcategory = career.subcategory {
-                Text(subcategory)
-                    .font(.subheadline)
-                    .foregroundStyle(TMIColors.textSecondary)
+        TMIGoldenHourCard {
+            HStack(alignment: .top, spacing: TMISpacing.md) {
+                VStack(alignment: .leading, spacing: TMISpacing.xs) {
+                    Text(Self.readable(career.category))
+                        .tmiEyebrow(TMIColors.goldenHourSecondaryText)
+                    Text(career.title)
+                        .font(.tmiEditorial(.largeTitle))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let subcategory = career.subcategory {
+                        Text(subcategory)
+                            .font(.subheadline)
+                            .foregroundStyle(TMIColors.goldenHourSecondaryText)
+                    }
+                    TMIStatusBadge(career.educationLevel.displayName, tone: .neutral, systemImage: "graduationcap.fill")
+                        .padding(.top, TMISpacing.xs)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: StudentCareerDiscoveryView.symbol(for: career.category))
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(TMIColors.goldenHourText.opacity(0.85))
+                    .frame(width: 64, height: 64)
+                    .background(TMIColors.surface.opacity(0.5), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .accessibilityHidden(true)
             }
         }
     }
@@ -127,14 +144,15 @@ struct CanonicalCareerDetailView: View {
         _ title: String,
         @ViewBuilder content: () -> some View
     ) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.xs) {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
             Text(title)
                 .font(.headline)
+                .foregroundStyle(TMIColors.textPrimary)
+                .accessibilityAddTraits(.isHeader)
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(TMISpacing.md)
-        .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+        .tmiSurface(padding: TMISpacing.md)
     }
 
     static func readable(_ identifier: String) -> String {

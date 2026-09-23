@@ -16,6 +16,7 @@ struct SignOutCallSiteTests {
             "TMI/Views/MainTabView.swift",
             "TMI/Views/Settings/SettingsView.swift",
             "TMI/Views/Settings/DeleteAccountView.swift",
+            "TMI/Views/User/UserProfileView.swift",
         ]
 
         for path in paths {

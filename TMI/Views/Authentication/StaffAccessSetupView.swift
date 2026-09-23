@@ -15,14 +15,14 @@ struct StaffAccessSetupView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     Image(systemName: "person.badge.key.fill")
-                        .font(.system(size: 56, weight: .semibold))
-                        .foregroundStyle(TMIColors.teal)
+                        .font(.largeTitle.weight(.semibold))
+                        .foregroundStyle(TMIColors.accent)
                         .accessibilityHidden(true)
 
                     VStack(spacing: 12) {
                         Text("Set Up Staff Access")
                             .font(.largeTitle.bold())
-                            .foregroundStyle(TMIColors.aubergine)
+                            .foregroundStyle(TMIColors.accent)
                             .multilineTextAlignment(.center)
 
                         Text(
@@ -38,18 +38,18 @@ struct StaffAccessSetupView: View {
                             icon: "person.fill",
                             placeholder: "Full name",
                             text: $displayName,
-                            capitalization: .words
+                            capitalization: .words,
+                            content: .name
                         )
-                        .textContentType(.name)
                         .accessibilityLabel("Full name")
                         .accessibilityIdentifier("authentication.accessSetup.name")
 
                         TMITextField(
                             icon: "key.fill",
                             placeholder: "Invitation code",
-                            text: $invitationCode
+                            text: $invitationCode,
+                            content: .oneTimeCode
                         )
-                        .textContentType(.oneTimeCode)
                         .accessibilityLabel("Staff invitation code")
                         .accessibilityIdentifier("authentication.accessSetup.invitation")
 

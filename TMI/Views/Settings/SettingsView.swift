@@ -13,22 +13,18 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.authStateModel) private var authStateModel
-    
-    @AppStorage("notificationsEnabled") private var notificationsEnabled = true
-    @AppStorage("showAnimations") private var showAnimations = true
-    @AppStorage("dataBackupEnabled") private var dataBackupEnabled = true
-    @AppStorage("offlineModeEnabled") private var offlineModeEnabled = true
-    
+    @Environment(\.studentContext) private var studentContext
+    @Environment(AppRouter.self) private var router
+
     @State private var showingLogoutAlert = false
     @State private var showingSignOutFailure = false
     @State private var showingDeleteAccountSheet = false
-    @State private var isLoaded = false
-    
+
     // Role-based visibility
     private var currentMembership: MembershipContext? {
         authStateModel.currentMembership
     }
-    
+
     private var isDistrictAdmin: Bool {
         guard let currentMembership else { return false }
         return AuthorizationPolicy.canViewAggregate(
@@ -36,7 +32,7 @@ struct SettingsView: View {
             districtID: currentMembership.districtID
         )
     }
-    
+
     private var canManageStaff: Bool {
         currentMembership.map(AuthorizationPolicy.canManageStaff) ?? false
     }
@@ -45,83 +41,125 @@ struct SettingsView: View {
         currentMembership.map(AuthorizationPolicy.canReadAudit) ?? false
     }
 
-    private var isStudent: Bool {
-        false
-    }
-    
-    private var isParent: Bool {
-        false
-    }
-    
     var body: some View {
-        ZStack {
-            // Background
-            TMIBackgroundView(variant: .base)
-                .ignoresSafeArea()
-            
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Header
-                    headerView
-                        .padding(.top, 20)
-                        .padding(.horizontal, 20)
-                        .opacity(isLoaded ? 1 : 0)
-                        .offset(y: isLoaded ? 0 : -20)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1), value: isLoaded)
-                    
-                    VStack(spacing: 16) {
-                        // Administration: compliance for district admins,
-                        // staff for staff.manage, audit for audit.read.
-                        if isDistrictAdmin || canManageStaff || canReadAudit {
-                            districtAdminSection
-                                .opacity(isLoaded ? 1 : 0)
-                                .offset(y: isLoaded ? 0 : 20)
-                                .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.35), value: isLoaded)
+        Form {
+            Section {
+                Button {
+                    try? router.open(.profile)
+                } label: {
+                    HStack(spacing: TMISpacing.ms) {
+                        TMIAvatar(initials: initials, size: 44)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(authStateModel.currentUser?.displayName ?? "Your account")
+                                .font(.headline)
+                                .foregroundStyle(TMIColors.textPrimary)
+                            Text(currentMembership?.role.displayName ?? "Staff")
+                                .font(.subheadline)
+                                .foregroundStyle(TMIColors.textSecondary)
                         }
-                        
-                        // Student-only sections
-                        if isStudent {
-                            studentSettingsSection
-                                .opacity(isLoaded ? 1 : 0)
-                                .offset(y: isLoaded ? 0 : 20)
-                                .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.3), value: isLoaded)
-                        }
-                        
-                        // Parent-only sections
-                        if isParent {
-                            parentSettingsSection
-                                .opacity(isLoaded ? 1 : 0)
-                                .offset(y: isLoaded ? 0 : 20)
-                                .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.3), value: isLoaded)
-                        }
-
-                        // Forms & Surveys admin - visible to all active staff
-                        if currentMembership != nil {
-                            formsSection
-                                .opacity(isLoaded ? 1 : 0)
-                                .offset(y: isLoaded ? 0 : 20)
-                                .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.4), value: isLoaded)
-                        }
-
-
-#if DEBUG
-                        developerSection
-                            .opacity(isLoaded ? 1 : 0)
-                            .offset(y: isLoaded ? 0 : 20)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.5), value: isLoaded)
-#endif
-
-                        // Account Actions Section - visible to all
-                        dangerousActionsSection
-                            .opacity(isLoaded ? 1 : 0)
-                            .offset(y: isLoaded ? 0 : 20)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.6), value: isLoaded)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(TMIColors.textTertiary)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens your profile")
+            }
+
+            // Administration: compliance for district admins, staff for
+            // staff.manage, audit for audit.read.
+            if isDistrictAdmin || canManageStaff || canReadAudit {
+                Section("Administration") {
+                    if canManageStaff, let currentMembership {
+                        NavigationLink {
+                            StaffAdministrationView(member: currentMembership)
+                        } label: {
+                            settingsLabel("Staff Management", symbol: "person.2.badge.gearshape", tone: .info)
+                        }
+                        .accessibilityIdentifier("settings.staffManagement")
+                    }
+                    if canReadAudit, let currentMembership {
+                        NavigationLink {
+                            AuditLogView(member: currentMembership)
+                        } label: {
+                            settingsLabel("Audit Log", symbol: "doc.text.magnifyingglass", tone: .neutral)
+                        }
+                        .accessibilityIdentifier("settings.auditLog")
+                    }
+                    if isDistrictAdmin, let currentMembership {
+                        NavigationLink {
+                            ComplianceSettingsView(districtId: currentMembership.districtID)
+                        } label: {
+                            settingsLabel("Compliance Settings", symbol: "checkmark.seal", tone: .success)
+                        }
+                        NavigationLink {
+                            ConsentManagementView()
+                        } label: {
+                            settingsLabel("Consent Management", symbol: "person.text.rectangle", tone: .brand)
+                        }
+                    }
                 }
             }
+
+            if currentMembership != nil {
+                Section("Forms & meetings") {
+                    NavigationLink {
+                        FormTemplateLibraryView()
+                    } label: {
+                        settingsLabel("Form Templates", symbol: "doc.on.doc", tone: .brand)
+                    }
+                    NavigationLink {
+                        StaffAssignmentListView()
+                    } label: {
+                        settingsLabel("Form Assignments", symbol: "list.bullet.rectangle", tone: .brand)
+                    }
+                    NavigationLink {
+                        MeetingsHubView()
+                    } label: {
+                        settingsLabel("Meetings", symbol: "calendar", tone: .success)
+                    }
+                }
+            }
+
+            Section("Data") {
+                NavigationLink {
+                    SyncStatusView()
+                } label: {
+                    settingsLabel("Sync Status", symbol: "arrow.triangle.2.circlepath", tone: .info)
+                }
+            }
+
+#if DEBUG
+            Section("Developer") {
+                NavigationLink {
+                    DeveloperModeView()
+                } label: {
+                    settingsLabel("Developer Mode", symbol: "wrench.and.screwdriver", tone: .neutral)
+                }
+            }
+            .accessibilityIdentifier("settings.developerMode")
+#endif
+
+            Section {
+                Button(role: .destructive) {
+                    showingLogoutAlert = true
+                } label: {
+                    Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+                Button(role: .destructive) {
+                    showingDeleteAccountSheet = true
+                } label: {
+                    Label("Delete Account…", systemImage: "person.crop.circle.badge.minus")
+                }
+            } footer: {
+                Text("Deleting your account removes your personal data. District records stay with the district.")
+            }
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .tmiScreenBackground()
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingDeleteAccountSheet) {
@@ -142,327 +180,27 @@ struct SettingsView: View {
         } message: {
             Text("Your account is still signed in. Check your connection and try again.")
         }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.5).delay(0.1)) {
-                isLoaded = true
-            }
-        }
     }
-    
+
     // MARK: - Role-Specific Sections
 
-    private var districtAdminSection: some View {
-        settingsSectionCard(title: "Administration", icon: "building.2") {
-            VStack(spacing: 0) {
-                if canManageStaff, let currentMembership {
-                    settingsRow(icon: "person.2.badge.gearshape", title: "Staff Management") {
-                        StaffAdministrationView(member: currentMembership)
-                    }
-                    .accessibilityIdentifier("settings.staffManagement")
-                }
-
-                if canReadAudit, let currentMembership {
-                    Divider().background(Color.white.opacity(0.1))
-                    settingsRow(icon: "doc.text.magnifyingglass", title: "Audit Log") {
-                        AuditLogView(member: currentMembership)
-                    }
-                    .accessibilityIdentifier("settings.auditLog")
-                }
-
-                if isDistrictAdmin {
-                    Divider().background(Color.white.opacity(0.1))
-                    settingsRow(icon: "checkmark.seal", title: "Compliance Settings") {
-                        if let currentMembership {
-                            ComplianceSettingsView(districtId: currentMembership.districtID)
-                        } else {
-                            ContentUnavailableView("Unavailable", systemImage: "lock", description: Text("No active district membership."))
-                        }
-                    }
-
-                    Divider().background(Color.white.opacity(0.1))
-
-                    settingsRow(icon: "person.text.rectangle", title: "Consent Management") {
-                        ConsentManagementView()
-                    }
-                }
-            }
-        }
-    }
-    
-    private var studentSettingsSection: some View {
-        settingsSectionCard(title: "My Settings", icon: "person.circle") {
-            VStack(spacing: 0) {
-                settingsRow(icon: "heart", title: "Interest Preferences") {
-                    // Interest preferences
-                }
-                
-                Divider().background(Color.white.opacity(0.1))
-                
-                settingsRow(icon: "lock.shield", title: "Privacy Settings") {
-                    // Privacy settings
-                }
-            }
-        }
-    }
-    
-    private var parentSettingsSection: some View {
-        settingsSectionCard(title: "Parent Settings", icon: "person.2") {
-            VStack(spacing: 0) {
-                settingsRow(icon: "bell", title: "Progress Notifications") {
-                    // Progress notification settings
-                }
-
-                Divider().background(Color.white.opacity(0.1))
-
-                settingsRow(icon: "doc.text", title: "Consent Management") {
-                    // Consent management
-                }
-            }
+    private func settingsLabel(_ title: String, symbol: String, tone: TMITone) -> some View {
+        HStack(spacing: TMISpacing.ms) {
+            TMIIconTile(symbol, tone: tone, size: 28)
+            Text(title)
+                .foregroundStyle(TMIColors.textPrimary)
         }
     }
 
-    private var formsSection: some View {
-        settingsSectionCard(title: "Forms & Meetings", icon: "doc.text.fill") {
-            VStack(spacing: 0) {
-                settingsRow(icon: "doc.on.doc", title: "Form Templates") {
-                    FormTemplateLibraryView()
-                }
-
-                Divider().background(Color.white.opacity(0.1))
-
-                settingsRow(icon: "list.bullet.rectangle", title: "Form Assignments") {
-                    StaffAssignmentListView()
-                }
-
-                Divider().background(Color.white.opacity(0.1))
-
-                settingsRow(icon: "calendar", title: "Meetings") {
-                    MeetingsHubView()
-                }
-            }
-        }
+    private var initials: String {
+        (authStateModel.currentUser?.displayName ?? "")
+            .split(whereSeparator: \.isWhitespace)
+            .prefix(2)
+            .compactMap(\.first)
+            .map(String.init)
+            .joined()
+            .uppercased()
     }
-
-
-#if DEBUG
-    /// DEBUG builds only. The console itself is authorized server-side.
-    private var developerSection: some View {
-        settingsSectionCard(title: "Developer", icon: "hammer") {
-            VStack(spacing: 0) {
-                settingsRow(icon: "wrench.and.screwdriver", title: "Developer Mode") {
-                    DeveloperModeView()
-                }
-            }
-        }
-        .accessibilityIdentifier("settings.developerMode")
-    }
-#endif
-
-    // MARK: - Helper Views
-    
-    private func settingsSectionCard<Content: View>(
-        title: String,
-        icon: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.tmiPrimary)
-                
-                Text(title)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(Color.tmiTextPrimary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            
-            content()
-                .background(Color.tmiSurface.opacity(0.5))
-                .cornerRadius(12)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-        }
-        .background(Color.tmiSurface)
-        .cornerRadius(16)
-    }
-    
-    private func settingsRow<Content: View>(
-        icon: String,
-        title: String,
-        @ViewBuilder destination: () -> Content
-    ) -> some View {
-        NavigationLink(destination: destination) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(.tmiTextSecondary)
-                    .frame(width: 24)
-                
-                Text(title)
-                    .font(.system(size: 15))
-                    .foregroundColor(Color.tmiTextPrimary)
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.tmiTextTertiary)
-            }
-            .padding(.vertical, 14)
-            .padding(.horizontal, 16)
-        }
-    }
-}
-
-// MARK: - Header View
-
-private var headerView: some View {
-    TMICard(style: .default) {
-        HStack(spacing: 16) {
-            // Profile Avatar
-            ZStack {
-                Circle()
-                    .fill(Color.tmiSecondary.opacity(0.2))
-                    .frame(width: 60, height: 60)
-                
-                if let user = Auth.auth().currentUser,
-                   let name = user.displayName,
-                   !name.isEmpty {
-                    Text(String(name.prefix(1).uppercased()))
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.tmiSecondary)
-                } else {
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(.tmiSecondary)
-                }
-            }
-            
-            // User Info
-            VStack(alignment: .leading, spacing: 4) {
-                if let user = Auth.auth().currentUser {
-                    Text(user.displayName ?? "TMI Educator")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color.tmiTextPrimary)
-                    
-                    Text(user.email ?? "Not available")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color.tmiTextSecondary)
-                }
-                
-                Text("TMI Professional")
-                    .font(.system(size: 12, weight: .medium))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(Color.tmiSecondary.opacity(0.2))
-                    )
-                    .foregroundColor(.tmiSecondary)
-            }
-            
-            Spacer()
-        }
-    }
-}
-
-// MARK: - Settings Sections
-
-extension SettingsView {
-    private var tmiSettingsSection: some View {
-        SettingsSection(title: "TMI Settings", icon: "brain.head.profile") {
-            SettingsToggleRow(
-                title: "Offline Mode",
-                subtitle: "Work without internet connection",
-                icon: "wifi.slash",
-                isOn: $offlineModeEnabled
-            )
-            
-            SettingsToggleRow(
-                title: "Auto Backup",
-                subtitle: "Automatically sync data to cloud",
-                icon: "cloud.fill",
-                isOn: $dataBackupEnabled
-            )
-            
-            SettingsRow(
-                title: "Default TMI Models",
-                subtitle: "Choose preferred intervention models",
-                icon: "slider.horizontal.3",
-                action: {
-                    // Navigate to model preferences
-                }
-            )
-        }
-    }
-
-    private var appPreferencesSection: some View {
-        SettingsSection(title: "App Preferences", icon: "gear") {
-            SettingsToggleRow(
-                title: "Enable Animations",
-                subtitle: "Show interface animations",
-                icon: "sparkles",
-                isOn: $showAnimations
-            )
-            
-            SettingsToggleRow(
-                title: "Push Notifications",
-                subtitle: "Receive important updates",
-                icon: "bell.fill",
-                isOn: $notificationsEnabled
-            )
-        }
-    }
-
-    private var dataManagementSection: some View {
-        SettingsSection(title: "Data Management", icon: "folder.fill") {
-            settingsRow(icon: "arrow.triangle.2.circlepath.icloud", title: "Sync") {
-                SyncStatusView()
-            }
-
-            SettingsRow(
-                title: "Clear Cache",
-                subtitle: "Free up storage space",
-                icon: "trash.fill",
-                action: {
-                    clearCache()
-                }
-            )
-        }
-    }
-
-
-    private var dangerousActionsSection: some View {
-        SettingsSection(title: "Account Actions", icon: "exclamationmark.triangle.fill") {
-            SettingsRow(
-                title: "Log Out",
-                subtitle: "Sign out of your account",
-                icon: "rectangle.portrait.and.arrow.right",
-                titleColor: .orange,
-                action: {
-                    showingLogoutAlert = true
-                }
-            )
-
-            Divider()
-                .background(Color.white.opacity(0.1))
-                .padding(.horizontal, 16)
-
-            SettingsRow(
-                title: "Delete Account",
-                subtitle: "Permanently delete your account and personal data",
-                icon: "person.crop.circle.badge.minus",
-                titleColor: .red,
-                action: {
-                    showingDeleteAccountSheet = true
-                }
-            )
-        }
-    }
-
-    // MARK: - Helper Functions
 
     @MainActor
     private func attemptSignOut() {
@@ -470,6 +208,8 @@ extension SettingsView {
             showingSignOutFailure = true
             return
         }
+        studentContext.clearContext()
+        router.reset()
     }
 }
 
@@ -525,11 +265,11 @@ struct SettingsSection<Content: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 16))
+                    .font(.body)
                     .foregroundColor(.tmiSecondary)
                 
                 Text(title)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundColor(Color.tmiTextPrimary)
             }
             .padding(.horizontal, 4)
@@ -554,7 +294,7 @@ struct SettingsRow: View {
         title: String,
         subtitle: String,
         icon: String,
-        titleColor: Color = .white,
+        titleColor: Color = TMIColors.textPrimary,
         action: @escaping () -> Void
     ) {
         self.title = title
@@ -570,30 +310,30 @@ struct SettingsRow: View {
         Button(action: action) {
             HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .font(.system(size: 18))
+                    .font(.title3)
                     .foregroundColor(.tmiSecondary)
                     .frame(width: 24)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.body.weight(.medium))
                         .foregroundColor(titleColor)
                     
                     Text(subtitle)
-                        .font(.system(size: 14))
+                        .font(.subheadline)
                         .foregroundColor(Color.tmiTextSecondary)
                 }
                 
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
+                    .font(.subheadline)
                     .foregroundColor(Color.tmiTextTertiary)
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
             .background(
-                Color.white.opacity(isPressed ? 0.1 : 0)
+                TMIColors.fill.opacity(isPressed ? 1 : 0)
             )
             .scaleEffect(isPressed ? 0.98 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: isPressed)
@@ -613,17 +353,17 @@ struct SettingsToggleRow: View {
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 18))
+                .font(.title3)
                 .foregroundColor(.tmiSecondary)
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundColor(Color.tmiTextPrimary)
                 
                 Text(subtitle)
-                    .font(.system(size: 14))
+                    .font(.subheadline)
                     .foregroundColor(Color.tmiTextSecondary)
             }
             

@@ -106,27 +106,9 @@ struct AllMeetingsView: View {
 
     private var searchAndFilterBar: some View {
         VStack(spacing: TMISpacing.sm) {
-            // Search
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.tmiTextSecondary)
-
-                TextField("Search meetings...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .foregroundColor(.tmiTextPrimary)
-
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.tmiTextTertiary)
-                    }
-                }
-            }
-            .padding(TMISpacing.md)
-            .background(Color.tmiSurface)
-            .cornerRadius(TMIRadius.sm)
-            .padding(.horizontal, TMISpacing.screenPadding)
-            .padding(.top, TMISpacing.md)
+            TMISearchBar(text: $searchText, placeholder: "Search meetings")
+                .padding(.horizontal, TMISpacing.screenPadding)
+                .padding(.top, TMISpacing.md)
 
             // Filters
             ScrollView(.horizontal, showsIndicators: false) {
@@ -185,7 +167,7 @@ struct AllMeetingsView: View {
                     // Count Badge
                     HStack(spacing: 4) {
                         Text("\(filteredAndSortedMeetings.count)")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.footnote.weight(.bold))
                         Text("meeting\(filteredAndSortedMeetings.count == 1 ? "" : "s")")
                             .font(.tmiCaption)
                     }
@@ -204,7 +186,7 @@ struct AllMeetingsView: View {
     private var emptyState: some View {
         VStack(spacing: TMISpacing.md) {
             Image(systemName: searchText.isEmpty ? "calendar.badge.exclamationmark" : "magnifyingglass")
-                .font(.system(size: 48))
+                .font(.largeTitle)
                 .foregroundColor(.tmiTextTertiary)
 
             Text(searchText.isEmpty ? "No Meetings" : "No Results")
@@ -264,6 +246,15 @@ struct MeetingListCard: View {
         meeting.endTime < Date()
     }
 
+    private var statusTone: TMITone {
+        switch meeting.status {
+        case .scheduled, .confirmed: .brand
+        case .completed: .success
+        case .cancelled: .neutral
+        case .rescheduled: .warning
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
             // Header
@@ -275,13 +266,13 @@ struct MeetingListCard: View {
                         .frame(width: 40, height: 40)
 
                     Image(systemName: meeting.meetingType.icon)
-                        .font(.system(size: 18))
+                        .font(.title3)
                         .foregroundColor(Color(hex: meeting.meetingType.color))
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(meeting.title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundColor(.tmiTextPrimary)
 
                     HStack(spacing: 8) {
@@ -301,23 +292,14 @@ struct MeetingListCard: View {
 
                 Spacer()
 
-                // Status Badge
-                Text(meeting.status.rawValue)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(statusColor)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(statusColor.opacity(0.2))
-                    )
+                TMIStatusBadge(meeting.status.rawValue, tone: statusTone)
             }
 
             // Time and Location
             HStack(spacing: TMISpacing.md) {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
-                        .font(.system(size: 11))
+                        .font(.caption2)
                     Text("\(formattedTime(meeting.startTime)) - \(formattedTime(meeting.endTime))")
                         .font(.tmiCaption)
                 }
@@ -326,7 +308,7 @@ struct MeetingListCard: View {
                 if let location = meeting.location {
                     HStack(spacing: 4) {
                         Image(systemName: "location")
-                            .font(.system(size: 11))
+                            .font(.caption2)
                         Text(location)
                             .font(.tmiCaption)
                             .lineLimit(1)
@@ -341,9 +323,9 @@ struct MeetingListCard: View {
                     ForEach(meeting.participants.prefix(3)) { participant in
                         HStack(spacing: 4) {
                             Image(systemName: participant.role.icon)
-                                .font(.system(size: 10))
+                                .font(.caption2)
                             Text(participant.name)
-                                .font(.system(size: 11))
+                                .font(.caption2)
                         }
                         .foregroundColor(.tmiTextPrimary)
                         .padding(.horizontal, 6)
@@ -354,15 +336,13 @@ struct MeetingListCard: View {
 
                     if meeting.participants.count > 3 {
                         Text("+\(meeting.participants.count - 3)")
-                            .font(.system(size: 11))
+                            .font(.caption2)
                             .foregroundColor(.tmiTextTertiary)
                     }
                 }
             }
         }
-        .padding(TMISpacing.md)
-        .background(Color.tmiSurface)
-        .cornerRadius(TMIRadius.md)
+        .tmiSurface(padding: TMISpacing.md)
         .opacity(isPastMeeting && meeting.status != .completed ? 0.6 : 1.0)
     }
 

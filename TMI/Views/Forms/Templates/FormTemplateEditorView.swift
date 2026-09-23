@@ -94,7 +94,7 @@ struct FormTemplateEditorView: View {
                   if field.isRequired {
                       Text("Required")
                           .font(.caption)
-                          .foregroundColor(.red)
+                          .foregroundStyle(TMIColors.errorText)
                   }
               }
             }
@@ -114,7 +114,7 @@ struct FormTemplateEditorView: View {
                     template.sections.remove(at: index)
                 } label: {
                     Image(systemName: "trash")
-                        .foregroundColor(.red)
+                        .foregroundStyle(TMIColors.errorText)
                 }
             }
           }

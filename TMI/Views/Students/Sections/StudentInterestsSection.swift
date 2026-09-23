@@ -35,8 +35,7 @@ struct StudentInterestsSection: View {
                         observationOperationID = UUID().uuidString
                         isRecordingObservation = true
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(TMIColors.teal)
+                    .buttonStyle(.tmiPrimary)
                     .accessibilityIdentifier("studentInterests.recordObservation")
                 }
             }
@@ -119,7 +118,9 @@ struct StudentInterestsSection: View {
                 await load()
             }
         }
-        .sheet(isPresented: $isCollectingFamilyInput) {
+        // Full screen, not a sheet: the family hand-off must not show the staff
+        // record behind it (on iPad a form sheet leaves it visible).
+        .fullScreenCover(isPresented: $isCollectingFamilyInput) {
             FamilyInputSheet(childName: studentName) { draft in
                 try await FirebaseFamilyInputRecorder().record(
                     draft,

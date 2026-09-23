@@ -588,6 +588,7 @@ struct DashboardView: View {
                         VStack(alignment: .leading, spacing: TMISpacing.lg) {
                             metrics(data, columns: 2)
                             caseload(data)
+                            workspace
                         }
                         .frame(width: 380)
                     }
@@ -596,6 +597,7 @@ struct DashboardView: View {
                     metrics(data, columns: 2)
                     activity(data)
                     caseload(data)
+                    workspace
                 }
             }
             .padding(.horizontal, TMISpacing.screenPadding)
@@ -824,6 +826,49 @@ struct DashboardView: View {
             }
         }
         .accessibilityIdentifier("dashboard.activity")
+    }
+
+    // MARK: Workspace
+
+    /// Forms, meetings and follow-ups used to hide four taps deep in Settings.
+    private var workspace: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.ms) {
+            TMISectionHeader("Workspace")
+            VStack(spacing: 0) {
+                workspaceRow("My Tasks", detail: "Follow-ups assigned to you", symbol: "checklist", tone: .info, route: .tasks)
+                TMIDivider().padding(.leading, 56)
+                workspaceRow("Form Assignments", detail: "Send forms and review responses", symbol: "list.bullet.rectangle", tone: .brand, route: .formAssignments)
+                TMIDivider().padding(.leading, 56)
+                workspaceRow("Meetings", detail: "Upcoming and past meetings", symbol: "calendar", tone: .success, route: .meetings)
+            }
+            .tmiSurface(padding: 0)
+        }
+        .accessibilityIdentifier("dashboard.workspace")
+    }
+
+    private func workspaceRow(_ title: String, detail: String, symbol: String, tone: TMITone, route: AppRoute) -> some View {
+        Button {
+            try? router.open(route)
+        } label: {
+            HStack(spacing: TMISpacing.ms) {
+                TMIIconTile(symbol, tone: tone)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(TMIColors.textPrimary)
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(TMIColors.textSecondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TMIColors.textTertiary)
+            }
+            .padding(.horizontal, TMISpacing.md)
+            .padding(.vertical, TMISpacing.ms)
+        }
+        .buttonStyle(.tmiPressable)
     }
 
     // MARK: Caseload
