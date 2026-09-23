@@ -731,21 +731,11 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
 struct DashboardView: View {
     @Environment(\.dashboardStateModel) var stateModel
     @Environment(\.authStateModel) private var authStateModel
-    @State private var districtViewModel = DistrictDashboardViewModel()
     @State private var selectedTimeFrame: TimeFrame = .week
     @State private var showingAllActivities = false
     @State private var navigateToStudents = false
     @State private var navigateToPlans = false
     @State private var navigateToSurveys = false
-
-    // Roles that should see district-level content appended to the dashboard
-    private var isDistrictAdminRole: Bool {
-        guard let membership = authStateModel.currentMembership else { return false }
-        return AuthorizationPolicy.canViewAggregate(
-          membership,
-          districtID: membership.districtID
-        )
-    }
 
     private var isTeacherRole: Bool {
         authStateModel.currentMembership?.role == .teacher
@@ -769,15 +759,9 @@ struct DashboardView: View {
         }
         .task {
             await stateModel.fetchWithMembership(authStateModel.currentMembership)
-            if isDistrictAdminRole {
-                await loadDistrictData()
-            }
         }
         .refreshable {
             await stateModel.fetchWithMembership(authStateModel.currentMembership)
-            if isDistrictAdminRole {
-                await loadDistrictData()
-            }
         }
         .navigationDestination(isPresented: $navigateToStudents) {
             StudentListView()
@@ -1048,84 +1032,6 @@ struct DashboardView: View {
                 .foregroundColor(.tmiTextSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    
-    // MARK: - District Data Loading
-
-    private func loadDistrictData() async {
-        if let membership = authStateModel.currentMembership,
-           AuthorizationPolicy.canViewAggregate(
-            membership,
-            districtID: membership.districtID
-           ) {
-            await districtViewModel.loadDashboard(districtId: membership.districtID)
-        }
-    }
-
-    // MARK: - District Overview Section (admin/superintendent roles)
-
-    @ViewBuilder
-    private var districtOverviewSection: some View {
-        VStack(alignment: .leading, spacing: TMISpacing.lg) {
-            // Section header
-            HStack {
-                Image(systemName: "building.columns.fill")
-                    .foregroundColor(.tmiPrimary)
-                Text("District Overview")
-                    .font(.tmiTitle3)
-                    .foregroundColor(.tmiTextPrimary)
-                Spacer()
-            }
-            .padding(.horizontal, TMISpacing.screenPadding)
-
-            if districtViewModel.isLoading {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .padding(.vertical, TMISpacing.xl)
-                    Spacer()
-                }
-            } else {
-                // KPI grid
-                VStack(spacing: TMISpacing.md) {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: TMISpacing.md) {
-                        DistrictKPICard(
-                            title: "Total Students",
-                            value: "\(districtViewModel.metrics.totalStudents)",
-                            icon: "person.3.fill",
-                            color: .blue
-                        )
-                        DistrictKPICard(
-                            title: "Engagement Rate",
-                            value: districtViewModel.metrics.engagementPercentage,
-                            icon: "chart.line.uptrend.xyaxis",
-                            color: .green
-                        )
-                        DistrictKPICard(
-                            title: "Active Plans",
-                            value: "\(districtViewModel.metrics.activePlansCount)",
-                            icon: "doc.text.fill",
-                            color: .orange
-                        )
-                        DistrictKPICard(
-                            title: "Needs Attention",
-                            value: "\(districtViewModel.metrics.flaggedStudentsCount)",
-                            icon: "exclamationmark.triangle.fill",
-                            color: districtViewModel.metrics.flaggedStudentsCount > 0 ? .red : .gray
-                        )
-                    }
-
-                    // Students needing attention list
-                    StudentsNeedingAttentionList(alerts: districtViewModel.studentsNeedingAttention)
-
-                    // AI-generated district insights
-                    DistrictInsightsSummary(insights: districtViewModel.insights)
-                }
-            }
-        }
-        .padding(.vertical, TMISpacing.md)
-        .background(Color(UIColor.secondarySystemBackground))
-        .cornerRadius(TMIRadius.lg)
     }
 }
 

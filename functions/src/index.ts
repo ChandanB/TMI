@@ -58,6 +58,7 @@ import { createRecordFamilyInputHandler } from "./familyInput.js";
 import { createFormHandlers } from "./forms.js";
 import { createCollaborationHandlers } from "./collaboration.js";
 import { createSearchHandlers } from "./search.js";
+import { createMetricsHandlers } from "./metrics.js";
 import {
   createAdministrationHandlers,
   requireCapabilityCeiling,
@@ -2052,6 +2053,9 @@ const transitionPlanHandler = async (
       const patch: DocumentData = { status: data.nextStatus, approvalStatus,
         recordVersion: version, updatedAt: stamp, updatedBy: identity.userID };
       if (data.nextStatus === "approved") Object.assign(patch, { approvedAt: stamp, approvedBy: identity.userID });
+      // Reporting measures time to approval and completion from these stamps.
+      if (data.nextStatus === "pendingApproval") patch.submittedForApprovalAt = stamp;
+      if (data.nextStatus === "completed") patch.completedAt = stamp;
       if (frozen) {
         const sequence = Math.max(0, ...(revisions?.docs.map(doc => Number(doc.get("sequence")) || 0) ?? [])) + 1;
         const revision: DocumentData = {
@@ -5735,4 +5739,20 @@ export const searchWorkspace = onCall(callableOptions, (request) =>
 );
 export const listColleagues = onCall(callableOptions, (request) =>
   searchHandlers().listColleagues(request),
+);
+
+const metricsHandlers = () =>
+  createMetricsHandlers({ firestore: () => getFirestore(), now: () => Date.now() });
+
+export const getMetricDictionary = onCall(callableOptions, () =>
+  metricsHandlers().getMetricDictionary(),
+);
+export const getDistrictReport = onCall({ ...callableOptions, timeoutSeconds: 120, memory: "512MiB" }, (request) =>
+  metricsHandlers().getDistrictReport(request),
+);
+export const exportDistrictReport = onCall({ ...callableOptions, timeoutSeconds: 120, memory: "512MiB" }, (request) =>
+  metricsHandlers().exportDistrictReport(request),
+);
+export const listStudentsNeedingAttention = onCall({ ...callableOptions, timeoutSeconds: 120 }, (request) =>
+  metricsHandlers().listStudentsNeedingAttention(request),
 );

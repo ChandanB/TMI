@@ -118,7 +118,7 @@ struct ProgramProfileTests {
     @Test("Tabs use program vocabulary")
     func tabs() {
         #expect(AppTab.students.title(for: .earlyChildhood) == "Children")
-        #expect(AppTab.district.title(for: .earlyChildhood) == "Organization")
+        #expect(AppTab.district.title(for: .earlyChildhood) == "Reports")
         #expect(AppTab.students.title(for: .k12) == "Students")
     }
 

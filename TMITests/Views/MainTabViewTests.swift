@@ -17,6 +17,12 @@ struct MainTabViewTests {
         #expect(tabs == [.dashboard, .students, .plans, .district])
     }
 
+    @Test("School admin sees reports for their own sites")
+    func schoolAdminTabs() {
+        #expect(AppNavigationPolicy(role: .schoolAdministrator).availableTabs == [.dashboard, .students, .plans, .district])
+        #expect(AppTab.district.title == "Reports")
+    }
+
     @Test("Nil or unsupported role falls back to dashboard only")
     func fallbackTabs() {
         #expect(AppNavigationPolicy(role: nil).availableTabs == [.dashboard])

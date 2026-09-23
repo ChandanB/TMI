@@ -27,11 +27,11 @@ struct TMIApp: App {
     @State private var dashboardStateModel: DashboardStateModel?
     @State private var interestsStateModel: InterestsAndHobbiesStateModel?
     @State private var meetingsStateModel: MeetingsStateModel?
-    @State private var districtStateModel: DistrictStateModel?
     @State private var recommendationsStateModel: RecommendationsStateModel?
     @State private var programContext: ProgramContextStore
 #if DEBUG
     @State private var collaborationFixture = InMemoryCollaborationRepository()
+    @State private var reportingFixture = InMemoryReportingRepository()
 #endif
 
     init() {
@@ -130,9 +130,6 @@ struct TMIApp: App {
         )
         _meetingsStateModel = State(
             initialValue: usesInMemoryDependencies ? nil : MeetingsStateModel()
-        )
-        _districtStateModel = State(
-            initialValue: usesInMemoryDependencies ? nil : DistrictStateModel()
         )
         _recommendationsStateModel = State(
             initialValue: usesInMemoryDependencies ? nil : RecommendationsStateModel()
@@ -251,6 +248,14 @@ struct TMIApp: App {
                 }
                 .navigationTitle("Meetings & Notes")
             }
+        case .districtReport:
+            NavigationStack {
+                DistrictReportView(
+                    repository: reportingFixture,
+                    memberOverride: MembershipContext(userID: "me", districtID: "district-fixture", schoolIDs: [], role: .districtAdministrator, capabilities: [.reportExport, .studentReadDetail], assignedStudentIDs: [], isActive: true, version: 1)
+                )
+            }
+            .environment(appRouter)
         case .studentForms:
             NavigationStack {
                 ScrollView {
@@ -339,7 +344,6 @@ struct TMIApp: App {
            let dashboardStateModel,
            let interestsStateModel,
            let meetingsStateModel,
-           let districtStateModel,
            let recommendationsStateModel {
             ContentView()
                 // Core state models
@@ -354,7 +358,6 @@ struct TMIApp: App {
                 .environment(\.dashboardStateModel, dashboardStateModel)
                 .environment(\.interestsStateModel, interestsStateModel)
                 .environment(\.meetingsStateModel, meetingsStateModel)
-                .environment(\.districtStateModel, districtStateModel)
                 .environment(\.recommendationsStateModel, recommendationsStateModel)
                 .environment(\.programContext, programContext)
                 .task(id: authStateModel.currentMembership) {
@@ -410,7 +413,6 @@ struct ContentView: View {
     @Environment(\.appDependencies) private var dependencies
     @Environment(\.authStateModel) var authStateModel
     @Environment(\.studentContext) var studentContext
-    @Environment(\.districtStateModel) var districtStateModel
     @Environment(AppRouter.self) private var appRouter
     
     @State private var hasBootstrapped = false
@@ -458,7 +460,6 @@ struct ContentView: View {
                 Task {
                     await MainActor.run {
                         studentContext.clearContext()
-                        districtStateModel.clearState()
                         appRouter.reset()
                         hasBootstrapped = false
                     }
@@ -515,15 +516,6 @@ struct ContentView: View {
         }
 
         hasBootstrapped = true
-        
-        // Load district context if applicable
-        if membership.role == .districtAdministrator,
-           AuthorizationPolicy.canViewAggregate(
-            membership,
-            districtID: membership.districtID
-           ) {
-            await districtStateModel.loadDistrict(id: membership.districtID)
-        }
         
         dependencies.logger.info(
             "bootstrap_completed",

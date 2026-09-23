@@ -13,16 +13,15 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Sendable {
         case .dashboard: "Dashboard"
         case .students: "Students"
         case .plans: "TMI Plans"
-        case .district: "District"
+        case .district: "Reports"
         }
     }
 
-    /// Program-appropriate tab title ("Children", "Organization").
+    /// Program-appropriate tab title ("Children" rather than "Students").
     func title(for terminology: Terminology) -> String {
         switch self {
         case .students: terminology.learners
-        case .district: terminology.organization
-        case .dashboard, .plans: title
+        case .dashboard, .plans, .district: title
         }
     }
 
@@ -31,7 +30,7 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Sendable {
         case .dashboard: "chart.bar.fill"
         case .students: "person.3.fill"
         case .plans: "doc.text.fill"
-        case .district: "building.2.fill"
+        case .district: "chart.bar.doc.horizontal"
         }
     }
 }
@@ -139,9 +138,9 @@ nonisolated struct AppNavigationPolicy: Equatable, Sendable {
 
     var availableTabs: [AppTab] {
         switch role {
-        case .districtAdministrator:
+        case .districtAdministrator, .schoolAdministrator:
             [.dashboard, .students, .plans, .district]
-        case .teacher, .counselor, .socialWorker, .schoolAdministrator:
+        case .teacher, .counselor, .socialWorker:
             [.dashboard, .students, .plans]
         case nil:
             [.dashboard]

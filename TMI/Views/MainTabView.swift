@@ -361,7 +361,7 @@ struct MainTabView: View {
         case .plans:
             CanonicalPlanListView()
         case .district:
-            DistrictDashboardView()
+            DistrictReportView()
         }
     }
 
