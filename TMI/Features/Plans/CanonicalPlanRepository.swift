@@ -46,7 +46,7 @@ final class CanonicalPlanRepository: PlanRecordRepository {
 
     init(
         firestore: Firestore,
-        currentUserID: @escaping @Sendable () -> String? = { Auth.auth().currentUser?.uid },
+        currentUserID: @escaping @Sendable () -> String? = { FirebaseSession.currentUserID() },
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.transport = FirebaseCanonicalPlanTransport(firestore: firestore)

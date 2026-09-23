@@ -28,7 +28,6 @@ struct StudentRosterUITestingContent: View {
         }
         .environment(router)
         .tint(TMIColors.teal)
-        .preferredColorScheme(.light)
     }
 
     fileprivate static let fixtureMember = MembershipContext(

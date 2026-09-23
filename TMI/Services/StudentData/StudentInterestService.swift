@@ -1,4 +1,5 @@
 import FirebaseAuth
+import FirebaseCore
 import FirebaseFirestore
 import FirebaseFunctions
 import Foundation
@@ -40,14 +41,17 @@ nonisolated protocol InterestApprovalBackend: Sendable {
 }
 
 nonisolated struct FirebaseInterestApprovalBackend: InterestApprovalBackend {
-    private let functions: Functions
+    // Resolved on first call, not at construction: `Functions.functions()`
+    // traps when no FirebaseApp is configured (UI-test fixtures and previews
+    // construct `StudentInterestService.shared` without ever approving).
+    private let makeFunctions: @Sendable () -> Functions
 
-    init(functions: Functions = .functions(region: "us-central1")) {
-        self.functions = functions
+    init(functions: @autoclosure @escaping @Sendable () -> Functions = .functions(region: "us-central1")) {
+        self.makeFunctions = functions
     }
 
     func approve(_ request: InterestApprovalRequest) async throws -> Int {
-        let result = try await functions.httpsCallable("approveSurveyInterests").call([
+        let result = try await makeFunctions().httpsCallable("approveSurveyInterests").call([
             "districtID": request.districtID,
             "studentID": request.studentID,
             "responseID": request.responseID,
@@ -123,11 +127,17 @@ final class StudentInterestService {
         self.approvalBackend = approvalBackend
     }
 
+    /// `Auth.auth()` traps when no FirebaseApp is configured (UI-test fixtures,
+    /// previews), so check for an app before asking for the current user.
+    private static var hasSignedInUser: Bool {
+        FirebaseApp.app() != nil && Auth.auth().currentUser != nil
+    }
+
     func getStudentInterests(districtID: String, studentID: String) async throws -> [StudentInterest] {
         guard !districtID.isEmpty, !studentID.isEmpty else {
             throw StudentInterestError.invalidStudentId
         }
-        guard Auth.auth().currentUser != nil else {
+        guard Self.hasSignedInUser else {
             throw StudentInterestError.userNotAuthenticated
         }
         do {
@@ -160,7 +170,7 @@ final class StudentInterestService {
         guard !districtID.isEmpty, !studentID.isEmpty else {
             throw StudentInterestError.invalidStudentId
         }
-        guard Auth.auth().currentUser != nil else {
+        guard Self.hasSignedInUser else {
             throw StudentInterestError.userNotAuthenticated
         }
         do {

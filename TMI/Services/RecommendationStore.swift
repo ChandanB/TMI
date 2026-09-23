@@ -31,7 +31,10 @@ nonisolated protocol RecommendationStore: Sendable {
 
 /// Firestore-backed implementation of `RecommendationStore`.
 nonisolated final class FirebaseRecommendationStore: RecommendationStore, Sendable {
-    private let db = Firestore.firestore()
+    // Resolved per call, not at construction: `Firestore.firestore()` throws
+    // when no FirebaseApp is configured (UI-test fixtures and previews build
+    // `RecommendationsService.shared` without ever querying).
+    private var db: Firestore { Firestore.firestore() }
 
     func documents(
         atCollectionPath path: String,

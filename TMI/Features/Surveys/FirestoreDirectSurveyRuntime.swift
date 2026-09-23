@@ -19,7 +19,7 @@ nonisolated struct FirestoreDirectSurveyRuntime: Sendable {
 
     init(
         firestore: Firestore,
-        currentUserID: @escaping @Sendable () -> String? = { Auth.auth().currentUser?.uid },
+        currentUserID: @escaping @Sendable () -> String? = { FirebaseSession.currentUserID() },
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.firestore = firestore

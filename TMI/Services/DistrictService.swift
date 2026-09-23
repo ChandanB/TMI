@@ -15,7 +15,8 @@ import Observation
 class DistrictService {
   static let shared = DistrictService()
   
-  private let db = Firestore.firestore()
+  // Resolved on use: `Firestore.firestore()` throws without a configured FirebaseApp.
+  private var db: Firestore { Firestore.firestore() }
   
   private init() {}
 

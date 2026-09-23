@@ -19,7 +19,7 @@ nonisolated final class MeetingService: Sendable {
     init(
         store: MeetingStore = FirebaseMeetingStore(),
         authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared,
-        currentUserID: @escaping @Sendable () -> String? = { Auth.auth().currentUser?.uid }
+        currentUserID: @escaping @Sendable () -> String? = { FirebaseSession.currentUserID() }
     ) {
         self.store = store
         self.authorizationSessions = authorizationSessions

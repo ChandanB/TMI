@@ -13,7 +13,8 @@ import Observation
 /// Service for managing public and tenant-scoped form templates.
 @Observable
 class FormTemplateService {
-  private let db = Firestore.firestore()
+  // Resolved on use: `Firestore.firestore()` throws without a configured FirebaseApp.
+  private var db: Firestore { Firestore.firestore() }
   private let authorizationSessions: any AuthorizationSessionProviding
   private let authorization = RBACService()
 

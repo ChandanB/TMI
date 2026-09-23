@@ -47,74 +47,90 @@ nonisolated extension Color {
 
 // MARK: - Elevation & Shadows
 
+/// One elevation per role. In dark mode shadows all but vanish, so edges come
+/// from `TMIColors.separator` hairlines instead (see `tmiSurface`).
 enum TMIElevation {
+    /// Flush with the canvas; separated by hairlines only.
     case flat
+    /// Cards and rows that sit on the canvas.
     case raised
+    /// Popovers, menus and hovered cards.
     case elevated
+    /// Floating controls and sheets.
     case floating
 
     var shadowColor: Color {
-        TMIColors.textPrimary
+        Color(light: 0x1C1917, dark: 0x000000)
     }
 
     var shadowRadius: CGFloat {
         switch self {
-        case .flat: return 0
-        case .raised: return 4
-        case .elevated: return 10
-        case .floating: return 20
+        case .flat: 0
+        case .raised: 3
+        case .elevated: 14
+        case .floating: 28
         }
     }
 
     var shadowOpacity: Double {
         switch self {
-        case .flat: return 0
-        case .raised: return 0.10
-        case .elevated: return 0.12
-        case .floating: return 0.14
+        case .flat: 0
+        case .raised: 0.05
+        case .elevated: 0.09
+        case .floating: 0.16
         }
     }
 
     var shadowOffset: CGSize {
         switch self {
-        case .flat: return .zero
-        case .raised: return CGSize(width: 0, height: 2)
-        case .elevated: return CGSize(width: 0, height: 4)
-        case .floating: return CGSize(width: 0, height: 8)
+        case .flat: .zero
+        case .raised: CGSize(width: 0, height: 1)
+        case .elevated: CGSize(width: 0, height: 6)
+        case .floating: CGSize(width: 0, height: 12)
         }
     }
 
-    /// Secondary shadow for layered depth effect
+    /// Contact shadow under the main one for crisp edges.
     var secondaryShadowRadius: CGFloat {
         switch self {
-        case .flat: return 0
-        case .raised: return 2
-        case .elevated: return 4
-        case .floating: return 8
+        case .flat: 0
+        case .raised: 1
+        case .elevated: 2
+        case .floating: 4
         }
     }
 
     var secondaryShadowOpacity: Double {
         switch self {
-        case .flat: return 0
-        case .raised: return 0.06
-        case .elevated: return 0.08
-        case .floating: return 0.10
+        case .flat: 0
+        case .raised: 0.04
+        case .elevated: 0.05
+        case .floating: 0.08
         }
     }
 }
 
-// MARK: - Typography (Additional)
-// Note: Most typography is defined in FontConstants.swift
-// These are additional specific use cases for the redesign
+// MARK: - Typography (roles beyond the base ramp)
 
 extension Font {
-    // Additional specialized fonts
-    static let tmiButton = Font.system(size: 16, weight: .semibold)
-    static let tmiNavTitle = Font.system(size: 20, weight: .bold)
-}
+    /// Button labels.
+    static let tmiButton = Font.body.weight(.semibold)
+    /// Inline navigation titles.
+    static let tmiNavTitle = Font.title3.weight(.bold)
 
-// Note: TMIAnimation already exists - see TMI/Helpers/TMIAnimation.swift
+    /// New York serif for greetings, people's names and record titles.
+    /// Use sparingly: one editorial moment per screen.
+    static func tmiEditorial(_ style: Font.TextStyle = .largeTitle) -> Font {
+        .system(style, design: .serif, weight: .semibold)
+    }
+
+    /// Key figures in metric tiles. Tabular digits so values don't jitter.
+    static let tmiMetric = Font.system(.title, design: .default, weight: .semibold).monospacedDigit()
+    /// Hero figures (report headline numbers).
+    static let tmiMetricLarge = Font.system(.largeTitle, design: .default, weight: .semibold).monospacedDigit()
+    /// Small uppercase labels above titles (apply `.tmiEyebrow()` for tracking).
+    static let tmiEyebrow = Font.caption.weight(.semibold)
+}
 
 // MARK: - Sizing Constants
 
@@ -127,11 +143,22 @@ enum TMISizing {
     static let avatarMd: CGFloat = 56
     static let avatarLg: CGFloat = 80
 
-    static let buttonHeight: CGFloat = 48
-    static let textFieldHeight: CGFloat = 48
-    static let listRowHeight: CGFloat = 64
+#if os(macOS)
+    /// Regular-size Mac controls are compact; pointers are precise.
+    static let buttonHeight: CGFloat = 32
+    static let textFieldHeight: CGFloat = 30
+    static let listRowHeight: CGFloat = 44
+#else
+    static let buttonHeight: CGFloat = 50
+    static let textFieldHeight: CGFloat = 50
+    static let listRowHeight: CGFloat = 60
+#endif
     static let tabBarHeight: CGFloat = 72
 
     static let fabSize: CGFloat = 56
     static let minTouchTarget: CGFloat = 44
+    /// Readable content width for forms and long text on wide windows.
+    static let readableWidth: CGFloat = 720
+    /// Maximum width for composed dashboards before margins grow instead.
+    static let maxContentWidth: CGFloat = 1180
 }

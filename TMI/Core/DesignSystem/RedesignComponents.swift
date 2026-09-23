@@ -2,8 +2,7 @@
 //  RedesignComponents.swift
 //  TMI
 //
-//  Lightweight components for redesigned views
-//  These wrap or extend existing components for the new design
+//  Shared Golden Hour building blocks used across screens.
 //
 
 import SwiftUI
@@ -30,30 +29,30 @@ struct TMIListRow<Leading: View, Trailing: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: TMISpacing.medium) {
+        HStack(spacing: TMISpacing.ms) {
             leading
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.tmiBody)
-                    .foregroundColor(.tmiTextPrimary)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(TMIColors.textPrimary)
 
-                if let subtitle = subtitle {
+                if let subtitle {
                     Text(subtitle)
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextSecondary)
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: TMISpacing.sm)
 
             trailing
         }
-        .padding(.horizontal, TMISpacing.medium)
-        .padding(.vertical, TMISpacing.sm)
+        .padding(.horizontal, TMISpacing.md)
+        .padding(.vertical, TMISpacing.ms)
         .frame(minHeight: TMISizing.listRowHeight)
-        .background(Color.tmiSurface)
-        .cornerRadius(TMIRadius.md)
+        .background(TMIColors.surface, in: TMIShape.control)
+        .contentShape(TMIShape.control)
     }
 }
 
@@ -70,17 +69,17 @@ struct TMIStatChip: View {
 
         var icon: String {
             switch self {
-            case .up: return "arrow.up.right"
-            case .down: return "arrow.down.right"
-            case .neutral: return "minus"
+            case .up: "arrow.up.right"
+            case .down: "arrow.down.right"
+            case .neutral: "minus"
             }
         }
 
-        var color: Color {
+        var tone: TMITone {
             switch self {
-            case .up: return .tmiSuccess
-            case .down: return .tmiError
-            case .neutral: return .tmiTextSecondary
+            case .up: .success
+            case .down: .danger
+            case .neutral: .neutral
             }
         }
     }
@@ -89,7 +88,7 @@ struct TMIStatChip: View {
         value: String,
         label: String,
         trend: Trend? = nil,
-        color: Color = .tmiPrimary
+        color: Color = TMIColors.textPrimary
     ) {
         self.value = value
         self.label = label
@@ -99,31 +98,33 @@ struct TMIStatChip: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
-                    .font(.tmiTitle3)
-                    .foregroundColor(color)
+                    .font(.title2.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(color)
+                    .contentTransition(.numericText())
 
-                if let trend = trend {
+                if let trend {
                     Image(systemName: trend.icon)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(trend.color)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(trend.tone.text)
                 }
             }
 
             Text(label)
-                .font(.tmiCaption)
-                .foregroundColor(.tmiTextSecondary)
+                .font(.caption)
+                .foregroundStyle(TMIColors.textSecondary)
         }
-        .padding(TMISpacing.medium)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.tmiSurface)
-        .cornerRadius(TMIRadius.small)
+        .tmiSurface(.raised, padding: TMISpacing.ms + 2, radius: TMIRadius.control + 2)
+        .accessibilityElement(children: .combine)
     }
 }
 
-// MARK: - Empty State (Wrapper around existing)
+// MARK: - Empty State
 
+/// Calm, composed empty/error state: a soft amber disc with a symbol, a
+/// title, one sentence, and at most one action.
 struct TMIEmptyState: View {
     let icon: String
     let title: String
@@ -131,38 +132,46 @@ struct TMIEmptyState: View {
     var action: (() -> Void)?
     var actionLabel: String?
 
-    var body: some View {
-        VStack(spacing: TMISpacing.large) {
-            Image(systemName: icon)
-                .font(.system(size: 48, weight: .light))
-                .foregroundColor(.tmiTextTertiary)
+    @ScaledMetric(relativeTo: .largeTitle) private var disc: CGFloat = 84
 
-            VStack(spacing: TMISpacing.small) {
+    var body: some View {
+        VStack(spacing: TMISpacing.ml) {
+            Image(systemName: icon)
+                .font(.system(size: disc * 0.4, weight: .regular))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(TMIColors.accent)
+                .frame(width: disc, height: disc)
+                .background(TMIColors.accentSoft, in: Circle())
+                .accessibilityHidden(true)
+
+            VStack(spacing: TMISpacing.sm) {
                 Text(title)
-                    .font(.tmiTitle3)
-                    .foregroundColor(.tmiTextPrimary)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(TMIColors.textPrimary)
+                    .multilineTextAlignment(.center)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text(message)
-                    .font(.tmiBody)
-                    .foregroundColor(.tmiTextSecondary)
+                    .font(.body)
+                    .foregroundStyle(TMIColors.textSecondary)
                     .multilineTextAlignment(.center)
+                    .frame(maxWidth: 380)
             }
 
-            if let action = action, let actionLabel = actionLabel {
-                TMIButton(
-                    text: actionLabel,
-                    style: .primary,
-                    action: action
-                )
+            if let action, let actionLabel {
+                Button(actionLabel, action: action)
+                    .buttonStyle(.tmiPrimary)
             }
         }
-        .padding(TMISpacing.extraLarge)
+        .padding(TMISpacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-// MARK: - Search Bar (Simplified wrapper)
+// MARK: - Search Bar
 
+/// Inline search field. Prefer `.searchable` on navigation containers; use
+/// this only inside sheets or panes that have no search placement.
 struct TMISearchBar: View {
     @Binding var text: String
     var placeholder: String
@@ -176,27 +185,30 @@ struct TMISearchBar: View {
     }
 
     var body: some View {
-        HStack(spacing: TMISpacing.small) {
+        HStack(spacing: TMISpacing.sm) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 16))
-                .foregroundColor(.tmiTextSecondary)
+                .foregroundStyle(TMIColors.textTertiary)
+                .accessibilityHidden(true)
 
-            TextField("", text: $text, prompt: Text(placeholder).foregroundColor(.tmiTextTertiary))
-                .font(.tmiBody)
-                .foregroundColor(.tmiTextPrimary)
+            TextField(placeholder, text: $text, prompt: Text(placeholder).foregroundStyle(TMIColors.textTertiary))
+                .font(.body)
+                .foregroundStyle(TMIColors.textPrimary)
+                .autocorrectionDisabled()
 
             if !text.isEmpty {
-                Button(action: { text = "" }) {
+                Button {
+                    text = ""
+                } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.tmiTextTertiary)
+                        .foregroundStyle(TMIColors.textTertiary)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, TMISpacing.medium)
-        .frame(height: TMISizing.minTouchTarget)
-        .background(Color.tmiSurface)
-        .cornerRadius(TMIRadius.small)
+        .padding(.horizontal, TMISpacing.ms)
+        .frame(minHeight: TMISizing.minTouchTarget - 6)
+        .background(TMIColors.fill, in: Capsule())
     }
 }
 
@@ -209,63 +221,58 @@ struct TMIFilterChip: View {
 
     var body: some View {
         Button(action: action) {
-            Text(label)
-                .font(.tmiCaption)
-                .foregroundColor(isSelected ? .white : .tmiTextPrimary)
-                .padding(.horizontal, TMISpacing.medium)
-                .padding(.vertical, TMISpacing.small)
-                .background(isSelected ? Color.tmiSecondary : Color.tmiSurface)
-                .cornerRadius(TMIRadius.pill)
-                .overlay(
-                    !isSelected ?
-                    RoundedRectangle(cornerRadius: TMIRadius.pill)
-                        .stroke(Color.tmiBorder, lineWidth: 1) : nil
-                )
+            HStack(spacing: 5) {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.bold))
+                        .transition(.scale.combined(with: .opacity))
+                }
+                Text(label)
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(isSelected ? TMIColors.accent : TMIColors.textPrimary)
+            .padding(.horizontal, TMISpacing.ms)
+            .padding(.vertical, 7)
+            .background(isSelected ? TMIColors.accentSoft : TMIColors.fill, in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(isSelected ? TMIColors.accent.opacity(0.35) : Color.clear, lineWidth: 1)
+            }
+            .padding(.vertical, 4)
+            .contentShape(Capsule())
+            .animation(TMIAnimation.snappy, value: isSelected)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .sensoryFeedback(.selection, trigger: isSelected)
     }
 }
 
 // MARK: - FAB
 
+/// Floating action on Liquid Glass tinted with the brand amber.
 struct TMIFAB: View {
     let icon: String
     var label: String?
     let action: () -> Void
 
-    @State private var isPressed = false
-
     var body: some View {
         Button(action: action) {
-            HStack(spacing: TMISpacing.small) {
+            HStack(spacing: TMISpacing.sm) {
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.title3.weight(.semibold))
 
-                if let label = label {
+                if let label {
                     Text(label)
                         .font(.tmiButton)
                 }
             }
-            .foregroundColor(Color.tmiTextOnPrimary)
-            .padding(.horizontal, label != nil ? TMISpacing.large : 0)
-            .frame(width: label != nil ? nil : TMISizing.fabSize, height: TMISizing.fabSize)
-            .background(Color.tmiPrimary)
-            .cornerRadius(TMIRadius.pill)
-            .shadow(
-                color: .black.opacity(TMIElevation.floating.shadowOpacity),
-                radius: TMIElevation.floating.shadowRadius,
-                x: 0,
-                y: TMIElevation.floating.shadowOffset.height
-            )
-            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .foregroundStyle(TMIColors.onBrand)
+            .padding(.horizontal, label != nil ? TMISpacing.ml : 0)
+            .frame(minWidth: TMISizing.fabSize, minHeight: TMISizing.fabSize)
+            .glassEffect(.regular.tint(TMIColors.brand).interactive(), in: Capsule())
         }
         .buttonStyle(.plain)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
-        .animation(TMIAnimation.springInteractive, value: isPressed)
+        .accessibilityLabel(label ?? "Add")
     }
 }
 
@@ -274,53 +281,56 @@ struct TMIFAB: View {
 struct TMIAvatar: View {
     let initials: String
     var photoURL: String?
-    var color: Color
+    /// Explicit tint. When left at the default, a stable per-person color is used.
+    var color: Color?
     var size: CGFloat
 
     init(
         initials: String,
         photoURL: String? = nil,
-        color: Color = .tmiPrimary,
+        color: Color? = nil,
         size: CGFloat = TMISizing.avatarSm
     ) {
         self.initials = initials
         self.photoURL = photoURL
-        self.color = color
+        // The legacy default passed the brand color everywhere; treat it as "auto".
+        self.color = color == Color.tmiPrimary ? nil : color
         self.size = size
+    }
+
+    private var colors: TMIAvatarColors {
+        if let color {
+            return TMIAvatarColors(background: color.opacity(0.16), foreground: color)
+        }
+        return TMIAvatarColors.forKey(initials)
     }
 
     var body: some View {
         Group {
             if let photoURLString = photoURL, let url = URL(string: photoURLString) {
-                // Use async image loading with SDWebImage
                 WebImage(url: url) { image in
                     image
                         .resizable()
                         .scaledToFill()
                 } placeholder: {
-                    ZStack {
-                        Circle()
-                            .fill(color.opacity(0.2))
-                        ProgressView()
-                            .tint(color)
-                    }
+                    initialsView
                 }
                 .transition(.opacity.animation(.easeInOut(duration: 0.3)))
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-            } else {
-                // Show initials fallback
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.2))
-
-                    Text(initials)
-                        .font(.system(size: size * 0.4, weight: .semibold))
-                        .foregroundColor(color)
-                }
                 .frame(width: size, height: size)
+                .clipShape(Circle())
+            } else {
+                initialsView
             }
         }
+        .accessibilityHidden(true)
+    }
+
+    private var initialsView: some View {
+        Text(initials.uppercased())
+            .font(.system(size: size * 0.38, weight: .semibold, design: .rounded))
+            .foregroundStyle(colors.foreground)
+            .frame(width: size, height: size)
+            .background(colors.background, in: Circle())
     }
 }
 
@@ -336,7 +346,7 @@ struct TMIProgressCircle: View {
         progress: Double,
         size: CGFloat = 40,
         lineWidth: CGFloat = 4,
-        color: Color = .tmiPrimary
+        color: Color = TMIColors.chartPrimary
     ) {
         self.progress = progress
         self.size = size
@@ -347,27 +357,32 @@ struct TMIProgressCircle: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.tmiBorder, lineWidth: lineWidth)
+                .stroke(TMIColors.chartTrack, lineWidth: lineWidth)
 
             Circle()
-                .trim(from: 0, to: progress)
+                .trim(from: 0, to: min(max(progress, 0), 1))
                 .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
+                .animation(TMIAnimation.smooth, value: progress)
 
-            Text("\(Int(progress * 100))%")
-                .font(.system(size: size * 0.25, weight: .semibold))
-                .foregroundColor(.tmiTextPrimary)
+            Text("\(Int((progress * 100).rounded()))%")
+                .font(.system(size: size * 0.25, weight: .semibold).monospacedDigit())
+                .foregroundStyle(TMIColors.textPrimary)
         }
         .frame(width: size, height: size)
+        .accessibilityElement()
+        .accessibilityValue("\(Int((progress * 100).rounded())) percent")
     }
 }
 
 // MARK: - Divider
 
 struct TMIDivider: View {
+    @Environment(\.displayScale) private var displayScale
+
     var body: some View {
         Rectangle()
-            .fill(Color.tmiDivider)
-            .frame(height: 1)
+            .fill(TMIColors.separator)
+            .frame(height: 1 / max(displayScale, 1))
     }
 }

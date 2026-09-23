@@ -13,7 +13,8 @@ import Observation
 /// Service for managing form assignments to authorized student cohorts.
 @Observable
 class FormAssignmentService {
-  private let db = Firestore.firestore()
+  // Resolved on use: `Firestore.firestore()` throws without a configured FirebaseApp.
+  private var db: Firestore { Firestore.firestore() }
   private let authorizationSessions: any AuthorizationSessionProviding
   private let authorization = RBACService()
   private let studentRepository: any StudentRepository

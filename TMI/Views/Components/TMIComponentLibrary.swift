@@ -87,87 +87,39 @@ struct TMIBackgroundView: View {
 // MARK: - Card Style
 
 enum TMICardStyle {
+    /// Surface fill, hairline edge, faint shadow.
     case `default`
+    /// Lifted: popovers, featured cards.
     case elevated
+    /// Transparent with an outline, for secondary groupings.
     case outlined
 
-    var cornerRadius: CGFloat {
-        switch self {
-        case .default, .outlined: return 12
-        case .elevated: return 16
-        }
-    }
+    var cornerRadius: CGFloat { TMIRadius.card }
 
     var padding: CGFloat {
         switch self {
-        case .default, .outlined: return 20
-        case .elevated: return 24
+        case .default, .outlined: TMISpacing.cardPadding
+        case .elevated: TMISpacing.ml
         }
     }
 
-    var hasBorder: Bool {
+    var elevation: TMIElevation {
         switch self {
-        case .default, .outlined: return true
-        case .elevated: return true
-        }
-    }
-
-    var borderColor: Color {
-        switch self {
-        case .default, .elevated: return Color.tmiBorderStrong
-        case .outlined: return Color.tmiBorderStrong
+        case .default: .raised
+        case .elevated: .elevated
+        case .outlined: .flat
         }
     }
 
     var background: Color {
         switch self {
-        case .default, .elevated: return Color.tmiSurface
-        case .outlined: return .clear
-        }
-    }
-
-    var shadowRadius: CGFloat {
-        switch self {
-        case .default: return 4
-        case .elevated: return 10
-        case .outlined: return 0
-        }
-    }
-
-    var shadowOpacity: Double {
-        switch self {
-        case .default: return 0.10
-        case .elevated: return 0.12
-        case .outlined: return 0
-        }
-    }
-
-    var shadowOffset: CGFloat {
-        switch self {
-        case .default: return 2
-        case .elevated: return 4
-        case .outlined: return 0
-        }
-    }
-
-    var secondaryShadowRadius: CGFloat {
-        switch self {
-        case .default: return 2
-        case .elevated: return 4
-        case .outlined: return 0
-        }
-    }
-
-    var secondaryShadowOpacity: Double {
-        switch self {
-        case .default: return 0.06
-        case .elevated: return 0.08
-        case .outlined: return 0
+        case .default, .elevated: TMIColors.surface
+        case .outlined: .clear
         }
     }
 }
 
-/// Unified solid card component
+/// Unified card component (Golden Hour surface).
 struct TMICard<Content: View>: View {
     let style: TMICardStyle
     let accentColor: Color?
@@ -181,83 +133,46 @@ struct TMICard<Content: View>: View {
 
     var body: some View {
         content
-            .padding(style.padding)
-            .background(style.background)
-            .clipShape(RoundedRectangle(cornerRadius: style.cornerRadius))
-            .overlay(
-                style.hasBorder
-                    ? RoundedRectangle(cornerRadius: style.cornerRadius)
-                        .stroke(style.borderColor, lineWidth: 1)
-                    : nil
-            )
-            .overlay(alignment: .leading) {
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                // An accent gives the card a faint wash rather than a side rail.
                 if let accentColor {
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: style.cornerRadius,
-                        bottomLeadingRadius: style.cornerRadius,
-                        bottomTrailingRadius: 0,
-                        topTrailingRadius: 0
-                    )
-                    .fill(accentColor)
-                    .frame(width: 3)
+                    RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous)
+                        .fill(accentColor.opacity(0.06))
+                        .padding(-style.padding)
                 }
             }
-            .shadow(
-                color: TMIColors.textPrimary.opacity(style.secondaryShadowOpacity),
-                radius: style.secondaryShadowRadius,
-                x: 0,
-                y: 1
-            )
-            .shadow(
-                color: TMIColors.textPrimary.opacity(style.shadowOpacity),
-                radius: style.shadowRadius,
-                x: 0,
-                y: style.shadowOffset
-            )
+            .tmiSurface(style.elevation, padding: style.padding, fill: style.background, radius: style.cornerRadius)
     }
 }
 
 // MARK: - Logo View
 
 struct TMILogoView: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .largeTitle) private var markSize: CGFloat = 72
 
     var body: some View {
-        VStack(spacing: 5) {
-            Image(systemName: "building.columns")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 70, height: 70)
-                .foregroundColor(Color.tmiPrimary)
-                .padding(.bottom, 10)
+        VStack(spacing: TMISpacing.ms) {
+            TMISchoolhouseMark(size: markSize, onTile: true)
+                .shadow(color: .black.opacity(0.18), radius: 14, y: 8)
 
-            Text("TMI")
-                .font(
-                    .system(
-                        size: 36 * dynamicTypeSize.tmiFontScale,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .foregroundColor(Color.tmiTextPrimary)
-                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
-
-            Text("TANGIBLE MODIFICATION INTERVENTION")
-                .font(
-                    .system(
-                        size: 12 * dynamicTypeSize.tmiFontScale,
-                        weight: .semibold
-                    )
-                )
-                .foregroundColor(Color.tmiTextBrand)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 4) {
+                Text("TMI")
+                    .font(.tmiEditorial(.largeTitle))
+                    .foregroundStyle(TMIColors.textPrimary)
+                Text("Tangible Modification Intervention")
+                    .tmiEyebrow(TMIColors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("TMI, Tangible Modification Intervention")
     }
 }
 
 // MARK: - Button Components
 
-/// Unified button component with multiple styles
+/// Unified button component. Prefer `Button` + `.buttonStyle(.tmiPrimary)` in new code.
 struct TMIButton: View {
     let text: String
     let icon: String?
@@ -266,9 +181,7 @@ struct TMIButton: View {
     let isDisabled: Bool
     let action: () -> Void
 
-    @State private var isPressed = false
-    @State private var isHovered = false
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var tapCount = 0
 
     enum TMIButtonStyle: Equatable {
         case primary
@@ -279,84 +192,35 @@ struct TMIButton: View {
         case filter(isSelected: Bool = false)
         case icon
 
-        static func == (lhs: TMIButtonStyle, rhs: TMIButtonStyle) -> Bool {
-            switch (lhs, rhs) {
-            case (.primary, .primary),
-                (.secondary, .secondary),
-                (.tertiary, .tertiary),
-                (.destructive, .destructive),
-                (.floating, .floating),
-                (.icon, .icon):
-                return true
-            case (.filter(let lhsSelected), .filter(let rhsSelected)):
-                return lhsSelected == rhsSelected
-            default:
-                return false
+        var prominence: TMIButtonProminence {
+            switch self {
+            case .primary, .floating: .primary
+            case .secondary, .icon: .secondary
+            case .tertiary: .tertiary
+            case .destructive: .destructive
+            case .filter(let isSelected): isSelected ? .primary : .secondary
             }
+        }
+
+        /// iPhone stretches primary actions to the thumb-friendly full width;
+        /// the Mac keeps intrinsic-width buttons like native controls.
+        var fillsWidth: Bool {
+#if os(macOS)
+            false
+#else
+            switch self {
+            case .primary, .secondary, .destructive: true
+            case .tertiary, .floating, .filter, .icon: false
+            }
+#endif
         }
 
         var foregroundColor: Color {
-            switch self {
-            case .primary, .destructive, .floating: return .white
-            case .secondary: return Color.tmiSecondary
-            case .tertiary: return Color.tmiSecondary
-            case .filter(let isSelected): return isSelected ? .white : Color.tmiTextSecondary
-            case .icon: return Color.tmiTextSecondary
-            }
-        }
-
-        var backgroundColor: Color {
-            switch self {
-            case .primary: return Color.tmiSecondary
-            case .secondary: return .clear
-            case .tertiary: return TMIColors.aubergineSoft
-            case .destructive: return Color.tmiError
-            case .floating: return Color.tmiPrimary
-            case .filter(let isSelected): return isSelected ? TMIColors.teal : TMIColors.aubergineSoft
-            case .icon: return TMIColors.aubergineSoft
-            }
-        }
-
-        var borderColor: Color? {
-            switch self {
-            case .secondary: return Color.tmiSecondary
-            case .filter(let isSelected): return isSelected ? nil : Color.tmiBorder
-            default: return nil
-            }
-        }
-
-        var borderWidth: CGFloat {
-            switch self {
-            case .secondary: return 1.5
-            case .filter: return 1.0
-            default: return 1.5
-            }
-        }
-
-        var cornerRadius: CGFloat {
-            switch self {
-            case .floating: return 30
-            case .filter: return 24
-            case .icon: return 12
-            default: return 14
-            }
-        }
-
-        var height: CGFloat {
-            switch self {
-            case .floating: return 60
-            case .filter: return 48
-            case .icon: return 44
-            default: return 56
-            }
-        }
-
-        var shadowColor: Color {
-            switch self {
-            case .primary: return Color.tmiSecondary.opacity(0.15)
-            case .floating: return Color.tmiPrimary.opacity(0.15)
-            case .destructive: return Color.tmiError.opacity(0.15)
-            default: return .clear
+            switch prominence {
+            case .primary: TMIColors.onBrand
+            case .secondary: TMIColors.textPrimary
+            case .tertiary: TMIColors.accent
+            case .destructive: TMIColors.errorText
             }
         }
     }
@@ -378,100 +242,29 @@ struct TMIButton: View {
     }
 
     var body: some View {
-        Button(action: handleTap) {
-            HStack(spacing: 12) {
+        Button {
+            tapCount += 1
+            action()
+        } label: {
+            HStack(spacing: TMISpacing.sm) {
                 if isLoading {
                     ProgressView()
-                        .progressViewStyle(
-                            CircularProgressViewStyle(
-                                tint: style.foregroundColor
-                            )
-                        )
-                } else {
-                    if let icon = icon {
-                        Image(systemName: icon)
-                            .font(
-                                .system(
-                                    size: 18 * dynamicTypeSize.tmiFontScale,
-                                    weight: .medium
-                                )
-                            )
-                    }
-
-                    if style != .icon {
-                        Text(text)
-                            .font(
-                                .system(
-                                    size: 17 * dynamicTypeSize.tmiFontScale,
-                                    weight: .semibold
-                                )
-                            )
-                    }
+                        .controlSize(.small)
+                        .tint(style.foregroundColor)
+                } else if let icon {
+                    Image(systemName: icon)
+                        .fontWeight(.semibold)
+                }
+                if style != .icon {
+                    Text(text)
                 }
             }
-            .padding(.horizontal, {
-                switch style {
-                case .filter: return 20
-                case .floating, .icon: return 16
-                default: return 24
-                }
-            }())
-            .foregroundColor(style.foregroundColor)
-            .frame(
-                minWidth: {
-                    switch style {
-                    case .floating: return style.height
-                    case .filter: return 80
-                    default: return nil
-                    }
-                }(),
-                maxWidth: {
-                    switch style {
-                    case .floating, .icon, .filter: return nil
-                    default: return .infinity
-                    }
-                }()
-            )
-            .frame(minHeight: style.height)
-            .background(
-                RoundedRectangle(cornerRadius: style.cornerRadius)
-                    .fill(style.backgroundColor)
-                    .overlay(
-                        style.borderColor != nil
-                            ? RoundedRectangle(cornerRadius: style.cornerRadius)
-                                .stroke(style.borderColor!, lineWidth: style.borderWidth) : nil
-                    )
-            )
-            .shadow(
-                color: style.shadowColor,
-                radius: isHovered ? 12 : 8,
-                x: 0,
-                y: isHovered ? 8 : 5
-            )
-            .scaleEffect(isPressed ? 0.98 : (isHovered ? 1.02 : 1.0))
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-            .animation(.easeInOut(duration: 0.2), value: isPressed)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TMIActionButtonStyle(prominence: style.prominence, fullWidth: style.fillsWidth))
         .disabled(isLoading || isDisabled)
+        .sensoryFeedback(.impact(weight: .light), trigger: tapCount)
         .accessibilityLabel(text)
         .accessibilityValue(isLoading ? "In progress" : "")
-        .onHover { hovering in
-            isHovered = hovering
-        }
-    }
-
-    private func handleTap() {
-        withAnimation(.easeInOut(duration: 0.1)) {
-            isPressed = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isPressed = false
-            }
-            action()
-        }
     }
 }
 
@@ -494,7 +287,7 @@ struct TMITextField: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundColor(isFocused ? Color.tmiSecondary : Color.tmiTextTertiary)
+                .foregroundStyle(isFocused ? TMIColors.accent : TMIColors.textTertiary)
                 .frame(width: 20)
                 .animation(.easeOut(duration: 0.2), value: isFocused)
 
@@ -515,8 +308,8 @@ struct TMITextField: View {
                     .focused($isFocused)
                 }
             }
-            .font(.system(size: 17 * dynamicTypeSize.tmiFontScale))
-            .foregroundColor(Color.tmiTextPrimary)
+            .font(.body)
+            .foregroundStyle(TMIColors.textPrimary)
             .autocorrectionDisabled()
             .tmiTextInputAutocapitalization(effectiveCapitalization)
             .textContentType(isSecure ? .password : nil)
@@ -541,21 +334,19 @@ struct TMITextField: View {
                 }
             }
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 20)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.tmiInputBackground)
-                .shadow(color: TMIColors.textPrimary.opacity(0.04), radius: 5, x: 0, y: 2)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    isFocused ? Color.tmiSecondary : Color.tmiBorder,
-                    lineWidth: isFocused ? 1.5 : 1.0
-                )
-                .animation(.easeInOut(duration: 0.2), value: isFocused)
-        )
+#if os(macOS)
+        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
+#else
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+#endif
+        .background(TMIColors.fill, in: TMIShape.control)
+        .overlay {
+            TMIShape.control
+                .strokeBorder(isFocused ? TMIColors.accent : Color.clear, lineWidth: 2)
+                .animation(TMIAnimation.snappy, value: isFocused)
+        }
     }
 
     private var effectiveCapitalization: TMITextInputAutocapitalization? {
@@ -570,26 +361,12 @@ struct TMITextField: View {
 
 /// Unified progress view style.
 struct TMIProgressViewStyle: ProgressViewStyle {
-    var color: Color = TMIColors.teal
-    var height: CGFloat = 4
+    var color: Color = TMIColors.chartPrimary
+    var height: CGFloat = 6
     var cornerRadius: CGFloat = 10
 
     func makeBody(configuration: Configuration) -> some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(Color.tmiBorder)
-                    .frame(height: height)
-
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(color)
-                    .frame(
-                        width: geometry.size.width * CGFloat(configuration.fractionCompleted ?? 0),
-                        height: height
-                    )
-            }
-        }
-        .frame(height: height)
+        TMIProgressBar(value: configuration.fractionCompleted ?? 0, color: color, height: height)
     }
 }
 
@@ -602,7 +379,7 @@ struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? scaleAmount : 1.0)
-            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+            .animation(TMIAnimation.snappy, value: configuration.isPressed)
     }
 }
 
@@ -635,7 +412,7 @@ extension View {
     }
 
     /// Apply TMI progress view styling
-    func tmiProgressStyle(color: Color = TMIColors.teal, height: CGFloat = 4) -> some View {
+    func tmiProgressStyle(color: Color = TMIColors.chartPrimary, height: CGFloat = 6) -> some View {
         self.progressViewStyle(TMIProgressViewStyle(color: color, height: height))
     }
 

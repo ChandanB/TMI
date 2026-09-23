@@ -507,7 +507,6 @@ private struct StaffShellModifier: ViewModifier {
         @Bindable var router = router
 
         content
-            .tint(.tmiPrimary)
             .sheet(item: $router.presentedSheet) { sheet in
                 switch sheet {
                 case .workspace:

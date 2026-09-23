@@ -176,6 +176,8 @@ struct TMIApp: App {
 #if DEBUG
     private var uiTestingRootContent: some View {
         uiTestingFixtureContent
+            .tint(TMIColors.accent)
+            .preferredColorScheme(uiTestingConfiguration.appearance.colorScheme)
             .environment(
                 \.programContext,
                 ProgramContextStore.fixture(
@@ -299,6 +301,10 @@ struct TMIApp: App {
                     repository: InMemoryStaffAdministrationRepository()
                 )
             }
+        case .dashboard:
+            DashboardUITestingContent()
+        case .appShell:
+            AppShellUITestingContent()
         case .developerMode:
             NavigationStack {
                 DeveloperModeView(repository: InMemoryDeveloperConsoleRepository())
@@ -386,8 +392,7 @@ struct TMIApp: App {
                     if phase == .active { Task { await syncCoordinator.syncNow() } }
                 }
 
-                .tint(TMIColors.teal)
-                .preferredColorScheme(.light)
+                .tint(TMIColors.accent)
                 .onOpenURL { url in
                     do {
                         appRouter.updatePolicy(
@@ -425,8 +430,6 @@ struct TMIApp: App {
         AuthenticationView()
             .environment(\.appDependencies, dependencies)
             .environment(\.authStateModel, authStateModel)
-            .tint(TMIColors.teal)
-            .preferredColorScheme(.light)
     }
 #endif
 }
@@ -457,8 +460,6 @@ struct ContentView: View {
                 })
             }
         }
-        .foregroundColor(Color.tmiTextPrimary)
-        .foregroundStyle(Color.tmiTextPrimary)
         .sheet(
             isPresented: $isRegistrationPresented,
             onDismiss: {
@@ -556,22 +557,18 @@ struct ContentView: View {
 // MARK: - Loading View
 
 struct LoadingView: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var markSize: CGFloat = 64
+
     var body: some View {
-        ZStack {
-            Color.tmiBackground
-                .ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                // App logo or icon
-                Image(systemName: "sparkles")
-                    .font(.system(size: 60))
-                    .foregroundColor(.tmiPrimary)
-                
-                ProgressView("Loading...")
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .foregroundColor(Color.tmiTextPrimary)
-            }
+        VStack(spacing: TMISpacing.lg) {
+            TMISchoolhouseMark(size: markSize, onTile: true)
+            ProgressView()
+                .controlSize(.regular)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(TMIColors.background.ignoresSafeArea())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading TMI")
     }
 }
 
