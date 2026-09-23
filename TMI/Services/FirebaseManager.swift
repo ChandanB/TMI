@@ -44,30 +44,6 @@ struct FirebaseManager {
   }
 }
 
-extension FirebaseManager {
-  /// Performs Firebase configuration checks and configures offline support.
-  /// Call this from your app's startup (e.g., AppDelegate, SceneDelegate, or main SwiftUI entry point) after FirebaseManager has been initialized.
-  @MainActor
-  static func configureIfNeeded() async {
-    let configStatus = FirebaseConfigurationHelper.shared.checkFirebaseConfiguration()
-    Log.firebase.info(
-      "firebase_configuration_checked",
-      metadata: ["status": configStatus.telemetryValue]
-    )
-    
-    if configStatus.canWorkOffline {
-      FirebaseConfigurationHelper.shared.enableOfflineMode()
-    }
-    
-    if !configStatus.isWorking {
-      Log.firebase.warning(
-        "firebase_configuration_incomplete",
-        metadata: ["status": configStatus.telemetryValue]
-      )
-    }
-  }
-}
-
 // MARK: - User Session Service
 extension FirebaseManager {
   func signIn(withEmail email: String, password: String) async throws {

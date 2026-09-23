@@ -11,7 +11,6 @@
 		1185DAEE2C93A75C004616D5 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DAED2C93A75C004616D5 /* FirebaseFirestore */; };
 		1185DAF02C93A75C004616D5 /* FirebaseFirestoreCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DAEF2C93A75C004616D5 /* FirebaseFirestoreCombine-Community */; };
 		1185DAF22C93A75C004616D5 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DAF12C93A75C004616D5 /* FirebaseFunctions */; };
-		A1C0FFEE2E80000000000001 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = A1C0FFEE2E80000000000002 /* FirebaseAppCheck */; };
 		1185DB022C93A75C004616D5 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DB012C93A75C004616D5 /* FirebaseStorage */; };
 		1185DB0A2C93A7CC004616D5 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1185DB092C93A7CC004616D5 /* SDWebImageSwiftUI */; };
 		1185DB0C2C93AA92004616D5 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 1185DB0B2C93AA91004616D5 /* GoogleService-Info.plist */; };
@@ -19,6 +18,7 @@
 		11C813C72DB57544005477FC /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 11C813C62DB57544005477FC /* SwiftSoup */; };
 		11C813E12DB59A6D005477FC /* Apple_MCP.md in Resources */ = {isa = PBXBuildFile; fileRef = 11C813E02DB59A6D005477FC /* Apple_MCP.md */; };
 		11E7D12A2C93A2B70021AC20 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 11E7D1292C93A2B70021AC20 /* Assets.xcassets */; };
+		A1C0FFEE2E80000000000001 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = A1C0FFEE2E80000000000002 /* FirebaseAppCheck */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -720,11 +720,6 @@
 			package = 1185DAD82C93A75C004616D5 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = "FirebaseFirestoreCombine-Community";
 		};
-		A1C0FFEE2E80000000000002 /* FirebaseAppCheck */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 1185DAD82C93A75C004616D5 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAppCheck;
-		};
 		1185DAF12C93A75C004616D5 /* FirebaseFunctions */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 1185DAD82C93A75C004616D5 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
@@ -749,6 +744,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 11C813C52DB57544005477FC /* XCRemoteSwiftPackageReference "SwiftSoup" */;
 			productName = SwiftSoup;
+		};
+		A1C0FFEE2E80000000000002 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1185DAD82C93A75C004616D5 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

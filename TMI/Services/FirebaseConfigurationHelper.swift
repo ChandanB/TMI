@@ -125,12 +125,32 @@ class FirebaseConfigurationHelper {
     ]
   }
   
-  /// Enables offline mode with enhanced caching
+  /// Enables the 100 MB on-disk cache, keeping any settings already applied
+  /// (the DEBUG emulator host, for example).
+  ///
+  /// Falls back to a memory cache when another process holds the on-disk cache,
+  /// because Firestore aborts the app if it cannot take the LevelDB lock.
   func enableOfflineMode() {
-    let settings = FirestoreSettings()
-    settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: 100 * 1024 * 1024)) // 100MB
-    Firestore.firestore().settings = settings
-    
+    let firestore = Firestore.firestore()
+    let settings = firestore.settings
+    guard settings.host == FirestoreSettings().host else {
+      // Emulator runs keep the memory cache applied by FirebaseEnvironment.
+      return
+    }
+    let projectID = FirebaseApp.app()?.options.projectID ?? ""
+    if let lockFile = FirestoreCacheLock.lockFileURL(projectID: projectID),
+       let holder = FirestoreCacheLock.holder(of: lockFile) {
+      settings.cacheSettings = MemoryCacheSettings()
+      firestore.settings = settings
+      Log.firebase.warning(
+        "firebase_offline_cache_locked",
+        metadata: ["holderPID": String(holder)]
+      )
+      return
+    }
+    settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: 100 * 1024 * 1024))
+    firestore.settings = settings
+
     Log.firebase.info(
       "firebase_offline_cache_enabled",
       metadata: ["sizeBytes": "104857600"]

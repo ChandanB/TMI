@@ -14,9 +14,15 @@ import FirebaseStorage
 /// Firebase console → App Check → Manage debug tokens. Release builds use
 /// DeviceCheck, which needs the DeviceCheck key registered for the app.
 enum FirebaseBootstrap {
+    private static var isConfigured = false
+
     @MainActor
     static func configureIfNeeded() {
-        guard FirebaseApp.app() == nil else { return }
+        // Checked with a flag first: `FirebaseApp.app()` logs a "not yet
+        // configured" warning whenever it is asked before configuration.
+        guard !isConfigured else { return }
+        isConfigured = true
+        guard FirebaseApp.allApps?.isEmpty ?? true else { return }
 #if DEBUG
         AppCheck.setAppCheckProviderFactory(AppCheckDebugProviderFactory())
 #else
