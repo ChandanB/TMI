@@ -28,6 +28,9 @@ nonisolated enum DeepLinkRouter {
         case "settings":
             return components.isEmpty ? .settings : nil
 
+        case "tasks":
+            return components.isEmpty ? .tasks : nil
+
         default:
             return nil
         }

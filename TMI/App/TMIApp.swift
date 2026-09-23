@@ -30,6 +30,9 @@ struct TMIApp: App {
     @State private var districtStateModel: DistrictStateModel?
     @State private var recommendationsStateModel: RecommendationsStateModel?
     @State private var programContext: ProgramContextStore
+#if DEBUG
+    @State private var collaborationFixture = InMemoryCollaborationRepository()
+#endif
 
     init() {
         let dependencies: AppDependencies
@@ -226,6 +229,28 @@ struct TMIApp: App {
                 .dynamicTypeSize(uiTestingConfiguration.contentSize == .accessibility5 ? .accessibility5 : .large)
         case .planDetailsFailure:
             PlanWorkflowUITestingContent(failsDetails: true)
+        case .collaboration:
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: TMISpacing.lg) {
+                        StudentTasksSection(
+                            districtID: "district-fixture",
+                            studentID: "student-fixture",
+                            studentName: "Maya Thompson",
+                            member: MembershipContext(userID: "me", districtID: "district-fixture", schoolIDs: ["school-fixture"], role: .counselor, capabilities: [.studentReadDetail, .studentWriteDetail, .studentRestrictedRead, .studentRestrictedWrite], assignedStudentIDs: ["student-fixture"], isActive: true, version: 1),
+                            repository: collaborationFixture
+                        )
+                        StudentNotesSection(
+                            districtID: "district-fixture",
+                            studentID: "student-fixture",
+                            member: MembershipContext(userID: "me", districtID: "district-fixture", schoolIDs: ["school-fixture"], role: .counselor, capabilities: [.studentReadDetail, .studentWriteDetail, .studentRestrictedRead, .studentRestrictedWrite], assignedStudentIDs: ["student-fixture"], isActive: true, version: 1),
+                            repository: collaborationFixture
+                        )
+                    }
+                    .padding()
+                }
+                .navigationTitle("Meetings & Notes")
+            }
         case .studentForms:
             NavigationStack {
                 ScrollView {

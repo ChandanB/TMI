@@ -465,9 +465,17 @@ private struct StudentOperationalHubContent: View {
                 VStack(alignment: .leading, spacing: TMISpacing.lg) {
                     StudentMeetingsSection(studentID: student.id)
 
-                    StudentTimelineView(
-                        privateNotes: state.privateNotes,
-                        studentReflections: state.studentReflections
+                    StudentTasksSection(
+                        districtID: student.districtID,
+                        studentID: student.id,
+                        studentName: student.displayName,
+                        member: member
+                    )
+
+                    StudentNotesSection(
+                        districtID: student.districtID,
+                        studentID: student.id,
+                        member: member
                     )
                 }
             } else if domain == .meetingsAndNotes {

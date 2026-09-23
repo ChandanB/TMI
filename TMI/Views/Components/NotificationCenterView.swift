@@ -11,7 +11,23 @@ import SwiftUI
 struct NotificationCenterView: View {
     @Environment(\.notificationService) private var notificationService
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppRouter.self) private var router
     
+    /// Marks the notification read and opens the exact record it refers to.
+    /// The router re-validates access before navigating.
+    private func open(_ notification: InAppNotification) {
+        Task {
+            try? await notificationService?.markAsRead(notification.id)
+        }
+        guard let url = notification.actionUrl.flatMap(URL.init(string:)) else { return }
+        do {
+            try router.enqueueDeepLink(url)
+            dismiss()
+        } catch {
+            // Unsupported or no-longer-authorized destinations stay put.
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -21,6 +37,10 @@ struct NotificationCenterView: View {
                     } else {
                         ForEach(notificationService.notifications) { notification in
                             NotificationRow(notification: notification)
+                                .contentShape(Rectangle())
+                                .onTapGesture { open(notification) }
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityHint(notification.actionUrl == nil ? "" : "Opens the related record")
                                 .swipeActions(edge: .trailing) {
                                     Button(role: .destructive) {
                                         Task {

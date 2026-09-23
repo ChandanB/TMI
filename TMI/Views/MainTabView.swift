@@ -18,6 +18,7 @@ struct MainTabView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.notificationService) private var notificationService
     @Environment(\.programContext) private var programContext
+    @State private var showingSearch = false
     
     // Student Mode
     @State private var studentModeSession = StudentModeSession()
@@ -156,6 +157,7 @@ struct MainTabView: View {
                 routeDestination(route)
             }
             .toolbar { staffToolbar }
+                .sheet(isPresented: $showingSearch) { GlobalSearchView() }
         }
     }
 
@@ -196,6 +198,7 @@ struct MainTabView: View {
                         routeDestination(route)
                     }
                     .toolbar { staffToolbar }
+                .sheet(isPresented: $showingSearch) { GlobalSearchView() }
             }
         }
     }
@@ -209,6 +212,13 @@ struct MainTabView: View {
             }
         }
         ToolbarItemGroup(placement: .automatic) {
+            Button {
+                showingSearch = true
+            } label: {
+                Label("Search", systemImage: "magnifyingglass")
+            }
+            .keyboardShortcut("f", modifiers: [.command])
+            .accessibilityIdentifier("main.search")
             if notificationService != nil {
                 NotificationBellButton()
             }
@@ -315,6 +325,12 @@ struct MainTabView: View {
             }
 
             Button {
+                try? router.open(.tasks)
+            } label: {
+                Label("My Tasks", systemImage: "checklist")
+            }
+
+            Button {
                 try? router.open(.settings)
             } label: {
                 Label("Settings", systemImage: "gearshape")
@@ -371,6 +387,8 @@ struct MainTabView: View {
             UserProfileView()
         case .settings:
             SettingsView()
+        case .tasks:
+            TaskListView()
         }
     }
 }

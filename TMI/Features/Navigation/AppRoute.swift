@@ -42,12 +42,13 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case plan(String)
     case profile
     case settings
+    case tasks
 
     var tab: AppTab? {
         switch self {
         case .student, .editStudent: .students
         case .plan: .plans
-        case .profile, .settings: nil
+        case .profile, .settings, .tasks: nil
         }
     }
 }

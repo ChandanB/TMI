@@ -639,10 +639,10 @@ service cloud.firestore {
           allow list, write: if false;
         }
 
+        // Restricted records are read and written only through audited
+        // callables (listRestrictedRecords / createRestrictedRecord).
         match /restrictedRecords/{recordID} {
-          allow read: if canReadRestrictedStudentRecord(districtID, studentID);
-          allow create, update: if canWriteRestrictedStudentRecord(districtID, studentID);
-          allow delete: if false;
+          allow read, write: if false;
         }
 
         match /consents/{consentID} {
@@ -847,9 +847,10 @@ service cloud.firestore {
               studentID,
               studentData(districtID, studentID)
             );
+          // Notes are authored through saveStudentNote so authorship and
+          // revision history can't be forged.
           allow create, update: if collectionName in [
-              'surveys',
-              'notes'
+              'surveys'
             ]
             && canCollaborateOnStudent(districtID, studentID);
           allow delete: if false;
@@ -965,24 +966,15 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // Tasks are created and changed only by the task callables, which
+      // validate assignees and notify them.
       match /tasks/{taskID} {
         allow read: if hasActiveMembership(districtID)
           && (
             resource.data.get('assigneeUserID', '') == request.auth.uid
             || resource.data.get('createdBy', '') == request.auth.uid
           );
-        allow create: if hasActiveMembership(districtID)
-          && request.resource.data.get('createdBy', '') == request.auth.uid;
-        allow update: if hasActiveMembership(districtID)
-          && (
-            resource.data.get('assigneeUserID', '') == request.auth.uid
-            || resource.data.get('createdBy', '') == request.auth.uid
-          )
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'districtId',
-            'createdAt',
-            'createdBy'
-          ]);
+        allow create, update: if false;
         allow delete: if false;
       }
 

@@ -304,7 +304,7 @@ describe("canonical Firestore authorization", () => {
     await assertFails(getDoc(doc(staleDB, "districts/d1/students/student-1")));
   });
 
-  it("requires explicit capability for restricted records", async () => {
+  it("keeps restricted records out of direct client reads, even with the capability", async () => {
     const teacherDB = testEnv
       .authenticatedContext("teacher-1", trustedClaims("d1"))
       .firestore();
@@ -323,7 +323,8 @@ describe("canonical Firestore authorization", () => {
         { capabilities: ["student.restricted.read"] },
       );
     });
-    await assertSucceeds(
+    // Reads go through the audited listRestrictedRecords callable instead.
+    await assertFails(
       getDoc(
         doc(
           teacherDB,

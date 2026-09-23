@@ -26,6 +26,7 @@ import {
   type PrivilegedOperationResult,
   type TrustedMembership,
 } from "./authz.js";
+import { enqueueNotification } from "./collaboration.js";
 
 /**
  * Canonical form completion and review.
@@ -454,6 +455,19 @@ export const createFormHandlers = (firestore: () => Firestore) => ({
         transaction.update(db.doc(paths(data.districtID, data.assignmentID, data.studentID).assignment), {
           totalSubmitted: FieldValue.increment(1),
         });
+        const assignedBy = context.assignment.assignedBy;
+        if (context.assignment.requiresReview === true && isValidIdentifier(assignedBy) && assignedBy !== identity.userID) {
+          enqueueNotification(transaction, db, {
+            districtID: data.districtID,
+            recipientUserID: assignedBy,
+            type: "form_submitted",
+            title: "A form is ready for review",
+            message: typeof context.assignment.templateName === "string" ? context.assignment.templateName : "Form",
+            actionURL: `tmi://student/${data.studentID}`,
+            targetID: data.assignmentID,
+            eventKey: `form-review-${data.assignmentID}`,
+          }, now);
+        }
         return { recordVersion: nextVersion };
       },
     });

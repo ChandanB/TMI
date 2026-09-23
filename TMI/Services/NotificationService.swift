@@ -33,6 +33,9 @@ struct InAppNotification: Identifiable, Codable, Equatable, Sendable {
         case surveyComplete = "survey_complete"
         case resourceAdded = "resource_added"
         case systemMessage = "system_message"
+        case taskAssigned = "task_assigned"
+        case formSubmitted = "form_submitted"
+        case helpRequest = "help_request"
         
         var icon: String {
             switch self {
@@ -43,6 +46,9 @@ struct InAppNotification: Identifiable, Codable, Equatable, Sendable {
             case .surveyComplete: return "list.clipboard.fill"
             case .resourceAdded: return "book.pages.fill"
             case .systemMessage: return "bell.fill"
+            case .taskAssigned: return "checklist"
+            case .formSubmitted: return "doc.text.magnifyingglass"
+            case .helpRequest: return "hand.raised.fill"
             }
         }
         
@@ -55,6 +61,9 @@ struct InAppNotification: Identifiable, Codable, Equatable, Sendable {
             case .surveyComplete: return "orange"
             case .resourceAdded: return "teal"
             case .systemMessage: return "gray"
+            case .taskAssigned: return "teal"
+            case .formSubmitted: return "orange"
+            case .helpRequest: return "red"
             }
         }
     }
@@ -108,8 +117,10 @@ struct NotificationPreferences: Codable, Sendable {
             return surveyUpdates
         case .resourceAdded:
             return resourceRecommendations
-        case .systemMessage:
-            return true // Always show system messages
+        case .systemMessage, .taskAssigned, .helpRequest:
+            return true // Work assigned to you and requests for help always show
+        case .formSubmitted:
+            return surveyUpdates
         }
     }
 }

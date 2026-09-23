@@ -56,6 +56,8 @@ import { requireCareerProgram, resolveSiteProgram } from "./program.js";
 import { createRecordInterestObservationHandler } from "./observations.js";
 import { createRecordFamilyInputHandler } from "./familyInput.js";
 import { createFormHandlers } from "./forms.js";
+import { createCollaborationHandlers } from "./collaboration.js";
+import { createSearchHandlers } from "./search.js";
 import {
   createAdministrationHandlers,
   requireCapabilityCeiling,
@@ -5682,4 +5684,55 @@ export const submitFormResponse = onCall(callableOptions, (request) =>
 );
 export const reviewFormResponse = onCall(callableOptions, (request) =>
   formHandlers().reviewFormResponse(request),
+);
+
+const collaborationHandlers = () =>
+  createCollaborationHandlers({ firestore: () => getFirestore(), now: () => new Date() });
+
+export const listStudentNotes = onCall(callableOptions, (request) =>
+  collaborationHandlers().listStudentNotes(request),
+);
+export const saveStudentNote = onCall(callableOptions, (request) =>
+  collaborationHandlers().saveStudentNote(request),
+);
+export const listRestrictedRecords = onCall(callableOptions, (request) =>
+  collaborationHandlers().listRestrictedRecords(request),
+);
+export const createRestrictedRecord = onCall(callableOptions, (request) =>
+  collaborationHandlers().createRestrictedRecord(request),
+);
+export const listTasks = onCall(callableOptions, (request) =>
+  collaborationHandlers().listTasks(request),
+);
+export const createTask = onCall(callableOptions, (request) =>
+  collaborationHandlers().createTask(request),
+);
+export const updateTask = onCall(callableOptions, (request) =>
+  collaborationHandlers().updateTask(request),
+);
+
+const searchHandlers = () =>
+  createSearchHandlers({
+    firestore: () => getFirestore(),
+    getUsers: async (userIDs) => {
+      const users = [];
+      for (let index = 0; index < userIDs.length; index += 100) {
+        const result = await getAuth().getUsers(
+          userIDs.slice(index, index + 100).map((uid) => ({ uid })),
+        );
+        users.push(...result.users.map((user) => ({
+          userID: user.uid,
+          displayName: user.displayName,
+          email: user.email,
+        })));
+      }
+      return users;
+    },
+  });
+
+export const searchWorkspace = onCall(callableOptions, (request) =>
+  searchHandlers().searchWorkspace(request),
+);
+export const listColleagues = onCall(callableOptions, (request) =>
+  searchHandlers().listColleagues(request),
 );
