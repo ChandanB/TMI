@@ -13,11 +13,11 @@ struct AppShellUITestingContent: View {
 
     private let dependencies: AppDependencies
 
-    init() {
+    init(role: StaffRole = .schoolAdministrator) {
         let students = StudentRosterUITestingData.populatedRepository()
         let plans = PlanWorkflowUITestingData.store()
         let membership = StaffShellUITestingSession.membership(
-            role: .schoolAdministrator,
+            role: role,
             capabilities: [.studentReadDetail, .studentWriteDetail, .planApprove, .reportExport, .staffManage]
         )
         let session = StaffShellUITestingSession.make(membership: membership) { membershipProvider, authentication in

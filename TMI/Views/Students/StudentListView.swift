@@ -104,6 +104,10 @@ private struct StudentRosterContent: View {
     @State private var showingBulkAssignment = false
     @State private var navigationError: String?
     @State private var showingNavigationError = false
+    @State private var tableSortOrder: [KeyPathComparator<StudentRecord>] = []
+    @State private var tableFocus: Set<String> = []
+    /// Archive requested from a swipe or context menu; confirmed in a dialog.
+    @State private var pendingArchive: StudentRecord?
 
     var body: some View {
         GeometryReader { proxy in
@@ -161,6 +165,22 @@ private struct StudentRosterContent: View {
             }
             .tmiSheetStyle()
         }
+        .confirmationDialog(
+            "Archive \(pendingArchive?.displayName ?? "student")?",
+            isPresented: Binding(
+                get: { pendingArchive != nil },
+                set: { if !$0 { pendingArchive = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingArchive
+        ) { record in
+            Button("Archive Student", role: .destructive) {
+                archive(record)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { _ in
+            Text("The student will leave the active roster. The institutional record is retained.")
+        }
         .alert("Unable to Open Student", isPresented: $showingNavigationError) {
         } message: {
             Text(navigationError ?? "This student record is not available.")
@@ -182,7 +202,6 @@ private struct StudentRosterContent: View {
         switch state.phase {
         case .idle, .loading:
             ProgressView("Loading students…")
-                .tint(TMIColors.teal)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("studentRoster.loading")
 
@@ -206,7 +225,6 @@ private struct StudentRosterContent: View {
         case .refreshing:
             VStack(spacing: 0) {
                 ProgressView()
-                    .tint(TMIColors.teal)
                     .padding(.vertical, TMISpacing.sm)
                     .accessibilityLabel("Refreshing students")
                 rosterWithMutationFeedback(records: state.students, usesGrid: usesGrid)
@@ -240,9 +258,7 @@ private struct StudentRosterContent: View {
                     Text(message)
                 } actions: {
                     Button("Try Again", action: refresh)
-                        .buttonStyle(.borderedProminent)
-                        .tint(TMIColors.teal)
-                        .frame(minHeight: 44)
+                        .buttonStyle(.tmiPrimary)
                         .accessibilityIdentifier("studentRoster.retry")
                 }
                 .accessibilityIdentifier("studentRoster.error")
@@ -275,21 +291,22 @@ private struct StudentRosterContent: View {
                 Button("Clear Filters") {
                     Task { await state.setFilters(StudentListFilters()) }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(TMIColors.teal)
-                .frame(minHeight: 44)
+                .buttonStyle(.tmiPrimary)
                 .accessibilityIdentifier("studentRoster.empty.clearFilters")
             }
             .accessibilityIdentifier("studentRoster.empty.filters")
         } else {
             VStack(spacing: TMISpacing.md) {
-                Image(systemName: "person.3")
-                    .font(.system(size: 52, weight: .regular))
-                    .foregroundStyle(TMIColors.textSecondary)
+                Image(systemName: "person.2")
+                    .font(.largeTitle)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(TMIColors.accent)
+                    .frame(width: 84, height: 84)
+                    .background(TMIColors.accentSoft, in: Circle())
                     .accessibilityHidden(true)
 
                 Text("No \(programContext.shell.terminology.learners) Yet")
-                    .font(.title2.bold())
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(TMIColors.textPrimary)
 
                 Text("Add the first \(programContext.shell.terminology.learner.lowercased()) record for this roster, or adjust the active filters.")
@@ -300,9 +317,7 @@ private struct StudentRosterContent: View {
 
                 if canCreateStudent {
                     Button("Add \(programContext.shell.terminology.learner)", systemImage: "plus", action: presentCreateEditor)
-                        .buttonStyle(.borderedProminent)
-                        .tint(TMIColors.teal)
-                        .frame(minHeight: 44)
+                        .buttonStyle(.tmiPrimary)
                         .accessibilityLabel("Add first student")
                         .accessibilityIdentifier("studentRoster.empty.addStudent")
                 }
@@ -349,11 +364,10 @@ private struct StudentRosterContent: View {
     @ViewBuilder
     private func roster(records: [StudentRecord], usesGrid: Bool) -> some View {
         if usesGrid {
-            ScrollView {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 300, maximum: 420))],
-                    spacing: TMISpacing.md
-                ) {
+            rosterTable(records: records)
+        } else {
+            List {
+                Section {
                     ForEach(records) { record in
                         StudentRosterCard(
                             record: record,
@@ -366,45 +380,153 @@ private struct StudentRosterContent: View {
                             edit: { editor = .edit(record, operationID: UUID()) },
                             archive: { archive(record) }
                         )
-                    }
-                    paginationProgress
-                }
-                .padding(TMISpacing.screenPadding)
-            }
-            .refreshable { await state.refresh() }
-        } else {
-            List {
-                ForEach(records) { record in
-                    StudentRosterCard(
-                        record: record,
-                        isSelected: selectedStudentIDs.contains(record.id),
-                        isSelecting: isSelecting,
-                        isOffline: state.phase == .offline,
-                        canEdit: canEdit(record),
-                        open: { open(record) },
-                        toggleSelection: { toggleSelection(record.id) },
-                        edit: { editor = .edit(record, operationID: UUID()) },
-                        archive: { archive(record) }
-                    )
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: TMISpacing.xs,
-                            leading: TMISpacing.screenPadding,
-                            bottom: TMISpacing.xs,
-                            trailing: TMISpacing.screenPadding
+                        .listRowBackground(
+                            selectedStudentIDs.contains(record.id) ? TMIColors.selection : TMIColors.surface
                         )
-                    )
+                        .listRowInsets(
+                            EdgeInsets(top: TMISpacing.sm, leading: TMISpacing.md, bottom: TMISpacing.sm, trailing: TMISpacing.sm)
+                        )
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            if !isSelecting, canEdit(record), state.phase != .offline {
+                                if !record.isArchived {
+                                    Button("Archive", systemImage: "archivebox") {
+                                        pendingArchive = record
+                                    }
+                                    .tint(TMIColors.warningText)
+                                }
+                                Button("Edit", systemImage: "pencil") {
+                                    editor = .edit(record, operationID: UUID())
+                                }
+                                .tint(TMIColors.accent)
+                            }
+                        }
+                        .contextMenu {
+                            rowContextMenu(for: record)
+                        }
+                    }
                 }
                 paginationProgress
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
-            .listStyle(.plain)
+            .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .refreshable { await state.refresh() }
         }
+    }
+
+    /// iPad and Mac: a sortable table. Double-click (or Return) opens a
+    /// record; selection drives bulk assignment while selecting.
+    private func rosterTable(records: [StudentRecord]) -> some View {
+        let terminology = programContext.shell.terminology
+        let sorted = tableSortOrder.isEmpty ? records : records.sorted(using: tableSortOrder)
+        return Table(sorted, selection: tableSelection, sortOrder: $tableSortOrder) {
+            TableColumn(terminology.learner, value: \.displayName) { record in
+                HStack(spacing: TMISpacing.ms) {
+                    TMIAvatar(initials: Self.initials(for: record), size: 28)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(record.displayName)
+                            .font(.body.weight(.medium))
+                            .foregroundStyle(TMIColors.textPrimary)
+                        if let identifier = record.studentIdentifier {
+                            Text("ID \(identifier)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(TMIColors.textTertiary)
+                        }
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("studentRoster.student.\(record.id)")
+            }
+            .width(min: 200, ideal: 280)
+
+            TableColumn(terminology.gradeLabel, value: \.grade) { record in
+                Text(record.grade)
+                    .monospacedDigit()
+                    .foregroundStyle(TMIColors.textSecondary)
+            }
+            .width(min: 60, ideal: 80, max: 120)
+
+            TableColumn(terminology.site) { record in
+                Text(programContext.siteName(record.schoolID))
+                    .foregroundStyle(TMIColors.textSecondary)
+                    .lineLimit(1)
+            }
+            .width(min: 120, ideal: 200)
+
+            TableColumn("Team") { record in
+                Label("\(record.assignedMemberIDs.count)", systemImage: "person.2")
+                    .monospacedDigit()
+                    .foregroundStyle(TMIColors.textSecondary)
+                    .help("\(record.assignedMemberIDs.count) assigned staff")
+            }
+            .width(min: 60, ideal: 80, max: 100)
+
+            TableColumn("Status") { record in
+                if record.isArchived {
+                    TMIStatusBadge("Archived", tone: .warning)
+                } else {
+                    TMIStatusBadge("Active", tone: .success)
+                }
+            }
+            .width(min: 90, ideal: 110, max: 140)
+        }
+        .contextMenu(forSelectionType: String.self) { ids in
+            if ids.count == 1, let id = ids.first, let record = records.first(where: { $0.id == id }) {
+                rowContextMenu(for: record)
+            }
+        } primaryAction: { ids in
+            if !isSelecting, let id = ids.first, let record = records.first(where: { $0.id == id }) {
+                open(record)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .overlay(alignment: .bottom) {
+            paginationProgress
+        }
+        .refreshable { await state.refresh() }
+    }
+
+    /// Table selection maps onto bulk selection only while selecting.
+    private var tableSelection: Binding<Set<String>> {
+        Binding(
+            get: { isSelecting ? selectedStudentIDs : tableFocus },
+            set: { ids in
+                if isSelecting {
+                    selectedStudentIDs = ids
+                } else {
+                    tableFocus = ids
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func rowContextMenu(for record: StudentRecord) -> some View {
+        Button("Open \(programContext.shell.terminology.learnerRecord)", systemImage: "person.text.rectangle") {
+            open(record)
+        }
+        if canEdit(record), state.phase != .offline {
+            Button("Edit", systemImage: "pencil") {
+                editor = .edit(record, operationID: UUID())
+            }
+            if !record.isArchived {
+                Divider()
+                Button("Archive…", systemImage: "archivebox", role: .destructive) {
+                    pendingArchive = record
+                }
+            }
+        }
+    }
+
+    fileprivate static func initials(for record: StudentRecord) -> String {
+        record.displayName
+            .split(whereSeparator: { $0.isWhitespace })
+            .prefix(2)
+            .compactMap(\.first)
+            .map(String.init)
+            .joined()
+            .uppercased()
     }
 
     @ViewBuilder
@@ -413,7 +535,6 @@ private struct StudentRosterContent: View {
             HStack {
                 Spacer()
                 ProgressView()
-                    .tint(TMIColors.teal)
                     .accessibilityLabel("Loading more students")
                 Spacer()
             }
@@ -458,8 +579,14 @@ private struct StudentRosterContent: View {
                 .accessibilityIdentifier("studentRoster.selectStudents")
             }
 
+#if os(macOS)
+            Button("Refresh", systemImage: "arrow.clockwise", action: refresh)
+                .keyboardShortcut("r", modifiers: .command)
+                .help("Refresh the roster (⌘R)")
+#endif
             if canCreateStudent, state.phase != .permissionDenied {
                 Button("Add Student", systemImage: "plus", action: presentCreateEditor)
+                    .keyboardShortcut("n", modifiers: .command)
                     .frame(minWidth: 44, minHeight: 44)
                     .accessibilityIdentifier("studentRoster.addStudent")
             }
@@ -766,7 +893,8 @@ private struct StudentRosterCard: View {
                 )
                 .labelStyle(.iconOnly)
                 .font(.title2)
-                .foregroundStyle(isSelected ? TMIColors.teal : TMIColors.textSecondary)
+                .foregroundStyle(isSelected ? TMIColors.accent : TMIColors.textTertiary)
+                .contentTransition(.symbolEffect(.replace))
                 .frame(minWidth: 44, minHeight: 44)
                 .accessibilityIdentifier("studentRoster.select.\(record.id)")
             }
@@ -789,15 +917,7 @@ private struct StudentRosterCard: View {
                 )
             }
         }
-        .padding(TMISpacing.md)
-        .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
-        .overlay {
-            RoundedRectangle(cornerRadius: TMIRadius.md)
-                .stroke(
-                    isSelected ? TMIColors.teal : TMIColors.interactiveBorder,
-                    lineWidth: isSelected ? 2 : 1
-                )
-        }
+        .sensoryFeedback(.selection, trigger: isSelected)
     }
 
     private var accessibilitySummary: String {
@@ -834,25 +954,17 @@ private struct StudentRosterCardLabel: View {
 
         layout {
             if !dynamicTypeSize.isAccessibilitySize {
-                ZStack {
-                    Circle().fill(TMIColors.aubergineSoft)
-                    Text(initials)
-                        .font(.headline)
-                        .foregroundStyle(TMIColors.aubergine)
-                        .minimumScaleFactor(0.7)
-                }
-                .frame(width: 48, height: 48)
-                .accessibilityHidden(true)
+                TMIAvatar(initials: initials, size: 44)
             }
 
-            VStack(alignment: .leading, spacing: TMISpacing.xs) {
-                Text(record.displayName)
-                    .font(.headline)
-                    .foregroundStyle(TMIColors.textPrimary)
-                if record.isArchived {
-                    Label("Archived", systemImage: "archivebox.fill")
-                        .font(.footnote)
-                        .foregroundStyle(TMIColors.warningText)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: TMISpacing.sm) {
+                    Text(record.displayName)
+                        .font(.headline)
+                        .foregroundStyle(TMIColors.textPrimary)
+                    if record.isArchived {
+                        TMIStatusBadge("Archived", tone: .warning, systemImage: "archivebox.fill")
+                    }
                 }
 
                 if dynamicTypeSize.isAccessibilitySize {
@@ -868,18 +980,19 @@ private struct StudentRosterCardLabel: View {
                         .foregroundStyle(TMIColors.textSecondary)
                 }
 
-                if let studentIdentifier = record.studentIdentifier {
-                    Text("\(terminology.learner) ID: \(studentIdentifier)")
-                        .font(.footnote)
-                        .foregroundStyle(TMIColors.textSecondary)
+                HStack(spacing: TMISpacing.ms) {
+                    if let studentIdentifier = record.studentIdentifier {
+                        Text("ID \(studentIdentifier)")
+                            .monospacedDigit()
+                    }
+                    Label(
+                        "\(record.assignedMemberIDs.count) assigned staff",
+                        systemImage: "person.2"
+                    )
+                    .labelStyle(.titleAndIcon)
                 }
-
-                Label(
-                    "\(record.assignedMemberIDs.count) assigned staff",
-                    systemImage: "person.2"
-                )
                 .font(.footnote)
-                .foregroundStyle(TMIColors.infoText)
+                .foregroundStyle(TMIColors.textTertiary)
             }
         }
     }
@@ -915,8 +1028,8 @@ private struct StudentRosterActionMenu: View {
             }
         }
         .labelStyle(.iconOnly)
-        .font(.title2)
-        .foregroundStyle(TMIColors.aubergine)
+        .font(.title3)
+        .foregroundStyle(TMIColors.textTertiary)
         .frame(minWidth: 44, minHeight: 44)
         .confirmationDialog(
             "Archive \(record.displayName)?",
@@ -940,11 +1053,13 @@ private struct StudentRosterStatusBanner: View {
 
     var body: some View {
         Label(title, systemImage: systemImage)
-            .font(.subheadline)
+            .font(.subheadline.weight(.medium))
             .foregroundStyle(foreground)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, TMISpacing.md)
+            .background(background, in: TMIShape.control)
             .padding(.horizontal, TMISpacing.screenPadding)
-            .background(background)
+            .padding(.vertical, TMISpacing.xs)
             .accessibilityIdentifier(identifier)
     }
 }

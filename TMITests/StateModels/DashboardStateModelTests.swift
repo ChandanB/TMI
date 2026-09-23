@@ -148,7 +148,11 @@ struct DashboardStateModelTests {
         let planRepository = DashboardTestPlanRepository(
             plans: [activePlan, pendingPlan, archivedPlan]
         )
-        let studentRepository = DashboardTestStudentRepository()
+        let now = Date()
+        let studentRepository = DashboardTestStudentRepository(records: [
+            makeStudentRecord(id: "student-a", displayName: "Ada Lovelace", createdAt: now.addingTimeInterval(-30 * 86_400)),
+            makeStudentRecord(id: "student-b", displayName: "Grace Hopper", createdAt: now.addingTimeInterval(-30 * 86_400)),
+        ])
         let model = DashboardStateModel(
             studentRepository: studentRepository,
             planRepository: planRepository
@@ -158,8 +162,56 @@ struct DashboardStateModelTests {
 
         #expect(model.value?.activeTMIPlans == 1)
         #expect(model.value?.plansAligned == 2)
+        // A teacher cannot approve, so pending approval is never their next step.
+        #expect(model.value?.nextBestAction?.type != .pendingApproval)
+        #expect(model.value?.pendingApprovalCount == 0)
+    }
+
+    @MainActor
+    @Test("Only an assigned approver sees pending approval as the next step")
+    func approvalNextStepRequiresAssignedApprover() async {
+        var pendingPlan = makePlanRecord(
+            id: "plan-pending",
+            status: .pendingApproval,
+            approvalStatus: .pending,
+            studentIDs: ["student-b"]
+        )
+        pendingPlan.approverMemberIDs = ["staff-1"]
+        let model = DashboardStateModel(
+            studentRepository: DashboardTestStudentRepository(),
+            planRepository: DashboardTestPlanRepository(plans: [pendingPlan])
+        )
+
+        await model.fetchWithMembership(membership(role: .counselor, capabilities: [.planApprove]))
+
         #expect(model.value?.nextBestAction?.type == .pendingApproval)
         #expect(model.value?.nextBestAction?.targetPlanId == "plan-pending")
+        #expect(model.value?.nextBestAction?.description == "1 plan needs your review")
+        #expect(model.value?.pendingApprovalCount == 1)
+    }
+
+    @MainActor
+    @Test("Plan coverage only counts students on the member's roster")
+    func coverageIsRosterScoped() async {
+        let plan = makePlanRecord(
+            id: "plan-active",
+            status: .active,
+            approvalStatus: .approved,
+            studentIDs: ["student-elsewhere"]
+        )
+        let model = DashboardStateModel(
+            studentRepository: DashboardTestStudentRepository(records: [
+                makeStudentRecord(id: "student-a", displayName: "Ada Lovelace", createdAt: Date()),
+            ]),
+            planRepository: DashboardTestPlanRepository(plans: [plan])
+        )
+
+        await model.fetchWithMembership(membership(role: .teacher))
+
+        #expect(model.value?.plansAligned == 0)
+        #expect(model.value?.studentsWithoutPlanCount == 1)
+        #expect(model.value?.nextBestAction?.type == .createPlan)
+        #expect(model.value?.nextBestAction?.targetStudentId == "student-a")
     }
 
     @MainActor

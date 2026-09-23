@@ -38,10 +38,10 @@ struct GlobalSearchView: View {
                     ContentUnavailableView.search(text: trimmed)
                 }
                 group(terminology.learners, systemImage: "person.fill", hits: results.students) { hit in
-                    open { try router.open(.student(hit.id)) }
+                    open { try router.openListed(.student(hit.id)) }
                 }
                 group("Plans", systemImage: "doc.text.fill", hits: results.plans) { hit in
-                    open { try router.open(.plan(hit.id)) }
+                    open { try router.openListed(.plan(hit.id)) }
                 }
                 group("Resources", systemImage: "book.fill", hits: results.resources) { hit in
                     if let url = hit.url.flatMap(URL.init(string:)) {

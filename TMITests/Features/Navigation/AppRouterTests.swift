@@ -19,6 +19,34 @@ struct AppRouterTests {
         )
     }
 
+    @Test("Listed records open through the router and switch to their tab")
+    func listedRecordsOpen() throws {
+        let router = AppRouter(policy: policy(role: .schoolAdministrator))
+
+        try router.openListed(.plan("plan-a"))
+        #expect(router.selectedTab == .plans)
+        #expect(router.path == [.plan("plan-a")])
+        #expect(router.activePlanID == "plan-a")
+
+        try router.openListed(.student("student-z"))
+        #expect(router.selectedTab == .students)
+        #expect(router.path == [.student("student-z")])
+    }
+
+    @Test("Listed records still require a signed-in role and a valid identifier")
+    func listedRecordsFailClosed() {
+        let signedOut = AppRouter(policy: AppNavigationPolicy(role: nil))
+        #expect(throws: NavigationError.unauthorizedRoute) {
+            try signedOut.openListed(.plan("plan-a"))
+        }
+
+        let teacher = AppRouter(policy: policy(role: .teacher))
+        #expect(throws: NavigationError.invalidIdentifier) {
+            try teacher.openListed(.plan("../plan"))
+        }
+        #expect(teacher.path.isEmpty)
+    }
+
     @Test("A role change leaves an unavailable district tab")
     func policyRefreshSelectsAnAvailableTab() throws {
         let router = AppRouter(
@@ -332,8 +360,10 @@ struct AppRouterTests {
         let studentDetailSource = try sourceFile(
             at: "TMI/Views/Students/StudentDetailView.swift"
         )
+        // Today's shortcuts (formerly QuickActionCards) switch tabs through
+        // the router and never push duplicate tab roots.
         let quickActionsSource = try sourceFile(
-            at: "TMI/Views/Dashboard/Components/QuickActionCards.swift"
+            at: "TMI/Views/Dashboard/DashboardView.swift"
         )
         let notificationSource = try sourceFile(
             at: "TMI/Services/NotificationService.swift"
