@@ -170,10 +170,13 @@ protocol CollaborationRepository: AnyObject {
 
 @MainActor
 final class FirebaseCollaborationRepository: CollaborationRepository {
-    private let functions: Functions
+    // Resolved on use: `Functions.functions()` traps without a configured
+    // FirebaseApp (UI-test fixtures and previews construct this type).
+    private let makeFunctions: @Sendable () -> Functions
+    private var functions: Functions { makeFunctions() }
 
-    init(functions: Functions = Functions.functions(region: "us-central1")) {
-        self.functions = functions
+    init(functions: @autoclosure @escaping @Sendable () -> Functions = Functions.functions(region: "us-central1")) {
+        self.makeFunctions = functions
     }
 
     func notes(districtID: String, studentID: String) async throws -> (notes: [TeamNote], canWrite: Bool) {

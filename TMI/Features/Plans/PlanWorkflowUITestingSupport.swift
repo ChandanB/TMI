@@ -100,3 +100,14 @@ private struct FixturePlanAuditing: PlanExportAuditing {
     }
 }
 #endif
+
+#if DEBUG
+/// Plan data for fixtures outside this file (the app-shell fixture).
+enum PlanWorkflowUITestingData {
+    static func store() -> any PlanRecordRepository & PlanChildRepositoryProtocol {
+        PlanWorkflowFixture(failsDetails: false)
+    }
+
+    static var auditing: any PlanExportAuditing { FixturePlanAuditing() }
+}
+#endif

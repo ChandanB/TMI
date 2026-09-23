@@ -64,10 +64,13 @@ protocol FamilyInputRecording: AnyObject {
 
 @MainActor
 final class FirebaseFamilyInputRecorder: FamilyInputRecording {
-    private let functions: Functions
+    // Resolved on use: `Functions.functions()` traps without a configured
+    // FirebaseApp (UI-test fixtures and previews construct this type).
+    private let makeFunctions: @Sendable () -> Functions
+    private var functions: Functions { makeFunctions() }
 
-    init(functions: Functions = Functions.functions(region: "us-central1")) {
-        self.functions = functions
+    init(functions: @autoclosure @escaping @Sendable () -> Functions = Functions.functions(region: "us-central1")) {
+        self.makeFunctions = functions
     }
 
     func record(_ draft: FamilyInputDraft, districtID: String, studentID: String, operationID: String) async throws {

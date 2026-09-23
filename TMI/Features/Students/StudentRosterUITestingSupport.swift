@@ -544,3 +544,12 @@ private actor StudentRosterUITestingRepository: StudentRepository {
     }
 }
 #endif
+
+#if DEBUG
+/// Roster data for fixtures outside this file (the app-shell fixture).
+enum StudentRosterUITestingData {
+    static func populatedRepository() -> any StudentRepository {
+        StudentRosterUITestingRepository(scenario: .populated)
+    }
+}
+#endif

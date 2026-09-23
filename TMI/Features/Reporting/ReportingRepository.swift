@@ -206,11 +206,14 @@ nonisolated enum ReportExportFormat: String, Codable, Sendable, CaseIterable, Id
 
 @MainActor
 final class FirebaseReportingRepository: ReportingRepository {
-    private let functions: Functions
+    // Resolved on use: `Functions.functions()` traps without a configured
+    // FirebaseApp (UI-test fixtures and previews construct this type).
+    private let makeFunctions: @Sendable () -> Functions
+    private var functions: Functions { makeFunctions() }
     private let timeZone: TimeZone
 
-    init(functions: Functions = Functions.functions(region: "us-central1"), timeZone: TimeZone = .current) {
-        self.functions = functions
+    init(functions: @autoclosure @escaping @Sendable () -> Functions = Functions.functions(region: "us-central1"), timeZone: TimeZone = .current) {
+        self.makeFunctions = functions
         self.timeZone = timeZone
     }
 

@@ -10,6 +10,9 @@ struct GlobalSearchView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     var repository: (any CollaborationRepository)? = nil
+    /// Set when search is hosted as a tab: called after navigating to a hit
+    /// (instead of dismissing a sheet) so the shell can leave the Search tab.
+    var onOpen: (() -> Void)? = nil
 
     @State private var query = ""
     @State private var results: WorkspaceSearchResults = .empty
@@ -54,7 +57,9 @@ struct GlobalSearchView: View {
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                if onOpen == nil {
+                    ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                }
             }
             .task(id: trimmed) { await search() }
         }
@@ -71,7 +76,7 @@ struct GlobalSearchView: View {
                     } label: {
                         HStack {
                             Image(systemName: systemImage)
-                                .foregroundStyle(TMIColors.aubergine)
+                                .foregroundStyle(TMIColors.accent)
                                 .frame(width: 24)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading) {
@@ -100,7 +105,11 @@ struct GlobalSearchView: View {
     private func open(_ navigate: () throws -> Void) {
         do {
             try navigate()
-            dismiss()
+            if let onOpen {
+                onOpen()
+            } else {
+                dismiss()
+            }
         } catch {
             errorMessage = "You don't have access to open that record."
         }

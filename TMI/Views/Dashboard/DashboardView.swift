@@ -122,6 +122,8 @@ nonisolated struct NextBestAction: Equatable, Sendable {
 
 // MARK: - Environment Key
 extension EnvironmentValues {
+  // Fail closed: the app root injects the real model. A Firebase-backed
+  // default would trap in fixtures and previews with no FirebaseApp.
   @Entry var dashboardStateModel: DashboardStateModel = DashboardStateModel()
 }
 
@@ -138,7 +140,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
 
   // MARK: - Initialization
   init(
-    studentRepository: any StudentRepository = CanonicalStudentRepository.firebase(),
+    studentRepository: any StudentRepository = UnavailableStudentRepository(),
     planRepository: (any PlanRecordRepository)? = nil
   ) {
     self.studentRepository = studentRepository

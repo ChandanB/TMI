@@ -150,9 +150,15 @@ struct TMIApp: App {
 #if os(macOS)
         WindowGroup {
             rootContent
-                .frame(minWidth: 900, minHeight: 700)
+                .frame(minWidth: 960, minHeight: 640)
         }
-        .defaultSize(width: 900, height: 800)
+        .defaultSize(width: 1280, height: 820)
+        .commands {
+            StaffCommands()
+            // One window: the router and student context are app-scoped, so a
+            // second window would mirror (and fight over) navigation.
+            CommandGroup(replacing: .newItem) { }
+        }
 #else
         WindowGroup {
             rootContent

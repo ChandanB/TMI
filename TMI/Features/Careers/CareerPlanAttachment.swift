@@ -27,9 +27,11 @@ final class FirebaseCareerPlanAttacher: CareerPlanAttaching {
 
     private let call: Callable
 
-    init(functions: Functions = Functions.functions(region: "us-central1")) {
+    // `functions` is resolved per call: `Functions.functions()` traps without a
+    // configured FirebaseApp (UI-test fixtures and previews).
+    init(functions: @autoclosure @escaping @Sendable () -> Functions = Functions.functions(region: "us-central1")) {
         self.call = { request in
-            let result = try await functions.httpsCallable("attachCareerToPlan").call([
+            let result = try await functions().httpsCallable("attachCareerToPlan").call([
                 "districtID": request.districtID,
                 "studentID": request.studentID,
                 "careerID": request.careerID,

@@ -19,6 +19,9 @@ struct MainTabView: View {
     @Environment(\.notificationService) private var notificationService
     @Environment(\.programContext) private var programContext
     @State private var showingSearch = false
+    /// iPhone/iPad only: the Search tab is shell-local, not an `AppTab`, so
+    /// the router's tab policy and path semantics stay unchanged.
+    @State private var isSearchTabSelected = false
     
     // Student Mode
     @State private var studentModeSession = StudentModeSession()
@@ -138,69 +141,157 @@ struct MainTabView: View {
 #endif
     }
 
-    private var mobileStaffNavigation: some View {
-        @Bindable var router = router
+    private var terminology: Terminology { programContext.shell.terminology }
 
-        return NavigationStack(path: $router.path) {
-            TabView(selection: $router.selectedTab) {
-                ForEach(router.availableTabs) { tab in
-                    destinationView(for: tab)
-                        .tabItem {
-                            Label(tab.title(for: programContext.shell.terminology), systemImage: tab.systemImage)
-                        }
-                        .tag(tab)
+    /// Each tab owns its own `NavigationStack`, so the Liquid Glass tab bar
+    /// stays visible while pushing. Only the selected tab's stack is bound to
+    /// `router.path`; the router clears the path on every tab switch, so an
+    /// unselected tab is always at its root.
+    private var mobileStaffNavigation: some View {
+        TabView(selection: tabSelection) {
+            ForEach(router.availableTabs) { tab in
+                Tab(tab.title(for: terminology), systemImage: tab.systemImage, value: ShellTab.app(tab)) {
+                    tabStack(for: tab)
                 }
             }
-            .tabViewStyle(.sidebarAdaptable)
-            .navigationTitle(router.selectedTab.title(for: programContext.shell.terminology))
-            .navigationDestination(for: AppRoute.self) { route in
-                routeDestination(route)
+            Tab(value: ShellTab.search, role: .search) {
+                GlobalSearchView(onOpen: { isSearchTabSelected = false })
             }
-            .toolbar { staffToolbar }
-                .sheet(isPresented: $showingSearch) { GlobalSearchView() }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+#if os(iOS)
+        .tabBarMinimizeBehavior(.onScrollDown)
+#endif
+    }
+
+    private var tabSelection: Binding<ShellTab> {
+        Binding(
+            get: { isSearchTabSelected ? .search : .app(router.selectedTab) },
+            set: { selection in
+                switch selection {
+                case .search:
+                    isSearchTabSelected = true
+                case .app(let tab):
+                    isSearchTabSelected = false
+                    if tab != router.selectedTab {
+                        try? router.select(tab)
+                    }
+                }
+            }
+        )
+    }
+
+    private func tabStack(for tab: AppTab) -> some View {
+        NavigationStack(path: path(for: tab)) {
+            destinationView(for: tab)
+                .navigationTitle(tab.title(for: terminology))
+                .navigationDestination(for: AppRoute.self) { route in
+                    routeDestination(route)
+                }
+                .toolbar { staffToolbar }
         }
     }
 
+    private func path(for tab: AppTab) -> Binding<[AppRoute]> {
+        Binding(
+            get: { router.selectedTab == tab ? router.path : [] },
+            set: { newPath in
+                if router.selectedTab == tab {
+                    router.path = newPath
+                }
+            }
+        )
+    }
+
 #if os(macOS)
+    /// A native source-list sidebar. Tab shortcuts (⌘1–⌘4), Back (⌘[) and
+    /// Settings (⌘,) live in `StaffCommands` so they appear in the menu bar.
     private var macStaffNavigation: some View {
         @Bindable var router = router
 
         return NavigationSplitView {
-            List {
-                ForEach(Array(router.availableTabs.enumerated()), id: \.element) { index, tab in
-                    Button {
-                        try? router.select(tab)
-                    } label: {
-                        Label(tab.title(for: programContext.shell.terminology), systemImage: tab.systemImage)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+            List(selection: sidebarSelection) {
+                Section {
+                    ForEach(router.availableTabs) { tab in
+                        Label(tab.title(for: terminology), systemImage: tab.systemImage)
+                            .tag(tab)
                     }
-                    .buttonStyle(.plain)
-                    .listRowBackground(
-                        router.selectedTab == tab
-                            ? Color.tmiPrimary.opacity(0.18)
-                            : Color.clear
-                    )
-                    .keyboardShortcut(
-                        KeyEquivalent(Character(String(index + 1))),
-                        modifiers: .command
-                    )
-                    .accessibilityAddTraits(
-                        router.selectedTab == tab ? .isSelected : []
-                    )
                 }
+                Section("You") {
+                    Button {
+                        try? router.open(.tasks)
+                    } label: {
+                        Label("My Tasks", systemImage: "checklist")
+                    }
+                    Button {
+                        try? router.open(.profile)
+                    } label: {
+                        Label("Profile", systemImage: "person.crop.circle")
+                    }
+                }
+                .buttonStyle(.plain)
             }
-            .navigationTitle("TMI")
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
+            .safeAreaInset(edge: .bottom) {
+                sidebarAccountFooter
+            }
         } detail: {
             NavigationStack(path: $router.path) {
                 destinationView(for: router.selectedTab)
-                    .navigationTitle(router.selectedTab.title(for: programContext.shell.terminology))
+                    .navigationTitle(router.selectedTab.title(for: terminology))
                     .navigationDestination(for: AppRoute.self) { route in
                         routeDestination(route)
                     }
                     .toolbar { staffToolbar }
-                .sheet(isPresented: $showingSearch) { GlobalSearchView() }
             }
+            .sheet(isPresented: $showingSearch) { GlobalSearchView() }
         }
+        .focusedSceneValue(\.staffRouter, router)
+    }
+
+    private var sidebarSelection: Binding<AppTab?> {
+        Binding(
+            get: { router.selectedTab },
+            set: { tab in
+                if let tab, tab != router.selectedTab {
+                    try? router.select(tab)
+                }
+            }
+        )
+    }
+
+    private var sidebarAccountFooter: some View {
+        Menu {
+            accountMenuItems
+        } label: {
+            HStack(spacing: TMISpacing.sm) {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(TMIColors.accent)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Account")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(TMIColors.textPrimary)
+                    if let role = authStateModel.currentMembership?.role {
+                        Text(role.displayName)
+                            .font(.caption)
+                            .foregroundStyle(TMIColors.textSecondary)
+                    }
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TMIColors.textTertiary)
+            }
+            .padding(.horizontal, TMISpacing.ms)
+            .padding(.vertical, TMISpacing.sm)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .padding(TMISpacing.sm)
+        .accessibilityLabel("Account")
     }
 #endif
 
@@ -213,17 +304,22 @@ struct MainTabView: View {
         }
         ToolbarItemGroup(placement: .automatic) {
             SyncStatusButton { try? router.open(.sync) }
+#if os(macOS)
             Button {
                 showingSearch = true
             } label: {
                 Label("Search", systemImage: "magnifyingglass")
             }
             .keyboardShortcut("f", modifiers: [.command])
+            .help("Search students, plans and resources (⌘F)")
             .accessibilityIdentifier("main.search")
+#endif
             if notificationService != nil {
                 NotificationBellButton()
             }
+#if !os(macOS)
             profileMenu
+#endif
         }
     }
 
@@ -288,66 +384,53 @@ struct MainTabView: View {
         } label: {
             HStack(spacing: 6) {
                 if let student = router.activeStudent {
-                    TMIAvatar(
-                        initials: student.initials,
-                        color: .tmiPrimary,
-                        size: 28
-                    )
+                    TMIAvatar(initials: student.initials, size: 24)
                 } else {
                     Image(systemName: "person.crop.circle")
-                        .font(.system(size: 20))
                 }
-
                 Text(router.activeStudentName ?? "Selected Student")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
             }
-            .foregroundColor(Color.tmiTextPrimary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(Color.tmiPrimary.opacity(0.3))
-            )
         }
-        .buttonStyle(.plain)
+        .help("Open the workspace for the selected student")
         .accessibilityLabel("Open workspace for \(router.activeStudentName ?? "selected student")")
+    }
+
+    @ViewBuilder
+    private var accountMenuItems: some View {
+        Button {
+            try? router.open(.profile)
+        } label: {
+            Label("Profile", systemImage: "person.crop.circle")
+        }
+
+        Button {
+            try? router.open(.tasks)
+        } label: {
+            Label("My Tasks", systemImage: "checklist")
+        }
+
+        Button {
+            try? router.open(.settings)
+        } label: {
+            Label("Settings", systemImage: "gearshape")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            showingSignOutConfirmation = true
+        } label: {
+            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+        }
     }
 
     private var profileMenu: some View {
         Menu {
-            Button {
-                try? router.open(.profile)
-            } label: {
-                Label("Profile", systemImage: "person.crop.circle")
-            }
-
-            Button {
-                try? router.open(.tasks)
-            } label: {
-                Label("My Tasks", systemImage: "checklist")
-            }
-
-            Button {
-                try? router.open(.settings)
-            } label: {
-                Label("Settings", systemImage: "gearshape")
-            }
-
-            Divider()
-
-            Button(role: .destructive) {
-                showingSignOutConfirmation = true
-            } label: {
-                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-            }
+            accountMenuItems
         } label: {
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 22))
-                .foregroundColor(Color.tmiTextPrimary)
+            Label("Account", systemImage: "person.crop.circle")
         }
         .accessibilityLabel("Account")
     }
@@ -541,6 +624,65 @@ private struct StaffShellModifier: ViewModifier {
         }
         .onDisappear {
             notificationService?.stopListening()
+        }
+    }
+}
+
+// MARK: - Shell selection
+
+/// iPhone/iPad tab selection: an app tab or the shell-local Search tab.
+private enum ShellTab: Hashable {
+    case app(AppTab)
+    case search
+}
+
+extension FocusedValues {
+    /// The router of the focused staff window (drives menu-bar commands).
+    @Entry var staffRouter: AppRouter?
+}
+
+/// Menu-bar commands for the staff shell on Mac (and iPad keyboards).
+struct StaffCommands: Commands {
+    @FocusedValue(\.staffRouter) private var router
+
+    var body: some Commands {
+        CommandMenu("Go") {
+            ForEach(Array(AppTab.allCases.enumerated()), id: \.element) { index, tab in
+                Button(tab.title) {
+                    try? router?.select(tab)
+                }
+                .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+                .disabled(!(router?.availableTabs.contains(tab) ?? false))
+            }
+
+            Divider()
+
+            Button("Back") {
+                router?.pop()
+            }
+            .keyboardShortcut("[", modifiers: .command)
+            .disabled(router?.path.isEmpty ?? true)
+
+            Divider()
+
+            Button("My Tasks") {
+                try? router?.open(.tasks)
+            }
+            .keyboardShortcut("t", modifiers: [.command, .shift])
+            .disabled(router == nil)
+
+            Button("Sync Status") {
+                try? router?.open(.sync)
+            }
+            .disabled(router == nil)
+        }
+
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings…") {
+                try? router?.open(.settings)
+            }
+            .keyboardShortcut(",", modifiers: .command)
+            .disabled(router == nil)
         }
     }
 }
