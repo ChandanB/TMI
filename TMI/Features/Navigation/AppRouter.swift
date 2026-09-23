@@ -75,7 +75,9 @@ final class AppRouter {
     /// plans (and hold only assigned students), so `open(_:)` would refuse
     /// these; the destination screen re-authorizes against its repository on
     /// load, exactly as `NavigationLink(value:)` rows already do.
-    func openListed(_ route: AppRoute) throws {
+    /// - Parameter staysOnCurrentTab: push onto the current tab's stack (for
+    ///   drill-downs such as Reports → student) so Back returns to the source.
+    func openListed(_ route: AppRoute, staysOnCurrentTab: Bool = false) throws {
         switch route {
         case .student(let identifier), .plan(let identifier):
             _ = try validIdentifier(identifier)
@@ -85,11 +87,11 @@ final class AppRouter {
         case .editStudent, .profile, .settings, .tasks, .sync:
             try validate(route)
         }
-        try push(route)
+        try push(route, switchingTab: !staysOnCurrentTab)
     }
 
-    private func push(_ route: AppRoute) throws {
-        if let tab = route.tab {
+    private func push(_ route: AppRoute, switchingTab: Bool = true) throws {
+        if switchingTab, let tab = route.tab {
             guard availableTabs.contains(tab) else {
                 throw NavigationError.unavailableTab
             }

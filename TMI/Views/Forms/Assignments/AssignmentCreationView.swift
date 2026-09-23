@@ -60,60 +60,63 @@ struct AssignmentCreationView: View {
 
   var body: some View {
     NavigationStack {
-      VStack {
-        // Progress Indicator
-        ProgressView(value: Double(currentStep), total: 2)
-          .padding(.horizontal)
-        
-        TabView(selection: $currentStep) {
-          // Step 1: Select Template
-          templateSelectionStep
-            .tag(0)
-          
-          // Step 2: Configure Details
-          configurationStep
-            .tag(1)
-          
-          // Step 3: Select Cohort & Review
-          cohortSelectionStep
-            .tag(2)
+      VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+          Text("Step \(currentStep + 1) of 3 · \(stepTitle)")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(TMIColors.textSecondary)
+          TMIProgressBar(value: Double(currentStep + 1) / 3, height: 5)
         }
-        #if canImport(UIKit)
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        #else
-        .tabViewStyle(.automatic)
-        #endif
-        .animation(.easeInOut, value: currentStep)
-        
-        // Navigation Buttons
+        .padding(.horizontal, TMISpacing.screenPadding)
+        .padding(.vertical, TMISpacing.ms)
+
+        // Steps change only through Next/Back so every step's validation
+        // runs (a paged TabView let a swipe skip it).
+        Group {
+          switch currentStep {
+          case 0: templateSelectionStep
+          case 1: configurationStep
+          default: cohortSelectionStep
+          }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)))
+        .id(currentStep)
+
         HStack {
             if currentStep > 0 {
-                Button("Back") {
-                    withAnimation { currentStep -= 1 }
+                Button("Back", systemImage: "chevron.left") {
+                    withAnimation(TMIAnimation.smooth) { currentStep -= 1 }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.tmiSecondary)
             }
-            
+
             Spacer()
-            
+
             if currentStep < 2 {
                 Button("Next") {
                     if canProceed() {
-                        withAnimation { currentStep += 1 }
+                        withAnimation(TMIAnimation.smooth) { currentStep += 1 }
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.tmiPrimary)
                 .disabled(!canProceed())
             } else {
                 Button("Assign Form") {
                     Task { await createAssignment() }
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(isSubmitting)
+                .buttonStyle(.tmiPrimary)
+                .disabled(isSubmitting || !canProceed() || selectedTemplate == nil)
+                .keyboardShortcut(.defaultAction)
             }
         }
-        .padding()
+        .padding(.horizontal, TMISpacing.screenPadding)
+        .padding(.vertical, TMISpacing.ms)
+        .background(TMIColors.surface)
+        .overlay(alignment: .top) { TMIDivider() }
       }
+      .tmiScreenBackground()
       .navigationTitle("New Assignment")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
@@ -125,8 +128,11 @@ struct AssignmentCreationView: View {
           await loadTemplates()
           await loadSchools()
       }
-      .alert("Error", isPresented: .constant(errorMessage != nil)) {
-          Button("OK") { errorMessage = nil }
+      .alert("Couldn’t Create Assignment", isPresented: Binding(
+          get: { errorMessage != nil },
+          set: { if !$0 { errorMessage = nil } }
+      )) {
+          Button("OK", role: .cancel) { errorMessage = nil }
       } message: {
           if let msg = errorMessage { Text(msg) }
       }
@@ -294,6 +300,14 @@ struct AssignmentCreationView: View {
       case .specificStudents:
           if selectedStudents.isEmpty { return "No students selected" }
           return "\(selectedStudents.count) student\(selectedStudents.count == 1 ? "" : "s")"
+      }
+  }
+
+  private var stepTitle: String {
+      switch currentStep {
+      case 0: "Template"
+      case 1: "Details"
+      default: "Who receives it"
       }
   }
 

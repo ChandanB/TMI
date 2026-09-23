@@ -46,13 +46,13 @@ final class StudentDetailUITests: XCTestCase {
 
         app.buttons["studentDetail.destination.meetingsAndNotes"].tap()
 
-        let unavailable = app.staticTexts[
-            "Timeline available in Release 4"
-        ]
+        // User-facing copy never names internal release numbers.
+        let unavailable = app.staticTexts["Timeline not available yet"]
         XCTAssertTrue(
             unavailable.waitForExistence(timeout: 5),
             app.debugDescription
         )
+        XCTAssertTrue(element("studentDetail.timeline.unavailable", in: app).exists)
         XCTAssertFalse(element("studentDetail.timeline.empty", in: app).exists)
     }
 

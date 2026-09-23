@@ -46,7 +46,6 @@ struct StudentDetailView: View {
                 )
             } else {
                 ProgressView("Loading student access…")
-                    .tint(TMIColors.teal)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .accessibilityIdentifier("studentDetail.loading")
             }
@@ -83,6 +82,8 @@ struct StudentDetailView: View {
                     }
                 }
                 .tmiSheetStyle()
+            } else {
+                StudentSheetUnavailableView(title: "Editing unavailable")
             }
         }
         .sheet(isPresented: $showingStudentModeLaunch) {
@@ -97,6 +98,8 @@ struct StudentDetailView: View {
                     session: studentModeSession
                 )
                 .tmiSheetStyle()
+            } else {
+                StudentSheetUnavailableView(title: "Student Mode unavailable")
             }
         }
     }
@@ -195,6 +198,17 @@ private struct StudentOperationalHubContent: View {
     /// Approved interests drive career matching; an empty list means nothing
     /// has been approved yet, which the discovery view says plainly.
     @State private var careerInterests: [StudentInterest] = []
+#if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+#endif
+
+    private var usesWideLayout: Bool {
+#if os(macOS)
+        true
+#else
+        horizontalSizeClass == .regular
+#endif
+    }
 
     var body: some View {
         ZStack {
@@ -203,6 +217,17 @@ private struct StudentOperationalHubContent: View {
             phaseContent
         }
         .accessibilityIdentifier("studentDetail.screen")
+#if os(macOS)
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    Task { await state.refresh() }
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                .help("Refresh this record (⌘R)")
+            }
+        }
+#endif
         .sheet(isPresented: $showingPlanEditor) {
             if let member, let header = state.header {
                 CanonicalPlanEditorView(
@@ -236,7 +261,6 @@ private struct StudentOperationalHubContent: View {
         switch state.phase {
         case .idle, .loading:
             ProgressView("Loading student…")
-                .tint(TMIColors.teal)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("studentDetail.loading")
 
@@ -271,8 +295,7 @@ private struct StudentOperationalHubContent: View {
                         await state.refresh()
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(TMIColors.teal)
+                .buttonStyle(.tmiPrimary)
             }
             .accessibilityIdentifier("studentDetail.failed")
 
@@ -295,17 +318,61 @@ private struct StudentOperationalHubContent: View {
                         onArchive: state.menuActions.contains(.archive)
                             ? archive
                             : nil,
-                        onLaunchStudentMode: launchStudentMode
+                        // Offer Student Mode only when this build can run it;
+                        // otherwise the button would open an empty sheet.
+                        onLaunchStudentMode: dependencies.studentModeRepository == nil
+                            ? nil
+                            : launchStudentMode
                     )
                 }
 
-                destinationPicker
-                selectedContent
+                if usesWideLayout {
+                    HStack(alignment: .top, spacing: TMISpacing.lg) {
+                        sectionRail
+                            .frame(width: 220)
+                        selectedContent
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                } else {
+                    destinationPicker
+                    selectedContent
+                }
             }
-            .frame(maxWidth: 980, alignment: .leading)
-            .padding(TMISpacing.lg)
+            .frame(maxWidth: TMISizing.maxContentWidth, alignment: .leading)
+            .padding(.horizontal, TMISpacing.screenPadding)
+            .padding(.vertical, TMISpacing.md)
             .frame(maxWidth: .infinity)
         }
+        .sensoryFeedback(.selection, trigger: selectedDestination)
+    }
+
+    /// iPad and Mac: a System Settings–style section list beside the content.
+    private var sectionRail: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(StudentHubDestination.destinations(for: programProfile)) { destination in
+                let isSelected = selectedDestination == destination
+                Button {
+                    selectedDestination = destination
+                } label: {
+                    HStack(spacing: TMISpacing.ms) {
+                        TMIIconTile(destination.systemImage, tone: isSelected ? .brand : .neutral, size: 26)
+                        Text(destination.title(for: programProfile))
+                            .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                            .foregroundStyle(TMIColors.textPrimary)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, TMISpacing.sm)
+                    .padding(.vertical, 6)
+                    .background(isSelected ? TMIColors.selection : Color.clear, in: TMIShape.control)
+                    .contentShape(TMIShape.control)
+                }
+                .buttonStyle(.tmiPressable)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityIdentifier("studentDetail.destination.\(destination.id)")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Student detail sections")
     }
 
     @ViewBuilder
@@ -363,28 +430,30 @@ private struct StudentOperationalHubContent: View {
                     } label: {
                         Label(destination.title(for: programProfile), systemImage: destination.systemImage)
                             .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, TMISpacing.md)
-                            .frame(minHeight: 44)
+                            .padding(.horizontal, TMISpacing.ms + 2)
+                            .padding(.vertical, 8)
                             .foregroundStyle(
                                 selectedDestination == destination
-                                    ? TMIColors.tealForeground
+                                    ? TMIColors.accent
                                     : TMIColors.textPrimary
                             )
                             .background(
                                 selectedDestination == destination
-                                    ? TMIColors.teal
-                                    : TMIColors.surface
+                                    ? TMIColors.accentSoft
+                                    : TMIColors.fill,
+                                in: Capsule()
                             )
-                            .clipShape(Capsule())
                             .overlay {
                                 Capsule()
-                                    .stroke(
+                                    .strokeBorder(
                                         selectedDestination == destination
-                                            ? TMIColors.teal
-                                            : TMIColors.interactiveBorder,
+                                            ? TMIColors.accent.opacity(0.35)
+                                            : Color.clear,
                                         lineWidth: 1
                                     )
                             }
+                            .frame(minHeight: 44)
+                            .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(
@@ -409,7 +478,8 @@ private struct StudentOperationalHubContent: View {
                 currentSections: state.currentSections,
                 member: member,
                 planCreatedMessage: planCreatedMessage,
-                onStartPlan: { showingPlanEditor = true }
+                onStartPlan: { showingPlanEditor = true },
+                onOpen: { domain in selectedDestination = .domain(domain) }
             )
         case .domain(let domain):
             if domain == .interests, let student = state.student {
@@ -432,7 +502,16 @@ private struct StudentOperationalHubContent: View {
                 )
             } else if domain == .plans, let student = state.student, let member,
                       let repository = dependencies.planRepository {
-                CanonicalPlanListView(state: CanonicalPlanListState(repository: repository, studentID: student.id), member: member, embedded: true)
+                CanonicalPlanListView(
+                    state: CanonicalPlanListState(
+                        repository: repository,
+                        studentRepository: dependencies.studentRepository,
+                        children: dependencies.planChildRepository,
+                        studentID: student.id
+                    ),
+                    member: member,
+                    embedded: true
+                )
                     .id(student.id)
             } else if domain == .resources, let student = state.student, let member,
                       let repository = dependencies.resourceRepository {
@@ -463,6 +542,13 @@ private struct StudentOperationalHubContent: View {
                 }
             } else if domain == .meetingsAndNotes, let student = state.student {
                 VStack(alignment: .leading, spacing: TMISpacing.lg) {
+                    // Private notes and student reflections from the record
+                    // itself, kept visibly distinct (previously unreachable).
+                    StudentTimelineView(
+                        privateNotes: state.privateNotes,
+                        studentReflections: state.studentReflections
+                    )
+
                     StudentMeetingsSection(studentID: student.id)
 
                     StudentTasksSection(
@@ -568,61 +654,50 @@ private struct StudentOverviewSection: View {
     var member: MembershipContext?
     var planCreatedMessage: String?
     var onStartPlan: () -> Void = {}
+    var onOpen: (StudentDetailDomain) -> Void = { _ in }
 
     var body: some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 260), spacing: TMISpacing.md)],
-            spacing: TMISpacing.md
-        ) {
-            TMICard(style: .outlined, accentColor: TMIColors.teal) {
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            TMIGoldenHourCard {
                 VStack(alignment: .leading, spacing: TMISpacing.sm) {
-                    Label("Next step", systemImage: "arrow.forward.circle")
-                        .font(.headline)
-                        .foregroundStyle(TMIColors.aubergine)
+                    Label("Next step", systemImage: "sparkles")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(TMIColors.surface.opacity(0.55), in: Capsule())
+                    Text(planCreatedMessage ?? planStatus)
+                        .font(.title3.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(
-                        programContext.profile(forSchoolID: header?.schoolID).showsCareers
+                        programProfile.showsCareers
                             ? "Review the verified profile and assigned team, then explore this student's interests, careers, plans, and resources."
                             : "Review the child's profile and care team, record what you observe them enjoying, invite the family's input, then build a plan."
                     )
-                    .font(.body)
-                    .foregroundStyle(TMIColors.textSecondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            TMICard(style: .outlined, accentColor: TMIColors.aubergine) {
-                VStack(alignment: .leading, spacing: TMISpacing.sm) {
-                    Label("Plan status", systemImage: "checklist")
-                        .font(.headline)
-                        .foregroundStyle(TMIColors.aubergine)
-                    Text(planCreatedMessage ?? planStatus)
-                        .font(.body)
-                        .foregroundStyle(
-                            planCreatedMessage == nil
-                                ? TMIColors.textSecondary
-                                : TMIColors.successText
-                        )
+                    .font(.subheadline)
+                    .foregroundStyle(TMIColors.goldenHourSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
                     if canStartPlan {
                         Button("Start a TMI plan", systemImage: "plus.circle") {
                             onStartPlan()
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(TMIColors.aubergine)
+                        .buttonStyle(.tmiPrimary)
+                        .padding(.top, TMISpacing.xs)
                         .accessibilityIdentifier("studentDetail.startPlan")
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            ForEach(currentSections) { section in
-                TMICard(style: .outlined) {
-                    HStack(alignment: .top, spacing: TMISpacing.md) {
-                        Image(systemName: section.domain.systemImage)
-                            .font(.title2)
-                            .foregroundStyle(TMIColors.teal)
-                            .frame(width: 32)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: TMISpacing.xs) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 240), spacing: TMISpacing.ms)],
+                spacing: TMISpacing.ms
+            ) {
+                ForEach(visibleSections) { section in
+                    Button {
+                        onOpen(section.domain)
+                    } label: {
+                    HStack(alignment: .top, spacing: TMISpacing.ms) {
+                        TMIIconTile(section.domain.systemImage, tone: section.itemIDs.isEmpty ? .neutral : .brand)
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(section.domain.title)
                                 .font(.headline)
                                 .foregroundStyle(TMIColors.textPrimary)
@@ -630,15 +705,31 @@ private struct StudentOverviewSection: View {
                                 .font(.subheadline)
                                 .foregroundStyle(TMIColors.textSecondary)
                         }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(TMIColors.textTertiary)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .tmiSurface(padding: TMISpacing.md)
+                    }
+                    .buttonStyle(.tmiPressable)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier(
+                        "studentDetail.overview.\(section.domain.rawValue)"
+                    )
                 }
-                .accessibilityIdentifier(
-                    "studentDetail.overview.\(section.domain.rawValue)"
-                )
             }
         }
         .accessibilityIdentifier("studentDetail.overview")
+    }
+
+    private var programProfile: ProgramProfile {
+        programContext.profile(forSchoolID: header?.schoolID)
+    }
+
+    /// Early-childhood sites have no careers, so their card is hidden too.
+    private var visibleSections: [StudentDetailSectionProjection] {
+        currentSections.filter { $0.domain != .careers || programProfile.showsCareers }
     }
 
     /// Creating a plan writes to the district, so it needs the same authority
@@ -666,7 +757,7 @@ private struct StudentOverviewSection: View {
         _ section: StudentDetailSectionProjection
     ) -> String {
         if section.itemIDs.isEmpty {
-            return "No confirmed records yet."
+            return "Open to review"
         }
         return "\(section.itemIDs.count) confirmed \(section.itemIDs.count == 1 ? "record" : "records")"
     }
@@ -680,8 +771,9 @@ private struct StudentDomainSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             Text(domain.title)
-                .font(.title2.bold())
+                .font(.tmiHeading2)
                 .foregroundStyle(TMIColors.textPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             StudentDomainCollectionCard(
                 title: "Current",
@@ -707,15 +799,14 @@ private struct StudentDomainCollectionCard: View {
         TMICard(style: .outlined) {
             VStack(alignment: .leading, spacing: TMISpacing.sm) {
                 Text(title)
-                    .font(.headline)
-                    .foregroundStyle(TMIColors.aubergine)
+                    .tmiEyebrow()
 
                 if let projection, !projection.itemIDs.isEmpty {
                     Label(
                         "\(projection.itemIDs.count) confirmed \(projection.itemIDs.count == 1 ? "record" : "records")",
                         systemImage: "checkmark.seal"
                     )
-                    .foregroundStyle(TMIColors.teal)
+                    .foregroundStyle(TMIColors.successText)
                 } else if let emptyState = projection?.emptyState {
                     ContentUnavailableView(
                         emptyState.title,
@@ -757,9 +848,31 @@ private struct StudentDetailStatusBanner: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .foregroundStyle(foreground)
-        .padding(TMISpacing.md)
-        .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, TMISpacing.md)
+        .padding(.vertical, TMISpacing.ms)
+        .background(background, in: TMIShape.control)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Shown instead of an empty sheet when the record a sheet needs has gone away
+/// (for example after access changed while the sheet was opening).
+private struct StudentSheetUnavailableView: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+
+    var body: some View {
+        NavigationStack {
+            ContentUnavailableView(
+                title,
+                systemImage: "person.crop.circle.badge.exclamationmark",
+                description: Text("Refresh the student record and try again.")
+            )
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }

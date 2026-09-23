@@ -33,6 +33,17 @@ struct AppRouterTests {
         #expect(router.path == [.student("student-z")])
     }
 
+    @Test("A drill-down can push a listed record without leaving the current tab")
+    func listedDrillDownStaysOnTab() throws {
+        let router = AppRouter(policy: policy(role: .districtAdministrator))
+        try router.select(.district)
+
+        try router.openListed(.student("student-a"), staysOnCurrentTab: true)
+
+        #expect(router.selectedTab == .district)
+        #expect(router.path == [.student("student-a")])
+    }
+
     @Test("Listed records still require a signed-in role and a valid identifier")
     func listedRecordsFailClosed() {
         let signedOut = AppRouter(policy: AppNavigationPolicy(role: nil))

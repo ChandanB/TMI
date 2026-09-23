@@ -244,6 +244,7 @@ final class FirebaseStaffAdministrationRepository: StaffAdministrationRepository
         _ request: Request
     ) async throws -> Response {
         do {
+            try FirebaseSession.requireApp()
             let callable: Callable<Request, Response> = functions.httpsCallable(name)
             return try await callable.call(request)
         } catch is DecodingError {

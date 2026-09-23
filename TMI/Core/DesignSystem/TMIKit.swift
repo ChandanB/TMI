@@ -711,3 +711,23 @@ nonisolated struct TMIAvatarColors: Sendable {
         return palette[Int(hash % UInt32(palette.count))]
     }
 }
+
+// MARK: - Sheet sizing
+
+extension View {
+    /// Sizes a sheet on the Mac only. On iPhone a minimum width wider than
+    /// the screen clips the sheet, so iOS keeps the system sizing.
+    @ViewBuilder
+    func tmiMacSheetFrame(
+        minWidth: CGFloat,
+        idealWidth: CGFloat? = nil,
+        minHeight: CGFloat? = nil,
+        idealHeight: CGFloat? = nil
+    ) -> some View {
+#if os(macOS)
+        frame(minWidth: minWidth, idealWidth: idealWidth, minHeight: minHeight, idealHeight: idealHeight)
+#else
+        self
+#endif
+    }
+}

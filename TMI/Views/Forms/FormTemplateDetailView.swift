@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct FormTemplateDetailView: View {
+  @Environment(\.dismiss) private var dismiss
   var template: FormTemplate
 
   @State private var isAddingTemplate = false
@@ -76,6 +77,9 @@ struct FormTemplateDetailView: View {
     .navigationTitle(template.name)
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Done") { dismiss() }
+      }
       ToolbarItem(placement: .navigationBarTrailing) {
         Menu {
           Button(action: {
@@ -85,34 +89,8 @@ struct FormTemplateDetailView: View {
           }) {
             Label("Add to My Forms", systemImage: "plus.circle")
           }
-
-          Button(action: {
-            // Edit action
-          }) {
-            Label("Edit Template", systemImage: "pencil")
-          }
-
-          Button(action: {
-            // Share action
-          }) {
-            Label("Share Template", systemImage: "square.and.arrow.up")
-          }
-
-          Divider()
-
-          Button(
-            role: .destructive,
-            action: {
-              // Delete action
-            }
-          ) {
-            Label("Delete Template", systemImage: "trash")
-          }
         } label: {
-          Image(systemName: "ellipsis")
-            .font(.system(size: 20))
-            .foregroundColor(Color.tmiTextPrimary)
-            .frame(width: 40, height: 40)
+          Label("More", systemImage: "ellipsis")
         }
       }
     }
@@ -122,8 +100,10 @@ struct FormTemplateDetailView: View {
       }
     }
     .sheet(isPresented: $showingPreview) {
-      FormPreviewView(template: template)
-        .tmiSheetStyle()
+      NavigationStack {
+        FormPreviewView(template: template)
+      }
+      .tmiSheetStyle()
     }
   }
 

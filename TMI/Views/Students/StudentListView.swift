@@ -409,7 +409,11 @@ private struct StudentRosterContent: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
+#if os(macOS)
+            .listStyle(.inset)
+#else
             .listStyle(.insetGrouped)
+#endif
             .scrollContentBackground(.hidden)
             .refreshable { await state.refresh() }
         }

@@ -244,7 +244,7 @@ final class CanonicalPlanListState {
             progress: progress,
             relationships: relationships,
             attentionReasons: attention,
-            nextReviewDate: nil
+            nextReviewDate: plan.reviewDate
         )
     }
 

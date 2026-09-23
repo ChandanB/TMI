@@ -21,6 +21,18 @@ struct CanonicalPlanDetailView: View {
     @State private var pendingTransition: PlanRecordStatus?
     @State private var transitionNote = ""
     @State private var isEditingPlan = false
+    @State private var confirmingArchive = false
+#if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+#endif
+
+    private var usesWideLayout: Bool {
+#if os(macOS)
+        true
+#else
+        horizontalSizeClass == .regular
+#endif
+    }
 
     private let memberOverride: MembershipContext?
 
@@ -72,7 +84,8 @@ struct CanonicalPlanDetailView: View {
                     }
                 }
             }
-            .frame(minWidth: 460, idealWidth: 500, minHeight: 320)
+            .tmiMacSheetFrame(minWidth: 460, idealWidth: 500, minHeight: 320)
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $isEditingPlan) {
             if let state, let plan = state.plan, let member,
@@ -186,7 +199,7 @@ struct CanonicalPlanDetailView: View {
                     description: Text(message)
                 )
                 Button("Retry") { Task { await state.load(member: member) } }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.tmiPrimary)
                 }
             case .loaded(let plan):
                 loaded(plan: plan, state: state, member: member)
@@ -204,138 +217,205 @@ struct CanonicalPlanDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: TMISpacing.lg) {
                 header(plan: plan, state: state, member: member)
-                lifecycle(plan: plan, state: state, member: member)
-                if let summary = plan.summary, !summary.isEmpty {
-                    section("Summary") {
-                        Text(summary).font(.body)
-                    }
-                }
-                section("Dates") {
-                    LabeledContent(
-                        "Starts",
-                        value: plan.startDate.formatted(date: .abbreviated, time: .omitted)
-                    )
-                    if let targetDate = plan.targetDate {
-                        LabeledContent(
-                            "Target",
-                            value: targetDate.formatted(date: .abbreviated, time: .omitted)
-                        )
-                    }
-                }
-                if state.childrenPhase == .loaded {
-                goalsSection(plan: plan, state: state, member: member)
-
-                if let repository = dependencies.resourceRepository {
-                    section("Resources") {
-                        PlanResourceListSection(
-                            planID: plan.id,
-                            member: member,
-                            repository: repository,
-                            canLink: plan.status.isEditable
-                        )
-                    }
-                }
-
-                if let studentID = plan.studentIDs.sorted().first {
-                    section("Recommendations") {
-                        PlanRecommendationsStrip(studentID: studentID, planID: plan.id)
-                    }
-                }
-
-                section("Progress") {
-                    if state.progress.isEmpty {
-                        Text("No progress recorded yet.")
-                            .font(.subheadline)
-                            .foregroundStyle(TMIColors.textSecondary)
-                    } else {
-                        Text("\(state.completionPercentage)% of due actions done")
-                            .font(.subheadline.weight(.semibold))
-                            .accessibilityIdentifier("planDetail.completion")
-                        ForEach(state.progress) { entry in
-                            VStack(alignment: .leading, spacing: TMISpacing.xxs) {
-                                Text(entry.note ?? entry.measuredValue ?? "Recorded")
-                                    .font(.subheadline)
-                                Text(entry.visibility == .sharedWithStudent
-                                    ? "Shared with the student"
-                                    : "Staff only")
-                                    .font(.caption)
-                                    .foregroundStyle(TMIColors.textSecondary)
-                            }
+                if usesWideLayout {
+                    HStack(alignment: .top, spacing: TMISpacing.lg) {
+                        VStack(alignment: .leading, spacing: TMISpacing.lg) {
+                            mainColumn(plan: plan, state: state, member: member)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(alignment: .leading, spacing: TMISpacing.lg) {
+                            sideColumn(plan: plan, state: state, member: member)
+                        }
+                        .frame(width: 340)
                     }
-                }
-
-                if state.canExport(member) {
-                    section("Export") {
-                        // Exporting is a separate permission from reading, and
-                        // it is recorded before anything is produced.
-                        ForEach(PlanExportKind.allCases, id: \.self) { kind in
-                            Button("Export \(kind.title)") {
-                                Task { await state.export(kind: kind, member: member) }
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(state.isMutating)
-                            .accessibilityIdentifier("planDetail.export.\(kind.rawValue)")
-                        }
-                        if state.exportedPDF != nil {
-                            let exportID = state.exportID
-                            ShareLink(item: PlanPDFShare {
-                                try state.pdfForSharing(id: exportID, member: member)
-                            }, preview: SharePreview("TMI plan", image: Image(systemName: "doc.richtext"))) {
-                                Label("Share PDF", systemImage: "square.and.arrow.up")
-                            }
-                            .accessibilityIdentifier("planDetail.sharePDF")
-                        }
-                        if let message = state.exportMessage {
-                            Text(message)
-                                .font(.footnote)
-                                .foregroundStyle(TMIColors.textSecondary)
-                                .accessibilityIdentifier("planDetail.exportMessage")
-                        }
-                    }
-                }
-
-                section("History") {
-                    // Revisions freeze at approval, changes requested and
-                    // completion. Until those are persisted there is nothing
-                    // to show, and saying so beats an empty box.
-                    if state.revisions.isEmpty {
-                        Text("Revisions appear here once this plan is approved or completed.")
-                            .font(.subheadline)
-                            .foregroundStyle(TMIColors.textSecondary)
-                    } else {
-                        ForEach(PlanRevisionHistory.ordered(state.revisions)) { revision in
-                            VStack(alignment: .leading, spacing: TMISpacing.xxs) {
-                                Text("\(revision.reason.displayName) · revision \(revision.sequence)")
-                                    .font(.subheadline.weight(.semibold))
-                                Text(revision.frozenAt.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption)
-                                    .foregroundStyle(TMIColors.textSecondary)
-                                if let note = revision.note {
-                                    Text(note).font(.caption)
-                                }
-                            }
-                        }
-                    }
-                }
                 } else {
-                    section("Plan details") {
-                        switch state.childrenPhase {
-                        case .loading: ProgressView("Loading goals and history…")
-                        case .failed(let message):
-                            Text(message).foregroundStyle(TMIColors.errorText)
-                            Button("Retry loading details") { Task { await state.load(member: member) } }
-                                .buttonStyle(.bordered)
-                        case .loaded: EmptyView()
+                    mainColumn(plan: plan, state: state, member: member)
+                    sideColumn(plan: plan, state: state, member: member)
+                }
+            }
+            .frame(maxWidth: usesWideLayout ? TMISizing.maxContentWidth : TMISizing.readableWidth, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, TMISpacing.screenPadding)
+            .padding(.vertical, TMISpacing.md)
+        }
+        .tmiScreenBackground()
+        .refreshable { await state.load(member: member) }
+#if os(macOS)
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    Task { await state.load(member: member) }
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                .help("Refresh this plan (⌘R)")
+            }
+        }
+#endif
+        .confirmationDialog(
+            "Archive this plan?",
+            isPresented: $confirmingArchive,
+            titleVisibility: .visible
+        ) {
+            Button("Archive Plan", role: .destructive) {
+                Task { await state.transition(to: .archived, member: member) }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Archiving is final. The plan leaves active work and can no longer be edited.")
+        }
+    }
+
+    @ViewBuilder
+    private func mainColumn(
+        plan: PlanRecord,
+        state: CanonicalPlanDetailState,
+        member: MembershipContext
+    ) -> some View {
+        lifecycle(plan: plan, state: state, member: member)
+        if let summary = plan.summary, !summary.isEmpty {
+            section("Summary") {
+                Text(summary)
+                    .font(.body)
+                    .foregroundStyle(TMIColors.textPrimary)
+            }
+        }
+        if state.childrenPhase == .loaded {
+            goalsSection(plan: plan, state: state, member: member)
+            progressSection(state: state)
+        } else {
+            section("Plan details") {
+                switch state.childrenPhase {
+                case .loading: ProgressView("Loading goals and history…")
+                case .failed(let message):
+                    Text(message).foregroundStyle(TMIColors.errorText)
+                    Button("Retry loading details") { Task { await state.load(member: member) } }
+                        .buttonStyle(.tmiSecondary)
+                case .loaded: EmptyView()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sideColumn(
+        plan: PlanRecord,
+        state: CanonicalPlanDetailState,
+        member: MembershipContext
+    ) -> some View {
+        section("Dates") {
+            TMIKeyValueRow("Starts", value: plan.startDate.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
+            if let targetDate = plan.targetDate {
+                TMIKeyValueRow("Target", value: targetDate.formatted(date: .abbreviated, time: .omitted), systemImage: "target")
+            }
+            if let reviewDate = plan.reviewDate {
+                TMIKeyValueRow("Next review", value: reviewDate.formatted(date: .abbreviated, time: .omitted), systemImage: "clock")
+            }
+        }
+        if state.childrenPhase == .loaded {
+            if let repository = dependencies.resourceRepository {
+                section("Resources") {
+                    PlanResourceListSection(
+                        planID: plan.id,
+                        member: member,
+                        repository: repository,
+                        canLink: plan.status.isEditable
+                    )
+                }
+            }
+
+            if let studentID = plan.studentIDs.sorted().first {
+                section("Recommendations") {
+                    PlanRecommendationsStrip(studentID: studentID, planID: plan.id)
+                }
+            }
+
+            if state.canExport(member) {
+                section("Export") {
+                    // Exporting is a separate permission from reading, and
+                    // it is recorded before anything is produced.
+                    ForEach(PlanExportKind.allCases, id: \.self) { kind in
+                        Button("Export \(kind.title)", systemImage: "arrow.down.doc") {
+                            Task { await state.export(kind: kind, member: member) }
+                        }
+                        .buttonStyle(.tmiSecondary)
+                        .disabled(state.isMutating)
+                        .accessibilityIdentifier("planDetail.export.\(kind.rawValue)")
+                    }
+                    if state.exportedPDF != nil {
+                        let exportID = state.exportID
+                        ShareLink(item: PlanPDFShare {
+                            try state.pdfForSharing(id: exportID, member: member)
+                        }, preview: SharePreview("TMI plan", image: Image(systemName: "doc.richtext"))) {
+                            Label("Share PDF", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.tmiPrimary)
+                        .accessibilityIdentifier("planDetail.sharePDF")
+                    }
+                    if let message = state.exportMessage {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(TMIColors.textSecondary)
+                            .accessibilityIdentifier("planDetail.exportMessage")
+                    }
+                }
+            }
+
+            section("History") {
+                // Revisions freeze at approval, changes requested and
+                // completion. Until those are persisted there is nothing
+                // to show, and saying so beats an empty box.
+                if state.revisions.isEmpty {
+                    Text("Revisions appear here once this plan is approved or completed.")
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                } else {
+                    ForEach(PlanRevisionHistory.ordered(state.revisions)) { revision in
+                        VStack(alignment: .leading, spacing: TMISpacing.xxs) {
+                            Text("\(revision.reason.displayName) · revision \(revision.sequence)")
+                                .font(.subheadline.weight(.semibold))
+                            Text(revision.frozenAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption)
+                                .foregroundStyle(TMIColors.textSecondary)
+                            if let note = revision.note {
+                                Text(note).font(.caption)
+                            }
                         }
                     }
                 }
             }
-            .frame(maxWidth: 800, alignment: .leading)
-            .frame(maxWidth: .infinity)
-            .padding(TMISpacing.lg)
         }
-        .refreshable { await state.load(member: member) }
+    }
+
+    private func progressSection(state: CanonicalPlanDetailState) -> some View {
+        section("Progress") {
+            if state.progress.isEmpty {
+                Text("No progress recorded yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(TMIColors.textSecondary)
+            } else {
+                // Completion counts every action on the plan, due or not.
+                Text("\(state.completionPercentage)% of actions done")
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("planDetail.completion")
+                ForEach(state.progress) { entry in
+                    HStack(alignment: .top, spacing: TMISpacing.ms) {
+                        TMIIconTile(entry.visibility == .sharedWithStudent ? "person.fill.checkmark" : "lock.fill",
+                                    tone: entry.visibility == .sharedWithStudent ? .success : .neutral,
+                                    size: 28)
+                        VStack(alignment: .leading, spacing: TMISpacing.xxs) {
+                            Text(entry.note ?? entry.measuredValue ?? "Recorded")
+                                .font(.subheadline)
+                                .foregroundStyle(TMIColors.textPrimary)
+                            Text(entry.visibility == .sharedWithStudent
+                                ? "Shared with the student"
+                                : "Staff only")
+                                .font(.caption)
+                                .foregroundStyle(TMIColors.textSecondary)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func header(
@@ -343,65 +423,88 @@ struct CanonicalPlanDetailView: View {
         state: CanonicalPlanDetailState,
         member: MembershipContext
     ) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.sm) {
-            HStack(alignment: .top, spacing: TMISpacing.md) {
-                VStack(alignment: .leading, spacing: TMISpacing.xxs) {
-                    Text(plan.title)
-                        .font(.largeTitle.bold())
-                        .accessibilityIdentifier("planDetail.title")
-                    // A default plan keeps the model's name as its title; showing
-                    // the model again underneath would just repeat the heading.
-                    if plan.model.rawValue != plan.title {
-                        Text(plan.model.rawValue)
-                            .font(.headline)
-                            .foregroundStyle(TMIColors.aubergine)
-                    }
-                }
-                Spacer(minLength: 0)
+        HStack(alignment: .top, spacing: TMISpacing.md) {
+            VStack(alignment: .leading, spacing: TMISpacing.sm) {
                 planStatusBadge(plan.status)
+                Text(plan.title)
+                    .font(.tmiEditorial(.largeTitle))
+                    .foregroundStyle(TMIColors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("planDetail.title")
+                // A default plan keeps the model's name as its title; showing
+                // the model again underneath would just repeat the heading.
+                if plan.model.rawValue != plan.title {
+                    Label(plan.model.rawValue, systemImage: "sparkles")
+                        .font(.headline)
+                        .foregroundStyle(TMIColors.accent)
+                }
+                if let name = state.studentDisplayName {
+                    Label(name, systemImage: "person.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                        .privacySensitive()
+                        .accessibilityIdentifier("planDetail.student")
+                }
+                if plan.status.isEditable,
+                   (plan.effectiveOwnerMemberID == member.userID || plan.assignedMemberIDs.contains(member.userID)),
+                   member.capabilities.contains(.studentWriteDetail) {
+                    Button("Edit plan", systemImage: "pencil") { self.isEditingPlan = true }
+                        .buttonStyle(.tmiSecondary)
+                        .keyboardShortcut("e", modifiers: .command)
+                        .padding(.top, TMISpacing.xs)
+                        .accessibilityIdentifier("planDetail.edit")
+                }
             }
-            if let name = state.studentDisplayName {
-                Label(name, systemImage: "person.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(TMIColors.textSecondary)
-                    .accessibilityIdentifier("planDetail.student")
-            }
-            if plan.status.isEditable,
-               (plan.effectiveOwnerMemberID == member.userID || plan.assignedMemberIDs.contains(member.userID)),
-               member.capabilities.contains(.studentWriteDetail) {
-                Button("Edit plan", systemImage: "pencil") { self.isEditingPlan = true }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("planDetail.edit")
+            Spacer(minLength: 0)
+            if state.childrenPhase == .loaded, !state.actions.isEmpty {
+                VStack(spacing: 4) {
+                    TMIProgressCircle(progress: Double(state.completionPercentage) / 100, size: 72, lineWidth: 6)
+                    Text("of actions done")
+                        .font(.caption)
+                        .foregroundStyle(TMIColors.textTertiary)
+                }
+                .accessibilityElement(children: .combine)
             }
         }
+        .tmiSurface(padding: TMISpacing.ml)
     }
 
     private func planStatusBadge(_ status: PlanRecordStatus) -> some View {
-        Text(status.displayName)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, TMISpacing.sm)
-            .padding(.vertical, TMISpacing.xxs)
-            .background(TMIColors.aubergineSoft, in: Capsule())
-            .foregroundStyle(TMIColors.aubergine)
+        TMIStatusBadge(status.displayName, tone: Self.tone(for: status))
             .accessibilityIdentifier("planDetail.status")
     }
 
-    private func goalStatusBadge(_ status: GoalRecordStatus) -> some View {
-        let palette: (background: Color, foreground: Color) = switch status {
-        case .notStarted: (TMIColors.surface, TMIColors.textSecondary)
-        case .inProgress: (TMIColors.infoSurface, TMIColors.infoText)
-        case .met: (TMIColors.successSurface, TMIColors.successText)
-        case .discontinued: (TMIColors.errorSurface, TMIColors.errorText)
+    private static func tone(for status: PlanRecordStatus) -> TMITone {
+        switch status {
+        case .approved, .active: .success
+        case .paused, .changesRequested, .pendingApproval: .warning
+        case .completed, .archived: .info
+        case .draft: .neutral
         }
-        return Text(status.displayName)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, TMISpacing.sm)
-            .padding(.vertical, 2)
-            .background(palette.background, in: Capsule())
-            .foregroundStyle(palette.foreground)
-            .overlay(
-                Capsule().stroke(TMIColors.border.opacity(0.5), lineWidth: status == .notStarted ? 1 : 0)
-            )
+    }
+
+    /// Forward moves first, pauses and rework next, archive (terminal) last.
+    private static func rank(_ status: PlanRecordStatus) -> Int {
+        switch status {
+        case .pendingApproval: 0
+        case .approved: 1
+        case .active: 2
+        case .completed: 3
+        case .changesRequested: 4
+        case .paused: 5
+        case .draft: 6
+        case .archived: 7
+        }
+    }
+
+    private func goalStatusBadge(_ status: GoalRecordStatus) -> some View {
+        let tone: TMITone = switch status {
+        case .notStarted: .neutral
+        case .inProgress: .info
+        case .met: .success
+        case .discontinued: .danger
+        }
+        return TMIStatusBadge(status.displayName, tone: tone)
     }
 
     private func lifecycle(
@@ -419,18 +522,26 @@ struct CanonicalPlanDetailView: View {
                     .foregroundStyle(TMIColors.textSecondary)
                     .accessibilityIdentifier("planDetail.noTransitions")
             } else {
-                ForEach(transitions, id: \.self) { status in
-                    Button("Move to \(status.displayName.lowercased())") {
-                        if status == .changesRequested || status == .completed {
-                            self.transitionNote = ""
-                            self.pendingTransition = status
-                        } else {
-                            Task { await state.transition(to: status, member: member) }
+                let ordered = transitions.sorted { Self.rank($0) < Self.rank($1) }
+                FlowLayout(spacing: TMISpacing.sm) {
+                    ForEach(ordered, id: \.self) { status in
+                        Button("Move to \(status.displayName.lowercased())") {
+                            if status == .changesRequested || status == .completed {
+                                self.transitionNote = ""
+                                self.pendingTransition = status
+                            } else if status == .archived {
+                                self.confirmingArchive = true
+                            } else {
+                                Task { await state.transition(to: status, member: member) }
+                            }
                         }
+                        .buttonStyle(TMIActionButtonStyle(
+                            prominence: status == .archived ? .destructive
+                                : (status == ordered.first ? .primary : .secondary)
+                        ))
+                        .disabled(state.isMutating)
+                        .accessibilityIdentifier("planDetail.transition.\(status.rawValue)")
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(state.isMutating)
-                    .accessibilityIdentifier("planDetail.transition.\(status.rawValue)")
                 }
             }
             if let message = state.actionMessage {
@@ -464,8 +575,7 @@ struct CanonicalPlanDetailView: View {
                 Button("Add a goal", systemImage: "plus.circle.fill") {
                     isAddingGoal = true
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(TMIColors.aubergine)
+                .buttonStyle(.tmiPrimary)
                 .accessibilityIdentifier("planDetail.addGoal")
             }
         }
@@ -536,15 +646,13 @@ struct CanonicalPlanDetailView: View {
                         .accessibilityIdentifier("planDetail.recordProgress.\(goal.id)")
                     }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(.tmiTertiary)
             }
         }
         .padding(TMISpacing.md)
-        .background(TMIColors.background, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+        .background(TMIColors.surfaceSecondary, in: TMIShape.control)
         .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.md)
-                .stroke(TMIColors.border.opacity(0.6), lineWidth: 1)
+            TMIShape.control.strokeBorder(TMIColors.separator, lineWidth: 1)
         )
     }
 
@@ -559,7 +667,8 @@ struct CanonicalPlanDetailView: View {
         } label: {
             HStack(spacing: TMISpacing.sm) {
                 Image(systemName: symbol)
-                    .foregroundStyle(action.status == .done ? TMIColors.teal : TMIColors.textSecondary)
+                    .foregroundStyle(action.status == .done ? TMIColors.successText : TMIColors.textTertiary)
+                    .contentTransition(.symbolEffect(.replace))
                 Text(action.title)
                     .strikethrough(action.status == .done, color: TMIColors.textSecondary)
                     .foregroundStyle(action.status == .done ? TMIColors.textSecondary : TMIColors.textPrimary)
@@ -579,13 +688,15 @@ struct CanonicalPlanDetailView: View {
         _ title: String,
         @ViewBuilder content: () -> some View
     ) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.xs) {
-            Text(title).font(.headline)
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(TMIColors.textPrimary)
+                .accessibilityAddTraits(.isHeader)
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(TMISpacing.md)
-        .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+        .tmiSurface(padding: TMISpacing.md)
     }
 }
 

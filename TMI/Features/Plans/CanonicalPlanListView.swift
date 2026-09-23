@@ -10,7 +10,7 @@ struct CanonicalPlanListView: View {
         if embedded {
             content
         } else {
-            content.navigationTitle("TMI Plans")
+            content.navigationTitle("Plans")
         }
     }
 
@@ -51,7 +51,6 @@ struct CanonicalPlanListView: View {
             loaded(state: state, membership: membership)
         } else {
             ProgressView("Loading plans…")
-                .tint(TMIColors.teal)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("plans.loading")
                 .task {
@@ -72,7 +71,7 @@ struct CanonicalPlanListView: View {
         membership: MembershipContext
     ) -> some View {
         ZStack {
-            TMIBackgroundView(variant: .plans).ignoresSafeArea()
+            TMIColors.background.ignoresSafeArea()
 
             switch state.phase {
             case .idle, .loading:
@@ -105,6 +104,7 @@ struct CanonicalPlanListView: View {
                     Button("Try Again") {
                         Task { await state.load(member: membership) }
                     }
+                    .buttonStyle(.tmiPrimary)
                 }
                 .accessibilityIdentifier("plans.failed")
             case .loaded:
@@ -125,8 +125,7 @@ struct CanonicalPlanListView: View {
         return Group {
             if embedded {
                 VStack(alignment: .leading, spacing: TMISpacing.md) {
-                    TextField("Search plans", text: $state.searchText)
-                        .textFieldStyle(.roundedBorder)
+                    TMISearchBar(text: $state.searchText, placeholder: "Search plans")
                         .accessibilityIdentifier("plans.search")
                     filterBar(state: state, membership: membership)
                     if state.visibleItems.isEmpty {
@@ -136,10 +135,9 @@ struct CanonicalPlanListView: View {
                         NavigationLink(value: AppRoute.plan(item.id)) {
                             CanonicalPlanRow(item: item, currentMemberID: membership.userID)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(TMISpacing.md)
-                                .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: 16))
+                                .tmiSurface(padding: TMISpacing.md)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.tmiPressable)
                         .accessibilityIdentifier("plans.row.\(item.id)")
                     }
                 }
@@ -148,6 +146,8 @@ struct CanonicalPlanListView: View {
                     Section {
                         filterBar(state: state, membership: membership)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                     if state.visibleItems.isEmpty {
                         noMatches
                             .listRowBackground(Color.clear)
@@ -176,9 +176,10 @@ struct CanonicalPlanListView: View {
 
         return ScrollView(.horizontal) {
             HStack(spacing: TMISpacing.sm) {
-                Toggle("Open only", isOn: $state.showOpenOnly)
-                    .toggleStyle(.button)
-                    .accessibilityIdentifier("plans.openOnly")
+                TMIFilterChip(label: "Open only", isSelected: state.showOpenOnly) {
+                    state.showOpenOnly.toggle()
+                }
+                .accessibilityIdentifier("plans.openOnly")
 
                 filterMenu(
                     title: "Status",
@@ -249,9 +250,22 @@ struct CanonicalPlanListView: View {
                 Button(option.0) { select(option.1) }
             }
         } label: {
-            Label(current ?? title, systemImage: current == nil ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
-                .lineLimit(1)
+            HStack(spacing: 5) {
+                Text(current ?? title)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(current == nil ? TMIColors.textPrimary : TMIColors.accent)
+            .padding(.horizontal, TMISpacing.ms)
+            .padding(.vertical, 7)
+            .background(current == nil ? TMIColors.fill : TMIColors.accentSoft, in: Capsule())
+            .padding(.vertical, 4)
+            .contentShape(Capsule())
         }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .accessibilityLabel("Filter by \(title)")
         .accessibilityValue(current ?? "Any")
     }
@@ -279,61 +293,87 @@ private struct CanonicalPlanRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
             HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: TMISpacing.xxs) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(plan.title)
                         .font(.headline)
                         .foregroundStyle(TMIColors.textPrimary)
                     Text(item.studentDisplayNames.joined(separator: ", "))
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(TMIColors.aubergine)
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                        .privacySensitive()
                 }
                 Spacer(minLength: TMISpacing.md)
-                statusPill
+                TMIStatusBadge(plan.status.displayName, tone: statusTone)
             }
 
-            HStack(spacing: TMISpacing.md) {
+            HStack(spacing: TMISpacing.sm) {
                 Label(plan.model.rawValue, systemImage: "sparkles")
-                Label("Owner: \(ownerLabel)", systemImage: "person")
+                Text("·")
+                Text("Owner: \(ownerLabel)")
             }
-            .font(.caption)
-            .foregroundStyle(TMIColors.textSecondary)
+            .font(.footnote)
+            .foregroundStyle(TMIColors.textTertiary)
+            .lineLimit(1)
 
-            HStack(spacing: TMISpacing.md) {
+            progressView
+
+            HStack(spacing: TMISpacing.sm) {
                 Label {
                     Text(plan.startDate, format: .dateTime.month(.abbreviated).day().year())
                 } icon: {
                     Image(systemName: "calendar")
                 }
                 if let targetDate = plan.targetDate {
-                    Label {
-                        Text(targetDate, format: .dateTime.month(.abbreviated).day().year())
-                    } icon: {
-                        Image(systemName: "target")
-                    }
+                    Text("→")
+                    Text(targetDate, format: .dateTime.month(.abbreviated).day().year())
                 }
+                Spacer(minLength: 0)
+                Text(nextReviewText)
             }
-            .font(.caption)
-            .foregroundStyle(TMIColors.textSecondary)
-
-            HStack(spacing: TMISpacing.sm) {
-                progressLabel
-                Text("Next review: not recorded")
-                    .foregroundStyle(TMIColors.textSecondary)
-            }
-            .font(.caption)
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(TMIColors.textTertiary)
 
             if !item.relationships.isEmpty || !item.attentionReasons.isEmpty {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: TMISpacing.xs) { badges }
-                    VStack(alignment: .leading, spacing: TMISpacing.xs) { badges }
-                }
+                FlowLayout(spacing: TMISpacing.xs) { badges }
             }
         }
         .padding(.vertical, TMISpacing.xxs)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(plan.title), \(item.studentDisplayNames.joined(separator: ", ")), \(plan.model.rawValue), \(plan.status.displayName), owner \(ownerLabel), \(progressAccessibilityLabel), next review not recorded"
+            "\(plan.title), \(item.studentDisplayNames.joined(separator: ", ")), \(plan.model.rawValue), \(plan.status.displayName), owner \(ownerLabel), \(progressAccessibilityLabel), \(nextReviewText.lowercased())"
         )
+    }
+
+    private var nextReviewText: String {
+        if let date = item.nextReviewDate {
+            return "Review \(date.formatted(.dateTime.month(.abbreviated).day()))"
+        }
+        return "No review date"
+    }
+
+    @ViewBuilder
+    private var progressView: some View {
+        switch item.progress {
+        case .percentage(let value):
+            HStack(spacing: TMISpacing.sm) {
+                TMIProgressBar(value: Double(value) / 100, height: 6)
+                Text("\(value)%")
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(TMIColors.textSecondary)
+                    .frame(minWidth: 36, alignment: .trailing)
+            }
+        case .unavailable:
+            EmptyView()
+        }
+    }
+
+    private var statusTone: TMITone {
+        switch plan.status {
+        case .approved, .active: .success
+        case .paused, .changesRequested, .pendingApproval: .warning
+        case .completed, .archived: .info
+        case .draft: .neutral
+        }
     }
 
     private var ownerLabel: String {
@@ -348,18 +388,6 @@ private struct CanonicalPlanRow: View {
     }
 
     @ViewBuilder
-    private var progressLabel: some View {
-        switch item.progress {
-        case .percentage(let value):
-            Label("Progress: \(value)%", systemImage: "chart.bar.fill")
-                .foregroundStyle(TMIColors.teal)
-        case .unavailable:
-            Label("Progress unavailable", systemImage: "chart.bar")
-                .foregroundStyle(TMIColors.textSecondary)
-        }
-    }
-
-    @ViewBuilder
     private var badges: some View {
         ForEach(CanonicalPlanRelationship.allCases.filter(item.relationships.contains), id: \.self) { relationship in
             badge(relationship.displayName, systemImage: "person.2")
@@ -370,38 +398,6 @@ private struct CanonicalPlanRow: View {
     }
 
     private func badge(_ text: String, systemImage: String, attention: Bool = false) -> some View {
-        Label(text, systemImage: systemImage)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, TMISpacing.sm)
-            .padding(.vertical, TMISpacing.xxs)
-            .background(attention ? TMIColors.warningSurface : TMIColors.aubergineSoft, in: Capsule())
-            .foregroundStyle(attention ? TMIColors.warningText : TMIColors.aubergine)
-    }
-
-    private var statusPill: some View {
-        Text(plan.status.displayName)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, TMISpacing.sm)
-            .padding(.vertical, TMISpacing.xxs)
-            .background(statusSurface, in: Capsule())
-            .foregroundStyle(statusText)
-    }
-
-    private var statusSurface: Color {
-        switch plan.status {
-        case .approved, .active: TMIColors.successSurface
-        case .paused, .changesRequested, .pendingApproval: TMIColors.warningSurface
-        case .completed, .archived: TMIColors.infoSurface
-        case .draft: TMIColors.aubergineSoft
-        }
-    }
-
-    private var statusText: Color {
-        switch plan.status {
-        case .approved, .active: TMIColors.successText
-        case .paused, .changesRequested, .pendingApproval: TMIColors.warningText
-        case .completed, .archived: TMIColors.infoText
-        case .draft: TMIColors.aubergine
-        }
+        TMIStatusBadge(text, tone: attention ? .warning : .brand, systemImage: systemImage)
     }
 }

@@ -73,7 +73,8 @@ private struct PlanEditorWorkflowView: View {
                         saveFeedback
                     }
                     .frame(maxWidth: 760, alignment: .leading)
-                    .padding(TMISpacing.xl)
+                    .padding(.horizontal, TMISpacing.screenPadding)
+                    .padding(.vertical, TMISpacing.lg)
                     .frame(maxWidth: .infinity)
                 }
 
@@ -103,21 +104,48 @@ private struct PlanEditorWorkflowView: View {
     private var progressHeader: some View {
         VStack(alignment: .leading, spacing: TMISpacing.sm) {
             HStack {
-                Text("Step \(step.rawValue + 1) of \(PlanEditorState.Step.allCases.count)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(TMIColors.teal)
+                // Jump to any step; each step saves as you leave it.
+                Menu {
+                    ForEach(PlanEditorState.Step.allCases, id: \.self) { candidate in
+                        Button {
+                            state.scheduleAutosave()
+                            step = candidate
+                        } label: {
+                            if candidate == step {
+                                Label(candidate.title(for: programProfile), systemImage: "checkmark")
+                            } else {
+                                Text(candidate.title(for: programProfile))
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Step \(step.rawValue + 1) of \(PlanEditorState.Step.allCases.count)")
+                            .foregroundStyle(TMIColors.accent)
+                        Text(step.title(for: programProfile))
+                            .foregroundStyle(TMIColors.textPrimary)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(TMIColors.textTertiary)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Step \(step.rawValue + 1) of \(PlanEditorState.Step.allCases.count), \(step.title(for: programProfile))")
+                .accessibilityHint("Choose a step to jump to")
                 Spacer()
-                Text(step.title(for: programProfile))
-                    .font(.caption)
-                    .foregroundStyle(TMIColors.textSecondary)
             }
-            ProgressView(value: Double(step.rawValue + 1), total: Double(PlanEditorState.Step.allCases.count))
-                .tint(TMIColors.teal)
+            TMIProgressBar(
+                value: Double(step.rawValue + 1) / Double(PlanEditorState.Step.allCases.count),
+                height: 5
+            )
         }
-        .padding(.horizontal, TMISpacing.xl)
-        .padding(.vertical, TMISpacing.md)
+        .padding(.horizontal, TMISpacing.screenPadding)
+        .padding(.vertical, TMISpacing.ms)
         .background(TMIColors.surface)
-        .overlay(alignment: .bottom) { Divider() }
+        .overlay(alignment: .bottom) { TMIDivider() }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("planEditor.progress")
     }
 
@@ -176,7 +204,7 @@ private struct PlanEditorWorkflowView: View {
                                     Spacer()
                                     if state.modelSelection == .recommendation(recommendation.model) {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(TMIColors.teal)
+                                            .foregroundStyle(TMIColors.accent)
                                     }
                                 }
                                 ForEach(recommendation.reasons, id: \.self) { reason in
@@ -258,6 +286,8 @@ private struct PlanEditorWorkflowView: View {
                     }
                 }
                 DatePicker("First due date", selection: immediateActionDueDateBinding, in: state.startDate..., displayedComponents: .date)
+                    // Commit the date the picker shows; otherwise review says "not set".
+                    .onAppear { if state.immediateAction.dueDate == nil { state.immediateAction.dueDate = immediateActionDueDateBinding.wrappedValue } }
                     .accessibilityIdentifier("planEditor.action.dueDate")
             }
 
@@ -292,6 +322,7 @@ private struct PlanEditorWorkflowView: View {
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("planEditor.goal.target")
                 DatePicker("Goal due date", selection: goalDueDateBinding, in: state.startDate..., displayedComponents: .date)
+                    .onAppear { if state.goal.dueDate == nil { state.goal.dueDate = goalDueDateBinding.wrappedValue } }
             }
 
         case .responsibleStaff:
@@ -332,8 +363,10 @@ private struct PlanEditorWorkflowView: View {
                 DatePicker("Start date", selection: savingBinding(\.startDate), displayedComponents: .date)
                     .accessibilityIdentifier("planEditor.startDate")
                 DatePicker("Review date", selection: reviewDateBinding, in: state.startDate..., displayedComponents: .date)
+                    .onAppear { if state.reviewDate == nil { state.reviewDate = reviewDateBinding.wrappedValue } }
                     .accessibilityIdentifier("planEditor.reviewDate")
                 DatePicker("End date", selection: targetDateBinding, in: state.startDate..., displayedComponents: .date)
+                    .onAppear { if state.targetDate == nil { state.targetDate = targetDateBinding.wrappedValue } }
                     .accessibilityIdentifier("planEditor.targetDate")
                 Picker("Team review cadence", selection: savingBinding(\.meetingCadence)) {
                     Text("Choose cadence").tag(ActionCadence?.none)
@@ -450,24 +483,29 @@ private struct PlanEditorWorkflowView: View {
     }
 
     private var navigationFooter: some View {
-        HStack(spacing: TMISpacing.md) {
+        HStack(spacing: TMISpacing.ms) {
             Button("Back", systemImage: "chevron.left") { move(by: -1) }
+                .buttonStyle(.tmiSecondary)
                 .disabled(step == .student)
+                .keyboardShortcut(.leftArrow, modifiers: .command)
                 .accessibilityIdentifier("planEditor.back")
             Spacer()
-            Text(step.title(for: programProfile))
-                .font(.footnote)
-                .foregroundStyle(TMIColors.textSecondary)
-            Spacer()
             if step != .reviewAndSubmit {
-                Button("Next", systemImage: "chevron.right") { move(by: 1) }
-                    .accessibilityIdentifier("planEditor.next")
+                Button {
+                    move(by: 1)
+                } label: {
+                    Label("Next", systemImage: "chevron.right")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.tmiPrimary)
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+                .accessibilityIdentifier("planEditor.next")
             }
         }
-        .padding(.horizontal, TMISpacing.xl)
-        .padding(.vertical, TMISpacing.md)
+        .padding(.horizontal, TMISpacing.screenPadding)
+        .padding(.vertical, TMISpacing.ms)
         .background(TMIColors.surface)
-        .overlay(alignment: .top) { Divider() }
+        .overlay(alignment: .top) { TMIDivider() }
     }
 
     private func editorCard<Content: View>(
@@ -475,14 +513,18 @@ private struct PlanEditorWorkflowView: View {
         icon: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        TMICard(style: .outlined, accentColor: TMIColors.teal) {
-            VStack(alignment: .leading, spacing: TMISpacing.md) {
-                Label(title, systemImage: icon)
+        VStack(alignment: .leading, spacing: TMISpacing.md) {
+            HStack(spacing: TMISpacing.ms) {
+                TMIIconTile(icon, tone: .brand, size: 34)
+                Text(title)
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(TMIColors.aubergine)
-                content()
+                    .foregroundStyle(TMIColors.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
             }
+            content()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .tmiSurface(padding: TMISpacing.ml)
     }
 
     private func reviewRow(_ label: String, _ value: String) -> some View {

@@ -110,7 +110,7 @@ struct GoalEditorView: View {
         // A macOS sheet auto-sizes to its content; without a frame the grouped
         // Form's label/field columns collapse and clip (the same defect the
         // plan editor had). Pin a legible size.
-        .frame(minWidth: 480, idealWidth: 520, minHeight: 520)
+        .tmiMacSheetFrame(minWidth: 480, idealWidth: 520, minHeight: 520)
     }
 
     private func prefill() {

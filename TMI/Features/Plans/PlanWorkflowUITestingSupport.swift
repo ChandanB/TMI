@@ -39,7 +39,7 @@ struct PlanWorkflowUITestingContent: View {
             studentRepository: students, studentDetailRepository: Release1StudentDetailRepository(students: students),
             planRepository: store, planChildRepository: store, planExportAuditing: FixturePlanAuditing(),
             logger: TMILogger(category: "PlanUITesting")))
-        .tint(TMIColors.teal)
+        .tint(TMIColors.accent)
     }
 }
 
