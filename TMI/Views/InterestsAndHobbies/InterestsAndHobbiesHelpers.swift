@@ -71,7 +71,7 @@ struct InterestsSearchBar: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(.white.opacity(0.2), lineWidth: 1)
+                .stroke(TMIColors.separator, lineWidth: 1)
         )
     }
 }
@@ -136,7 +136,7 @@ struct InterestsCard<Content: View>: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(.white.opacity(0.2), lineWidth: 1)
+                .stroke(TMIColors.separator, lineWidth: 1)
         )
     }
 }
@@ -192,7 +192,7 @@ struct TMIBadge: View {
     
     var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .medium))
+            .font(.caption.weight(.medium))
             .foregroundColor(style == .solid ? .white : color)
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
@@ -230,7 +230,7 @@ struct TMITextEditor: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(.white.opacity(0.2), lineWidth: 1)
+                .stroke(TMIColors.separator, lineWidth: 1)
         )
     }
 }
@@ -292,7 +292,7 @@ struct TMIIconSelector: View {
                                 .frame(width: 50, height: 50)
 
                             Image(systemName: icon)
-                                .font(.system(size: 22))
+                                .font(.title2)
                                 .foregroundColor(selection == icon ? color : Color.tmiTextTertiary)
                         }
                         .overlay(
@@ -320,7 +320,7 @@ struct TMIStudentCard: View {
         HStack(spacing: 12) {
             // Avatar
             Text(String(student.name.prefix(1)))
-                .font(.system(size: 16, weight: .medium))
+                .font(.body.weight(.medium))
                 .foregroundColor(Color.tmiTextPrimary)
                 .frame(width: 32, height: 32)
                 .background(color.opacity(0.3))
@@ -328,11 +328,11 @@ struct TMIStudentCard: View {
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(student.name)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(Color.tmiTextPrimary)
                 
                 Text("Grade \(student.grade) • \(Int(student.engagementScore * 100))% engaged")
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundColor(Color.tmiTextSecondary)
             }
             
@@ -342,7 +342,7 @@ struct TMIStudentCard: View {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white.opacity(0.05))
+                .fill(TMIColors.fill)
         )
     }
 }

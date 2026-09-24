@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct FormTemplateDetailView: View {
+  @State private var showingEditor = false
+  @Environment(\.dismiss) private var dismiss
   var template: FormTemplate
 
   @State private var isAddingTemplate = false
@@ -32,11 +34,11 @@ struct FormTemplateDetailView: View {
           TMICard(style: .default) {
             VStack(alignment: .leading, spacing: 16) {
               Text("Description")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundColor(Color.tmiTextPrimary)
 
               Text(template.templateDescription)
-                .font(.system(size: 16))
+                .font(.body)
                 .foregroundColor(Color.tmiTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -76,6 +78,9 @@ struct FormTemplateDetailView: View {
     .navigationTitle(template.name)
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Done") { dismiss() }
+      }
       ToolbarItem(placement: .navigationBarTrailing) {
         Menu {
           Button(action: {
@@ -85,34 +90,15 @@ struct FormTemplateDetailView: View {
           }) {
             Label("Add to My Forms", systemImage: "plus.circle")
           }
-
-          Button(action: {
-            // Edit action
-          }) {
-            Label("Edit Template", systemImage: "pencil")
-          }
-
-          Button(action: {
-            // Share action
-          }) {
-            Label("Share Template", systemImage: "square.and.arrow.up")
-          }
-
-          Divider()
-
-          Button(
-            role: .destructive,
-            action: {
-              // Delete action
+          if template.id != nil {
+            Button {
+              showingEditor = true
+            } label: {
+              Label("Edit Template", systemImage: "pencil")
             }
-          ) {
-            Label("Delete Template", systemImage: "trash")
           }
         } label: {
-          Image(systemName: "ellipsis")
-            .font(.system(size: 20))
-            .foregroundColor(Color.tmiTextPrimary)
-            .frame(width: 40, height: 40)
+          Label("More", systemImage: "ellipsis")
         }
       }
     }
@@ -121,9 +107,17 @@ struct FormTemplateDetailView: View {
         animateContent = true
       }
     }
-    .sheet(isPresented: $showingPreview) {
-      FormPreviewView(template: template)
+    .sheet(isPresented: $showingEditor) {
+      // The editor owns its NavigationStack; saving uses updateTemplate and
+      // the server rules decide who may write.
+      FormTemplateEditorView(template: template)
         .tmiSheetStyle()
+    }
+    .sheet(isPresented: $showingPreview) {
+      NavigationStack {
+        FormPreviewView(template: template)
+      }
+      .tmiSheetStyle()
     }
   }
 
@@ -137,7 +131,7 @@ struct FormTemplateDetailView: View {
             .frame(width: 80, height: 80)
 
           Image(systemName: categoryIcon)
-            .font(.system(size: 36))
+            .font(.largeTitle)
             .foregroundColor(template.themeColor)
         }
 
@@ -150,7 +144,7 @@ struct FormTemplateDetailView: View {
               .foregroundColor(Color.tmiTextPrimary)
 
             Text("Sections")
-              .font(.system(size: 14))
+              .font(.subheadline)
               .foregroundColor(Color.tmiTextSecondary)
           }
 
@@ -161,18 +155,18 @@ struct FormTemplateDetailView: View {
               .foregroundColor(Color.tmiTextPrimary)
 
             Text("Fields")
-              .font(.system(size: 14))
+              .font(.subheadline)
               .foregroundColor(Color.tmiTextSecondary)
           }
 
           // Created
           VStack(spacing: 4) {
             Text(template.createdAt ?? Date(), style: .date)
-              .font(.system(size: 16, weight: .medium))
+              .font(.body.weight(.medium))
               .foregroundColor(Color.tmiTextPrimary)
 
             Text("Created")
-              .font(.system(size: 14))
+              .font(.subheadline)
               .foregroundColor(Color.tmiTextSecondary)
           }
         }
@@ -184,7 +178,7 @@ struct FormTemplateDetailView: View {
   private var formPreview: some View {
     VStack(alignment: .leading, spacing: 20) {
       Text("Form Structure")
-        .font(.system(size: 20, weight: .semibold))
+        .font(.title3.weight(.semibold))
         .foregroundColor(Color.tmiTextPrimary)
 
       ForEach(template.sections) { section in

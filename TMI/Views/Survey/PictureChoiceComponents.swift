@@ -16,7 +16,7 @@ struct SurveyOptionImage: View {
                     .resizable()
                     .scaledToFit()
                     .padding(TMISpacing.md)
-                    .foregroundStyle(TMIColors.aubergine)
+                    .foregroundStyle(TMIColors.accent)
             } else if let reference, Self.hasAsset(named: reference) {
                 Image(reference)
                     .resizable()
@@ -26,7 +26,7 @@ struct SurveyOptionImage: View {
                     .resizable()
                     .scaledToFit()
                     .padding(TMISpacing.lg)
-                    .foregroundStyle(TMIColors.aubergine.opacity(0.8))
+                    .foregroundStyle(TMIColors.accent.opacity(0.8))
             }
         }
         .accessibilityHidden(true)
@@ -95,8 +95,7 @@ struct ReadAloudButton: View {
                 .font(.headline)
                 .frame(minWidth: 44, minHeight: 44)
         }
-        .buttonStyle(.bordered)
-        .tint(TMIColors.teal)
+        .buttonStyle(.tmiSecondary)
         .accessibilityHint("Reads the question out loud")
         .accessibilityIdentifier("studentSurvey.readAloud")
     }
@@ -140,7 +139,7 @@ struct PictureChoiceGrid: View {
                                 in: RoundedRectangle(cornerRadius: TMIRadius.lg))
                     .overlay {
                         RoundedRectangle(cornerRadius: TMIRadius.lg)
-                            .stroke(selected ? TMIColors.teal : TMIColors.interactiveBorder,
+                            .stroke(selected ? TMIColors.accent : TMIColors.interactiveBorder,
                                     lineWidth: selected ? 4 : 1)
                     }
                 }

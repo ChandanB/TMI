@@ -264,6 +264,8 @@ final class CanonicalPlanDetailState {
                 switch status {
                 case .active where plan.status == .draft || plan.status == .pendingApproval:
                     false
+                case .pendingApproval:
+                    member.capabilities.contains(.studentWriteDetail) && isReadyForApproval
                 case .active where plan.status == .approved:
                     member.capabilities.contains(.studentWriteDetail)
                         && plan.effectiveOwnerMemberID == member.userID
@@ -275,6 +277,13 @@ final class CanonicalPlanDetailState {
                 }
             }
             .sorted { $0.rawValue < $1.rawValue }
+    }
+
+    /// Approvers can only judge a plan that says what will be measured and
+    /// what happens first. The editor checks every field; from the detail
+    /// screen a plan must at least have its loaded goal and first action.
+    var isReadyForApproval: Bool {
+        childrenPhase == .loaded && !goals.isEmpty && !actions.isEmpty
     }
 
     func transition(

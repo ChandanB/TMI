@@ -13,11 +13,12 @@ struct FormTemplateLibraryView: View {
   @State private var showingImportPicker = false
   @State private var showingTemplateDetail = false
   @State private var showingTemplateEditor = false
+  @State private var pendingDelete: FormTemplate?
   @Environment(\.authStateModel) private var authStateModel
 
   var body: some View {
     ZStack {
-      TMIBackgroundView(variant: .dashboard)
+      TMIColors.background.ignoresSafeArea()
 
       if viewModel.isLoading && viewModel.templates.isEmpty {
         ProgressView("Loading templates...")
@@ -58,14 +59,50 @@ struct FormTemplateLibraryView: View {
     .refreshable {
       await viewModel.refreshTemplates(districtId: authStateModel.currentMembership?.districtID)
     }
-    .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-      Button("OK") {
+    .alert("Something went wrong", isPresented: Binding(
+      get: { viewModel.errorMessage != nil },
+      set: { if !$0 { viewModel.errorMessage = nil } }
+    )) {
+      Button("OK", role: .cancel) {
         viewModel.errorMessage = nil
       }
     } message: {
       if let error = viewModel.errorMessage {
         Text(error)
       }
+    }
+    // Sheets live on the root so "Create New" works even when the library is
+    // empty or filtered to nothing (they used to hang off the grid).
+    .sheet(isPresented: $showingTemplateDetail) {
+      if let template = viewModel.selectedTemplate {
+        NavigationStack {
+          FormTemplateDetailView(template: template)
+        }
+        .tmiSheetStyle()
+      }
+    }
+    .sheet(isPresented: $showingTemplateEditor) {
+      // The editor owns its NavigationStack.
+      FormTemplateEditorView()
+        .tmiSheetStyle()
+        .onDisappear {
+          Task {
+            await viewModel.refreshTemplates(districtId: authStateModel.currentMembership?.districtID)
+          }
+        }
+    }
+    .confirmationDialog(
+      "Delete “\(pendingDelete?.name ?? "template")”?",
+      isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+      titleVisibility: .visible,
+      presenting: pendingDelete
+    ) { template in
+      Button("Delete Template", role: .destructive) {
+        Task { await viewModel.deleteTemplate(template) }
+      }
+      Button("Cancel", role: .cancel) { }
+    } message: { _ in
+      Text("Existing assignments keep their frozen copy. This can’t be undone.")
     }
   }
 
@@ -111,12 +148,11 @@ struct FormTemplateLibraryView: View {
             viewModel.selectedCategory ?? "All Categories",
             systemImage: "folder"
           )
-          .font(.subheadline)
-          .foregroundColor(.primary)
+          .font(.subheadline.weight(.medium))
+          .foregroundStyle(TMIColors.textPrimary)
           .padding(.horizontal, 12)
           .padding(.vertical, 8)
-          .background(Color(UIColor.secondarySystemBackground))
-          .cornerRadius(16)
+          .background(TMIColors.fill, in: Capsule())
         }
 
         // Public filter
@@ -128,7 +164,7 @@ struct FormTemplateLibraryView: View {
             .foregroundColor(viewModel.showPublicOnly ? .blue : .primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(UIColor.secondarySystemBackground))
+            .background(TMIColors.fill)
             .cornerRadius(16)
         }
 
@@ -141,7 +177,7 @@ struct FormTemplateLibraryView: View {
             .foregroundColor(viewModel.showPrivateOnly ? .blue : .primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(UIColor.secondarySystemBackground))
+            .background(TMIColors.fill)
             .cornerRadius(16)
         }
 
@@ -152,10 +188,10 @@ struct FormTemplateLibraryView: View {
           } label: {
             Label("Clear", systemImage: "xmark.circle.fill")
             .font(.subheadline)
-            .foregroundColor(.red)
+            .foregroundStyle(TMIColors.errorText)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(UIColor.secondarySystemBackground))
+            .background(TMIColors.fill)
             .cornerRadius(16)
           }
         }
@@ -186,9 +222,7 @@ struct FormTemplateLibraryView: View {
             }
           },
           onDelete: {
-            Task {
-              await viewModel.deleteTemplate(template)
-            }
+            pendingDelete = template
           },
           onTogglePublic: {
             if template.isPublic {
@@ -206,24 +240,6 @@ struct FormTemplateLibraryView: View {
         )
       }
     }
-    .sheet(isPresented: $showingTemplateDetail) {
-      if let template = viewModel.selectedTemplate {
-        FormTemplateDetailView(template: template)
-          .tmiSheetStyle()
-      }
-    }
-    .sheet(isPresented: $showingTemplateEditor) {
-      NavigationStack {
-        FormTemplateEditorView()
-      }
-      .tmiSheetStyle()
-      .onDisappear {
-        // Refresh templates after creation
-        Task {
-          await viewModel.refreshTemplates(districtId: authStateModel.currentMembership?.districtID)
-        }
-      }
-    }
   }
 
   // MARK: - Empty State
@@ -231,7 +247,7 @@ struct FormTemplateLibraryView: View {
   private var emptyState: some View {
     VStack(spacing: 16) {
       Image(systemName: "doc.text.magnifyingglass")
-        .font(.system(size: 60))
+        .font(.largeTitle)
         .foregroundColor(.secondary)
 
       Text("No Templates Found")
@@ -273,7 +289,7 @@ struct FormTemplateLibraryView: View {
         }
       } label: {
         Image(systemName: "ellipsis.circle")
-          .font(.system(size: 22))
+          .font(.title2)
       }
     }
   }

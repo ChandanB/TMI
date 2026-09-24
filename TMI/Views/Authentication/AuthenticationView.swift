@@ -13,12 +13,19 @@ struct AuthenticationView: View {
   @State private var verificationMessage: String?
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @FocusState private var focusedField: Field?
-  @State private var appearAnimation = false
+  @State private var hasAppeared = false
+  @State private var resetRequest: PasswordResetRequest?
+#if os(iOS)
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+#endif
 
-  // Track animation state
-  @State private var animateEmail = false
-  @State private var animatePassword = false
-  @State private var animateButtons = false
+  private var usesWideLayout: Bool {
+#if os(macOS)
+    true
+#else
+    horizontalSizeClass == .regular
+#endif
+  }
 
   #if DEBUG
   @State private var didAttemptDebugAutoLogin = false
@@ -31,285 +38,266 @@ struct AuthenticationView: View {
   }
 
   var body: some View {
-    ZStack {
-      // Dynamic background - Using unified TMIBackgroundView
-      TMIBackgroundView(variant: .auth)
+    GeometryReader { proxy in
+      ZStack {
+        TMIGoldenHourBackground(animated: true)
+          .ignoresSafeArea()
 
-      // Content
-      ScrollView {
-        VStack(spacing: 30) {
-          Spacer()
-            .frame(minHeight: 80)
-
-          // Logo
-          TMILogoView()
-            .padding(.top, 40)
-            .scaleEffect(appearAnimation ? 1.0 : 0.6)
-            .opacity(appearAnimation ? 1.0 : 0)
-            .animation(
-              Animation.spring(response: 0.6, dampingFraction: 0.7, blendDuration: 0.6)
-                .delay(0.1),
-              value: appearAnimation
-            )
-
-          // Welcome Text
-          VStack(spacing: 8) {
-            Text("Welcome to TMI")
-              .font(
-                .system(
-                  size: 28 * dynamicTypeSize.tmiFontScale,
-                  weight: .bold,
-                  design: .rounded
-                )
-              )
-              .foregroundColor(Color.tmiTextPrimary)
-              .accessibilityIdentifier("authentication.signIn.screen")
-
-            Text("Tangible Modification Intervention")
-              .font(.system(size: 16 * dynamicTypeSize.tmiFontScale))
-              .foregroundColor(Color.tmiTextSecondary)
-          }
-          .padding(.bottom, 20)
-          .opacity(appearAnimation ? 1.0 : 0)
-          .offset(y: appearAnimation ? 0 : 20)
-          .animation(
-            Animation.spring(response: 0.6, dampingFraction: 0.8, blendDuration: 0.6)
-              .delay(0.2),
-            value: appearAnimation
-          )
-
-          HStack {
-            Spacer()
-
-            // Login Card - Using unified TMICard
-            TMICard(style: .elevated) {
-              VStack(spacing: 24) {
-                if dependencies.flags.staffEmailVerificationRequired
-                    && stateModel.requiresVerification {
-                  emailVerificationStatus
-                }
-
-                // Email field - Using unified TMITextField
-                TMITextField(
-                  icon: "envelope.fill",
-                  placeholder: "Email",
-                  text: Binding(
-                    get: { stateModel.email },
-                    set: { stateModel.updateEmail($0) }
-                  ),
-                  keyboardType: .emailAddress,
-                  onSubmit: {
-                    focusedField = .password
-                  },
-                  focus: focusBinding(for: .email)
-                )
-                .accessibilityIdentifier("authentication.signIn.email")
-                .offset(x: animateEmail ? 0 : -30)
-                .opacity(animateEmail ? 1.0 : 0)
-                .animation(
-                  Animation.spring(response: 0.6, dampingFraction: 0.8)
-                    .delay(0.3),
-                  value: animateEmail
-                )
-
-                // Password field - Using unified TMITextField
-                TMITextField(
-                  icon: "lock.fill",
-                  placeholder: "Password",
-                  text: Binding(
-                    get: { stateModel.password },
-                    set: { stateModel.updatePassword($0) }
-                  ),
-                  isSecure: true,
-                  onSubmit: {
-                    authenticate()
-                  },
-                  focus: focusBinding(for: .password)
-                )
-                .accessibilityIdentifier("authentication.signIn.password")
-                .offset(x: animatePassword ? 0 : -30)
-                .opacity(animatePassword ? 1.0 : 0)
-                .animation(
-                  Animation.spring(response: 0.6, dampingFraction: 0.8)
-                    .delay(0.4),
-                  value: animatePassword
-                )
-
-                // Forgot Password
-                HStack {
-                  Spacer()
-                  Button(action: {
-                    showingForgotPassword = true
-                  }) {
-                    Text("Forgot Password?")
-                      .font(
-                        .system(
-                          size: 13 * dynamicTypeSize.tmiFontScale,
-                          weight: .medium
-                        )
-                      )
-                      .foregroundColor(Color.tmiSecondary)
-                  }
-                  .padding(.top, 4)
-                }
-                .opacity(animateButtons ? 1.0 : 0)
-                .animation(
-                  Animation.easeInOut(duration: 0.5)
-                    .delay(0.5),
-                  value: animateButtons
-                )
-
-                // Authentication error
-                if let errorMessage = stateModel.errorMessage {
-                  AuthenticationErrorView(message: errorMessage)
-                  .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-
-                // Login Button - Using unified TMIButton
-                TMIButton(
-                  text: "Log In",
-                  icon: "arrow.right",
-                  style: .primary,
-                  isLoading: stateModel.isAuthenticating,
-                  action: authenticate
-                )
-                .accessibilityIdentifier("authentication.signIn.logIn")
-                .disabled(stateModel.isAuthenticating)
-                .padding(.top, 10)
-                .opacity(animateButtons ? 1.0 : 0)
-                .animation(
-                  Animation.easeInOut(duration: 0.5)
-                    .delay(0.6),
-                  value: animateButtons
-                )
-
-                #if DEBUG
-                // Developer-only shortcut past the login screen. Compiled out
-                // of Release/App Store builds; shown only when the scheme
-                // supplies TMI_DEBUG_EMAIL / TMI_DEBUG_PASSWORD.
-                if stateModel.isDebugSignInAvailable {
-                  Button {
-                    Task { await stateModel.debugSignIn() }
-                  } label: {
-                    Label("Debug sign-in", systemImage: "hammer.fill")
-                      .font(.footnote.weight(.semibold))
-                      .frame(maxWidth: .infinity)
-                  }
-                  .buttonStyle(.bordered)
-                  .tint(.orange)
-                  .disabled(stateModel.isAuthenticating)
-                  .padding(.top, 4)
-                  .accessibilityIdentifier("authentication.signIn.debug")
-                }
-                #endif
-
-                // Enhanced Sign Up Section
-                VStack(spacing: 12) {
-                  Button(action: {
-                    self.onCreateAccount()
-                  }) {
-                    ViewThatFits(in: .horizontal) {
-                      HStack(spacing: 0) {
-                        Text("Don't have an account? ")
-                          .foregroundColor(Color.tmiTextSecondary)
-                        Text("Create Account")
-                          .foregroundColor(Color.tmiSecondary)
-                          .fontWeight(.semibold)
-                      }
-
-                      VStack(spacing: 4) {
-                        Text("Don't have an account?")
-                          .foregroundColor(Color.tmiTextSecondary)
-                        Text("Create Account")
-                          .foregroundColor(Color.tmiSecondary)
-                          .fontWeight(.semibold)
-                      }
-                    }
-                    .font(.system(size: 17 * dynamicTypeSize.tmiFontScale))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                  }
-                  .accessibilityIdentifier("authentication.signIn.createAccount")
-                }
-                .padding(.top, 10)
-                .opacity(animateButtons ? 1.0 : 0)
-                .animation(
-                  Animation.easeInOut(duration: 0.5)
-                    .delay(0.7),
-                  value: animateButtons
-                )
-              }
+        if usesWideLayout {
+          HStack(spacing: 0) {
+            brandPanel
+              .frame(width: max(proxy.size.width * 0.4, 320))
+            ScrollView {
+              formCard
+                .frame(maxWidth: 420)
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+                .padding(.horizontal, TMISpacing.xl)
             }
-            .frame(maxWidth: 800)
-            .padding(.horizontal)
-            .offset(y: appearAnimation ? 0 : 50)
-            .opacity(appearAnimation ? 1.0 : 0)
-            .animation(
-              Animation.spring(response: 0.7, dampingFraction: 0.8, blendDuration: 0.5)
-                .delay(0.3),
-              value: appearAnimation
-            )
-
-            Spacer()
+            .scrollBounceBehavior(.basedOnSize)
           }
-        }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 100)  // Extra padding at bottom for keyboard
-        .padding(.top)
-      }
-      .task {
-        await stateModel.fetch()
-        #if DEBUG
-        // Optional: launch with `-TMIDebugAutoLogin` (and the debug env vars set)
-        // to skip the login screen automatically. DEBUG-only; runs at most once.
-        if !didAttemptDebugAutoLogin,
-           ProcessInfo.processInfo.arguments.contains("-TMIDebugAutoLogin"),
-           stateModel.isDebugSignInAvailable,
-           !stateModel.isLoggedIn {
-          didAttemptDebugAutoLogin = true
-          await stateModel.debugSignIn()
-        }
-        #endif
-      }
-      .navigationBarTitleDisplayMode(.inline)
-      .alert("Reset Password", isPresented: $showingForgotPassword) {
-        TextField("Email", text: Binding(
-          get: { stateModel.email },
-          set: { stateModel.updateEmail($0) }
-        ))
-        .keyboardType(.emailAddress)
-        .textInputAutocapitalization(.never)
-        .autocorrectionDisabled()
-
-        Button("Cancel", role: .cancel) {}
-        Button("Reset") {
-          Task {
-            await stateModel.resetPassword()
+          .ignoresSafeArea(edges: .vertical)
+        } else {
+          ScrollView {
+            VStack(spacing: TMISpacing.xl) {
+              brandLockup
+              formCard
+            }
+            .frame(maxWidth: 440)
+            .padding(.horizontal, TMISpacing.screenPadding)
+            .padding(.vertical, TMISpacing.xl)
+            .frame(maxWidth: .infinity, minHeight: proxy.size.height)
           }
-        }
-      } message: {
-        Text("Enter your email address and we'll send you a link to reset your password.")
-      }
-      .errorBoundary()
-      .onAppear {
-        // Trigger animations
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-          appearAnimation = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-          animateEmail = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-          animatePassword = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-          animateButtons = true
+          .scrollBounceBehavior(.basedOnSize)
+          .scrollDismissesKeyboard(.interactively)
         }
       }
     }
+    .opacity(hasAppeared ? 1 : 0)
+#if os(macOS)
+    // Let the brand panel and gradient run under a chrome-less title bar.
+    .toolbar(removing: .title)
+    .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+#endif
+    .task {
+      withAnimation(.easeOut(duration: 0.45)) { hasAppeared = true }
+      await stateModel.fetch()
+      #if DEBUG
+      // Optional: launch with `-TMIDebugAutoLogin` (and the debug env vars set)
+      // to skip the login screen automatically. DEBUG-only; runs at most once.
+      if !didAttemptDebugAutoLogin,
+         ProcessInfo.processInfo.arguments.contains("-TMIDebugAutoLogin"),
+         stateModel.isDebugSignInAvailable,
+         !stateModel.isLoggedIn {
+        didAttemptDebugAutoLogin = true
+        await stateModel.debugSignIn()
+      }
+      #endif
+    }
+    .sheet(item: $resetRequest) { _ in
+      PasswordResetSheet(
+        email: stateModel.email,
+        send: { email in
+          stateModel.updateEmail(email)
+          await stateModel.resetPassword()
+        }
+      )
+    }
+    .sensoryFeedback(.error, trigger: stateModel.errorMessage) { _, new in new != nil }
+    .errorBoundary()
+  }
+
+  // MARK: Brand
+
+  /// iPhone: the app icon's mark and the name, above the form.
+  private var brandLockup: some View {
+    VStack(spacing: TMISpacing.ms) {
+      TMISchoolhouseMark(size: 76, onTile: true)
+        .shadow(color: .black.opacity(0.18), radius: 18, y: 10)
+      Text("TMI")
+        .font(.tmiEditorial(.largeTitle))
+        .foregroundStyle(TMIColors.goldenHourText)
+      Text("Tangible Modification Intervention")
+        .tmiEyebrow(TMIColors.goldenHourSecondaryText)
+        .multilineTextAlignment(.center)
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("TMI, Tangible Modification Intervention")
+  }
+
+  /// iPad and Mac: the icon's charcoal ground as a brand panel.
+  private var brandPanel: some View {
+    ZStack(alignment: .bottomLeading) {
+      Color(light: 0x2F2D2C, dark: 0x1E1D1C)
+      VStack(alignment: .leading, spacing: TMISpacing.lg) {
+        Spacer()
+        TMISchoolhouseShape()
+          .fill(TMIColors.brand, style: FillStyle(eoFill: true))
+          .frame(width: 120, height: 120)
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: TMISpacing.sm) {
+          Text("TMI")
+            .font(.tmiEditorial(.largeTitle))
+            .foregroundStyle(Color(light: 0xFFF7EA, dark: 0xFFF7EA))
+          Text("Support plans that start with what each student cares about.")
+            .font(.title3)
+            .foregroundStyle(Color(light: 0xD9CBB7, dark: 0xD9CBB7))
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        Spacer()
+        Text("Tangible Modification Intervention")
+          .tmiEyebrow(Color(light: 0xA8998A, dark: 0xA8998A))
+      }
+      .padding(TMISpacing.xxl)
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("TMI, Tangible Modification Intervention")
+  }
+
+  // MARK: Form
+
+  private var formCard: some View {
+    VStack(alignment: .leading, spacing: TMISpacing.ml) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text("Sign in to TMI")
+          .font(.title2.weight(.semibold))
+          .foregroundStyle(TMIColors.textPrimary)
+          .accessibilityAddTraits(.isHeader)
+          .accessibilityIdentifier("authentication.signIn.screen")
+        Text("Use the email your school or district invited.")
+          .font(.subheadline)
+          .foregroundStyle(TMIColors.textSecondary)
+      }
+
+      if dependencies.flags.staffEmailVerificationRequired
+          && stateModel.requiresVerification {
+        emailVerificationStatus
+      } else {
+        credentialFields
+      }
+
+      TMIDivider()
+
+      Button {
+        self.onCreateAccount()
+      } label: {
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: 4) {
+            Text("Have an invitation?")
+              .foregroundStyle(TMIColors.textSecondary)
+            Text("Create Account")
+              .foregroundStyle(TMIColors.accent)
+              .fontWeight(.semibold)
+          }
+          VStack(spacing: 2) {
+            Text("Have an invitation?")
+              .foregroundStyle(TMIColors.textSecondary)
+            Text("Create Account")
+              .foregroundStyle(TMIColors.accent)
+              .fontWeight(.semibold)
+          }
+        }
+        .font(.subheadline)
+        .frame(maxWidth: .infinity, minHeight: TMISizing.minTouchTarget)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("authentication.signIn.createAccount")
+    }
+    .tmiSurface(.floating, padding: TMISpacing.lg, radius: TMIRadius.card + 6)
+  }
+
+  @ViewBuilder
+  private var credentialFields: some View {
+    VStack(spacing: TMISpacing.ms) {
+      TMITextField(
+        icon: "envelope",
+        placeholder: "Email",
+        text: Binding(
+          get: { stateModel.email },
+          set: { stateModel.updateEmail($0) }
+        ),
+        keyboardType: .emailAddress,
+        onSubmit: {
+          focusedField = .password
+        },
+        focus: focusBinding(for: .email),
+        content: .username
+      )
+      .accessibilityIdentifier("authentication.signIn.email")
+
+      TMITextField(
+        icon: "lock",
+        placeholder: "Password",
+        text: Binding(
+          get: { stateModel.password },
+          set: { stateModel.updatePassword($0) }
+        ),
+        isSecure: true,
+        onSubmit: {
+          authenticate()
+        },
+        focus: focusBinding(for: .password),
+        content: .password,
+        submitLabel: .go
+      )
+      .accessibilityIdentifier("authentication.signIn.password")
+    }
+
+    VStack(alignment: .leading, spacing: TMISpacing.sm) {
+      if let errorMessage = stateModel.errorMessage {
+        AuthenticationErrorView(message: errorMessage)
+          .transition(.opacity.combined(with: .move(edge: .top)))
+      }
+      // No fixedSize: at accessibility text sizes a fixed-width link forced
+      // the whole card wider than the screen.
+      Button("Forgot password?") {
+        resetRequest = PasswordResetRequest()
+      }
+      .font(.subheadline.weight(.medium))
+      .foregroundStyle(TMIColors.accent)
+      .buttonStyle(.plain)
+      .multilineTextAlignment(.trailing)
+      .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+    .animation(TMIAnimation.smooth, value: stateModel.errorMessage)
+
+    Button(action: authenticate) {
+      HStack(spacing: TMISpacing.sm) {
+        if stateModel.isAuthenticating {
+          ProgressView()
+            .controlSize(.small)
+            .tint(TMIColors.onBrand)
+        } else {
+          Image(systemName: "arrow.right")
+            .fontWeight(.semibold)
+        }
+        Text("Sign In")
+      }
+    }
+    .buttonStyle(.tmi(.primary, fullWidth: true))
+    .accessibilityLabel("Sign In")
+    .accessibilityIdentifier("authentication.signIn.logIn")
+    .disabled(stateModel.isAuthenticating)
+    .keyboardShortcut(.defaultAction)
+    .sensoryFeedback(.impact(weight: .light), trigger: stateModel.isAuthenticating)
+
+    #if DEBUG
+    // Developer-only shortcut past the login screen. Compiled out
+    // of Release/App Store builds; shown only when the scheme
+    // supplies TMI_DEBUG_EMAIL / TMI_DEBUG_PASSWORD.
+    if stateModel.isDebugSignInAvailable {
+      Button {
+        Task { await stateModel.debugSignIn() }
+      } label: {
+        Label("Debug sign-in", systemImage: "hammer.fill")
+          .font(.footnote.weight(.semibold))
+          .frame(maxWidth: .infinity)
+      }
+      .buttonStyle(.tmiSecondary)
+      .disabled(stateModel.isAuthenticating)
+      .accessibilityIdentifier("authentication.signIn.debug")
+    }
+    #endif
   }
 
   private func authenticate() {
@@ -334,7 +322,7 @@ struct AuthenticationView: View {
   private var emailVerificationStatus: some View {
     VStack(spacing: 12) {
       Image(systemName: "envelope.badge.shield.half.filled")
-        .font(.system(size: 28, weight: .semibold))
+        .font(.title.weight(.semibold))
         .foregroundColor(Color.tmiSecondary)
 
       Text("Verify Your Email")
@@ -419,22 +407,93 @@ struct AuthenticationErrorView: View {
   let message: String
 
   var body: some View {
-    TMICard(style: .default) {
-      HStack(alignment: .top, spacing: 12) {
-        Image(systemName: "exclamationmark.circle.fill")
-          .font(.system(size: 20))
-          .foregroundColor(TMIColors.errorText)
+    Label(message, systemImage: "exclamationmark.circle.fill")
+      .font(.subheadline)
+      .foregroundStyle(TMIColors.errorText)
+      .fixedSize(horizontal: false, vertical: true)
+      .accessibilityElement(children: .combine)
+      .accessibilityAddTraits(.updatesFrequently)
+  }
+}
 
-        Text(message)
-          .font(.system(size: 14))
-          .foregroundColor(TMIColors.errorText)
-          .multilineTextAlignment(.leading)
+// MARK: - Password reset
 
-        Spacer(minLength: 0)
+struct PasswordResetRequest: Identifiable {
+  let id = UUID()
+}
+
+/// Replaces the old alert-with-a-text-field, which never confirmed success.
+private struct PasswordResetSheet: View {
+  @Environment(\.dismiss) private var dismiss
+  @State var email: String
+  let send: (String) async -> Void
+
+  @State private var isSending = false
+  @State private var didSend = false
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        if didSend {
+          Section {
+            VStack(spacing: TMISpacing.ms) {
+              Image(systemName: "envelope.badge.fill")
+                .font(.largeTitle)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(TMIColors.accent)
+              Text("Check your inbox")
+                .font(.title3.weight(.semibold))
+              Text("If an account exists for \(email), a reset link is on its way.")
+                .font(.subheadline)
+                .foregroundStyle(TMIColors.textSecondary)
+                .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, TMISpacing.md)
+          }
+        } else {
+          Section {
+            TextField("Email", text: $email)
+#if os(iOS)
+              .keyboardType(.emailAddress)
+              .textInputAutocapitalization(.never)
+#endif
+              .textContentType(.username)
+              .autocorrectionDisabled()
+              .submitLabel(.send)
+              .onSubmit { Task { await submit() } }
+          } footer: {
+            Text("We’ll email you a link to choose a new password.")
+          }
+        }
       }
-      .padding(.vertical, 8)
+      .navigationTitle("Reset Password")
+#if os(iOS)
+      .toolbarTitleDisplayMode(.inline)
+#endif
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button(didSend ? "Done" : "Cancel") { dismiss() }
+        }
+        if !didSend {
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Send") { Task { await submit() } }
+              .disabled(isSending || !email.contains("@"))
+          }
+        }
+      }
     }
-    .padding(.horizontal, 20)
+    .presentationDetents([.medium])
+    .tmiMacSheetFrame(minWidth: 420, minHeight: 280)
+    .sensoryFeedback(.success, trigger: didSend)
+  }
+
+  private func submit() async {
+    guard !isSending else { return }
+    isSending = true
+    await send(email.trimmingCharacters(in: .whitespacesAndNewlines))
+    isSending = false
+    withAnimation(TMIAnimation.smooth) { didSend = true }
   }
 }
 

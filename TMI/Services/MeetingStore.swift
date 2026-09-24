@@ -42,7 +42,8 @@ nonisolated protocol MeetingStore: Sendable {
 
 /// Firestore-backed implementation of `MeetingStore`.
 nonisolated final class FirebaseMeetingStore: MeetingStore, Sendable {
-    private let db = Firestore.firestore()
+    // Resolved on use: `Firestore.firestore()` throws without a configured FirebaseApp.
+    private var db: Firestore { Firestore.firestore() }
 
     func documents(atCollectionPath path: String) async throws -> [(id: String, data: [String: Any])] {
         let snapshot = try await db.collection(path).getDocuments()

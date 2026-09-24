@@ -34,7 +34,7 @@ final class FirebaseResourceRepository: ResourceRepository {
 
     init(
         transport: any ResourceTransport = FirebaseResourceTransport(),
-        currentUserID: @escaping @Sendable () -> String? = { Auth.auth().currentUser?.uid }
+        currentUserID: @escaping @Sendable () -> String? = { FirebaseSession.currentUserID() }
     ) {
         self.transport = transport
         self.currentUserID = currentUserID

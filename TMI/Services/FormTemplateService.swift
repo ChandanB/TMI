@@ -13,7 +13,8 @@ import Observation
 /// Service for managing public and tenant-scoped form templates.
 @Observable
 class FormTemplateService {
-  private let db = Firestore.firestore()
+  // Resolved on use: `Firestore.firestore()` throws without a configured FirebaseApp.
+  private var db: Firestore { Firestore.firestore() }
   private let authorizationSessions: any AuthorizationSessionProviding
   private let authorization = RBACService()
 
@@ -31,34 +32,45 @@ class FormTemplateService {
       throw FormTemplateError.authorizationDenied
     }
 
-    let querySnapshot = try await templatesCollection(
-      districtID: session.membership.districtID
-    )
-      .whereField("districtId", isEqualTo: session.membership.districtID)
-      .order(by: "updatedAt", descending: true)
-      .getDocuments()
-    let templates = querySnapshot.documents.compactMap {
-      try? $0.data(as: FormTemplate.self)
-    }
-
-    return templates.filter {
-      canRead($0, member: session.membership)
-    }
+    let templates = try await listReadableTemplates(member: session.membership)
+    return templates
+      .filter { canRead($0, member: session.membership) }
+      .sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }
   }
 
   /// Public catalog records do not confer tenant authority.
   func fetchPublicTemplates() async throws -> [FormTemplate] {
     let session = try authorizedSession()
-    let querySnapshot = try await templatesCollection(
-      districtID: session.membership.districtID
-    )
-      .whereField("isPublic", isEqualTo: true)
-      .order(by: "name", descending: false)
-      .getDocuments()
+    return try await listReadableTemplates(member: session.membership)
+      .filter(\.isPublic)
+      .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+  }
 
-    return querySnapshot.documents.compactMap {
-      try? $0.data(as: FormTemplate.self)
+  /// The list rule only admits queries that constrain `schoolId` to a school
+  /// the member belongs to, or to null for district-wide templates, so a
+  /// school-scoped member runs one query per school plus one for the district.
+  /// District administrators may list the whole collection.
+  private func listReadableTemplates(member: MembershipContext) async throws -> [FormTemplate] {
+    let collection = templatesCollection(districtID: member.districtID)
+    let queries: [Query]
+    if member.role == .districtAdministrator {
+      queries = [collection.whereField("districtId", isEqualTo: member.districtID)]
+    } else {
+      queries = [collection.whereField("schoolId", isEqualTo: NSNull())]
+        + member.schoolIDs.sorted().map { collection.whereField("schoolId", isEqualTo: $0) }
     }
+
+    var seen = Set<String>()
+    var templates: [FormTemplate] = []
+    for query in queries {
+      for document in try await query.getDocuments().documents
+      where seen.insert(document.documentID).inserted {
+        if let template = try? document.data(as: FormTemplate.self) {
+          templates.append(template)
+        }
+      }
+    }
+    return templates
   }
 
   func fetchTemplate(id: String) async throws -> FormTemplate {
@@ -103,7 +115,10 @@ class FormTemplateService {
       throw FormTemplateError.authorizationDenied
     }
 
-    let data = try Firestore.Encoder().encode(newTemplate)
+    var data = try Firestore.Encoder().encode(newTemplate)
+    // District-wide templates store an explicit null so school-scoped
+    // members can list them by `schoolId == null`; the encoder omits nil.
+    if newTemplate.schoolId == nil { data["schoolId"] = NSNull() }
     let documentRef = try await templatesCollection(
       districtID: session.membership.districtID
     ).addDocument(data: data)
@@ -135,7 +150,8 @@ class FormTemplateService {
       throw FormTemplateError.authorizationDenied
     }
 
-    let data = try Firestore.Encoder().encode(updated)
+    var data = try Firestore.Encoder().encode(updated)
+    if updated.schoolId == nil { data["schoolId"] = NSNull() }
     try await templatesCollection(
       districtID: session.membership.districtID
     ).document(id).setData(data, merge: false)
@@ -252,7 +268,7 @@ class FormTemplateService {
 
   private func authorizedSession() throws -> AuthenticatedSession {
     guard let session = authorizationSessions.session(
-      authenticatedUserID: Auth.auth().currentUser?.uid
+      authenticatedUserID: FirebaseSession.currentUserID()
     ) else {
       throw FormTemplateError.userNotAuthenticated
     }

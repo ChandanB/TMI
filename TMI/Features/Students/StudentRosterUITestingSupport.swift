@@ -27,8 +27,7 @@ struct StudentRosterUITestingContent: View {
             StudentListView(state: state, member: member)
         }
         .environment(router)
-        .tint(TMIColors.teal)
-        .preferredColorScheme(.light)
+        .tint(TMIColors.accent)
     }
 
     fileprivate static let fixtureMember = MembershipContext(
@@ -542,6 +541,15 @@ private actor StudentRosterUITestingRepository: StudentRepository {
             member: fixtureMember,
             version: 1
         )
+    }
+}
+#endif
+
+#if DEBUG
+/// Roster data for fixtures outside this file (the app-shell fixture).
+enum StudentRosterUITestingData {
+    static func populatedRepository() -> any StudentRepository {
+        StudentRosterUITestingRepository(scenario: .populated)
     }
 }
 #endif

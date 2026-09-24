@@ -35,7 +35,7 @@ struct SimplifiedRegistrationViewTests {
         )
 
         let routingEnd = try #require(
-            contentView.range(of: ".foregroundStyle(Color.tmiTextPrimary)")?.upperBound
+            contentView.range(of: "AuthenticationRecoveryView()")?.upperBound
         )
         let sheetStart = try #require(
             contentView.range(of: ".sheet(")?.lowerBound

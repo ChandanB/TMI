@@ -39,7 +39,7 @@ struct PlanWorkflowUITestingContent: View {
             studentRepository: students, studentDetailRepository: Release1StudentDetailRepository(students: students),
             planRepository: store, planChildRepository: store, planExportAuditing: FixturePlanAuditing(),
             logger: TMILogger(category: "PlanUITesting")))
-        .tint(TMIColors.teal)
+        .tint(TMIColors.accent)
     }
 }
 
@@ -98,5 +98,16 @@ private struct FixturePlanAuditing: PlanExportAuditing {
     func recordExport(planID: String, studentID: String, kind: PlanExportKind, districtID: String) async throws -> String {
         "fixture-export-audit"
     }
+}
+#endif
+
+#if DEBUG
+/// Plan data for fixtures outside this file (the app-shell fixture).
+enum PlanWorkflowUITestingData {
+    static func store() -> any PlanRecordRepository & PlanChildRepositoryProtocol {
+        PlanWorkflowFixture(failsDetails: false)
+    }
+
+    static var auditing: any PlanExportAuditing { FixturePlanAuditing() }
 }
 #endif

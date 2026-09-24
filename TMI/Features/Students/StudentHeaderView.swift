@@ -45,76 +45,34 @@ struct StudentHeaderView: View {
 
         VStack(alignment: .leading, spacing: TMISpacing.md) {
             identityLayout {
-                ZStack {
-                    Circle()
-                        .fill(TMIColors.aubergineSoft)
+                TMIAvatar(initials: initials, size: dynamicTypeSize.isAccessibilitySize ? 56 : 68)
 
-                    Text(initials)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(TMIColors.aubergine)
-                }
-                .frame(width: TMISizing.avatarLg, height: TMISizing.avatarLg)
-                .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(header.displayName)
-                        .font(.title2)
-                        .bold()
+                        .font(.tmiEditorial(.title))
                         .foregroundStyle(TMIColors.textPrimary)
 
-                    Text("\(terminology.gradeLabel): \(header.grade)")
-                        .font(.body)
+                    Text("\(terminology.gradeDescription(header.grade)) · \(programContext.siteName(header.schoolID))")
+                        .font(.subheadline)
                         .foregroundStyle(TMIColors.textSecondary)
 
-                    Text("\(terminology.site): \(programContext.siteName(header.schoolID))")
-                        .font(.body)
-                        .foregroundStyle(TMIColors.textSecondary)
-
-                    Label(
-                        assignedStaffDescription,
-                        systemImage: "person.2"
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(TMIColors.infoText)
-
-                    Group {
+                    FlowLayout(spacing: TMISpacing.sm) {
+                        TMIStatusBadge(assignedStaffDescription, tone: .info, systemImage: "person.2.fill")
                         switch header.activePlanStatus {
                         case .unavailable:
-                            Label(
-                                "Active plan status unavailable",
-                                systemImage: "questionmark.circle"
-                            )
-                            .foregroundStyle(TMIColors.textSecondary)
+                            TMIStatusBadge("Plan status unavailable", tone: .neutral, systemImage: "questionmark.circle")
                         case .none:
-                            Label(
-                                "No active plans",
-                                systemImage: "minus.circle"
-                            )
-                            .foregroundStyle(TMIColors.textSecondary)
+                            TMIStatusBadge("No active plans", tone: .neutral, systemImage: "minus.circle")
                         case .active(let count):
-                            Label(
-                                activePlanDescription(count: count),
-                                systemImage: "checkmark.circle.fill"
-                            )
-                            .foregroundStyle(TMIColors.successText)
+                            TMIStatusBadge(activePlanDescription(count: count), tone: .success, systemImage: "checkmark.circle.fill")
                         }
                     }
-                    .font(.subheadline)
+                    .padding(.top, 2)
 
                     if let lastInteractionAt = header.lastInteractionAt {
-                        Label(
-                            "Last interaction \(lastInteractionAt.formatted(date: .abbreviated, time: .shortened))",
-                            systemImage: "clock"
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(TMIColors.textSecondary)
-                    } else {
-                        Label(
-                            "No recorded interactions",
-                            systemImage: "clock.badge.questionmark"
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(TMIColors.textSecondary)
+                        Text("Last interaction \(lastInteractionAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.footnote)
+                            .foregroundStyle(TMIColors.textTertiary)
                     }
                 }
             }
@@ -141,8 +99,7 @@ struct StudentHeaderView: View {
                         systemImage: "pencil",
                         action: onEdit
                     )
-                    .buttonStyle(.bordered)
-                    .tint(TMIColors.aubergine)
+                    .buttonStyle(.tmiSecondary)
                     .disabled(isOffline || isMutating)
                     .accessibilityIdentifier("studentDetail.edit")
                 }
@@ -155,7 +112,7 @@ struct StudentHeaderView: View {
                     ) {
                         showingArchiveConfirmation = true
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tmiDestructive)
                     .disabled(isOffline || isMutating)
                     .accessibilityIdentifier("studentDetail.archive")
                 }
@@ -167,12 +124,7 @@ struct StudentHeaderView: View {
                 }
             }
         }
-        .padding(TMISpacing.lg)
-        .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.xl))
-        .overlay {
-            RoundedRectangle(cornerRadius: TMIRadius.xl)
-                .stroke(TMIColors.interactiveBorder, lineWidth: 1)
-        }
+        .tmiSurface(padding: TMISpacing.ml)
         .confirmationDialog(
             "Archive \(header.displayName)?",
             isPresented: $showingArchiveConfirmation,
@@ -195,33 +147,34 @@ struct StudentHeaderView: View {
         Button {
             onLaunchStudentMode?()
         } label: {
-            HStack(spacing: TMISpacing.md) {
-                Image(systemName: "person.crop.circle.badge.clock")
-                    .font(.title3)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: TMISpacing.xxs) {
+            HStack(spacing: TMISpacing.ms) {
+                TMIIconTile("person.crop.circle.badge.clock", tone: .brand, size: 36)
+                VStack(alignment: .leading, spacing: 1) {
                     Text(terminology.learnerMode)
                         .font(.headline)
+                        .foregroundStyle(TMIColors.textPrimary)
                     Text(studentModeSubtitle)
                         .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
                 }
                 Spacer(minLength: 0)
                 Text("Launch")
-                    .font(.caption.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(TMIColors.accent)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(TMIColors.textTertiary)
             }
-            .foregroundStyle(TMIColors.infoText)
-            .padding(.horizontal, TMISpacing.md)
+            .padding(.horizontal, TMISpacing.ms)
+            .padding(.vertical, TMISpacing.sm)
             .frame(maxWidth: .infinity, minHeight: TMISizing.minTouchTarget)
-            .background(
-                TMIColors.infoSurface,
-                in: RoundedRectangle(cornerRadius: TMIRadius.lg)
-            )
+            .background(TMIColors.surfaceSecondary, in: TMIShape.control)
             .overlay {
-                RoundedRectangle(cornerRadius: TMIRadius.lg)
-                    .stroke(TMIColors.interactiveBorder, lineWidth: 1)
+                TMIShape.control.strokeBorder(TMIColors.separator, lineWidth: 1)
             }
+            .contentShape(TMIShape.control)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.tmiPressable)
         .disabled(isOffline || isMutating || onLaunchStudentMode == nil || !isOldEnoughForLearnerMode)
         .accessibilityLabel("Student Mode")
         .accessibilityValue(studentModeAccessibilityValue)

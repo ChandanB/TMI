@@ -221,7 +221,7 @@ struct TraumaInformedWelcomeSection: View {
     VStack(spacing: 16) {
       // Safe, welcoming icon
       Image(systemName: "heart.circle.fill")
-        .font(.system(size: 50))
+        .font(.largeTitle)
         .foregroundColor(Color.tmiSecondary)
 
       Text("Welcome to TMI")
@@ -230,7 +230,7 @@ struct TraumaInformedWelcomeSection: View {
         .multilineTextAlignment(.center)
 
       Text("A safe space for learning and growth")
-        .font(.system(size: 16))
+        .font(.body)
         .foregroundColor(Color.tmiTextSecondary)
         .multilineTextAlignment(.center)
 
@@ -238,7 +238,7 @@ struct TraumaInformedWelcomeSection: View {
         Text(
           "Help us understand how you'll be using TMI so we can provide the right protections and support for you."
         )
-        .font(.system(size: 14))
+        .font(.subheadline)
         .foregroundColor(Color.tmiTextSecondary)
         .multilineTextAlignment(.center)
         .padding(.horizontal, 20)
@@ -250,7 +250,7 @@ struct TraumaInformedWelcomeSection: View {
             Image(systemName: "info.circle")
             Text("Why do we ask this?")
           }
-          .font(.system(size: 12))
+          .font(.caption)
           .foregroundColor(Color.tmiSecondary)
         }
       }
@@ -332,7 +332,7 @@ struct RoleSelectionGrid: View {
     TMICard(style: .default) {
       VStack(spacing: 20) {
         Text("I am a...")
-          .font(.system(size: 20, weight: .semibold))
+          .font(.title3.weight(.semibold))
           .foregroundColor(Color.tmiTextPrimary)
 
         LazyVGrid(
@@ -374,18 +374,18 @@ struct SimplifiedRoleSelectionCard: View {
       VStack(spacing: 12) {
         // Role icon
         Image(systemName: category.iconName)
-          .font(.system(size: 28))
+          .font(.title)
           .foregroundColor(isSelected ? Color.tmiPrimary : Color.tmiTextTertiary)
 
         // Role name
         Text(category.displayName)
-          .font(.system(size: 14, weight: .medium))
+          .font(.subheadline.weight(.medium))
           .foregroundColor(isSelected ? Color.tmiTextPrimary : Color.tmiTextSecondary)
           .multilineTextAlignment(.center)
 
         // Role description
         Text(category.shortDescription)
-          .font(.system(size: 11))
+          .font(.caption2)
           .foregroundColor(Color.tmiTextSecondary)
           .multilineTextAlignment(.center)
           .lineLimit(2)
@@ -425,11 +425,11 @@ struct InstitutionVerificationSection: View {
       VStack(spacing: 16) {
         HStack {
           Image(systemName: "building.2")
-            .font(.system(size: 20))
+            .font(.title3)
             .foregroundColor(Color.tmiSecondary)
 
           Text("Connect with your institution")
-            .font(.system(size: 16, weight: .medium))
+            .font(.body.weight(.medium))
             .foregroundColor(Color.tmiTextPrimary)
 
           Spacer()
@@ -438,7 +438,7 @@ struct InstitutionVerificationSection: View {
         Text(
           "To verify your role and provide appropriate access, we need to connect you with your educational institution."
         )
-        .font(.system(size: 14))
+        .font(.subheadline)
         .foregroundColor(Color.tmiTextSecondary)
         .multilineTextAlignment(.leading)
 
@@ -465,7 +465,7 @@ struct InstitutionVerificationSection: View {
             Image(systemName: "magnifyingglass")
             Text("Search for your institution")
           }
-          .font(.system(size: 14))
+          .font(.subheadline)
           .foregroundColor(Color.tmiSecondary)
         }
         .padding(.top, 4)
@@ -504,17 +504,17 @@ struct AgeVerificationView: View {
           // Trauma-informed age verification explanation
           VStack(spacing: 16) {
             Image(systemName: "calendar.badge.checkmark")
-              .font(.system(size: 40))
+              .font(.largeTitle)
               .foregroundColor(Color.tmiSecondary)
 
             Text("Age Verification")
-              .font(.system(size: 24, weight: .bold))
+              .font(.title2.weight(.bold))
               .foregroundColor(Color.tmiTextPrimary)
 
             Text(
               "We need to verify your age to ensure we provide the right protections and follow important privacy laws that keep you safe."
             )
-            .font(.system(size: 16))
+            .font(.body)
             .foregroundColor(Color.tmiTextSecondary)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 30)
@@ -524,7 +524,7 @@ struct AgeVerificationView: View {
           TMICard(style: .default) {
             VStack(spacing: 20) {
               Text("What's your date of birth?")
-                .font(.system(size: 18, weight: .medium))
+                .font(.title3.weight(.medium))
                 .foregroundColor(Color.tmiTextPrimary)
 
               DatePicker(
@@ -545,10 +545,10 @@ struct AgeVerificationView: View {
               if isValidAge {
                 HStack {
                   Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
+                    .foregroundStyle(TMIColors.successText)
                   Text("Age verified successfully")
-                    .font(.system(size: 14))
-                    .foregroundColor(.green)
+                    .font(.subheadline)
+                    .foregroundStyle(TMIColors.successText)
                 }
                 .padding(.top, 8)
               }
@@ -691,26 +691,26 @@ struct InstitutionCard: View {
       TMICard(style: .default) {
         HStack(spacing: 16) {
           Image(systemName: "building.2")
-            .font(.system(size: 24))
+            .font(.title2)
             .foregroundColor(Color.tmiSecondary)
 
           VStack(alignment: .leading, spacing: 4) {
             Text(institution.name)
-              .font(.system(size: 16, weight: .medium))
+              .font(.body.weight(.medium))
               .foregroundColor(Color.tmiTextPrimary)
               .multilineTextAlignment(.leading)
 
             Text(institution.domain)
-              .font(.system(size: 14))
+              .font(.subheadline)
               .foregroundColor(Color.tmiTextSecondary)
 
             if institution.supportsSSOIntegration {
               HStack {
                 Image(systemName: "checkmark.circle.fill")
-                  .foregroundColor(.green)
+                  .foregroundStyle(TMIColors.successText)
                 Text("SSO Supported")
-                  .font(.system(size: 12))
-                  .foregroundColor(.green)
+                  .font(.caption)
+                  .foregroundStyle(TMIColors.successText)
               }
             }
           }
@@ -718,7 +718,7 @@ struct InstitutionCard: View {
           Spacer()
 
           Image(systemName: "arrow.right")
-            .font(.system(size: 14))
+            .font(.subheadline)
             .foregroundColor(Color.tmiTextSecondary)
         }
         .padding(.horizontal, 4)
@@ -740,7 +740,7 @@ struct RoleInformationSheet: View {
         ScrollView {
           VStack(spacing: 24) {
             Text("Why We Ask About Your Role")
-              .font(.system(size: 24, weight: .bold))
+              .font(.title2.weight(.bold))
               .foregroundColor(Color.tmiTextPrimary)
               .padding(.top, 20)
 
@@ -804,17 +804,17 @@ struct InfoCard: View {
     TMICard(style: .default) {
       HStack(spacing: 16) {
         Image(systemName: icon)
-          .font(.system(size: 24))
+          .font(.title2)
           .foregroundColor(Color.tmiSecondary)
           .frame(width: 40)
 
         VStack(alignment: .leading, spacing: 8) {
           Text(title)
-            .font(.system(size: 16, weight: .semibold))
+            .font(.body.weight(.semibold))
             .foregroundColor(Color.tmiTextPrimary)
 
           Text(description)
-            .font(.system(size: 14))
+            .font(.subheadline)
             .foregroundColor(Color.tmiTextSecondary)
             .multilineTextAlignment(.leading)
         }

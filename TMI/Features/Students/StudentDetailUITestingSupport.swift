@@ -33,7 +33,7 @@ struct StudentDetailUITestingContent: View {
         }
         .environment(\.appDependencies, dependencies)
         .environment(router)
-        .tint(TMIColors.teal)
+        .tint(TMIColors.accent)
     }
 
     private static let member = MembershipContext(

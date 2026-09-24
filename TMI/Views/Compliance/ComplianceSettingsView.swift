@@ -57,6 +57,9 @@ struct ComplianceSettingsView: View {
         }
         .navigationTitle("Compliance Settings")
         .navigationBarTitleDisplayMode(.large)
+        // With unsaved edits the system Back (and edge swipe) would discard
+        // them silently, so leaving goes through Cancel's confirmation.
+        .navigationBarBackButtonHidden(hasUnsavedChanges)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
@@ -134,7 +137,7 @@ struct ComplianceSettingsView: View {
                 HStack {
                     Image(systemName: "shield.checkered")
                         .font(.title2)
-                        .foregroundColor(.cyan)
+                        .foregroundStyle(TMIColors.accent)
 
                     Text("Compliance Configuration")
                         .font(.headline)
@@ -170,7 +173,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
-                .tint(.cyan)
+                .tint(TMIColors.accent)
 
                 if coppaEnabled {
                     VStack(alignment: .leading, spacing: 8) {
@@ -214,7 +217,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
-                .tint(.cyan)
+                .tint(TMIColors.accent)
 
                 if ferpaEnabled {
                     Toggle(isOn: $requireParentalConsent.onChange { hasUnsavedChanges = true }) {
@@ -226,7 +229,7 @@ struct ComplianceSettingsView: View {
                                 .foregroundColor(Color.tmiTextSecondary)
                         }
                     }
-                    .tint(.cyan)
+                    .tint(TMIColors.accent)
                     .padding(.leading)
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -249,7 +252,7 @@ struct ComplianceSettingsView: View {
                                 }
                             ))
                             .labelsHidden()
-                            .tint(.cyan)
+                            .tint(TMIColors.accent)
                         }
 
                         if let expirationDays = consentExpirationDays {
@@ -257,7 +260,7 @@ struct ComplianceSettingsView: View {
                                 get: { expirationDays },
                                 set: { consentExpirationDays = $0; hasUnsavedChanges = true }
                             ), in: 30...1825, step: 30) {
-                                Text("\(expirationDays) days (\(expirationDays / 365) year\(expirationDays / 365 == 1 ? "" : "s"))")
+                                Text(ComplianceDuration.describe(days: expirationDays))
                                     .foregroundColor(Color.tmiTextSecondary)
                             }
                         }
@@ -293,7 +296,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
-                .tint(.cyan)
+                .tint(TMIColors.accent)
 
                 if dataRetentionEnabled {
                     VStack(alignment: .leading, spacing: 8) {
@@ -302,7 +305,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextPrimary)
 
                         Stepper(value: $retentionPolicyDays.onChange { hasUnsavedChanges = true }, in: 365...3650, step: 365) {
-                            Text("\(retentionPolicyDays) days (\(retentionPolicyDays / 365) years)")
+                            Text(ComplianceDuration.describe(days: retentionPolicyDays))
                                 .foregroundColor(Color.tmiTextSecondary)
                         }
 
@@ -321,7 +324,7 @@ struct ComplianceSettingsView: View {
                                 .foregroundColor(autoDeleteEnabled ? .orange : Color.tmiTextSecondary)
                         }
                     }
-                    .tint(.orange)
+                    .tint(TMIColors.warningText)
                     .padding(.leading)
                 }
             }
@@ -349,7 +352,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
-                .tint(.cyan)
+                .tint(TMIColors.accent)
 
                 if auditLoggingEnabled {
                     VStack(alignment: .leading, spacing: 8) {
@@ -358,7 +361,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextPrimary)
 
                         Stepper(value: $auditRetentionDays.onChange { hasUnsavedChanges = true }, in: 365...3650, step: 365) {
-                            Text("\(auditRetentionDays) days (\(auditRetentionDays / 365) years)")
+                            Text(ComplianceDuration.describe(days: auditRetentionDays))
                                 .foregroundColor(Color.tmiTextSecondary)
                         }
 
@@ -377,7 +380,7 @@ struct ComplianceSettingsView: View {
                                 .foregroundColor(Color.tmiTextSecondary)
                         }
                     }
-                    .tint(.cyan)
+                    .tint(TMIColors.accent)
                     .padding(.leading)
                 }
             }
@@ -405,7 +408,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
-                .tint(.cyan)
+                .tint(TMIColors.accent)
 
                 Toggle(isOn: $requireConsentForDataSharing.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -416,7 +419,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
-                .tint(.cyan)
+                .tint(TMIColors.accent)
 
                 Toggle(isOn: $allowDataExport.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -427,7 +430,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
-                .tint(.cyan)
+                .tint(TMIColors.accent)
 
                 Toggle(isOn: $allowThirdPartyIntegrations.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -438,7 +441,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(allowThirdPartyIntegrations ? .orange : Color.tmiTextSecondary)
                     }
                 }
-                .tint(.orange)
+                .tint(TMIColors.warningText)
             }
             .padding()
         }
@@ -464,7 +467,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
-                .tint(.cyan)
+                .tint(TMIColors.accent)
 
                 Toggle(isOn: $notifyOnDataExport.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -475,7 +478,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
-                .tint(.cyan)
+                .tint(TMIColors.accent)
 
                 Toggle(isOn: $notifyParentsOnMajorChanges.onChange { hasUnsavedChanges = true }) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -486,7 +489,7 @@ struct ComplianceSettingsView: View {
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                 }
-                .tint(.cyan)
+                .tint(TMIColors.accent)
             }
             .padding()
         }
@@ -498,7 +501,7 @@ struct ComplianceSettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .foregroundColor(.cyan)
+                    .foregroundStyle(TMIColors.accent)
                 Text(title)
                     .font(.headline)
                     .foregroundColor(Color.tmiTextPrimary)
@@ -515,7 +518,7 @@ struct ComplianceSettingsView: View {
         TMICard(style: .default) {
             HStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
+                    .foregroundStyle(TMIColors.warningText)
 
                 Text(message)
                     .font(.caption)
@@ -531,7 +534,7 @@ struct ComplianceSettingsView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.5)
-                .tint(.white)
+                .tint(TMIColors.accent)
 
             Text("Loading compliance settings...")
                 .font(.headline)
@@ -579,7 +582,8 @@ struct ComplianceSettingsView: View {
 
     @MainActor
     private func saveSettings() async {
-        guard let currentSettings = settings else { return }
+        // A district without a settings document yet saves its first one
+        // (the write merges); this used to return silently.
 
         isSaving = true
         errorMessage = nil
@@ -587,7 +591,7 @@ struct ComplianceSettingsView: View {
 
         // Create updated settings
         let updatedSettings = ComplianceSettings(
-            id: currentSettings.id,
+            id: settings?.id,
             districtId: districtId,
             coppaEnabled: coppaEnabled,
             coppaMinimumAge: coppaMinimumAge,
@@ -607,7 +611,7 @@ struct ComplianceSettingsView: View {
             notifyOnDataAccess: notifyOnDataAccess,
             notifyOnDataExport: notifyOnDataExport,
             notifyParentsOnMajorChanges: notifyParentsOnMajorChanges,
-            createdAt: currentSettings.createdAt,
+            createdAt: settings?.createdAt ?? Date(),
             lastUpdated: Date()
         )
 
@@ -642,5 +646,19 @@ extension Binding {
 #Preview {
     NavigationStack {
         ComplianceSettingsView(districtId: "sample-district")
+    }
+}
+
+/// "90 days (about 3 months)" / "730 days (2 years)". Integer division used to
+/// print "(0 years)" for anything under a year.
+nonisolated enum ComplianceDuration {
+    static func describe(days: Int) -> String {
+        if days < 365 {
+            let months = max(1, Int((Double(days) / 30.44).rounded()))
+            return "\(days) days (about \(months) month\(months == 1 ? "" : "s"))"
+        }
+        let years = Double(days) / 365
+        let text = years.formatted(.number.precision(.fractionLength(0...1)))
+        return "\(days) days (\(text) year\(years == 1 ? "" : "s"))"
     }
 }

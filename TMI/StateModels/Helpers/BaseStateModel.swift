@@ -402,15 +402,15 @@ struct TMIErrorBoundary<Content: View>: View {
                 TMICard(style: .default) {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 40))
+                            .font(.largeTitle)
                             .foregroundColor(.orange)
 
                         Text("Something went wrong")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.title3.weight(.semibold))
                             .foregroundColor(Color.tmiTextPrimary)
 
                         Text(error.message)
-                            .font(.system(size: 14))
+                            .font(.subheadline)
                             .foregroundColor(Color.tmiTextSecondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)

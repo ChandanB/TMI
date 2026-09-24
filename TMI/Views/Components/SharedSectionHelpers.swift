@@ -147,7 +147,7 @@ struct ResourceRow: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(
-                actionLabel == "Remove" ? Color.red : Color.accentColor
+                actionLabel == "Remove" ? TMIColors.errorText : TMIColors.accent
             )
             .accessibilityLabel(Text("\(actionLabel) \(resource.title)"))
         }

@@ -22,6 +22,8 @@ struct StaffAdministrationView: View {
     @State private var actionError: StaffAdministrationError?
     @State private var editing: AdminMembershipDraft?
     @State private var isInviting = false
+    @State private var invitationLoadError: StaffAdministrationError?
+    @State private var pendingRevoke: AdminInvitation?
 
     init(member: MembershipContext, repository: (any StaffAdministrationRepository)? = nil) {
         self.member = member
@@ -31,25 +33,56 @@ struct StaffAdministrationView: View {
 
     var body: some View {
         List {
-            Picker("Show", selection: $section) {
-                ForEach(Section.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .listRowBackground(Color.clear)
-
-            if let loadError {
-                ContentUnavailableView(
-                    "Staff unavailable",
-                    systemImage: "person.2.slash",
-                    description: Text(loadError.localizedDescription)
-                )
-                Button("Try again") { Task { await load() } }
+            if let loadError, section == .staff {
+                ContentUnavailableView {
+                    Label("Staff unavailable", systemImage: "person.2.slash")
+                } description: {
+                    Text(loadError.localizedDescription)
+                } actions: {
+                    Button("Try Again") { Task { await load() } }
+                        .buttonStyle(.tmiPrimary)
+                }
+            } else if let invitationLoadError, section == .invitations {
+                ContentUnavailableView {
+                    Label("Invitations unavailable", systemImage: "envelope.badge.shield.half.filled")
+                } description: {
+                    Text(invitationLoadError.localizedDescription)
+                } actions: {
+                    Button("Try Again") { Task { await load() } }
+                        .buttonStyle(.tmiPrimary)
+                }
             } else {
                 switch section {
                 case .staff: staffList
                 case .invitations: invitationList
                 }
             }
+        }
+        // The segmented control sits above the list so it can't reshape the
+        // first section's corners (it used to render inside the list).
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Picker("Show", selection: $section) {
+                ForEach(Section.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, TMISpacing.screenPadding)
+            .padding(.vertical, TMISpacing.sm)
+        }
+        .scrollContentBackground(.hidden)
+        .tmiScreenBackground()
+        .confirmationDialog(
+            "Revoke this invitation?",
+            isPresented: Binding(get: { pendingRevoke != nil }, set: { if !$0 { pendingRevoke = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingRevoke
+        ) { invitation in
+            Button("Revoke Invitation", role: .destructive) {
+                revoke(invitation)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { _ in
+            Text("The code stops working immediately. This can't be undone.")
         }
         .navigationTitle("Staff management")
         .navigationBarTitleDisplayMode(.inline)
@@ -104,35 +137,61 @@ struct StaffAdministrationView: View {
             Text("No staff yet. Invite someone to get started.").foregroundStyle(TMIColors.textSecondary)
         }
         ForEach(staff) { person in
-            Button {
-                if person.isManageable { editing = AdminMembershipDraft(member: person) }
-            } label: {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: TMISpacing.xxs) {
-                        Text(person.title + (person.isSelf ? " (you)" : ""))
-                            .font(.headline)
-                            .foregroundStyle(TMIColors.textPrimary)
-                        if let email = person.email, person.displayName != nil {
-                            Text(email).font(.caption).foregroundStyle(TMIColors.textSecondary)
-                        }
-                        Text(person.schoolIDs.map(programContext.siteName).joined(separator: ", "))
-                            .font(.caption)
-                            .foregroundStyle(TMIColors.textSecondary)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: TMISpacing.xxs) {
-                        Text(person.role?.displayName ?? "Unknown role").font(.subheadline)
-                        if !person.isActive {
-                            Label("Inactive", systemImage: "pause.circle")
-                                .font(.caption)
-                                .foregroundStyle(TMIColors.warningText)
-                        }
+            // Rows outside the admin's scope (including yourself) are plain
+            // rows, not disabled buttons, so they aren't dimmed.
+            if person.isManageable {
+                Button {
+                    editing = AdminMembershipDraft(member: person)
+                } label: {
+                    staffRow(person, showsChevron: true)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(TMIColors.surface)
+                .accessibilityHint("Edit access")
+            } else {
+                staffRow(person, showsChevron: false)
+                    .listRowBackground(TMIColors.surface)
+                    .accessibilityHint("Outside your administrative scope")
+            }
+        }
+    }
+
+    private func staffRow(_ person: AdminStaffMember, showsChevron: Bool) -> some View {
+        HStack(alignment: .center, spacing: TMISpacing.ms) {
+            TMIAvatar(initials: Self.initials(person.title), size: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: TMISpacing.sm) {
+                    Text(person.title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(TMIColors.textPrimary)
+                        .lineLimit(2)
+                    if person.isSelf {
+                        TMIStatusBadge("You", tone: .neutral)
                     }
                 }
+                if let email = person.email, person.displayName != nil {
+                    Text(email)
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                        .textSelection(.enabled)
+                }
+                let sites = person.schoolIDs.map(programContext.siteName).joined(separator: ", ")
+                Text([person.role?.displayName ?? "Unknown role", sites].filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.footnote)
+                    .foregroundStyle(TMIColors.textTertiary)
+                if !person.isActive {
+                    TMIStatusBadge("Inactive", tone: .warning, systemImage: "pause.circle.fill")
+                        .padding(.top, 2)
+                }
             }
-            .disabled(!person.isManageable)
-            .accessibilityHint(person.isManageable ? "Edit access" : "Outside your administrative scope")
+            Spacer(minLength: TMISpacing.sm)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TMIColors.textTertiary)
+            }
         }
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -143,57 +202,69 @@ struct StaffAdministrationView: View {
         ForEach(invitations) { invitation in
             VStack(alignment: .leading, spacing: TMISpacing.xxs) {
                 HStack {
-                    Text(invitation.label ?? invitation.role.displayName).font(.headline)
+                    Text(invitation.label ?? invitation.role.displayName)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(TMIColors.textPrimary)
                     Spacer()
-                    Text(invitation.status.displayName)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(invitation.status == .active ? TMIColors.successText : TMIColors.textSecondary)
+                    TMIStatusBadge(invitation.status.displayName, tone: invitation.status == .active ? .success : .neutral)
                 }
                 Text("\(invitation.role.displayName) · \(invitation.schoolIDs.map(programContext.siteName).joined(separator: ", "))")
                     .font(.caption)
                     .foregroundStyle(TMIColors.textSecondary)
             }
+            .listRowBackground(TMIColors.surface)
+            // Revoking changes the row's status rather than removing it, so it
+            // is not a destructive-role swipe (which would animate a delete).
             .swipeActions {
                 if invitation.status == .active || invitation.status == .expired {
-                    Button("Revoke", role: .destructive) {
-                        Task {
-                            do {
-                                try await repository.revokeInvitation(invitationID: invitation.invitationID, districtID: member.districtID)
-                                await load()
-                            } catch {
-                                actionError = StaffAdministrationError.map(error)
-                            }
-                        }
+                    Button("Revoke", systemImage: "xmark.octagon") {
+                        pendingRevoke = invitation
                     }
+                    .tint(TMIColors.errorText)
                 }
             }
             .contextMenu {
                 if invitation.status == .active || invitation.status == .expired {
-                    Button("Revoke", role: .destructive) {
-                        Task {
-                            do {
-                                try await repository.revokeInvitation(invitationID: invitation.invitationID, districtID: member.districtID)
-                                await load()
-                            } catch {
-                                actionError = StaffAdministrationError.map(error)
-                            }
-                        }
+                    Button("Revoke…", systemImage: "xmark.octagon", role: .destructive) {
+                        pendingRevoke = invitation
                     }
                 }
             }
         }
     }
 
+    private func revoke(_ invitation: AdminInvitation) {
+        Task {
+            do {
+                try await repository.revokeInvitation(invitationID: invitation.invitationID, districtID: member.districtID)
+                await load()
+            } catch {
+                actionError = StaffAdministrationError.map(error)
+            }
+        }
+    }
+
+    /// Staff and invitations load independently: an invitations failure no
+    /// longer hides a staff list that loaded fine.
     private func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
             staff = try await repository.staff(districtID: member.districtID)
-            invitations = try await repository.invitations(districtID: member.districtID)
             loadError = nil
         } catch {
             loadError = StaffAdministrationError.map(error)
         }
+        do {
+            invitations = try await repository.invitations(districtID: member.districtID)
+            invitationLoadError = nil
+        } catch {
+            invitationLoadError = StaffAdministrationError.map(error)
+        }
+    }
+
+    private static func initials(_ name: String) -> String {
+        name.split(whereSeparator: \.isWhitespace).prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
     }
 }
 
@@ -387,7 +458,7 @@ struct StaffInvitationEditor: View {
                     ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
                 }
             }
-            .interactiveDismissDisabled(created != nil && isSaving)
+            .interactiveDismissDisabled(isSaving || created != nil)
             .onAppear {
                 draft.capabilities = draft.role.defaultCapabilities.filter(caller.capabilities.contains)
                 if sites.count == 1 { draft.schoolIDs = sites.map(\.id) }

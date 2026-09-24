@@ -145,7 +145,9 @@ struct StudentEditorView: View {
             fieldError(for: .grade)
 
             TextField("\(terminology.learner) identifier (optional)", text: $studentIdentifier)
-                .textContentType(.username)
+                // Not a credential: `.username` summoned the Passwords AutoFill bar.
+                .textContentType(nil)
+                .autocorrectionDisabled()
                 .accessibilityIdentifier("studentEditor.identifier")
             fieldError(for: .studentIdentifier)
         }

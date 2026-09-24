@@ -23,7 +23,7 @@ struct ResourceCard: View {
                         .frame(width: 40, height: 40)
                     
                     Image(systemName: resource.category.icon)
-                        .font(.system(size: 20))
+                        .font(.title3)
                         .foregroundColor(resource.category.color)
                 }
                 
@@ -31,7 +31,7 @@ struct ResourceCard: View {
                 
                 // Category indicator
                 Text(resource.category.rawValue.capitalized)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.caption2.weight(.medium))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
@@ -43,14 +43,14 @@ struct ResourceCard: View {
             
             // Title
             Text(resource.title)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundColor(Color.tmiTextPrimary)
                 .lineLimit(2)
                 .frame(height: 44, alignment: .top)
             
             // Description
             Text(resource.description)
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .foregroundColor(Color.tmiTextSecondary)
                 .lineLimit(3)
                 .frame(height: 60, alignment: .top)
@@ -62,24 +62,24 @@ struct ResourceCard: View {
                 HStack(spacing: 4) {
                     ForEach(resource.tags.prefix(2), id: \.self) { tag in
                         Text(tag)
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .background(
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.white.opacity(0.1))
+                                    .fill(TMIColors.fill)
                             )
                             .foregroundColor(Color.tmiTextSecondary)
                     }
                     
                     if resource.tags.count > 2 {
                         Text("+\(resource.tags.count - 2)")
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .background(
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.white.opacity(0.1))
+                                    .fill(TMIColors.fill)
                             )
                             .foregroundColor(Color.tmiTextSecondary)
                     }
@@ -90,7 +90,7 @@ struct ResourceCard: View {
         .frame(height: 220)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.02))
+                .fill(TMIColors.fill)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
                         .fill(Color.tmiSurface)
@@ -102,7 +102,7 @@ struct ResourceCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(
                     LinearGradient(
-                        colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                        colors: [TMIColors.separator, .clear, TMIColors.separator],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),

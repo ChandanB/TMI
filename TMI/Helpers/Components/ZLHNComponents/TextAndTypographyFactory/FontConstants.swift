@@ -425,96 +425,49 @@ extension View {
 }
 
 
+// MARK: - TMI type ramp
+//
+// Every role maps to a Dynamic Type text style, so text scales with the
+// user's setting on iOS, iPadOS and macOS. Weights follow Apple's defaults
+// for each style. Pair numbers with `.monospacedDigit()` (see `tmiMetric`).
 nonisolated extension Font {
-    // MARK: - Display Fonts (Large Headings)
-    
-    /// Display 1 - Largest display font (34pt, bold)
-    static var tmiDisplay1: Font {
-        return .system(size: 34, weight: .bold, design: .default)
-    }
-    
-    /// Display 2 - Second largest display font (28pt, bold)
-    static var tmiDisplay2: Font {
-        return .system(size: 28, weight: .bold, design: .default)
-    }
-    
-    /// Display 3 - Third largest display font (24pt, bold)
-    static var tmiDisplay3: Font {
-        return .system(size: 24, weight: .bold, design: .default)
-    }
-    
-    // MARK: - Heading Fonts
-    
-    /// Heading 1 - Largest heading (22pt, bold)
-    static var tmiHeading1: Font {
-        return .system(size: 22, weight: .bold, design: .default)
-    }
-    
-    /// Heading 2 - Second largest heading (20pt, semibold)
-    static var tmiHeading2: Font {
-        return .system(size: 20, weight: .semibold, design: .default)
-    }
-    
-    /// Heading 3 - Third largest heading (18pt, semibold)
-    static var tmiHeading3: Font {
-        return .system(size: 18, weight: .semibold, design: .default)
-    }
-    
-    // MARK: - Body Fonts
-    
-    /// Body Large - Larger body text (17pt, regular)
-    static var tmiBodyLarge: Font {
-        return .system(size: 17, weight: .regular, design: .default)
-    }
-    
-    /// Body - Standard body text (16pt, regular)
-    static var tmiBody: Font {
-        return .system(size: 16, weight: .regular, design: .default)
-    }
-    
-    /// Body Small - Smaller body text (14pt, regular)
-    static var tmiBodySmall: Font {
-        return .system(size: 14, weight: .regular, design: .default)
-    }
-    
-    // MARK: - Label Fonts
-    
-    /// Label Large - Larger label text (16pt, medium)
-    static var tmiLabelLarge: Font {
-        return .system(size: 16, weight: .medium, design: .default)
-    }
-    
-    /// Label Medium - Standard label text (14pt, medium)
-    static var tmiLabelMedium: Font {
-        return .system(size: 14, weight: .medium, design: .default)
-    }
-    
-    /// Label Small - Smaller label text (12pt, medium)
-    static var tmiLabelSmall: Font {
-        return .system(size: 12, weight: .medium, design: .default)
-    }
-    
-    // MARK: - Caption Fonts
-    
-    /// Caption - Small caption text (12pt, regular)
-    static var tmiCaption: Font {
-        return .system(size: 12, weight: .regular, design: .default)
-    }
-    
-    /// Caption Small - Smallest caption text (10pt, regular)
-    static var tmiCaptionSmall: Font {
-        return .system(size: 10, weight: .regular, design: .default)
-    }
-    
-    // MARK: - Monospaced Fonts
-    
-    /// Code - Monospaced font for code display (14pt, regular)
-    static var tmiCode: Font {
-        return .system(size: 14, weight: .regular, design: .monospaced)
-    }
-    
-    /// Code Small - Smaller monospaced font (12pt, regular)
-    static var tmiCodeSmall: Font {
-        return .system(size: 12, weight: .regular, design: .monospaced)
-    }
+    // MARK: - Display (screen and hero titles)
+
+    /// Largest title (Large Title, bold).
+    static var tmiDisplay1: Font { .largeTitle.weight(.bold) }
+    /// Title (bold).
+    static var tmiDisplay2: Font { .title.weight(.bold) }
+    /// Title 2 (bold).
+    static var tmiDisplay3: Font { .title2.weight(.bold) }
+
+    // MARK: - Headings
+
+    /// Title 2 (semibold).
+    static var tmiHeading1: Font { .title2.weight(.semibold) }
+    /// Title 3 (semibold). Section titles.
+    static var tmiHeading2: Font { .title3.weight(.semibold) }
+    /// Headline. Card and row titles.
+    static var tmiHeading3: Font { .headline }
+
+    // MARK: - Body
+
+    static var tmiBodyLarge: Font { .body }
+    static var tmiBody: Font { .body }
+    static var tmiBodySmall: Font { .subheadline }
+
+    // MARK: - Labels
+
+    static var tmiLabelLarge: Font { .body.weight(.medium) }
+    static var tmiLabelMedium: Font { .subheadline.weight(.medium) }
+    static var tmiLabelSmall: Font { .footnote.weight(.medium) }
+
+    // MARK: - Captions
+
+    static var tmiCaption: Font { .caption }
+    static var tmiCaptionSmall: Font { .caption2 }
+
+    // MARK: - Monospaced
+
+    static var tmiCode: Font { .system(.subheadline, design: .monospaced) }
+    static var tmiCodeSmall: Font { .system(.caption, design: .monospaced) }
 }

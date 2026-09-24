@@ -421,8 +421,7 @@ struct AuthenticationAcceptanceUITestingContent: View {
         .environment(\.authStateModel, authStateModel)
         .environment(\.studentContext, studentContext)
         .environment(appRouter)
-        .tint(TMIColors.teal)
-        .preferredColorScheme(.light)
+        .tint(TMIColors.accent)
     }
 }
 
@@ -508,8 +507,7 @@ struct AuthenticationAvailabilityUITestingContent: View {
         .environment(\.authStateModel, authStateModel)
         .environment(\.studentContext, studentContext)
         .environment(appRouter)
-        .tint(TMIColors.teal)
-        .preferredColorScheme(.light)
+        .tint(TMIColors.accent)
         .task {
             guard identityProvider.currentIdentity == nil else {
                 return
@@ -525,6 +523,47 @@ struct AuthenticationAvailabilityUITestingContent: View {
             }
             hasStartedFixture = true
         }
+    }
+}
+#endif
+
+#if DEBUG
+/// A signed-in staff session for fixtures that host the real staff shell.
+/// Reuses the acceptance fakes, so sign-in runs the genuine AuthStateModel
+/// pipeline (trusted claim → profile → membership) with no network.
+@MainActor
+enum StaffShellUITestingSession {
+    static let email = AuthenticationAcceptanceFixture.signInEmail
+    static let password = AuthenticationAcceptanceFixture.password
+
+    static func membership(role: StaffRole, capabilities: Set<Capability>) -> MembershipContext {
+        MembershipContext(
+            userID: AuthenticationAcceptanceFixture.signInUserID,
+            districtID: AuthenticationAcceptanceFixture.districtID,
+            schoolIDs: [AuthenticationAcceptanceFixture.schoolID],
+            role: role,
+            capabilities: capabilities,
+            assignedStudentIDs: [],
+            isActive: true,
+            version: 1
+        )
+    }
+
+    static func make(
+        membership: MembershipContext,
+        dependencies makeDependencies: (any MembershipProviding, any AuthenticationProviding) -> AppDependencies
+    ) -> (auth: AuthStateModel, dependencies: AppDependencies) {
+        let identityProvider = AuthenticationAcceptanceUITestingIdentityProvider()
+        let authentication = AuthenticationAcceptanceUITestingRepository(identityProvider: identityProvider)
+        let membershipProvider = InMemoryMembershipProvider(memberships: [membership])
+        let auth = AuthStateModel(
+            authentication: authentication,
+            identityProvider: identityProvider,
+            profileProvider: AuthenticationAcceptanceUITestingProfileProvider(),
+            membershipProvider: membershipProvider,
+            automaticallyStart: false
+        )
+        return (auth, makeDependencies(membershipProvider, authentication))
     }
 }
 #endif

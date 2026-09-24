@@ -19,6 +19,9 @@ import WebKit
 
 @Observable
 final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableError> {
+    /// True while a profile save is in flight.
+    var isSaving = false
+
     // MARK: - Dependencies
     private let firebaseManager: FirebaseManager
 
@@ -112,7 +115,10 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
             return
         }
 
-        updateState(.loading)
+        // Keep the form (and the person's edits) on screen while saving; a
+        // full-screen spinner used to replace it and an error discarded edits.
+        isSaving = true
+        defer { isSaving = false }
 
         do {
             // Update displayName in Auth
@@ -128,15 +134,12 @@ final class UserProfileStateModel: BaseStateModel<UserProfileData, IdentifiableE
                 "organization": organization
             ])
 
-            // Show success message
-            ui.alertMessage = "Profile updated successfully"
+            ui.alertMessage = "Your profile is up to date."
             ui.isShowingAlert = true
-
-            // Refresh data to ensure we have the latest
-            await fetch()
         } catch {
-            let handledError = ErrorHandlingHelper.handleError(error, userFriendlyMessage: "Failed to update profile")
-            updateState(.error(handledError))
+            _ = ErrorHandlingHelper.handleError(error, userFriendlyMessage: "Failed to update profile")
+            ui.alertMessage = "Your profile couldn’t be saved. Your changes are still here; check your connection and try again."
+            ui.isShowingAlert = true
         }
     }
 
@@ -284,18 +287,23 @@ struct UserProfileView: View {
     @State private var showingDeleteAccount = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.authStateModel) private var authStateModel
+    @Environment(\.studentContext) private var studentContext
+    @Environment(AppRouter.self) private var router
+    @State private var showingSignOutConfirmation = false
+    /// The Change Email sheet keeps showing this while a save is in flight
+    /// (the live state is `.loading`, which used to blank the sheet).
+    @State private var lastLoadedProfile: UserProfileData?
+    @State private var showingSignOutFailure = false
 
     var body: some View {
         ZStack {
-            // Unified Background
-            TMIBackgroundView(variant: .base)
+            TMIColors.background
                 .ignoresSafeArea()
 
             Group {
                 switch stateModel.state {
                 case .idle, .loading:
                     ProgressView()
-                        .scaleEffect(1.5)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 case .loaded(let profileData):
@@ -306,7 +314,8 @@ struct UserProfileView: View {
                         showingPrivacyPolicy: $showingPrivacyPolicy,
                         showingTermsOfService: $showingTermsOfService,
                         showingDeleteAccount: $showingDeleteAccount,
-                        roleDisplayName: authStateModel.currentMembership?.role.displayName
+                        roleDisplayName: authStateModel.currentMembership?.role.displayName,
+                        onSignOut: { showingSignOutConfirmation = true }
                     )
 
                 case .error(let error):
@@ -316,7 +325,7 @@ struct UserProfileView: View {
                             .foregroundColor(Color.tmiTextPrimary)
 
                         Text(error.message)
-                            .foregroundColor(.red)
+                            .foregroundStyle(TMIColors.errorText)
                             .multilineTextAlignment(.center)
 
                         TMIButton(
@@ -334,29 +343,42 @@ struct UserProfileView: View {
             }
         }
         .navigationTitle("Profile")
-        .foregroundColor(Color.tmiTextPrimary)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 if case .loaded = stateModel.state {
-                    TMIButton(
-                        text: "Save",
-                        style: .primary,
-                        isDisabled: stateModel.isLoading,
-                        action: {
-                            Task {
-                                await stateModel.updateProfile()
-                            }
+                    if stateModel.isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Save") {
+                            Task { await stateModel.updateProfile() }
                         }
-                    )
+                        .keyboardShortcut("s", modifiers: .command)
+                        .accessibilityIdentifier("profile.save")
+                    }
                 }
             }
         }
-        .alert(isPresented: binding(stateModel, \.ui.isShowingAlert)) {
-            Alert(
-                title: Text(stateModel.ui.alertMessage.contains("Error") ? "Error" : "Success"),
-                message: Text(stateModel.ui.alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
+        // The title no longer guesses from the message text ("Failed to upload
+        // photo" used to appear under "Success").
+        .onChange(of: stateModel.isChangingEmail) { _, isChanging in
+            if isChanging { lastLoadedProfile = stateModel.state.value }
+        }
+        .alert("Profile", isPresented: binding(stateModel, \.ui.isShowingAlert)) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(stateModel.ui.alertMessage)
+        }
+        .alert("Sign Out", isPresented: $showingSignOutConfirmation) {
+            Button("Sign Out", role: .destructive, action: attemptSignOut)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to sign out?")
+        }
+        .alert("Couldn’t Sign Out", isPresented: $showingSignOutFailure) {
+            Button("Retry", action: attemptSignOut)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Your account is still signed in. Check your connection and try again.")
         }
         .sheet(
             isPresented: Binding(
@@ -364,7 +386,7 @@ struct UserProfileView: View {
                 set: { stateModel.isChangingEmail = $0 }
             )
         ) {
-            if case .loaded(let profileData) = stateModel.state {
+            if let profileData = stateModel.state.value ?? lastLoadedProfile {
                 ChangeEmailView(stateModel: stateModel, profileData: profileData)
                     .tmiSheetStyle()
             }
@@ -410,6 +432,18 @@ struct UserProfileView: View {
             }
         }
     }
+
+    /// Signs out through AuthStateModel (invalidating the trusted session),
+    /// exactly like the shell — the old path called Firebase directly.
+    @MainActor
+    private func attemptSignOut() {
+        guard authStateModel.signOut() else {
+            showingSignOutFailure = true
+            return
+        }
+        studentContext.clearContext()
+        router.reset()
+    }
 }
 
 @ViewBuilder
@@ -420,56 +454,29 @@ private func userProfileForm(
     showingPrivacyPolicy: Binding<Bool>,
     showingTermsOfService: Binding<Bool>,
     showingDeleteAccount: Binding<Bool>,
-    roleDisplayName: String?
+    roleDisplayName: String?,
+    onSignOut: @escaping () -> Void
 ) -> some View {
-    ScrollView {
-        VStack(spacing: 20) {
-            // Profile Photo Section
-            TMICard(style: .default) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Profile Photo")
-                        .font(.headline)
-                        .foregroundColor(Color.tmiTextPrimary)
-
-                    HStack(spacing: 16) {
-                        if let photoURLString = stateModel.photoURL, let url = URL(string: photoURLString) {
-                            WebImage(url: url)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
-                        } else if let photoData = stateModel.selectedPhotoData,
-                                  let uiImage = UIImage(data: photoData) {
-                            #if os(macOS)
-                            Image(nsImage: uiImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
-                            #elseif os(iOS)
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
-                            #endif
-                        } else {
-                            Image(systemName: "person.circle.fill")
-                                .resizable()
-                                .frame(width: 80, height: 80)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        PhotosPicker(selection: Bindable(stateModel).selectedPhotoItem, matching: .images) {
-                            Text("Change Photo")
-                        }
-
-                        if stateModel.isUploadingPhoto {
-                            ProgressView()
-                        }
+    Form {
+        Section {
+            HStack(spacing: TMISpacing.md) {
+                profilePhoto(stateModel: stateModel, name: profileData.displayName)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(profileData.displayName.isEmpty ? "Your profile" : profileData.displayName)
+                        .font(.tmiEditorial(.title2))
+                        .foregroundStyle(TMIColors.textPrimary)
+                    Text(roleDisplayName ?? "Access unavailable")
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                    PhotosPicker(selection: Bindable(stateModel).selectedPhotoItem, matching: .images) {
+                        Label(stateModel.isUploadingPhoto ? "Uploading…" : "Change Photo", systemImage: "camera")
+                            .font(.subheadline.weight(.semibold))
                     }
+                    .disabled(stateModel.isUploadingPhoto)
+                    .padding(.top, 2)
                 }
             }
+            .padding(.vertical, TMISpacing.xs)
             .onChange(of: stateModel.selectedPhotoItem) { _, newItem in
                 Task {
                     if let data = try? await newItem?.loadTransferable(type: Data.self) {
@@ -478,183 +485,107 @@ private func userProfileForm(
                     }
                 }
             }
+        }
 
-            // Profile Information Section
-            TMICard(style: .default) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Profile Information")
-                        .font(.headline)
-                        .foregroundColor(Color.tmiTextPrimary)
-
-                    HStack {
-                        Text("Email")
-                            .foregroundColor(Color.tmiTextPrimary)
-                        Spacer()
-                        Text(profileData.email)
-                            .foregroundColor(Color.tmiTextSecondary)
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Display Name")
-                            .foregroundColor(Color.tmiTextPrimary)
-
-                        TMITextField(
-                            icon: "person",
-                            placeholder: "Display Name",
-                            text: Binding(
-                                get: { profileData.displayName },
-                                set: { newValue in Task { @MainActor in stateModel.updateDisplayName(newValue) } }
-                            )
-                        )
-                    }
-                }
+        Section("Profile") {
+            LabeledContent("Email") {
+                Text(profileData.email)
+                    .foregroundStyle(TMIColors.textSecondary)
+                    .textSelection(.enabled)
             }
-
-            // Role Section (read-only)
-            TMICard(style: .default) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Role")
-                        .font(.headline)
-                        .foregroundColor(Color.tmiTextPrimary)
-
-                    Text(roleDisplayName ?? "Access unavailable")
-                        .foregroundStyle(.secondary)
-                }
+            LabeledContent("Name") {
+                TextField("Display name", text: Binding(
+                    get: { profileData.displayName },
+                    set: { newValue in Task { @MainActor in stateModel.updateDisplayName(newValue) } }
+                ))
+                .textContentType(.name)
+                .multilineTextAlignment(.trailing)
             }
-
-            // Organization Section
-            TMICard(style: .default) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("School / Organization")
-                        .font(.headline)
-                        .foregroundColor(Color.tmiTextPrimary)
-
-                    TMITextField(
-                        icon: "building.2",
-                        placeholder: "Enter your school or organization",
-                        text: Binding(
-                            get: { stateModel.organization },
-                            set: { stateModel.organization = $0 }
-                        )
-                    )
-                }
-            }
-
-            // Account Settings Section
-            TMICard(style: .default) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Account Settings")
-                        .font(.headline)
-                        .foregroundColor(Color.tmiTextPrimary)
-
-                    TMIButton(
-                        text: "Change Email",
-                        icon: "envelope",
-                        style: .secondary,
-                        action: {
-                            stateModel.isChangingEmail = true
-                        }
-                    )
-
-                    NavigationLink(destination: ChangePasswordView()) {
-                        HStack {
-                            Image(systemName: "lock")
-                                .foregroundColor(Color.tmiPrimary)
-                            Text("Change Password")
-                                .foregroundColor(Color.tmiTextPrimary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(Color.tmiTextSecondary)
-                        }
-                        .padding(.vertical, 8)
-                    }
-
-                    Button {
-                        showingDeleteAccount.wrappedValue = true
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "person.crop.circle.badge.minus")
-                                .foregroundStyle(.red)
-                                .frame(width: 24)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Delete Account")
-                                    .foregroundStyle(.red)
-                                Text("Permanently delete your account and personal data")
-                                    .font(.caption)
-                                    .foregroundStyle(Color.tmiTextSecondary)
-                                    .multilineTextAlignment(.leading)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(Color.tmiTextSecondary)
-                        }
-                        .contentShape(Rectangle())
-                        .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Delete Account")
-                    .accessibilityHint("Permanently delete your account and personal data")
-                }
-            }
-
-            // Legal Section
-            TMICard(style: .default) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Legal")
-                        .font(.headline)
-                        .foregroundColor(Color.tmiTextPrimary)
-
-                    Button {
-                        showingPrivacyPolicy.wrappedValue = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "hand.raised")
-                                .foregroundColor(Color.tmiPrimary)
-                            Text("Privacy Policy")
-                                .foregroundColor(Color.tmiTextPrimary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(Color.tmiTextSecondary)
-                        }
-                        .padding(.vertical, 8)
-                    }
-
-                    Button {
-                        showingTermsOfService.wrappedValue = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "doc.text")
-                                .foregroundColor(Color.tmiPrimary)
-                            Text("Terms of Service")
-                                .foregroundColor(Color.tmiTextPrimary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(Color.tmiTextSecondary)
-                        }
-                        .padding(.vertical, 8)
-                    }
-                }
-            }
-
-            // Sign Out Section
-            TMICard(style: .default) {
-                TMIButton(
-                    text: "Sign Out",
-                    icon: "rectangle.portrait.and.arrow.right",
-                    style: .destructive,
-                    action: {
-                        Task { @MainActor in
-                            stateModel.signOut()
-                            dismiss()
-                        }
-                    }
-                )
+            LabeledContent("Organization") {
+                TextField("School or district", text: Binding(
+                    get: { stateModel.organization },
+                    set: { stateModel.organization = $0 }
+                ))
+                .textContentType(.organizationName)
+                .multilineTextAlignment(.trailing)
             }
         }
-        .padding(20)
+        .disabled(stateModel.isSaving)
+
+        Section("Account") {
+            Button {
+                stateModel.isChangingEmail = true
+            } label: {
+                profileRowLabel("Change Email", symbol: "envelope", tone: .info)
+            }
+            NavigationLink {
+                ChangePasswordView()
+            } label: {
+                profileRowLabel("Change Password", symbol: "lock", tone: .brand)
+            }
+        }
+
+        Section("Legal") {
+            Button {
+                showingPrivacyPolicy.wrappedValue = true
+            } label: {
+                profileRowLabel("Privacy Policy", symbol: "hand.raised", tone: .neutral)
+            }
+            Button {
+                showingTermsOfService.wrappedValue = true
+            } label: {
+                profileRowLabel("Terms of Service", symbol: "doc.text", tone: .neutral)
+            }
+        }
+
+        Section {
+            Button(role: .destructive, action: onSignOut) {
+                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+            }
+            Button(role: .destructive) {
+                showingDeleteAccount.wrappedValue = true
+            } label: {
+                Label("Delete Account…", systemImage: "person.crop.circle.badge.minus")
+            }
+            .accessibilityHint("Permanently delete your account and personal data")
+        } footer: {
+            Text("Deleting your account removes your personal data. District records stay with the district.")
+        }
+    }
+    .formStyle(.grouped)
+    .scrollContentBackground(.hidden)
+}
+
+private func profileRowLabel(_ title: String, symbol: String, tone: TMITone) -> some View {
+    HStack(spacing: TMISpacing.ms) {
+        TMIIconTile(symbol, tone: tone, size: 28)
+        Text(title)
+            .foregroundStyle(TMIColors.textPrimary)
+    }
+}
+
+/// The picked photo shows immediately (it used to wait behind the old URL
+/// until upload finished); otherwise the saved photo, then initials.
+@ViewBuilder
+private func profilePhoto(stateModel: UserProfileStateModel, name: String) -> some View {
+    let size: CGFloat = 72
+    if let photoData = stateModel.selectedPhotoData, let image = UIImage(data: photoData) {
+#if os(macOS)
+        Image(nsImage: image).resizable().scaledToFill().frame(width: size, height: size).clipShape(Circle())
+#else
+        Image(uiImage: image).resizable().scaledToFill().frame(width: size, height: size).clipShape(Circle())
+#endif
+    } else if let photoURLString = stateModel.photoURL, let url = URL(string: photoURLString) {
+        WebImage(url: url)
+            .resizable()
+            .scaledToFill()
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+    } else {
+        TMIAvatar(
+            initials: name.split(whereSeparator: \.isWhitespace).prefix(2).compactMap(\.first).map(String.init).joined(),
+            size: size
+        )
     }
 }
 
@@ -663,84 +594,65 @@ struct ChangeEmailView: View {
     let profileData: UserProfileData
     @Environment(\.dismiss) private var dismiss
 
+    private var canSave: Bool {
+        !profileData.newEmail.isEmpty && !profileData.currentPassword.isEmpty && !stateModel.isLoading
+    }
+
     var body: some View {
         NavigationStack {
-            ZStack {
-                // Unified Background
-                TMIBackgroundView(variant: .base)
-                    .ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 20) {
-                        TMICard(style: .default) {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("Change Email")
-                                    .font(.headline)
-                                    .foregroundColor(Color.tmiTextPrimary)
-
-                                TMITextField(
-                                    icon: "envelope",
-                                    placeholder: "New Email",
-                                    text: Binding(
-                                        get: { profileData.newEmail },
-                                        set: { stateModel.updateNewEmail($0) }
-                                    ),
-                                    keyboardType: .emailAddress
-                                )
-
-                                TMITextField(
-                                    icon: "lock",
-                                    placeholder: "Current Password",
-                                    text: Binding(
-                                        get: { profileData.currentPassword },
-                                        set: { stateModel.updateCurrentPassword($0) }
-                                    ),
-                                    isSecure: true
-                                )
-
-                                Text("You'll need to verify your new email after changing it.")
-                                    .font(.caption)
-                                    .foregroundColor(Color.tmiTextSecondary)
-                                    .padding(.top, 8)
-                            }
-                        }
-                    }
-                    .padding(20)
+            Form {
+                Section {
+                    LabeledContent("Current", value: profileData.email)
+                    TextField("New email", text: Binding(
+                        get: { profileData.newEmail },
+                        set: { stateModel.updateNewEmail($0) }
+                    ))
+                    .textContentType(.emailAddress)
+#if os(iOS)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+#endif
+                    .autocorrectionDisabled()
+                } footer: {
+                    Text("We’ll send a verification link to the new address.")
                 }
 
-                if stateModel.isLoading {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.black.opacity(0.4))
+                Section {
+                    SecureField("Current password", text: Binding(
+                        get: { profileData.currentPassword },
+                        set: { stateModel.updateCurrentPassword($0) }
+                    ))
+                    .textContentType(.password)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        if canSave { Task { await stateModel.updateEmail() } }
+                    }
+                } footer: {
+                    Text("Confirm it’s you before changing where your account signs in.")
                 }
             }
+            .formStyle(.grouped)
+            .disabled(stateModel.isLoading)
             .navigationTitle("Change Email")
             .navigationBarTitleDisplayMode(.inline)
-            .foregroundColor(Color.tmiTextPrimary)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(Color.tmiTextPrimary)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
                 }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    TMIButton(
-                        text: "Save",
-                        style: .primary,
-                        isDisabled: profileData.newEmail.isEmpty || profileData.currentPassword.isEmpty
-                        || stateModel.isLoading,
-                        action: {
-                            Task {
-                                await stateModel.updateEmail()
-                            }
+                ToolbarItem(placement: .confirmationAction) {
+                    if stateModel.isLoading {
+                        ProgressView()
+                    } else {
+                        Button("Save") {
+                            Task { await stateModel.updateEmail() }
                         }
-                    )
+                        .disabled(!canSave)
+                    }
                 }
             }
         }
+        .presentationDetents([.medium, .large])
+        .tmiMacSheetFrame(minWidth: 440, minHeight: 320)
     }
 }
 

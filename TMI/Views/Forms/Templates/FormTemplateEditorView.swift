@@ -56,11 +56,24 @@ struct FormTemplateEditorView: View {
             set: { template.isScored = $0 }
           ))
           if template.isScored == true {
-            ForEach(Binding(get: { template.scoreBands ?? [] }, set: { template.scoreBands = $0 })) { $band in
+            // Indexed identity: a band's id is built from its label and
+            // minimum, so keying rows on it dropped focus on every keystroke.
+            ForEach(Array((template.scoreBands ?? []).indices), id: \.self) { bandIndex in
               HStack {
-                TextField("Label", text: $band.label)
-                Stepper("From \(band.minimum.formatted())", value: $band.minimum, in: 0...1_000, step: 1)
-                  .fixedSize()
+                TextField("Label", text: Binding(
+                  get: { template.scoreBands?[bandIndex].label ?? "" },
+                  set: { template.scoreBands?[bandIndex].label = $0 }
+                ))
+                Stepper(
+                  "From \((template.scoreBands?[bandIndex].minimum ?? 0).formatted())",
+                  value: Binding(
+                    get: { template.scoreBands?[bandIndex].minimum ?? 0 },
+                    set: { template.scoreBands?[bandIndex].minimum = $0 }
+                  ),
+                  in: 0...1_000,
+                  step: 1
+                )
+                .fixedSize()
               }
             }
             .onDelete { template.scoreBands?.remove(atOffsets: $0) }
@@ -77,16 +90,16 @@ struct FormTemplateEditorView: View {
             : "Turn on to score submissions from points you set on each question.")
         }
         
-        ForEach(Array($template.sections.enumerated()), id: \.element.id) { index, $section in
+        ForEach(Array($template.sections.enumerated()), id: \.offset) { index, $section in
           Section {
             TextField("Section Title", text: $section.title)
 
-            ForEach(Array($section.fields.enumerated()), id: \.element.id) { fieldIndex, $field in
+            ForEach(Array($section.fields.enumerated()), id: \.offset) { fieldIndex, $field in
               HStack {
                   VStack(alignment: .leading) {
                       Text(field.label)
                           .font(.body)
-                      Text([field.type.rawValue.capitalized, scoringSummary(field)].compactMap { $0 }.joined(separator: " · "))
+                      Text([field.type.displayName, scoringSummary(field)].compactMap { $0 }.joined(separator: " · "))
                           .font(.caption)
                           .foregroundColor(.secondary)
                   }
@@ -94,7 +107,7 @@ struct FormTemplateEditorView: View {
                   if field.isRequired {
                       Text("Required")
                           .font(.caption)
-                          .foregroundColor(.red)
+                          .foregroundStyle(TMIColors.errorText)
                   }
               }
             }
@@ -114,7 +127,7 @@ struct FormTemplateEditorView: View {
                     template.sections.remove(at: index)
                 } label: {
                     Image(systemName: "trash")
-                        .foregroundColor(.red)
+                        .foregroundStyle(TMIColors.errorText)
                 }
             }
           }
@@ -238,7 +251,7 @@ struct FieldEditorSheet: View {
                     TextField("Question", text: $label)
                     Picker("Type", selection: $type) {
                         ForEach(addableTypes, id: \.self) { type in
-                            Text(type.rawValue.capitalized).tag(type)
+                            Text(type.displayName).tag(type)
                         }
                     }
                     if !type.requiresOptions && type != .checkbox && type != .rating {

@@ -53,7 +53,7 @@ struct StudentModeLaunchView: View {
                                     ProgressView()
                                 } else {
                                     Image(systemName: "lock.shield")
-                                        .foregroundStyle(TMIColors.teal)
+                                        .foregroundStyle(TMIColors.accent)
                                 }
                             }
                         }

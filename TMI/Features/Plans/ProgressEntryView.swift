@@ -78,7 +78,7 @@ struct ProgressEntryView: View {
             }
         }
         // See GoalEditorView: pin the sheet so the grouped Form lays out.
-        .frame(minWidth: 480, idealWidth: 520, minHeight: 520)
+        .tmiMacSheetFrame(minWidth: 480, idealWidth: 520, minHeight: 520)
     }
 
     private var isEmpty: Bool {

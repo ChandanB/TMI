@@ -13,10 +13,18 @@ import Observation
 /// Service for managing form assignments to authorized student cohorts.
 @Observable
 class FormAssignmentService {
-  private let db = Firestore.firestore()
+  // Resolved on use: `Firestore.firestore()` throws without a configured FirebaseApp.
+  private var db: Firestore { Firestore.firestore() }
   private let authorizationSessions: any AuthorizationSessionProviding
   private let authorization = RBACService()
-  private let studentRepository: any StudentRepository
+  @ObservationIgnored private let injectedStudentRepository: (any StudentRepository)?
+  // Built on first use: `CanonicalStudentRepository.firebase()` touches
+  // Firestore, which traps without a configured FirebaseApp (fixtures,
+  // previews) — and screens construct this service just to be navigable.
+  @ObservationIgnored private lazy var defaultStudentRepository: any StudentRepository = CanonicalStudentRepository.firebase()
+  private var studentRepository: any StudentRepository {
+    injectedStudentRepository ?? defaultStudentRepository
+  }
 
   @MainActor
   init(
@@ -24,8 +32,7 @@ class FormAssignmentService {
     studentRepository: (any StudentRepository)? = nil
   ) {
     self.authorizationSessions = authorizationSessions
-    self.studentRepository = studentRepository
-      ?? CanonicalStudentRepository.firebase()
+    self.injectedStudentRepository = studentRepository
   }
 
   // MARK: - CRUD Operations

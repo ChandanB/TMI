@@ -7,7 +7,6 @@
 //
 
 import Charts
-import Combine
 import FirebaseFirestore
 import Foundation
 import Observation
@@ -53,6 +52,10 @@ struct DashboardData: Equatable, Sendable {
   var surveysCompleted: Int = 0
   var plansAligned: Int = 0
   var recentActivities: [RecentActivity] = []
+  /// Plans waiting on *this* member's approval (0 for members who can't approve).
+  var pendingApprovalCount: Int = 0
+  /// Active students with no open plan.
+  var studentsWithoutPlanCount: Int = 0
   
   // Next Best Action
   var nextBestAction: NextBestAction?
@@ -122,6 +125,8 @@ nonisolated struct NextBestAction: Equatable, Sendable {
 
 // MARK: - Environment Key
 extension EnvironmentValues {
+  // Fail closed: the app root injects the real model. A Firebase-backed
+  // default would trap in fixtures and previews with no FirebaseApp.
   @Entry var dashboardStateModel: DashboardStateModel = DashboardStateModel()
 }
 
@@ -133,26 +138,14 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   private let studentRepository: any StudentRepository
   private let planRepository: (any PlanRecordRepository)?
 
-  // MARK: - Cancellables
-  private var cancellables = Set<AnyCancellable>()
-
   // MARK: - Initialization
   init(
-    studentRepository: any StudentRepository = CanonicalStudentRepository.firebase(),
+    studentRepository: any StudentRepository = UnavailableStudentRepository(),
     planRepository: (any PlanRecordRepository)? = nil
   ) {
     self.studentRepository = studentRepository
     self.planRepository = planRepository
     super.init()
-
-    // Initialize UI state
-    ui.set("selectedTimeFrame", value: TimeFrame.week)
-    ui.set("selectedDataPoint", value: nil as AlignmentData?)
-    ui.set("showingInsightsSheet", value: false)
-  }
-
-  isolated deinit {
-    cancellables.forEach { $0.cancel() }
   }
 
   // MARK: - Data Fetching
@@ -164,7 +157,11 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
   
   @MainActor
   func fetchWithMembership(_ membership: MembershipContext?) async {
-    updateState(.loading)
+    // Stale-while-revalidate: keep what's on screen during a refresh so the
+    // page (and its pull-to-refresh control) never collapses into a spinner.
+    if case .loaded = state {} else {
+      updateState(.loading)
+    }
 
     do {
       guard let membership else {
@@ -187,9 +184,12 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       let activeTMIPlans = planRecords.filter {
         $0.status == .active && $0.approvalStatus == .approved
       }.count
+      // Coverage is roster-scoped: a plan naming a student outside this
+      // member's roster must not push coverage past 100%.
+      let rosterIDs = Set(students.map(\.id))
       let studentsWithPlans = Set(
         planRecords.filter { $0.status.isOpen }.flatMap { $0.studentIDs }
-      ).count
+      ).intersection(rosterIDs).count
       let recentActivities = canonicalRecentActivities(
         students: students,
         planRecords: planRecords
@@ -199,9 +199,17 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
         students: students,
         planRecords: planRecords
       )
-      let nextAction = Self.approvalAction(
-        forPending: planRecords.filter { $0.status == .pendingApproval }
-      )
+      // Approval work is only "next" for the member who can act on it —
+      // the same rule the plan list uses for its Needs Approval attention.
+      let approvable = planRecords.filter {
+        $0.status == .pendingApproval
+          && $0.approverMemberIDs.contains(membership.userID)
+          && membership.capabilities.contains(.planApprove)
+      }
+      let plannedStudentIDs = Set(planRecords.filter { $0.status.isOpen }.flatMap { $0.studentIDs })
+      let studentsWithoutPlan = students.filter { !plannedStudentIDs.contains($0.id) }
+      let nextAction = Self.approvalAction(forPending: approvable)
+        ?? Self.startPlanAction(for: studentsWithoutPlan.first)
 
       let dashboardData = DashboardData(
         engagementData: [],
@@ -211,6 +219,8 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
         surveysCompleted: 0,
         plansAligned: studentsWithPlans,
         recentActivities: recentActivities,
+        pendingApprovalCount: approvable.count,
+        studentsWithoutPlanCount: studentsWithoutPlan.count,
         nextBestAction: nextAction,
         roleData: roleData
       )
@@ -219,7 +229,6 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     } catch is CancellationError {
       return
     } catch {
-      print("[DashboardStateModel] Error fetching dashboard data: \(error)")
       handleError(error, userFriendlyMessage: "Failed to load dashboard data")
     }
   }
@@ -300,76 +309,45 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       let description: String
       if names.count == 1 {
         description = "Plan '\(plan.title)' for \(names[0]) was updated"
-      } else if !names.isEmpty {
+      } else if names.count > 1 {
         description = "Plan '\(plan.title)' for \(names.count) students was updated"
-      } else {
+      } else if plan.studentIDs.count > 1 {
         description = "Plan '\(plan.title)' for \(plan.studentIDs.count) students was updated"
+      } else {
+        description = "Plan '\(plan.title)' was updated"
       }
 
-      return RecentActivity(
-        icon: "doc.fill",
+      var activity = RecentActivity(
+        id: "plan-\(plan.id)-\(Int(plan.metadata.updatedAt.timeIntervalSince1970))",
+        icon: "doc.text",
         title: "TMI Plan Updated",
         description: description,
         date: plan.metadata.updatedAt,
         iconColor: .blue
       )
+      activity.destination = .plan(plan.id)
+      return activity
     }
 
     let studentActivities = students.compactMap { student -> RecentActivity? in
       guard student.metadata.createdAt > sevenDaysAgo else { return nil }
 
-      return RecentActivity(
+      var activity = RecentActivity(
+        id: "student-\(student.id)",
         icon: "person.crop.circle.badge.plus",
         title: "Student Added",
         description: "\(student.displayName) was added",
         date: student.metadata.createdAt,
         iconColor: .green
       )
+      activity.destination = .student(student.id)
+      return activity
     }
 
     return (planActivities + studentActivities)
       .sorted { $0.date > $1.date }
       .prefix(10)
       .map { $0 }
-  }
-  
-  // MARK: - Role-Specific Data Generation
-  
-  private func generateRoleSpecificData(role: StaffRole, students: [Student], plans: [TMIPlan]) -> RoleSpecificData {
-    var roleData = RoleSpecificData(role: role)
-    
-    switch role {
-    case .counselor:
-      // MVP: Show all students as caseload (filtering by assigned counselor is post-MVP)
-      roleData.caseloadCount = students.count
-      roleData.pendingApprovals = plans.filter { $0.approvalStatus == .pendingApproval }.count
-      roleData.upcomingMeetings = 0
-      roleData.criticalAlerts = students.filter { $0.engagementScore < 0.3 }.count
-      roleData.caseloadStudentIds = students.compactMap { $0.id }
-      
-    case .teacher:
-      // MVP: Show all students (classroom filtering is post-MVP)
-      roleData.classroomStudentCount = students.count
-      roleData.classroomPlansActive = plans.filter { $0.approvalStatus == .approved }.count
-      roleData.classroomSurveysPending = students.filter { $0.surveyResults?.isEmpty ?? true }.count
-      roleData.classroomAttentionCount = Self.urgentAttentionStudents(in: students).count
-      roleData.classroomPlanGapCount = Self.studentsMissingPlans(students: students, plans: plans).count
-      roleData.classroomStudentIds = students.compactMap { $0.id }
-      
-    case .schoolAdministrator, .districtAdministrator:
-      // MVP: Show all students and plans in single-teacher context
-      roleData.schoolWideStudents = students.count
-      roleData.schoolWidePlans = plans.count
-      roleData.staffCount = 0
-      
-    case .socialWorker:
-      // Social worker sees referred students with behavioral plans
-      roleData.caseloadCount = students.count
-      roleData.criticalAlerts = students.filter { $0.engagementScore < 0.3 }.count
-      
-    }
-    
-    return roleData
   }
   
   // MARK: - Next Best Action Generation
@@ -415,7 +393,7 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       id: "pending_approval",
       type: .pendingApproval,
       title: "Plans Awaiting Approval",
-      description: "\(pendingPlans.count) plan\(pendingPlans.count == 1 ? "" : "s") need your review",
+      description: pendingPlans.count == 1 ? "1 plan needs your review" : "\(pendingPlans.count) plans need your review",
       priority: .urgent,
       targetStudentId: nil,
       targetPlanId: pendingPlans.first?.id
@@ -431,10 +409,26 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
       id: "pending_approval",
       type: .pendingApproval,
       title: "Plans Awaiting Approval",
-      description: "\(pendingPlanRecords.count) plan\(pendingPlanRecords.count == 1 ? "" : "s") need your review",
+      description: pendingPlanRecords.count == 1
+        ? "1 plan needs your review"
+        : "\(pendingPlanRecords.count) plans need your review",
       priority: .urgent,
       targetStudentId: nil,
       targetPlanId: pendingPlanRecords.first?.id
+    )
+  }
+
+  private nonisolated static func startPlanAction(for student: StudentRecord?) -> NextBestAction? {
+    guard let student else { return nil }
+
+    return NextBestAction(
+      id: "create_plan_\(student.id)",
+      type: .createPlan,
+      title: "Start a support plan for \(student.displayName)",
+      description: "No open plan yet. Their record has what you need to begin.",
+      priority: .medium,
+      targetStudentId: student.id,
+      targetPlanId: nil
     )
   }
 
@@ -481,731 +475,550 @@ final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError
     )
   }
   
-  private func generateEngagementData(from students: [Student]) -> [EngagementData] {
-    // Generate weekly engagement data based on student interaction dates
-    let calendar = Calendar.current
-    let now = Date()
-    var weeklyData: [EngagementData] = []
-    
-    for week in 0..<7 {
-      let weekStart = calendar.date(byAdding: .weekOfYear, value: -week, to: now) ?? now
-      let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
-      
-      let weeklyEngagement = students.filter { student in
-        guard let lastInteraction = student.lastInteractionDate else { return false }
-        return lastInteraction >= weekStart && lastInteraction <= weekEnd
-      }.count
-      
-      let weekFormatter = DateFormatter()
-      weekFormatter.dateFormat = "MMM d"
-      
-      weeklyData.append(EngagementData(
-        week: weekFormatter.string(from: weekStart),
-        engagementLevel: Double(weeklyEngagement)
-      ))
-    }
-    
-    return weeklyData.reversed() // Most recent week last
-  }
-  
-  private func generateRecentActivities(from students: [Student], plans: [TMIPlan]) -> [RecentActivity] {
-    var activities: [RecentActivity] = []
-    
-    // Recent surveys completed
-    let recentSurveys = students.compactMap { student -> RecentActivity? in
-      guard let surveyResults = student.surveyResults,
-            let latestSurvey = surveyResults.sorted(by: { $0.date > $1.date }).first,
-            latestSurvey.isComplete,
-            latestSurvey.date > Date().addingTimeInterval(-7 * 24 * 60 * 60) else { return nil } // Last 7 days
-      
-      return RecentActivity(
-        icon: "checkmark.circle.fill",
-        title: "Survey Completed",
-        description: "\(student.name) completed \(latestSurvey.surveyName)",
-        date: latestSurvey.date,
-        iconColor: .green
-      )
-    }
-    
-    // Recent TMI Plans created/updated
-    let recentPlans = plans.compactMap { plan -> RecentActivity? in
-      guard plan.lastUpdated > Date().addingTimeInterval(-7 * 24 * 60 * 60) else { return nil } // Last 7 days
-      
-      let studentNames = plan.students.map { $0.name }.joined(separator: ", ")
-      let description = plan.students.count == 1
-        ? "Plan for \(studentNames) was updated"
-        : "Plan for \(plan.students.count) students was updated"
-      
-      return RecentActivity(
-        icon: "doc.fill",
-        title: "TMI Plan Updated",
-        description: description,
-        date: plan.lastUpdated,
-        iconColor: .blue,
-        showProgress: true,
-        progressValue: Double(plan.goals.count) / 5.0 // Assume 5 is max interventions
-      )
-    }
-    
-    // Recently added students
-    let recentStudents = students.compactMap { student -> RecentActivity? in
-      guard let lastInteraction = student.lastInteractionDate,
-            lastInteraction > Date().addingTimeInterval(-3 * 24 * 60 * 60) else { return nil } // Last 3 days
-      
-      return RecentActivity(
-        icon: "person.fill.badge.plus",
-        title: "New Student Activity",
-        description: "Recent interaction with \(student.name)",
-        date: lastInteraction,
-        iconColor: .purple
-      )
-    }
-    
-    // Combine and sort by date
-    activities.append(contentsOf: recentSurveys)
-    activities.append(contentsOf: recentPlans)
-    activities.append(contentsOf: recentStudents)
-    
-    // Sort by date (most recent first) and take top 5
-    return Array(activities.sorted { $0.date > $1.date }.prefix(5))
-  }
-
   @MainActor
   override func refresh() async {
     await fetch()
   }
 
-  @MainActor
-  func fetchDataForTimeFrame(_ timeFrame: TimeFrame) async {
-    // Don't update selectedTimeFrame here to avoid infinite loop
-    // The UI binding will handle the selectedTimeFrame state
-    
-    // Instead of refetching all data, just regenerate the dashboard data
-    // with the new timeframe applied to existing data
-    guard case .loaded(let currentData) = state else {
-      // If no data is loaded yet, fetch it
-      await fetch()
-      return
-    }
-    
-    // Regenerate data with new timeframe filter
-    let filteredData = filterDataForTimeFrame(currentData, timeFrame: timeFrame)
-    updateState(.loaded(filteredData))
-  }
-  
-  private func filterDataForTimeFrame(_ data: DashboardData, timeFrame: TimeFrame) -> DashboardData {
-    // Use TimeFrame's built-in date calculation methods
-    let startDate = timeFrame.startDate()
-    let endDate = timeFrame.endDate()
-    
-    // Filter recent activities based on timeframe
-    let filteredActivities = data.recentActivities.filter { activity in
-      activity.date >= startDate && activity.date <= endDate
-    }
-    
-    // Return filtered data with the same core stats but filtered activities
-    // Note: Core stats (totalStudents, etc.) remain the same as they represent overall counts
-    return DashboardData(
-      engagementData: data.engagementData, // Keep engagement data as is for now
-      totalStudents: data.totalStudents,
-      activeTMIPlans: data.activeTMIPlans,
-      interestsIdentified: data.interestsIdentified,
-      surveysCompleted: data.surveysCompleted,
-      plansAligned: data.plansAligned,
-      recentActivities: filteredActivities,
-      nextBestAction: data.nextBestAction,
-      roleData: data.roleData
-    )
-  }
-
-  // MARK: - UI State Accessors
-
-  var selectedTimeFrame: TimeFrame {
-    get { return ui.get("selectedTimeFrame") ?? .week }
-    set { ui.set("selectedTimeFrame", value: newValue) }
-  }
-
-  var selectedDataPoint: AlignmentData? {
-    get { return ui.get("selectedDataPoint") }
-    set { ui.set("selectedDataPoint", value: newValue) }
-  }
-
-  var showingInsightsSheet: Bool {
-    get { return ui.get("showingInsightsSheet") ?? false }
-    set { ui.set("showingInsightsSheet", value: newValue) }
-  }
-
-  var showingAllActivities: Bool {
-    get { return ui.get("showingAllActivities") ?? false }
-    set { ui.set("showingAllActivities", value: newValue) }
-  }
-
-  // MARK: - Helper Methods
-  
-  var alignmentData: [AlignmentData] {
-    guard case .loaded(let dashboardData) = state else {
-      return []
-    }
-    return generateAlignmentData(from: dashboardData)
-  }
-  
-  private func generateAlignmentData(from dashboardData: DashboardData) -> [AlignmentData] {
-    // Generate alignment data based on student engagement and TMI plan effectiveness
-    let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"]
-    let baseAlignment = 0.45
-    
-    return months.enumerated().map { index, month in
-      // Calculate alignment based on surveys completed and plans aligned
-      let completionRate = dashboardData.totalStudents > 0 ?
-        Double(dashboardData.surveysCompleted) / Double(dashboardData.totalStudents) : 0.0
-      let planRate = dashboardData.totalStudents > 0 ?
-        Double(dashboardData.plansAligned) / Double(dashboardData.totalStudents) : 0.0
-      
-      // Add some variance and progression over time
-      let monthProgress = Double(index) * 0.02 // Small improvement over time
-      let variance = Double.random(in: -0.05...0.05) // Random variance
-      
-      let alignment = min(0.95, max(0.25, baseAlignment + (completionRate * 0.3) + (planRate * 0.2) + monthProgress + variance))
-      
-      return AlignmentData(timePeriod: month, alignmentPercentage: alignment)
-    }
-  }
-
-  func averageAlignment() -> String {
-    let data = alignmentData
-    guard !data.isEmpty else { return "0.0" }
-    let average = data.map { $0.alignmentPercentage }.reduce(0, +) / Double(data.count)
-    return String(format: "%.1f", average * 100)
-  }
-
-  func highestAlignment() -> String {
-    let highest = alignmentData.map { $0.alignmentPercentage }.max() ?? 0
-    return String(format: "%.1f", highest * 100)
-  }
-
-  func highestAlignmentPeriod() -> String {
-    alignmentData.max { $0.alignmentPercentage < $1.alignmentPercentage }?.timePeriod ?? "N/A"
-  }
-
-  func alignmentTrend() -> String {
-    let values = alignmentData.map { $0.alignmentPercentage }
-    if let first = values.first, let last = values.last {
-      if first < last {
-        return "Increasing"
-      } else if first > last {
-        return "Decreasing"
-      } else {
-        return "Stable"
-      }
-    }
-    return "No Data"
-  }
-
-  func trendIcon() -> String {
-    let trend = alignmentTrend()
-    if trend == "Increasing" {
-      return "arrow.up.right"
-    } else if trend == "Decreasing" {
-      return "arrow.down.right"
-    } else {
-      return "arrow.right"
-    }
-  }
-
-  func trendColor() -> Color {
-    let trend = alignmentTrend()
-    if trend == "Increasing" {
-      return .green
-    } else if trend == "Decreasing" {
-      return .red
-    } else {
-      return .orange
-    }
-  }
 }
 
-// MARK: -  Activity Row
+// MARK: - Today (Dashboard)
 
-// MARK: - DashboardActivityRow moved to Components/DashboardActivityRow.swift
-
+/// The home screen. iPhone gets one focused column that answers "what needs
+/// me now?"; iPad and Mac get a composed two-column page within a readable
+/// maximum width.
 struct DashboardView: View {
     @Environment(\.dashboardStateModel) var stateModel
     @Environment(\.authStateModel) private var authStateModel
-    @State private var selectedTimeFrame: TimeFrame = .week
+    @Environment(\.programContext) private var programContext
+    @Environment(AppRouter.self) private var router
+#if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+#endif
     @State private var showingAllActivities = false
-    @State private var navigateToStudents = false
-    @State private var navigateToPlans = false
-    @State private var navigateToSurveys = false
+    @State private var refreshCount = 0
 
-    private var isTeacherRole: Bool {
-        authStateModel.currentMembership?.role == .teacher
+    private var terminology: Terminology { programContext.shell.terminology }
+
+    private var usesWideLayout: Bool {
+#if os(macOS)
+        true
+#else
+        horizontalSizeClass == .regular
+#endif
     }
 
     var body: some View {
-        ZStack {
-            TMIBackgroundView(variant: .dashboard)
-                .ignoresSafeArea()
-
-            Group {
-                switch stateModel.state {
-                case .idle, .loading:
-                    loadingView
-                case .loaded(let data):
-                    dashboardContent(data)
-                case .error(let error):
-                    errorView(error)
-                }
+        Group {
+            switch stateModel.state {
+            case .idle, .loading:
+                page(.placeholder, isPlaceholder: true)
+            case .loaded(let data):
+                page(data, isPlaceholder: false)
+            case .error(let error):
+                TMIEmptyState(
+                    icon: "exclamationmark.triangle",
+                    title: "Today couldn’t load",
+                    message: error.message,
+                    action: { Task { await reload() } },
+                    actionLabel: "Try Again"
+                )
             }
         }
-        .task {
-            await stateModel.fetchWithMembership(authStateModel.currentMembership)
+        .tmiScreenBackground()
+        .navigationTitle("Today")
+#if os(iOS)
+        .toolbarTitleDisplayMode(.inline)
+#endif
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    Task { await reload() }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                .help("Refresh (⌘R)")
+            }
+        }
+        .task(id: authStateModel.currentMembership) {
+            await reload()
         }
         .refreshable {
-            await stateModel.fetchWithMembership(authStateModel.currentMembership)
+            await reload()
         }
-        .navigationDestination(isPresented: $navigateToStudents) {
-            StudentListView()
-        }
-        .navigationDestination(isPresented: $navigateToPlans) {
-            CanonicalPlanListView()
-        }
-    }
-
-    // MARK: - Loading State
-
-    private var loadingView: some View {
-        VStack(spacing: TMISpacing.lg) {
-            ProgressView()
-                .tint(.tmiPrimary)
-
-            Text("Loading dashboard...")
-                .font(.tmiBody)
-                .foregroundColor(.tmiTextSecondary)
-        }
-    }
-
-    // MARK: - Error State
-
-    private func errorView(_ error: IdentifiableError) -> some View {
-        TMIEmptyState(
-            icon: "exclamationmark.triangle",
-            title: "Unable to Load",
-            message: error.message,
-            action: {
-                Task {
-                    await stateModel.fetchWithMembership(
-                        authStateModel.currentMembership
-                    )
+        .sensoryFeedback(.success, trigger: refreshCount)
+        .sheet(isPresented: $showingAllActivities) {
+            if case .loaded(let data) = stateModel.state {
+                NavigationStack {
+                    DashboardActivityFeed(activities: data.recentActivities, onOpen: open)
+                        .navigationTitle("Recent Activity")
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { showingAllActivities = false }
+                            }
+                        }
                 }
-            },
-            actionLabel: "Try Again"
-        )
+                .presentationDetents([.medium, .large])
+                .tmiSheetStyle()
+            }
+        }
     }
 
-    // MARK: - Main Content
+    private func reload() async {
+        await stateModel.fetchWithMembership(authStateModel.currentMembership)
+        if case .loaded = stateModel.state {
+            refreshCount += 1
+        }
+    }
+
+    // MARK: Layout
+
+    private func page(_ data: DashboardData, isPlaceholder: Bool) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: TMISpacing.lg) {
+                header
+                if usesWideLayout {
+                    HStack(alignment: .top, spacing: TMISpacing.lg) {
+                        VStack(alignment: .leading, spacing: TMISpacing.lg) {
+                            nextStep(data)
+                            activity(data)
+                        }
+                        .frame(maxWidth: .infinity)
+                        VStack(alignment: .leading, spacing: TMISpacing.lg) {
+                            metrics(data, columns: 2)
+                            caseload(data)
+                            workspace
+                        }
+                        .frame(width: 380)
+                    }
+                } else {
+                    nextStep(data)
+                    metrics(data, columns: 2)
+                    activity(data)
+                    caseload(data)
+                    workspace
+                }
+            }
+            .padding(.horizontal, TMISpacing.screenPadding)
+            .padding(.vertical, TMISpacing.md)
+            .frame(maxWidth: TMISizing.maxContentWidth, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .tmiPlaceholder(isPlaceholder)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(Date.now, format: .dateTime.weekday(.wide).month(.wide).day())
+                .tmiEyebrow()
+            Text(greeting)
+                .font(.tmiEditorial(usesWideLayout ? .largeTitle : .title))
+                .foregroundStyle(TMIColors.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+        }
+        .padding(.top, TMISpacing.sm)
+    }
+
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: .now)
+        let salutation = switch hour {
+        case 5..<12: "Good morning"
+        case 12..<17: "Good afternoon"
+        default: "Good evening"
+        }
+        let firstName = authStateModel.currentUser?.displayName
+            .split(separator: " ").first.map(String.init)
+        guard let firstName, !firstName.isEmpty else { return salutation }
+        return "\(salutation), \(firstName)"
+    }
+
+    // MARK: Next best step
 
     @ViewBuilder
-    private func dashboardContent(_ data: DashboardData) -> some View {
-        ScrollView {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: TMISpacing.lg) {
-                    dashboardLeftColumn(data)
-                        .frame(minWidth: 320, maxWidth: .infinity)
-                    dashboardRightColumn(data)
-                        .frame(minWidth: 320, maxWidth: .infinity)
-                }
-
-                VStack(spacing: TMISpacing.lg) {
-                    dashboardLeftColumn(data)
-                    dashboardRightColumn(data)
-                }
-            }
-            
-            Color.clear.frame(height: 120)
-        }
-        .padding(.horizontal, TMISpacing.screenPadding)
-        .padding(.top)
-        .navigationTitle("Dashboard")
-        .navigationBarTitleDisplayMode(.large)
-        .sheet(isPresented: $showingAllActivities) {
-            NavigationStack {
-                allActivitiesView(data)
-            }
-            .tmiSheetStyle()
-        }
-    }
-
-    private func dashboardLeftColumn(_ data: DashboardData) -> some View {
-        VStack(spacing: TMISpacing.lg) {
-            recentActivitySection(data)
-                .tmiCard()
-
-            if !data.engagementData.isEmpty {
-                DashboardEngagementChart(data: data.engagementData)
-                    .tmiCard()
-            }
-        }
-    }
-
-    private func dashboardRightColumn(_ data: DashboardData) -> some View {
-        VStack(spacing: TMISpacing.lg) {
-            QuickActionsGrid(data: data)
-                .tmiCard()
-
-            releaseOneStatusCard(data)
-                .tmiCard()
-        }
-    }
-
-    // MARK: - Recent Activity Section
-
-    private func recentActivitySection(_ data: DashboardData) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
-            HStack {
-                Text("Recent Activity")
-                    .font(.tmiTitle3.bold())
-                    .foregroundColor(.tmiTextPrimary)
-                Spacer()
-
-                if !data.recentActivities.isEmpty {
-                    Button(action: { showingAllActivities = true }) {
-                        HStack(spacing: 4) {
-                            Text("View All")
-                                .font(.tmiCaption)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .foregroundColor(.tmiPrimary)
-                    }
-                }
-            }
-
-            Divider()
-
-            if data.recentActivities.isEmpty {
-                emptyActivityState(data)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(data.recentActivities.prefix(3)) { activity in
-                        activityRow(activity)
-
-                        if activity.id != data.recentActivities.prefix(3).last?.id {
-                            TMIDivider()
-                                .padding(.leading, 56)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func activityRow(_ activity: RecentActivity) -> some View {
-        HStack(spacing: TMISpacing.md) {
-            ZStack {
-                Circle()
-                    .fill(activity.iconColor.opacity(0.15))
-                    .frame(width: 40, height: 40)
-
-                Image(systemName: activity.icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(activity.iconColor)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(activity.title)
-                    .font(.tmiBody)
-                    .foregroundColor(.tmiTextPrimary)
-
-                Text(activity.description)
-                    .font(.tmiCaption)
-                    .foregroundColor(.tmiTextSecondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            Text(activity.timeAgo)
-                .font(.tmiFootnote)
-                .foregroundColor(.tmiTextTertiary)
-        }
-        .padding(.vertical, TMISpacing.sm)
-    }
-
-    private func emptyActivityState(_ data: DashboardData) -> some View {
-        VStack(spacing: TMISpacing.sm) {
-            Image(systemName: data.totalStudents == 0 ? "person.crop.circle.badge.plus" : "clock.arrow.circlepath")
-                .font(.system(size: 36, weight: .medium))
-                .foregroundColor(.tmiPrimary)
-
-            Text(MVPEmptyStateCopy.dashboardActivityTitle)
-                .font(.tmiBody)
-                .fontWeight(.semibold)
-                .foregroundColor(.tmiTextPrimary)
-
-            Text(
-                data.totalStudents == 0
-                    ? MVPEmptyStateCopy.dashboardActivityMessage
-                    : "Recent roster and plan activity will appear here as canonical events are recorded."
-            )
-                .font(.tmiCaption)
-                .foregroundColor(.tmiTextSecondary)
-                .multilineTextAlignment(.center)
-
-            TMIButton(
-                text: data.totalStudents == 0
-                    ? MVPEmptyStateCopy.dashboardActivityAction
-                    : "View Roster",
-                icon: "person.3.fill",
-                style: .primary,
-                action: { navigateToStudents = true }
-            )
-            .padding(.top, TMISpacing.sm)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, TMISpacing.xl)
-        .overlay(
-            RoundedRectangle(cornerRadius: TMIRadius.md)
-                .strokeBorder(
-                    style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])
-                )
-                .foregroundColor(Color.tmiTextTertiary.opacity(0.4))
-        )
-        .padding(.horizontal, TMISpacing.sm)
-    }
-
-    // MARK: - All Activities Sheet
-
-    private func allActivitiesView(_ data: DashboardData) -> some View {
-        List(data.recentActivities) { activity in
-            TMIListRow(
-                title: activity.title,
-                subtitle: activity.description,
-                leading: {
-                    ZStack {
-                        Circle()
-                            .fill(activity.iconColor.opacity(0.15))
-                            .frame(width: 40, height: 40)
-
-                        Image(systemName: activity.icon)
-                            .font(.system(size: 16))
-                            .foregroundColor(activity.iconColor)
-                    }
-                },
-                trailing: {
-                    Text(activity.timeAgo)
-                        .font(.tmiFootnote)
-                        .foregroundColor(.tmiTextTertiary)
-                }
-            )
-            .listRowBackground(Color.tmiBackground)
-        }
-        .listStyle(.plain)
-        .background(Color.tmiBackground)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle("All Activities")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Done") {
-                    showingAllActivities = false
-                }
-            }
-        }
-    }
-
-    // MARK: - Helper Methods
-
-
-
-    private func releaseOneStatusCard(_ data: DashboardData) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.md) {
-            Label("Workspace", systemImage: "checkmark.shield")
-                .font(.tmiTitle3.bold())
-                .foregroundColor(.tmiPrimary)
-
-            Text("\(data.totalStudents) active students · \(data.activeTMIPlans) visible plans")
-                .font(.tmiBody)
-                .foregroundColor(.tmiTextPrimary)
-
-            Text("Engagement, survey, interest, and support-alert metrics appear only once their canonical data is available. No placeholder scores are shown.")
-                .font(.tmiCaption)
-                .foregroundColor(.tmiTextSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-// MARK: - Next Best Quick Action Tile
-
-struct NextBestQuickActionTile: View {
-    let action: NextBestAction
-    let onAction: () -> Void
-
-    var body: some View {
-        Button(action: onAction) {
-            HStack(spacing: TMISpacing.md) {
-                Circle()
-                    .fill(priorityColor.opacity(0.15))
-                    .frame(width: 36, height: 36)
-                    .overlay(
-                        Image(systemName: actionIcon)
-                            .foregroundColor(priorityColor)
-                            .font(.system(size: 14, weight: .semibold))
-                    )
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Next Step")
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextSecondary)
+    private func nextStep(_ data: DashboardData) -> some View {
+        if let action = data.nextBestAction {
+            TMIGoldenHourCard {
+                VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                    Label("Next best step", systemImage: "sparkles")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(TMIColors.surface.opacity(0.55), in: Capsule())
                     Text(action.title)
-                        .font(.tmiBody)
-                        .foregroundColor(.tmiTextPrimary)
-                        .lineLimit(1)
+                        .font(.title3.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(action.description)
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.goldenHourSecondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(actionLabel(for: action)) {
+                        perform(action)
+                    }
+                    .buttonStyle(.tmiPrimary)
+                    .padding(.top, TMISpacing.xs)
+                    .accessibilityIdentifier("dashboard.nextStep.action")
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("dashboard.nextStep")
+        } else {
+            HStack(spacing: TMISpacing.ms) {
+                TMIIconTile("checkmark.seal", tone: .success, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("You’re all caught up")
+                        .font(.headline)
+                        .foregroundStyle(TMIColors.textPrimary)
+                    Text(data.totalStudents == 0
+                        ? "Add your first \(terminology.learner.lowercased()) to get started."
+                        : "Nothing is waiting on you right now.")
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
                 }
                 Spacer(minLength: 0)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .tmiCard()
-    }
-
-    private var priorityColor: Color {
-        switch action.priority {
-        case .urgent: return .red
-        case .high: return .orange
-        case .medium: return .blue
-        case .low: return .gray
-        }
-    }
-
-    private var actionIcon: String {
-        switch action.type {
-        case .createPlan: return "plus.rectangle.fill"
-        case .reviewPlan: return "doc.text.magnifyingglass"
-        case .scheduleMeeting: return "calendar.badge.plus"
-        case .completeNotes: return "note.text.badge.plus"
-        case .addInterests: return "heart.text.square.fill"
-        case .checkProgress: return "chart.line.uptrend.xyaxis"
-        case .pendingApproval: return "checkmark.circle.badge.questionmark"
-        }
-    }
-}
-
-// MARK: - Next Best Action Card
-
-struct NextBestActionCard: View {
-    let action: NextBestAction
-    let onAction: () -> Void
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: TMISpacing.sm) {
-            HStack {
-                Circle()
-                    .fill(priorityColor.opacity(0.15))
-                    .frame(width: 40, height: 40)
-                    .overlay(
-                        Image(systemName: actionIcon)
-                            .foregroundColor(priorityColor)
-                            .font(.system(size: 16, weight: .medium))
-                    )
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Next Step")
-                        .font(.tmiCaption)
-                        .foregroundColor(.tmiTextSecondary)
-                    Text(action.title)
-                        .font(.tmiHeading2)
-                        .foregroundColor(.tmiTextPrimary)
-                }
-                
-                Spacer()
-                
-                Button(action: onAction) {
-                    Text("Go")
-                        .font(.tmiCaption.weight(.semibold))
-                        .foregroundColor(Color.tmiTextPrimary)
-                        .padding(.horizontal, TMISpacing.md)
-                        .padding(.vertical, TMISpacing.xs)
-                        .background(priorityColor)
-                        .cornerRadius(TMIRadius.sm)
+                if data.totalStudents == 0 {
+                    Button("Open \(terminology.learners)") {
+                        try? router.select(.students)
+                    }
+                    .buttonStyle(.tmiSecondary)
                 }
             }
-            
-            Text(action.description)
-                .font(.tmiCaption)
-                .foregroundColor(.tmiTextSecondary)
-        }
-        .tmiCard()
-    }
-    
-    private var priorityColor: Color {
-        switch action.priority {
-        case .urgent: return .red
-        case .high: return .orange
-        case .medium: return .blue
-        case .low: return .gray
+            .tmiSurface()
+            .accessibilityIdentifier("dashboard.caughtUp")
         }
     }
-    
-    private var actionIcon: String {
+
+    private func actionLabel(for action: NextBestAction) -> String {
         switch action.type {
-        case .createPlan: return "plus.rectangle.fill"
-        case .reviewPlan: return "doc.text.magnifyingglass"
-        case .scheduleMeeting: return "calendar.badge.plus"
-        case .completeNotes: return "note.text.badge.plus"
-        case .addInterests: return "heart.text.square.fill"
-        case .checkProgress: return "chart.line.uptrend.xyaxis"
-        case .pendingApproval: return "checkmark.circle.badge.questionmark"
+        case .pendingApproval, .reviewPlan: "Review Plan"
+        case .createPlan: "Open \(terminology.learner)"
+        case .scheduleMeeting: "Schedule"
+        case .addInterests: "Start Survey"
+        case .checkProgress, .completeNotes: "Open \(terminology.learner)"
         }
     }
-}
 
-/// MARK: - Role Summary Row
+    private func perform(_ action: NextBestAction) {
+        if let planID = action.targetPlanId {
+            open(.plan(planID))
+        } else if let studentID = action.targetStudentId {
+            open(.student(studentID))
+        } else if action.type == .pendingApproval {
+            try? router.select(.plans)
+        } else {
+            try? router.select(.students)
+        }
+    }
 
-struct RoleSummaryRow: View {
-    let icon: String
-    let value: String
-    let label: String
-    let color: Color
+    private func open(_ destination: ActivityDestination) {
+        showingAllActivities = false
+        switch destination {
+        case .student(let id): try? router.openListed(.student(id))
+        case .plan(let id): try? router.openListed(.plan(id))
+        }
+    }
 
-    var body: some View {
-        HStack(spacing: TMISpacing.md) {
-            ZStack {
-                Circle()
-                    .fill(color.opacity(0.12))
-                    .frame(width: 36, height: 36)
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(color)
+    // MARK: Metrics
+
+    private func metrics(_ data: DashboardData, columns: Int) -> some View {
+        let tiles = metricTiles(data)
+        return Grid(horizontalSpacing: TMISpacing.ms, verticalSpacing: TMISpacing.ms) {
+            ForEach(Array(stride(from: 0, to: tiles.count, by: columns)), id: \.self) { start in
+                GridRow {
+                    ForEach(tiles[start..<min(start + columns, tiles.count)]) { tile in
+                        TMIMetricTile(tile.title, value: tile.value, caption: tile.caption, systemImage: tile.symbol)
+                            .accessibilityIdentifier("dashboard.kpi.\(tile.id)")
+                    }
+                }
+            }
+        }
+    }
+
+    private struct MetricTileModel: Identifiable {
+        let id: String
+        let title: String
+        let value: String
+        let caption: String?
+        let symbol: String
+    }
+
+    private func metricTiles(_ data: DashboardData) -> [MetricTileModel] {
+        var tiles = [
+            MetricTileModel(
+                id: "students",
+                title: terminology.learners,
+                value: data.totalStudents.formatted(),
+                caption: "Active on your roster",
+                symbol: "person.2"
+            ),
+            MetricTileModel(
+                id: "activePlans",
+                title: "Active plans",
+                value: data.activeTMIPlans.formatted(),
+                caption: "Approved and underway",
+                symbol: "chart.line.uptrend.xyaxis"
+            ),
+        ]
+        tiles.append(MetricTileModel(
+            id: "withoutPlan",
+            title: "Need a plan",
+            value: data.studentsWithoutPlanCount.formatted(),
+            caption: "No open plan yet",
+            symbol: "doc.badge.plus"
+        ))
+        if authStateModel.currentMembership?.capabilities.contains(.planApprove) == true {
+            tiles.append(MetricTileModel(
+                id: "approvals",
+                title: "Awaiting you",
+                value: data.pendingApprovalCount.formatted(),
+                caption: "Plans to approve",
+                symbol: "checkmark.seal"
+            ))
+        } else {
+            let updates = data.recentActivities.filter {
+                if case .plan = $0.destination { true } else { false }
+            }.count
+            tiles.append(MetricTileModel(
+                id: "planUpdates",
+                title: "Plan updates",
+                value: updates.formatted(),
+                caption: "In the last 7 days",
+                symbol: "clock.arrow.circlepath"
+            ))
+        }
+        return tiles
+    }
+
+    // MARK: Activity
+
+    private func activity(_ data: DashboardData) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.ms) {
+            if data.recentActivities.count > 4 {
+                TMISectionHeader("Recent activity", actionTitle: "See All") {
+                    showingAllActivities = true
+                }
+            } else {
+                TMISectionHeader("Recent activity")
             }
 
-            Text(label)
-                .font(.tmiBody)
-                .foregroundColor(.tmiTextPrimary)
-
-            Spacer()
-
-            Text(value)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.tmiTextPrimary)
+            if data.recentActivities.isEmpty {
+                HStack(spacing: TMISpacing.ms) {
+                    TMIIconTile("clock", tone: .neutral)
+                    Text(data.totalStudents == 0
+                        ? MVPEmptyStateCopy.dashboardActivityMessage
+                        : "No activity in the last 7 days.")
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                    Spacer(minLength: 0)
+                }
+                .tmiSurface()
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(data.recentActivities.prefix(4).enumerated()), id: \.element.id) { index, item in
+                        if index > 0 {
+                            TMIDivider().padding(.leading, 56)
+                        }
+                        DashboardActivityRow(activity: item, onOpen: open)
+                    }
+                }
+                .tmiSurface(padding: 0)
+            }
         }
-        .padding(.vertical, TMISpacing.sm)
+        .accessibilityIdentifier("dashboard.activity")
+    }
+
+    // MARK: Workspace
+
+    /// Forms, meetings and follow-ups used to hide four taps deep in Settings.
+    private var workspace: some View {
+        VStack(alignment: .leading, spacing: TMISpacing.ms) {
+            TMISectionHeader("Workspace")
+            VStack(spacing: 0) {
+                workspaceRow("My Tasks", detail: "Follow-ups assigned to you", symbol: "checklist", tone: .info, route: .tasks)
+                TMIDivider().padding(.leading, 56)
+                workspaceRow("Form Assignments", detail: "Send forms and review responses", symbol: "list.bullet.rectangle", tone: .brand, route: .formAssignments)
+                TMIDivider().padding(.leading, 56)
+                workspaceRow("Meetings", detail: "Upcoming and past meetings", symbol: "calendar", tone: .success, route: .meetings)
+            }
+            .tmiSurface(padding: 0)
+        }
+        .accessibilityIdentifier("dashboard.workspace")
+    }
+
+    private func workspaceRow(_ title: String, detail: String, symbol: String, tone: TMITone, route: AppRoute) -> some View {
+        Button {
+            try? router.open(route)
+        } label: {
+            HStack(spacing: TMISpacing.ms) {
+                TMIIconTile(symbol, tone: tone)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(TMIColors.textPrimary)
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(TMIColors.textSecondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TMIColors.textTertiary)
+            }
+            .padding(.horizontal, TMISpacing.md)
+            .padding(.vertical, TMISpacing.ms)
+        }
+        .buttonStyle(.tmiPressable)
+    }
+
+    // MARK: Caseload
+
+    private func caseload(_ data: DashboardData) -> some View {
+        VStack(alignment: .leading, spacing: TMISpacing.ms) {
+            TMISectionHeader("Plan coverage")
+            VStack(alignment: .leading, spacing: TMISpacing.sm) {
+                let coverage = data.totalStudents > 0 ? Double(data.plansAligned) / Double(data.totalStudents) : 0
+                HStack(alignment: .firstTextBaseline) {
+                    Text(coverage, format: .percent.precision(.fractionLength(0)))
+                        .font(.tmiMetric)
+                        .foregroundStyle(TMIColors.textPrimary)
+                    Text("of \(terminology.learners.lowercased()) have an open plan")
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                }
+                TMIProgressBar(value: coverage, height: 8)
+                Button {
+                    try? router.select(.plans)
+                } label: {
+                    Label("Open Plans", systemImage: "arrow.right")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.tmiTertiary)
+                .padding(.leading, -8)
+            }
+            .tmiSurface()
+        }
     }
 }
 
-#Preview("Light Mode") {
+// MARK: - Activity row and feed
+
+/// One activity line: tinted symbol tile, what happened, and when.
+struct DashboardActivityRow: View {
+    let activity: RecentActivity
+    let onOpen: (ActivityDestination) -> Void
+
+    var body: some View {
+        Button {
+            if let destination = activity.destination {
+                onOpen(destination)
+            }
+        } label: {
+            HStack(spacing: TMISpacing.ms) {
+                TMIIconTile(activity.icon, tone: activity.destination.map(Self.tone) ?? .neutral)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(activity.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(TMIColors.textPrimary)
+                    Text(activity.description)
+                        .font(.footnote)
+                        .foregroundStyle(TMIColors.textSecondary)
+                        .lineLimit(2)
+                        .privacySensitive()
+                }
+                Spacer(minLength: TMISpacing.sm)
+                Text(activity.date, format: .relative(presentation: .named))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(TMIColors.textTertiary)
+                if activity.destination != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(TMIColors.textTertiary)
+                }
+            }
+            .padding(.horizontal, TMISpacing.md)
+            .padding(.vertical, TMISpacing.ms)
+        }
+        .buttonStyle(.tmiPressable)
+        .disabled(activity.destination == nil)
+        .help(activity.date.formatted(date: .abbreviated, time: .shortened))
+    }
+
+    private static func tone(_ destination: ActivityDestination) -> TMITone {
+        switch destination {
+        case .student: .info
+        case .plan: .brand
+        }
+    }
+}
+
+/// Every recent activity, grouped by day.
+struct DashboardActivityFeed: View {
+    let activities: [RecentActivity]
+    let onOpen: (ActivityDestination) -> Void
+
+    private var days: [(day: Date, items: [RecentActivity])] {
+        let calendar = Calendar.current
+        let grouped = Dictionary(grouping: activities) { calendar.startOfDay(for: $0.date) }
+        return grouped.keys.sorted(by: >).map { ($0, grouped[$0, default: []].sorted { $0.date > $1.date }) }
+    }
+
+    var body: some View {
+        List {
+            ForEach(days, id: \.day) { group in
+                Section(Self.title(for: group.day)) {
+                    ForEach(group.items) { item in
+                        DashboardActivityRow(activity: item, onOpen: onOpen)
+                            .listRowInsets(EdgeInsets())
+                    }
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .tmiScreenBackground()
+    }
+
+    private static func title(for day: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(day) { return "Today" }
+        if calendar.isDateInYesterday(day) { return "Yesterday" }
+        return day.formatted(.dateTime.weekday(.wide).month().day())
+    }
+}
+
+extension DashboardData {
+    /// Layout-shaped placeholder for the first load (rendered redacted).
+    static let placeholder = DashboardData(
+        totalStudents: 24,
+        activeTMIPlans: 12,
+        plansAligned: 16,
+        recentActivities: (0..<4).map { index in
+            RecentActivity(
+                id: "placeholder-\(index)",
+                icon: "doc.text",
+                title: "Plan updated",
+                description: "A support plan was updated this week",
+                date: .now
+            )
+        },
+        pendingApprovalCount: 2,
+        studentsWithoutPlanCount: 8,
+        nextBestAction: NextBestAction(
+            id: "placeholder",
+            type: .reviewPlan,
+            title: "Review a plan before its check-in",
+            description: "Two goals need an update",
+            priority: .medium,
+            targetStudentId: nil,
+            targetPlanId: nil
+        )
+    )
+}
+
+#Preview("Today") {
     NavigationStack {
         DashboardView()
             .environment(\.dashboardStateModel, DashboardStateModel())
-    }
-    .preferredColorScheme(.light)
-}
-
-#Preview("Dark Mode") {
-    NavigationStack {
-        DashboardView()
-            .environment(\.dashboardStateModel, DashboardStateModel())
+            .environment(AppRouter())
     }
 }
-
-// MARK: - Actionable Cards moved to Components/ActionableCards.swift

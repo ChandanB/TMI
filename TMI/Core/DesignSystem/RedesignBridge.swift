@@ -32,14 +32,25 @@ extension Font {
 // MARK: - Spacing Extensions
 
 extension TMISpacing {
-    /// Card padding (maps to md)
+    /// 12pt: row insets, tight stacks.
+    static let ms: CGFloat = 12
+    /// 20pt: card padding on iPhone, comfortable stacks.
+    static let ml: CGFloat = 20
+
+    /// Card padding.
     static var cardPadding: CGFloat { md }
 
-    /// Section spacing (maps to lg)
+    /// Space between sections of a screen.
     static var sectionSpacing: CGFloat { lg }
 
-    /// Screen padding (maps to md)
-    static var screenPadding: CGFloat { md }
+    /// Horizontal screen margin.
+    static var screenPadding: CGFloat {
+#if os(macOS)
+        lg
+#else
+        md
+#endif
+    }
 
     /// Convenience aliases
     static var small: CGFloat { sm }
@@ -49,19 +60,35 @@ extension TMISpacing {
 }
 
 // MARK: - Radius Extensions
+//
+// Always draw with `style: .continuous` (see `TMIShape`). iPhone uses softer,
+// larger radii that echo the device corners; the Mac is tighter and crisper.
 
 extension TMIRadius {
-    /// Card radius
-    static var card: CGFloat { md }
+#if os(macOS)
+    /// Cards, grouped containers, tables.
+    static let card: CGFloat = 12
+    /// Buttons, fields, segmented controls.
+    static let control: CGFloat = 8
+    /// Chips, badges, icon tiles.
+    static let chip: CGFloat = 6
+    /// Icon tiles in rows.
+    static let tile: CGFloat = 7
+#else
+    static let card: CGFloat = 20
+    static let control: CGFloat = 14
+    static let chip: CGFloat = 8
+    static let tile: CGFloat = 9
+#endif
 
     /// Button radius
-    static var button: CGFloat { sm }
+    static var button: CGFloat { control }
 
     /// Modal radius
-    static var modal: CGFloat { lg }
+    static var modal: CGFloat { card }
 
     /// Sheet radius
-    static var sheet: CGFloat { xl }
+    static var sheet: CGFloat { card }
 
     /// Pill radius (fully rounded)
     static var pill: CGFloat { full }
@@ -69,6 +96,14 @@ extension TMIRadius {
     /// Convenience aliases
     static var small: CGFloat { sm }
     static var medium: CGFloat { md }
+}
+
+/// Continuous rounded shapes for the standard radii.
+enum TMIShape {
+    static var card: RoundedRectangle { RoundedRectangle(cornerRadius: TMIRadius.card, style: .continuous) }
+    static var control: RoundedRectangle { RoundedRectangle(cornerRadius: TMIRadius.control, style: .continuous) }
+    static var chip: RoundedRectangle { RoundedRectangle(cornerRadius: TMIRadius.chip, style: .continuous) }
+    static var tile: RoundedRectangle { RoundedRectangle(cornerRadius: TMIRadius.tile, style: .continuous) }
 }
 
 // MARK: - Animation Extensions
@@ -88,6 +123,15 @@ extension TMIAnimation {
     static var easeInOutQuick: Animation {
         Animation.easeInOut(duration: 0.15)
     }
+
+    /// Default motion for state changes (0.35s, no bounce).
+    static var smooth: Animation { .smooth(duration: 0.35) }
+
+    /// Playful-but-controlled motion for celebrations and Student Mode.
+    static var bouncy: Animation { .bouncy(duration: 0.45, extraBounce: 0.05) }
+
+    /// Tight response for presses and toggles.
+    static var snappy: Animation { .snappy(duration: 0.22) }
 }
 
 // Note: TMISizing and TMIElevation are defined in TMIDesignTokens.swift already

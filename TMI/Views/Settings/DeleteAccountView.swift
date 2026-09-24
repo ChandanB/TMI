@@ -30,7 +30,7 @@ struct DeleteAccountView: View {
                 HStack {
                     Spacer()
                     Button("Cancel") { dismiss() }
-                        .font(.system(size: 16))
+                        .font(.body)
                         .foregroundColor(.tmiTextSecondary)
                         .padding()
                         .disabled(isDeleting)
@@ -40,11 +40,11 @@ struct DeleteAccountView: View {
                     VStack(spacing: 24) {
                         VStack(spacing: 12) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 48))
-                                .foregroundColor(.red)
+                                .font(.largeTitle)
+                                .foregroundStyle(TMIColors.errorText)
 
                             Text("Delete Account")
-                                .font(.system(size: 24, weight: .bold))
+                                .font(.title2.weight(.bold))
                                 .foregroundColor(.tmiTextPrimary)
                         }
                         .padding(.top, 8)
@@ -75,7 +75,7 @@ struct DeleteAccountView: View {
             TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("This will permanently delete:")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(Color.tmiTextPrimary)
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
@@ -100,7 +100,7 @@ struct DeleteAccountView: View {
             TMICard(style: .default) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Institutional records retained")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(Color.tmiTextPrimary)
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
@@ -123,7 +123,7 @@ struct DeleteAccountView: View {
             }
 
             Text("This action cannot be undone.")
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .foregroundColor(.tmiTextSecondary)
                 .multilineTextAlignment(.center)
 
@@ -134,7 +134,7 @@ struct DeleteAccountView: View {
             }
 
             Button("Cancel") { dismiss() }
-                .font(.system(size: 16))
+                .font(.body)
                 .foregroundColor(.tmiTextSecondary)
         }
     }
@@ -142,11 +142,11 @@ struct DeleteAccountView: View {
     private func consequenceRow(icon: String, text: String, color: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .foregroundStyle(color.opacity(0.8))
                 .frame(width: 20)
             Text(text)
-                .font(.system(size: 15))
+                .font(.subheadline)
                 .foregroundStyle(Color.tmiTextPrimary)
         }
     }
@@ -156,14 +156,14 @@ struct DeleteAccountView: View {
     private var confirmContent: some View {
         VStack(spacing: 20) {
             Text("Enter your password to confirm deletion.")
-                .font(.system(size: 15))
+                .font(.subheadline)
                 .foregroundColor(.tmiTextSecondary)
                 .multilineTextAlignment(.center)
 
             TMICard(style: .default) {
                 SecureField("Password", text: $password)
                     .textContentType(.password)
-                    .font(.system(size: 16))
+                    .font(.body)
                     .foregroundColor(.tmiTextPrimary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
@@ -172,8 +172,8 @@ struct DeleteAccountView: View {
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.system(size: 14))
-                    .foregroundColor(.red)
+                    .font(.subheadline)
+                    .foregroundStyle(TMIColors.errorText)
                     .multilineTextAlignment(.center)
                     .transition(.opacity)
             }
@@ -204,7 +204,7 @@ struct DeleteAccountView: View {
                     step = .warning
                 }
             }
-            .font(.system(size: 16))
+            .font(.body)
             .foregroundColor(.tmiTextSecondary)
             .disabled(isDeleting || accountDeletionCompleted)
         }

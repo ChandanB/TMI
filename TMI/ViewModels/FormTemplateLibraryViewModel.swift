@@ -43,27 +43,15 @@ class FormTemplateLibraryViewModel {
     errorMessage = nil
 
     do {
-      var allTemplates: [FormTemplate] = []
-      
-      // 1. Fetch district templates
-      if let districtId = districtId {
-        let districtTemplates = try await templateService.fetchTemplates(districtId: districtId)
-        allTemplates.append(contentsOf: districtTemplates)
+      // Everything the member may list, district-wide and public included;
+      // without a district there is only the public catalog.
+      let allTemplates: [FormTemplate]
+      if let districtId {
+        allTemplates = try await templateService.fetchTemplates(districtId: districtId)
+      } else {
+        allTemplates = try await templateService.fetchPublicTemplates()
       }
-      
-      // 2. Fetch public templates
-      let publicTemplates = try await templateService.fetchPublicTemplates()
-      
-      // 3. Merge avoiding duplicates (structs with same ID)
-      // Assuming ID is present.
-      let existingIds = Set(allTemplates.compactMap { $0.id })
-      let newPublicCalls = publicTemplates.filter { t in
-          guard let id = t.id else { return true }
-          return !existingIds.contains(id)
-      }
-      
-      allTemplates.append(contentsOf: newPublicCalls)
-      
+
       self.templates = allTemplates
       applyFilters()
       print("[FormTemplateLibraryViewModel] Loaded \(templates.count) templates")

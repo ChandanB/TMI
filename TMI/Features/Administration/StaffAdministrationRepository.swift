@@ -158,15 +158,19 @@ protocol StaffAdministrationRepository: AnyObject {
 
 @MainActor
 final class FirebaseStaffAdministrationRepository: StaffAdministrationRepository {
-    private let functions: Functions
-    private let firestore: Firestore
+    // Resolved on use: `Functions.functions()` traps without a configured
+    // FirebaseApp (UI-test fixtures and previews construct this type).
+    private let makeFunctions: @Sendable () -> Functions
+    private var functions: Functions { makeFunctions() }
+    private let makeFirestore: @MainActor () -> Firestore
+    private var firestore: Firestore { makeFirestore() }
 
     init(
-        functions: Functions = Functions.functions(region: "us-central1"),
-        firestore: Firestore = FirebaseManager.shared.firestore
+        functions: @autoclosure @escaping @Sendable () -> Functions = Functions.functions(region: "us-central1"),
+        firestore: @autoclosure @escaping @MainActor () -> Firestore = FirebaseManager.shared.firestore
     ) {
-        self.functions = functions
-        self.firestore = firestore
+        self.makeFunctions = functions
+        self.makeFirestore = firestore
     }
 
     func staff(districtID: String) async throws -> [AdminStaffMember] {
@@ -240,6 +244,7 @@ final class FirebaseStaffAdministrationRepository: StaffAdministrationRepository
         _ request: Request
     ) async throws -> Response {
         do {
+            try FirebaseSession.requireApp()
             let callable: Callable<Request, Response> = functions.httpsCallable(name)
             return try await callable.call(request)
         } catch is DecodingError {

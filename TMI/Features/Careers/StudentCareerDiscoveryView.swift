@@ -82,8 +82,7 @@ struct StudentCareerDiscoveryView: View {
                     Text(loadError)
                 } actions: {
                     Button("Try again") { Task { await loadCatalog() } }
-                        .buttonStyle(.borderedProminent)
-                        .tint(TMIColors.aubergine)
+                        .buttonStyle(.tmiPrimary)
                 }
                 .accessibilityIdentifier("careerDiscovery.error")
             } else if results.isEmpty {
@@ -178,8 +177,7 @@ struct StudentCareerDiscoveryView: View {
             Button("Compare \(state.comparisonIDs.count)") {
                 comparisonShown = true
             }
-            .buttonStyle(.borderedProminent)
-            .tint(TMIColors.aubergine)
+            .buttonStyle(.tmiChip(isSelected: state.canCompare))
             .disabled(!state.canCompare)
             .accessibilityIdentifier("careerDiscovery.compare")
         }
@@ -200,16 +198,14 @@ struct StudentCareerDiscoveryView: View {
                             state.educationLevels.insert(level)
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(isOn ? TMIColors.aubergine : nil)
+                    .buttonStyle(.tmiChip(isSelected: isOn))
                     .fixedSize()
                     .accessibilityIdentifier("careerDiscovery.filter.\(level.rawValue)")
                 }
                 Button("Recently viewed") {
                     state.showRecentlyViewed.toggle()
                 }
-                .buttonStyle(.bordered)
-                .tint(state.showRecentlyViewed ? TMIColors.aubergine : nil)
+                .buttonStyle(.tmiChip(isSelected: state.showRecentlyViewed))
                 .fixedSize()
                 .accessibilityAddTraits(state.showRecentlyViewed ? .isSelected : [])
                 .accessibilityIdentifier("careerDiscovery.filter.recent")
@@ -225,7 +221,10 @@ struct StudentCareerDiscoveryView: View {
     }
 
     private func careerRow(_ career: CareerRecord) -> some View {
-        VStack(alignment: .leading, spacing: TMISpacing.xs) {
+        let isSaved = relationships[career.id]?.isSaved == true
+        let isCompared = state.isSelectedForComparison(career.id)
+        let isMutating = mutatingCareerIDs.contains(career.id)
+        return HStack(alignment: .center, spacing: TMISpacing.ms) {
             NavigationLink {
                 CanonicalCareerDetailView(
                     career: career,
@@ -236,43 +235,46 @@ struct StudentCareerDiscoveryView: View {
                     }
                 )
             } label: {
-                VStack(alignment: .leading, spacing: TMISpacing.xxs) {
-                    Text(career.title)
-                        .font(.headline)
-                    Text(CanonicalCareerDetailView.readable(career.category))
-                        .font(.caption)
-                        .foregroundStyle(TMIColors.textSecondary)
-                    if let reason = matchesByID[career.id]?.reasons.first {
-                        Text(reason)
-                            .font(.caption)
-                            .foregroundStyle(TMIColors.aubergine)
+                HStack(spacing: TMISpacing.ms) {
+                    TMIIconTile(Self.symbol(for: career.category), tone: Self.tone(for: career.category), size: 40)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(career.title)
+                            .font(.headline)
+                            .foregroundStyle(TMIColors.textPrimary)
+                        Text(CanonicalCareerDetailView.readable(career.category))
+                            .font(.subheadline)
+                            .foregroundStyle(TMIColors.textSecondary)
+                        if let reason = matchesByID[career.id]?.reasons.first {
+                            Label(reason, systemImage: "sparkles")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(TMIColors.accent)
+                                .lineLimit(2)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.tmiPressable)
             .accessibilityIdentifier("careerDiscovery.career.\(career.id)")
 
-            HStack(spacing: TMISpacing.xs) {
-                Button(relationships[career.id]?.isSaved == true ? "Remove saved" : "Save") {
-                    Task { @MainActor in
-                        await persist(careerID: career.id, action: .save)
-                    }
+            HStack(spacing: 2) {
+                iconToggle(
+                    isSaved ? "bookmark.fill" : "bookmark",
+                    label: isSaved ? "Remove saved" : "Save",
+                    isOn: isSaved,
+                    identifier: "careerDiscovery.save.\(career.id)"
+                ) {
+                    Task { @MainActor in await persist(careerID: career.id, action: .save) }
                 }
-                .disabled(mutatingCareerIDs.contains(career.id))
-                .accessibilityIdentifier("careerDiscovery.save.\(career.id)")
-
-                Button("Dismiss") {
+                iconToggle(
+                    isCompared ? "checkmark.circle.fill" : "plus.circle",
+                    label: isCompared ? "Selected" : "Compare",
+                    isOn: isCompared,
+                    identifier: "careerDiscovery.compareToggle.\(career.id)"
+                ) {
                     Task { @MainActor in
-                        await persist(careerID: career.id, action: .dismiss)
-                    }
-                }
-                .disabled(mutatingCareerIDs.contains(career.id))
-                .accessibilityIdentifier("careerDiscovery.dismiss.\(career.id)")
-
-                Button(state.isSelectedForComparison(career.id) ? "Selected" : "Compare") {
-                    Task { @MainActor in
-                        if !state.isSelectedForComparison(career.id),
+                        if !isCompared,
                            state.comparisonIDs.count >= CareerDiscoveryState.maximumComparisons {
                             limitMessage = "You can compare up to \(CareerDiscoveryState.maximumComparisons) careers at once."
                             return
@@ -280,14 +282,82 @@ struct StudentCareerDiscoveryView: View {
                         await persist(careerID: career.id, action: .compare)
                     }
                 }
-                .disabled(mutatingCareerIDs.contains(career.id))
-                .accessibilityIdentifier("careerDiscovery.compareToggle.\(career.id)")
+                iconToggle(
+                    "hand.thumbsdown",
+                    label: "Dismiss",
+                    isOn: false,
+                    identifier: "careerDiscovery.dismiss.\(career.id)"
+                ) {
+                    Task { @MainActor in await persist(careerID: career.id, action: .dismiss) }
+                }
             }
-            .font(.caption)
-            .buttonStyle(.bordered)
+            .disabled(isMutating)
         }
-        .padding(TMISpacing.md)
-        .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+        .tmiSurface(padding: TMISpacing.ms)
+        .contextMenu {
+            Button(isSaved ? "Remove Saved" : "Save", systemImage: isSaved ? "bookmark.slash" : "bookmark") {
+                Task { @MainActor in await persist(careerID: career.id, action: .save) }
+            }
+            Button(isCompared ? "Remove from Comparison" : "Add to Comparison", systemImage: "square.split.2x1") {
+                Task { @MainActor in await persist(careerID: career.id, action: .compare) }
+            }
+            Divider()
+            Button("Not for Me", systemImage: "hand.thumbsdown") {
+                Task { @MainActor in await persist(careerID: career.id, action: .dismiss) }
+            }
+        }
+        .sensoryFeedback(.selection, trigger: isSaved)
+        .sensoryFeedback(.selection, trigger: isCompared)
+    }
+
+    private func iconToggle(
+        _ symbol: String,
+        label: String,
+        isOn: Bool,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(isOn ? TMIColors.accent : TMIColors.textTertiary)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 40, height: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(identifier)
+    }
+
+    /// A glyph and tint per career cluster, so the list reads at a glance.
+    static func symbol(for category: String) -> String {
+        let key = category.lowercased()
+        return switch true {
+        case key.contains("tech") || key.contains("computer"): "laptopcomputer"
+        case key.contains("health") || key.contains("medic"): "cross.case"
+        case key.contains("art") || key.contains("design") || key.contains("entertain"): "paintpalette"
+        case key.contains("engineer"): "gearshape.2"
+        case key.contains("science"): "flask"
+        case key.contains("educat"): "graduationcap"
+        case key.contains("business") || key.contains("finance"): "briefcase"
+        case key.contains("sport") || key.contains("fitness"): "figure.run"
+        case key.contains("trade") || key.contains("construct"): "hammer"
+        case key.contains("communic") || key.contains("media"): "megaphone"
+        case key.contains("social") || key.contains("community"): "person.2.wave.2"
+        default: "sparkles"
+        }
+    }
+
+    static func tone(for category: String) -> TMITone {
+        let key = category.lowercased()
+        return switch true {
+        case key.contains("health") || key.contains("social"): .success
+        case key.contains("tech") || key.contains("engineer") || key.contains("science"): .info
+        case key.contains("art") || key.contains("design") || key.contains("entertain"): .warning
+        default: .brand
+        }
     }
 
     private var attachmentContext: CareerPlanAttachmentContext? {

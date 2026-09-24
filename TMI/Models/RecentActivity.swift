@@ -8,6 +8,12 @@
 import Foundation
 import SwiftUI
 
+/// Where tapping an activity leads.
+nonisolated enum ActivityDestination: Hashable, Sendable {
+    case student(String)
+    case plan(String)
+}
+
 /// Represents a recent activity in the application
 nonisolated struct RecentActivity: Identifiable, Equatable, Sendable {
     // MARK: - Properties
@@ -38,6 +44,9 @@ nonisolated struct RecentActivity: Identifiable, Equatable, Sendable {
     
     /// Progress value between 0.0 and 1.0
     var progressValue: Double
+
+    /// The record this activity opens, when there is one.
+    var destination: ActivityDestination?
     
     // MARK: - Computed Properties
     

@@ -119,7 +119,7 @@ final class ScheduleMeetingCoordinator {
         isSaving = true
         defer { isSaving = false }
         
-        let meeting = try draft.toMeeting(organizerID: Auth.auth().currentUser?.uid)
+        let meeting = try draft.toMeeting(organizerID: FirebaseSession.currentUserID())
         
         let savedMeeting: Meeting
         if let existingId = draft.existingId {

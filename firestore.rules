@@ -979,7 +979,17 @@ service cloud.firestore {
       }
 
       match /formTemplates/{templateID} {
-        allow read: if (
+        // Rules are not filters, and `get(field, default)` on a field a query
+        // does not constrain evaluates to the default, so the get rule below
+        // would let any list query through. A list must constrain schoolId
+        // (district-wide templates store an explicit null).
+        allow list: if hasActiveMembership(districtID)
+          && (
+            role(districtID) == 'districtAdministrator'
+            || resource.data.schoolId == null
+            || resource.data.schoolId in membership(districtID).get('schoolIDs', [])
+          );
+        allow get: if (
             hasActiveMembership(districtID)
             && (
               resource.data.get('schoolId', null) == null

@@ -18,7 +18,7 @@ struct StudentTimelineView: View {
                 VStack(spacing: TMISpacing.sm) {
                     Image(systemName: "clock.badge.questionmark")
                         .font(.title)
-                        .foregroundStyle(TMIColors.teal)
+                        .foregroundStyle(TMIColors.accent)
                         .accessibilityHidden(true)
 
                     Text(
@@ -198,16 +198,16 @@ struct StudentTimelineView: View {
         var foregroundStyle: Color {
             switch self {
             case .privateNote:
-                TMIColors.aubergine
+                TMIColors.accent
             case .studentReflection:
-                TMIColors.teal
+                TMIColors.accent
             }
         }
 
         var backgroundStyle: Color {
             switch self {
             case .privateNote:
-                TMIColors.aubergineSoft
+                TMIColors.accentSoft
             case .studentReflection:
                 TMIColors.infoSurface
             }

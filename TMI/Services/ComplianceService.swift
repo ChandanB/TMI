@@ -24,7 +24,7 @@ final class ComplianceService {
     init(
         firestore: Firestore? = nil,
         authorizationSessions: any AuthorizationSessionProviding = TrustedAuthorizationSessionStore.shared,
-        currentUserID: @escaping @Sendable () -> String? = { Auth.auth().currentUser?.uid }
+        currentUserID: @escaping @Sendable () -> String? = { FirebaseSession.currentUserID() }
     ) {
         self.firestore = firestore
         self.authorizationSessions = authorizationSessions

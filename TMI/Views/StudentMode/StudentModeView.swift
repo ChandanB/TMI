@@ -16,6 +16,9 @@ struct StudentModeView: View {
     @State private var activityError: String?
     @State private var studentPlanRepository: StudentPlanProjectionRepository?
     @State private var studentPlanState: StudentPlanProjectionState?
+    /// Set when the student taps Finish on their results: a calm end state
+    /// until an educator takes the device back.
+    @State private var hasFinishedActivity = false
 
     init(
         profile: StudentModeProfile,
@@ -45,6 +48,8 @@ struct StudentModeView: View {
             }
         }
         .environment(\.studentAccessMode, .studentMode)
+        // Student Mode speaks in a softer, rounder voice than the staff app.
+        .fontDesign(.rounded)
         .alert("Exit Student Mode?", isPresented: $showingExitConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Exit", role: .destructive) {
@@ -124,7 +129,7 @@ struct StudentModeView: View {
                         Label("Try Again", systemImage: "arrow.clockwise")
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.tmiPrimary)
                 .disabled(session.isRestorationInProgress)
                 .accessibilityIdentifier("studentMode.restore.retry")
             }
@@ -190,16 +195,24 @@ struct StudentModeView: View {
            let surveyRepository,
            surveyActivitySessionID == grant.sessionID,
            surveyActivity.assignment.assignmentID == grant.scope.assignmentIDs.first {
+            if hasFinishedActivity {
+                allDone
+            } else {
             StudentSurveyFlow(
                 assignment: surveyActivity.assignment,
                 definition: surveyActivity.definition,
                 grant: grant,
                 repository: surveyRepository,
-                onActivity: { session.recordActivity() }
+                onActivity: { session.recordActivity() },
+                onFinish: {
+                    session.recordActivity()
+                    withAnimation(TMIAnimation.bouncy) { hasFinishedActivity = true }
+                }
             )
             .simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { _ in
                 session.recordActivity()
             })
+            }
         } else if let activityError {
             ContentUnavailableView(
                 "Activity unavailable",
@@ -209,6 +222,30 @@ struct StudentModeView: View {
         } else {
             ProgressView("Getting your activity ready…")
         }
+    }
+
+    private var allDone: some View {
+        VStack(spacing: TMISpacing.md) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.largeTitle)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(TMIColors.successText)
+                .symbolEffect(.bounce, value: hasFinishedActivity)
+                .accessibilityHidden(true)
+            Text("All done!")
+                .font(.largeTitle.bold())
+                .foregroundStyle(TMIColors.textPrimary)
+            Text("Thank you for sharing. Please hand the device back to your educator.")
+                .font(.title3)
+                .foregroundStyle(TMIColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+        }
+        .padding(TMISpacing.xl)
+        .frame(maxWidth: .infinity)
+        .sensoryFeedback(.success, trigger: hasFinishedActivity)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("studentMode.allDone")
     }
 
     @ViewBuilder
@@ -262,18 +299,17 @@ struct StudentModeView: View {
         Button {
             showingExitConfirmation = true
         } label: {
-            Label("Exit", systemImage: "lock.shield.fill")
+            // Deliberately quiet: this is the educator's control, not the child's.
+            Image(systemName: "lock.fill")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.tmiWarning)
-                .padding(.horizontal, TMISpacing.md)
-                .padding(.vertical, TMISpacing.sm)
-                .background(
-                    Color.tmiWarning.opacity(0.2),
-                    in: Capsule()
-                )
+                .foregroundStyle(TMIColors.textSecondary)
+                .frame(width: 44, height: 44)
+                .glassEffect(.regular.interactive(), in: Circle())
         }
         .buttonStyle(.plain)
         .disabled(isExiting)
+        .accessibilityLabel("Exit Student Mode")
+        .accessibilityHint("Requires staff authentication")
         .accessibilityIdentifier("studentMode.exit")
     }
 
@@ -281,37 +317,31 @@ struct StudentModeView: View {
         VStack(spacing: TMISpacing.md) {
             TMIAvatar(
                 initials: profile.initials,
-                color: .tmiPrimary,
                 size: 80
             )
+            .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
 
             VStack(spacing: TMISpacing.xxs) {
                 Text("Welcome, \(profile.firstName)")
-                    .font(.title2.bold())
-                    .foregroundStyle(Color.tmiTextPrimary)
+                    .font(.title.bold())
+                    .foregroundStyle(TMIColors.goldenHourText)
 
                 if !profile.grade.isEmpty {
                     // Early-childhood age groups read on their own ("Pre-K 4s").
                     Text(AgeGroup(rawValue: profile.grade) == nil ? "Grade \(profile.grade)" : profile.grade)
                         .font(.body.weight(.medium))
-                        .foregroundStyle(Color.tmiTextSecondary)
+                        .foregroundStyle(TMIColors.goldenHourSecondaryText)
                 }
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, TMISpacing.lg)
         .padding(.horizontal, TMISpacing.screenPadding)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.tmiPrimary.opacity(0.3),
-                    Color.tmiPrimary.opacity(0.1),
-                    Color.clear,
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .background {
+            TMIGoldenHourBackground(animated: true)
+                .clipShape(RoundedRectangle(cornerRadius: TMIRadius.card + 8, style: .continuous))
+                .padding(.horizontal, TMISpacing.sm)
+        }
     }
 
     private func lockDescription(_ reason: StudentModeLockReason) -> String {

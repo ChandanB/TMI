@@ -66,8 +66,32 @@ final class AppRouter {
 
     func open(_ route: AppRoute) throws {
         try validate(route)
+        try push(route)
+    }
 
-        if let tab = route.tab {
+    /// Opens a student or plan the member already received from a
+    /// member-scoped query: a list row, a server-filtered search hit, or a
+    /// dashboard item. The ID-only policy sets are deliberately empty for
+    /// plans (and hold only assigned students), so `open(_:)` would refuse
+    /// these; the destination screen re-authorizes against its repository on
+    /// load, exactly as `NavigationLink(value:)` rows already do.
+    /// - Parameter staysOnCurrentTab: push onto the current tab's stack (for
+    ///   drill-downs such as Reports → student) so Back returns to the source.
+    func openListed(_ route: AppRoute, staysOnCurrentTab: Bool = false) throws {
+        switch route {
+        case .student(let identifier), .plan(let identifier):
+            _ = try validIdentifier(identifier)
+            guard policy.role != nil else {
+                throw NavigationError.unauthorizedRoute
+            }
+        case .editStudent, .profile, .settings, .tasks, .sync, .formAssignments, .formTemplates, .meetings:
+            try validate(route)
+        }
+        try push(route, switchingTab: !staysOnCurrentTab)
+    }
+
+    private func push(_ route: AppRoute, switchingTab: Bool = true) throws {
+        if switchingTab, let tab = route.tab {
             guard availableTabs.contains(tab) else {
                 throw NavigationError.unavailableTab
             }
@@ -322,7 +346,7 @@ final class AppRouter {
                 throw NavigationError.unauthorizedRoute
             }
 
-        case .profile, .settings, .tasks, .sync:
+        case .profile, .settings, .tasks, .sync, .formAssignments, .formTemplates, .meetings:
             guard policy.role != nil else {
                 throw NavigationError.unauthorizedRoute
             }

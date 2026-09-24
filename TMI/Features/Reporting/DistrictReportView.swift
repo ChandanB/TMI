@@ -50,17 +50,19 @@ struct DistrictReportView: View {
                     }
                 }
             }
-            .padding(.horizontal, TMISpacing.md)
-            .padding(.vertical, TMISpacing.lg)
-            .frame(maxWidth: 1_100)
+            .padding(.horizontal, TMISpacing.screenPadding)
+            .padding(.vertical, TMISpacing.md)
+            .frame(maxWidth: TMISizing.maxContentWidth)
             .frame(maxWidth: .infinity)
         }
-        .background(TMIColors.background)
+        .tmiScreenBackground()
         .navigationTitle("Reports")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("Refresh", systemImage: "arrow.clockwise") { Task { await load(refresh: true) } }
+                    .keyboardShortcut("r", modifiers: .command)
+                    .help("Recalculate the report (⌘R)")
                     .disabled(isLoading || !canView)
                 if canExport {
                     Menu {
@@ -94,7 +96,7 @@ struct DistrictReportView: View {
             if isExporting {
                 ProgressView("Preparing export…")
                     .padding(TMISpacing.lg)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: TMIRadius.card, style: .continuous))
             }
         }
     }
@@ -110,7 +112,7 @@ struct DistrictReportView: View {
                 .foregroundStyle(TMIColors.warningText)
                 .padding(TMISpacing.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(TMIColors.warningSurface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+                .background(TMIColors.warningSurface, in: TMIShape.control)
         }
         MetricGrid(result: result)
         ReportTrendChart(trend: report.trend, includesObservations: report.includesEarlyChildhood)
@@ -146,11 +148,16 @@ struct DistrictReportView: View {
                 }
                 ForEach(attention) { student in
                     Button {
-                        try? router.open(.student(student.studentID))
+                        // Admins reach attention students through a server-
+                        // filtered list, so the ID-only policy set can't vouch
+                        // for them; the record re-authorizes on load. Stay on
+                        // this tab so Back returns to the report.
+                        try? router.openListed(.student(student.studentID), staysOnCurrentTab: true)
                     } label: {
                         AttentionRow(student: student, siteName: siteName(student.schoolID), gradeText: terminology.gradeDescription(student.grade))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.tmiPressable)
+                    if student.id != attention.last?.id { TMIDivider() }
                 }
             } else {
                 Text("Lists the \(terminology.learners.lowercased()) you already have access to who have no survey, no approved plan, an overdue follow-up, or a plan waiting for approval. Opening this list is recorded in the audit log.")
@@ -164,7 +171,7 @@ struct DistrictReportView: View {
                 } label: {
                     if isLoadingAttention { ProgressView() } else { Text("Show \(terminology.learners.lowercased())") }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.tmiSecondary)
                 .disabled(isLoadingAttention)
                 .accessibilityIdentifier("report.showAttention")
             }
@@ -292,7 +299,7 @@ struct MetricGrid: View {
     let result: DistrictReportResult
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: TMISpacing.sm)], spacing: TMISpacing.sm) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: TMISpacing.ms)], spacing: TMISpacing.ms) {
             ForEach(result.definitions.filter { result.report.metric($0.id) != nil }) { definition in
                 if let metric = result.report.metric(definition.id) {
                     MetricTile(definition: definition, metric: metric, minimumSample: result.minimumSample)
@@ -307,24 +314,33 @@ struct MetricTile: View {
     let metric: ReportMetric
     let minimumSample: Int
 
+    private var isWithheld: Bool { metric.status == .insufficientSample }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: TMISpacing.xxs) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(definition.label)
-                .font(.footnote)
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(TMIColors.textSecondary)
                 .lineLimit(2, reservesSpace: true)
-            Text(MetricFormatting.value(metric, unit: definition.unit))
-                .font(.title3.weight(.semibold).monospacedDigit())
-                .foregroundStyle(metric.value == nil ? TMIColors.textSecondary : TMIColors.textPrimary)
+            if isWithheld {
+                Label("Withheld", systemImage: "eye.slash")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(TMIColors.textTertiary)
+            } else {
+                Text(MetricFormatting.value(metric, unit: definition.unit))
+                    .font(.tmiMetric)
+                    .foregroundStyle(metric.value == nil ? TMIColors.textTertiary : TMIColors.textPrimary)
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
             Text(MetricFormatting.caption(metric, definition: definition, minimumSample: minimumSample))
                 .font(.caption)
-                .foregroundStyle(TMIColors.textSecondary)
+                .foregroundStyle(TMIColors.textTertiary)
                 .lineLimit(2)
         }
-        .padding(TMISpacing.sm + TMISpacing.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
-        .overlay { RoundedRectangle(cornerRadius: TMIRadius.md).stroke(TMIColors.border, lineWidth: 1) }
+        .tmiSurface(padding: 14)
         .accessibilityElement(children: .combine)
         .help(definition.formula)
     }
@@ -333,7 +349,7 @@ struct MetricTile: View {
 nonisolated enum MetricFormatting {
     static func value(_ metric: ReportMetric, unit: MetricDefinition.Unit) -> String {
         guard let value = metric.value else {
-            return metric.status == .insufficientSample ? "Suppressed" : "—"
+            return metric.status == .insufficientSample ? "Withheld" : "—"
         }
         switch unit {
         case .count: return value.formatted(.number.precision(.fractionLength(0)))
@@ -376,6 +392,25 @@ struct ReportTrendChart: View {
     let trend: [ReportTrendWeek]
     let includesObservations: Bool
 
+    @State private var selectedWeek: Date?
+
+    private func selectionCallout(for date: Date) -> some View {
+        let calendar = Calendar.current
+        let week = trend.first { calendar.isDate($0.date, equalTo: date, toGranularity: .weekOfYear) }
+        return VStack(alignment: .leading, spacing: 2) {
+            Text("Week of \((week?.date ?? date).formatted(.dateTime.month(.abbreviated).day()))")
+                .font(.caption.weight(.semibold))
+            if let week {
+                Text("\(week.surveysSubmitted) surveys · \(week.plansApproved) plans · \(week.tasksCompleted) follow-ups")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(TMIColors.textSecondary)
+            }
+        }
+        .padding(8)
+        .background(TMIColors.surfaceRaised, in: TMIShape.chip)
+        .overlay { TMIShape.chip.strokeBorder(TMIColors.separator, lineWidth: 1) }
+    }
+
     private struct Point: Identifiable {
         let date: Date
         let series: String
@@ -403,14 +438,27 @@ struct ReportTrendChart: View {
                 Text("No activity recorded in this window.")
                     .foregroundStyle(TMIColors.textSecondary)
             } else {
-                Chart(points) { point in
-                    LineMark(x: .value("Week", point.date, unit: .weekOfYear), y: .value("Count", point.count))
-                        .foregroundStyle(by: .value("Activity", point.series))
-                        .symbol(by: .value("Activity", point.series))
+                Chart {
+                    ForEach(points) { point in
+                        LineMark(x: .value("Week", point.date, unit: .weekOfYear), y: .value("Count", point.count))
+                            .foregroundStyle(by: .value("Activity", point.series))
+                            .symbol(by: .value("Activity", point.series))
+                            .interpolationMethod(.monotone)
+                            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    }
+                    if let selectedWeek {
+                        RuleMark(x: .value("Week", selectedWeek, unit: .weekOfYear))
+                            .foregroundStyle(TMIColors.separator)
+                            .annotation(position: .top, alignment: .leading, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                                selectionCallout(for: selectedWeek)
+                            }
+                    }
                 }
+                .chartForegroundStyleScale(range: TMIColors.chartSeries)
+                .chartXSelection(value: $selectedWeek)
                 .chartLegend(position: .bottom, alignment: .leading)
-                .frame(height: 220)
-                .accessibilityLabel("Weekly activity chart")
+                .frame(height: 240)
+                .sensoryFeedback(.selection, trigger: selectedWeek)
             }
         }
     }
@@ -433,7 +481,8 @@ struct PlanStatusChart: View {
             } else {
                 Chart(rows, id: \.status) { row in
                     BarMark(x: .value("Plans", row.count), y: .value("Status", MetricFormatting.statusName(row.status)))
-                        .foregroundStyle(TMIColors.aubergine)
+                        .foregroundStyle(TMIColors.chartPrimary)
+                        .cornerRadius(4)
                         .annotation(position: .trailing) {
                             Text("\(row.count)").font(.caption).foregroundStyle(TMIColors.textSecondary)
                         }
@@ -457,12 +506,7 @@ struct SiteBreakdown: View {
                     HStack {
                         Text(site.name).font(.headline)
                         if site.programType == "earlyChildhood" {
-                            Text("Early childhood")
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(TMIColors.infoSurface, in: Capsule())
-                                .foregroundStyle(TMIColors.infoText)
+                            TMIStatusBadge("Early childhood", tone: .info)
                         }
                     }
                     ViewThatFits(in: .horizontal) {
@@ -471,7 +515,7 @@ struct SiteBreakdown: View {
                     }
                 }
                 .padding(.vertical, TMISpacing.xs)
-                if site.id != sites.last?.id { Divider() }
+                if site.id != sites.last?.id { TMIDivider() }
             }
         }
     }
@@ -506,9 +550,12 @@ struct AttentionRow: View {
                 Text([gradeText, siteName].filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.caption)
                     .foregroundStyle(TMIColors.textSecondary)
-                Text(student.reasons.map(\.displayName).joined(separator: " · "))
-                    .font(.caption)
-                    .foregroundStyle(TMIColors.warningText)
+                FlowLayout(spacing: 4) {
+                    ForEach(student.reasons, id: \.self) { reason in
+                        TMIStatusBadge(reason.displayName, tone: .warning)
+                    }
+                }
+                .padding(.top, 2)
             }
             Spacer()
             Image(systemName: "chevron.right").foregroundStyle(TMIColors.textSecondary).accessibilityHidden(true)
@@ -540,8 +587,7 @@ struct MetricDefinitionsList: View {
         } label: {
             Label("About these numbers", systemImage: "info.circle")
         }
-        .padding(TMISpacing.md)
-        .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
+        .tmiSurface(padding: TMISpacing.md)
     }
 }
 
@@ -552,13 +598,17 @@ struct ReportCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: TMISpacing.md) {
-            Label(title, systemImage: systemImage).font(.headline)
+            HStack(spacing: TMISpacing.sm) {
+                TMIIconTile(systemImage, tone: .brand, size: 28)
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(TMIColors.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+            }
             content
         }
-        .padding(TMISpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(TMIColors.surface, in: RoundedRectangle(cornerRadius: TMIRadius.md))
-        .overlay { RoundedRectangle(cornerRadius: TMIRadius.md).stroke(TMIColors.border, lineWidth: 1) }
+        .tmiSurface(padding: TMISpacing.md)
     }
 }
 
@@ -570,8 +620,8 @@ struct ExportReadySheet: View {
         NavigationStack {
             VStack(spacing: TMISpacing.lg) {
                 Image(systemName: file.format.systemImage)
-                    .font(.system(size: 44))
-                    .foregroundStyle(TMIColors.aubergine)
+                    .font(.largeTitle)
+                    .foregroundStyle(TMIColors.accent)
                     .accessibilityHidden(true)
                 Text(file.url.lastPathComponent).font(.headline)
                 Text("The export was recorded in the audit log. Share it only with people allowed to see these figures.")
@@ -582,7 +632,7 @@ struct ExportReadySheet: View {
                     Label("Share or save", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.tmiPrimary)
                 .accessibilityIdentifier("report.share")
             }
             .padding(TMISpacing.xl)

@@ -145,7 +145,8 @@ class NotificationService {
     private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
     
     // Dependencies
-    private let db = Firestore.firestore()
+    // Resolved on use: `Firestore.firestore()` throws without a configured FirebaseApp.
+    private var db: Firestore { Firestore.firestore() }
     private var listenerRegistration: ListenerRegistration?
     private var activeMembership: MembershipContext?
     

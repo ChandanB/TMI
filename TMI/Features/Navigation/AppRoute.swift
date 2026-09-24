@@ -10,9 +10,9 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .dashboard: "Dashboard"
+        case .dashboard: "Today"
         case .students: "Students"
-        case .plans: "TMI Plans"
+        case .plans: "Plans"
         case .district: "Reports"
         }
     }
@@ -27,10 +27,10 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Sendable {
 
     var systemImage: String {
         switch self {
-        case .dashboard: "chart.bar.fill"
-        case .students: "person.3.fill"
-        case .plans: "doc.text.fill"
-        case .district: "chart.bar.doc.horizontal"
+        case .dashboard: "house"
+        case .students: "person.2"
+        case .plans: "doc.text"
+        case .district: "chart.bar.xaxis"
         }
     }
 }
@@ -43,12 +43,15 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case settings
     case tasks
     case sync
+    case formAssignments
+    case formTemplates
+    case meetings
 
     var tab: AppTab? {
         switch self {
         case .student, .editStudent: .students
         case .plan: .plans
-        case .profile, .settings, .tasks, .sync: nil
+        case .profile, .settings, .tasks, .sync, .formAssignments, .formTemplates, .meetings: nil
         }
     }
 }

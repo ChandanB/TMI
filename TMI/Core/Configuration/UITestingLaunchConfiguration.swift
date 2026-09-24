@@ -1,4 +1,5 @@
 #if DEBUG
+import SwiftUI
 nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
     nonisolated enum Fixture: String, Sendable, Equatable {
         case signedOut = "signed-out"
@@ -33,6 +34,23 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
         case collaboration = "collaboration"
         case districtReport = "district-report"
         case assignmentResponses = "assignment-responses"
+        case dashboard = "dashboard"
+        case appShell = "app-shell"
+        case meetings = "meetings"
+    }
+
+    /// `-appearance dark` renders a fixture in dark mode; the default is light
+    /// so baseline screenshots stay deterministic.
+    nonisolated enum Appearance: String, Sendable, Equatable {
+        case light
+        case dark
+
+        var colorScheme: ColorScheme {
+            switch self {
+            case .light: .light
+            case .dark: .dark
+            }
+        }
     }
 
     nonisolated enum ContentSize: String, Sendable, Equatable {
@@ -44,6 +62,7 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
     let contentSize: ContentSize?
     /// `-program earlyChildhood` renders any fixture as an early-childhood site.
     let program: ProgramType
+    let appearance: Appearance
 
     init(arguments: [String]) {
         guard arguments.contains("-uiTesting") else {
@@ -51,6 +70,7 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
             self.fixture = nil
             self.contentSize = nil
             self.program = .k12
+            self.appearance = .light
             return
         }
         self.isUITesting = true
@@ -69,6 +89,7 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
         self.fixture = value(after: "-fixture").flatMap(Fixture.init(rawValue:))
         self.contentSize = value(after: "-content-size").flatMap(ContentSize.init(rawValue:))
         self.program = value(after: "-program").flatMap(ProgramType.init(rawValue:)) ?? .k12
+        self.appearance = value(after: "-appearance").flatMap(Appearance.init(rawValue:)) ?? .light
     }
 }
 #endif

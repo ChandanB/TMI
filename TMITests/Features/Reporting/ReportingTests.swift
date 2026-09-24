@@ -41,7 +41,7 @@ struct ReportingTests {
         let rate = ReportMetric(id: "r", value: 0.256, numerator: 32, denominator: 125, status: .ok)
         let suppressed = ReportMetric(id: "r", value: nil, numerator: nil, denominator: nil, status: .insufficientSample)
         let definition = MetricDefinition(id: "r", label: "Rate", unit: .rate, window: .current, numerator: "A", denominator: "B")
-        #expect(MetricFormatting.value(suppressed, unit: .rate) == "Suppressed")
+        #expect(MetricFormatting.value(suppressed, unit: .rate) == "Withheld")
         #expect(MetricFormatting.caption(rate, definition: definition, minimumSample: 5) == "32 of 125")
         #expect(MetricFormatting.caption(suppressed, definition: definition, minimumSample: 5) == "Fewer than 5 in the group")
         #expect(definition.formula == "A ÷ B")

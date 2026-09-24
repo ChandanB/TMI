@@ -50,7 +50,7 @@ struct DeveloperInvitationsView: View {
                                 } label: {
                                     Label("Revoke", systemImage: "nosign")
                                 }
-                                .tint(.orange)
+                                .tint(TMIColors.warningText)
                             }
                         }
                         .contextMenu {

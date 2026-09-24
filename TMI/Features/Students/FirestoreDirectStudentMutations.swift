@@ -22,7 +22,7 @@ nonisolated struct FirestoreDirectStudentMutationBackend: StudentTrustedMutation
 
     init(
         firestore: Firestore,
-        currentUserID: @escaping @Sendable () -> String? = { Auth.auth().currentUser?.uid }
+        currentUserID: @escaping @Sendable () -> String? = { FirebaseSession.currentUserID() }
     ) {
         self.firestore = firestore
         self.currentUserID = currentUserID
