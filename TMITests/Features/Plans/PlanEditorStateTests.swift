@@ -178,6 +178,39 @@ struct PlanEditorStateTests {
         #expect(state.savePhase == .versionConflict)
     }
 
+    @Test("Editing an existing plan loads its goal and action and keeps their progress")
+    func editingLoadsAndPreservesChildren() async throws {
+        let repository = EditorPlanRepository()
+        let children = EditorChildRepository()
+        let creator = makeState(repository: repository, children: children)
+        makeReady(creator)
+        await creator.autosave()
+        let goal = try #require(children.savedGoals.first)
+        let progressed = GoalRecord(
+            id: goal.id, planID: goal.planID, studentID: goal.studentID,
+            title: goal.title, studentFacingTitle: goal.studentFacingTitle,
+            measure: goal.measure, baseline: goal.baseline, target: goal.target,
+            dueDate: goal.dueDate, responsibleMemberID: goal.responsibleMemberID,
+            status: .inProgress
+        )
+        children.savedGoals = [progressed]
+
+        let editor = makeState(repository: repository, children: children, existingPlan: repository.record)
+        #expect(editor.goal.title.isEmpty)
+        await editor.loadExistingChildren()
+
+        #expect(editor.goal.title == "Complete one project milestone")
+        #expect(editor.immediateAction.title == "Choose a first project task")
+        #expect(!editor.submissionIssues.contains(.goalRequired))
+        #expect(!editor.submissionIssues.contains(.immediateActionRequired))
+
+        editor.goal.target = "2 per week"
+        await editor.autosave()
+        let resaved = try #require(children.savedGoals.first { $0.id == goal.id })
+        #expect(resaved.target == "2 per week")
+        #expect(resaved.status == .inProgress)
+    }
+
     private func makeState(
         repository: EditorPlanRepository = EditorPlanRepository(),
         children: EditorChildRepository = EditorChildRepository(),

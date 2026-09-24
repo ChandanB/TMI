@@ -208,6 +208,10 @@ final class PlanEditorState {
 
     @ObservationIgnored private let repository: any PlanRecordRepository
     @ObservationIgnored private let children: any PlanChildRepositoryProtocol
+    /// The saved primary goal and immediate action of an existing plan. Kept
+    /// so re-saving preserves their IDs and progress status.
+    @ObservationIgnored private var loadedGoal: GoalRecord?
+    @ObservationIgnored private var loadedAction: ActionRecord?
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let operationID: UUID
     @ObservationIgnored private var selectedRecommendation: PlanRecommendation?
@@ -281,6 +285,39 @@ final class PlanEditorState {
 
         self.immediateAction = ImmediateActionDraft()
         self.goal = GoalDraft()
+    }
+
+    /// Editing an existing plan: load its primary goal and immediate action
+    /// into the drafts. They used to start empty, so a plan returned with
+    /// changes requested could never pass submission checks again.
+    func loadExistingChildren() async {
+        guard let planID = currentRecord?.id else { return }
+        if let goals = try? await children.goals(planID: planID, member: member),
+           let goal = goals.first(where: { $0.id == "goal_primary" }) ?? goals.first {
+            loadedGoal = goal
+            self.goal = GoalDraft(
+                title: goal.title,
+                studentFacingTitle: goal.studentFacingTitle ?? "",
+                measure: goal.measure,
+                baseline: goal.baseline,
+                target: goal.target,
+                dueDate: goal.dueDate,
+                responsibleMemberID: goal.responsibleMemberID,
+                developmentalDomain: goal.developmentalDomain
+            )
+        }
+        if let actions = try? await children.actions(planID: planID, member: member),
+           let action = actions.first(where: { $0.id == "action_immediate" })
+            ?? actions.first(where: { $0.goalID == loadedGoal?.id }) {
+            loadedAction = action
+            self.immediateAction = ImmediateActionDraft(
+                title: action.title,
+                ownerMemberID: action.ownerMemberID,
+                audience: action.audience,
+                cadence: action.cadence,
+                dueDate: action.dueDate
+            )
+        }
     }
 
     var recommendations: [PlanRecommendation] {
@@ -531,7 +568,7 @@ final class PlanEditorState {
             return nil
         }
         return GoalRecord(
-            id: "goal_primary",
+            id: loadedGoal?.id ?? "goal_primary",
             planID: planID,
             studentID: studentID,
             title: goal.title.trimmed,
@@ -541,7 +578,7 @@ final class PlanEditorState {
             target: goal.target.trimmed,
             dueDate: dueDate,
             responsibleMemberID: goal.responsibleMemberID.trimmed,
-            status: .notStarted,
+            status: loadedGoal?.status ?? .notStarted,
             developmentalDomain: goal.developmentalDomain
         )
     }
@@ -554,15 +591,15 @@ final class PlanEditorState {
             return nil
         }
         return ActionRecord(
-            id: "action_immediate",
+            id: loadedAction?.id ?? "action_immediate",
             planID: planID,
-            goalID: "goal_primary",
+            goalID: loadedGoal?.id ?? "goal_primary",
             title: immediateAction.title.trimmed,
             ownerMemberID: immediateAction.ownerMemberID.trimmed,
             audience: immediateAction.audience,
             cadence: cadence,
             dueDate: dueDate,
-            status: .open
+            status: loadedAction?.status ?? .open
         )
     }
 

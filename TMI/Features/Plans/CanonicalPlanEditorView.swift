@@ -47,6 +47,9 @@ struct CanonicalPlanEditorView: View {
             children: children,
             existingPlan: existingPlan
         )
+        if existingPlan != nil, let state {
+            Task { await state.loadExistingChildren() }
+        }
     }
 }
 
