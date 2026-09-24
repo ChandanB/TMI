@@ -78,8 +78,13 @@ nonisolated enum DeveloperConsoleError: LocalizedError, Equatable, Sendable {
             return .notDeployed
         case .permissionDenied:
             return .notOperator
-        case .unauthenticated:
+        // Our handlers reject a missing identity with "Authentication is
+        // required."; any other UNAUTHENTICATED is the framework refusing an
+        // invalid or missing App Check token under `enforceAppCheck`.
+        case .unauthenticated where message.localizedCaseInsensitiveContains("authentication is required"):
             return .signInRequired
+        case .unauthenticated:
+            return .appCheckRequired
         case .failedPrecondition where message.localizedCaseInsensitiveContains("app check"):
             return .appCheckRequired
         case .failedPrecondition where message.localizedCaseInsensitiveContains("disabled"):

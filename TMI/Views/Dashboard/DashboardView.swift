@@ -127,10 +127,15 @@ nonisolated struct NextBestAction: Equatable, Sendable {
 extension EnvironmentValues {
   // Fail closed: the app root injects the real model. A Firebase-backed
   // default would trap in fixtures and previews with no FirebaseApp.
-  @Entry var dashboardStateModel: DashboardStateModel = DashboardStateModel()
+  @Entry var dashboardStateModel: DashboardStateModel = .environmentDefault
 }
 
 // MARK: - State Model
+
+extension DashboardStateModel {
+  /// Allocated once so @Entry does not rebuild it on every read.
+  static let environmentDefault = DashboardStateModel()
+}
 
 @Observable
 final class DashboardStateModel: BaseStateModel<DashboardData, IdentifiableError> {

@@ -468,8 +468,9 @@ private func userProfileForm(
                     Text(roleDisplayName ?? "Access unavailable")
                         .font(.subheadline)
                         .foregroundStyle(TMIColors.textSecondary)
+                    let photoLabel = stateModel.isUploadingPhoto ? "Uploading…" : "Change Photo"
                     PhotosPicker(selection: Bindable(stateModel).selectedPhotoItem, matching: .images) {
-                        Label(stateModel.isUploadingPhoto ? "Uploading…" : "Change Photo", systemImage: "camera")
+                        Label(photoLabel, systemImage: "camera")
                             .font(.subheadline.weight(.semibold))
                     }
                     .disabled(stateModel.isUploadingPhoto)

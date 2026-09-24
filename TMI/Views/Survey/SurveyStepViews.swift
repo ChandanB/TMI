@@ -39,7 +39,7 @@ struct SurveyQuestionView: View {
                             .accessibilityIdentifier("studentSurvey.rating.\(value)")
                     }
                 }
-            case .shortText(let maximumLength):
+            case .shortText:
                 TextField("Type your answer here", text: textBinding, axis: .vertical)
                     .lineLimit(3...6)
                     .textFieldStyle(.roundedBorder)

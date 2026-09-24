@@ -568,10 +568,15 @@ private struct UnavailableAuthMembershipProvider: MembershipProviding {
 
 // MARK: - Environment Key
 extension EnvironmentValues {
-  @Entry var authStateModel: AuthStateModel = AuthStateModel(automaticallyStart: false)
+  @Entry var authStateModel: AuthStateModel = .environmentDefault
 }
 
 // MARK: - Auth State Model
+
+extension AuthStateModel {
+  /// Allocated once so @Entry does not rebuild it on every read.
+  static let environmentDefault = AuthStateModel(automaticallyStart: false)
+}
 
 @Observable
 @MainActor
