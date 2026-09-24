@@ -549,7 +549,7 @@ private struct StudentOperationalHubContent: View {
                         studentReflections: state.studentReflections
                     )
 
-                    StudentMeetingsSection(studentID: student.id)
+                    StudentMeetingsSection(studentID: student.id, studentName: student.displayName)
 
                     StudentTasksSection(
                         districtID: student.districtID,

@@ -36,6 +36,7 @@ nonisolated struct UITestingLaunchConfiguration: Sendable, Equatable {
         case assignmentResponses = "assignment-responses"
         case dashboard = "dashboard"
         case appShell = "app-shell"
+        case meetings = "meetings"
     }
 
     /// `-appearance dark` renders a fixture in dark mode; the default is light

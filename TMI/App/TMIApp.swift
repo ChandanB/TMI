@@ -311,6 +311,8 @@ struct TMIApp: App {
             DashboardUITestingContent()
         case .appShell:
             AppShellUITestingContent()
+        case .meetings:
+            MeetingsUITestingContent()
         case .developerMode:
             NavigationStack {
                 DeveloperModeView(repository: InMemoryDeveloperConsoleRepository())

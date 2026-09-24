@@ -13,6 +13,10 @@ struct MeetingsHubView: View {
 
     var body: some View {
         content(for: meetingsStateModel)
+            // The state model is shared with each student's meetings section,
+            // which narrows it to one student, so the hub always refetches
+            // everything when it appears rather than trusting a loaded state.
+            .task { await meetingsStateModel.fetch() }
     }
 
     @ViewBuilder
@@ -21,23 +25,26 @@ struct MeetingsHubView: View {
         case .idle, .loading:
             ProgressView("Loading meetings…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .task {
-                    await stateModel.fetch()
-                }
+                .tmiScreenBackground()
+                .navigationTitle("Meetings")
         case .error:
-            ContentUnavailableView(
-                "Couldn’t Load Meetings",
-                systemImage: "exclamationmark.triangle",
-                description: Text("Something went wrong while fetching meetings. Pull to try again.")
-            )
-            .task {
-                await stateModel.fetch()
+            ContentUnavailableView {
+                Label("Couldn’t Load Meetings", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text("Check your connection and try again.")
+            } actions: {
+                Button("Try Again") {
+                    Task { await stateModel.fetch() }
+                }
+                .buttonStyle(.tmiPrimary)
             }
+            .tmiScreenBackground()
+            .navigationTitle("Meetings")
         case .loaded:
             AllMeetingsView(
                 meetings: stateModel.value ?? [],
                 title: "Meetings",
-                context: .all
+                onRefresh: { await stateModel.fetch() }
             )
         }
     }

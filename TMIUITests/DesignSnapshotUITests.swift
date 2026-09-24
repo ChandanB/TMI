@@ -15,6 +15,7 @@ final class DesignSnapshotUITests: XCTestCase {
         "plan-workflow",
         "district-report",
         "staff-administration",
+        "meetings",
         "career-discovery",
         "student-mode-survey",
     ]
