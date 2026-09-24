@@ -216,6 +216,9 @@ final class PlanEditorState {
     @ObservationIgnored private let operationID: UUID
     @ObservationIgnored private var selectedRecommendation: PlanRecommendation?
     @ObservationIgnored private var autosaveTask: Task<Void, Never>?
+    /// Autosave creates the record on the first step, so a plan started here
+    /// exists as a draft even if the educator walks away from it.
+    @ObservationIgnored private let startedAsNewPlan: Bool
 
     init(
         studentID: String,
@@ -237,6 +240,7 @@ final class PlanEditorState {
         self.now = now
         self.operationID = operationID
         self.currentRecord = existingPlan
+        self.startedAsNewPlan = existingPlan == nil
 
         if let existingPlan {
             switch existingPlan.modelSelectionSource {
@@ -437,6 +441,32 @@ final class PlanEditorState {
             await handle(error, localDraft: draft)
         } catch {
             savePhase = .failed("The draft could not be saved. Your changes are still here.")
+        }
+    }
+
+    /// True when closing would leave behind a draft this session created.
+    var hasUnsubmittedNewDraft: Bool {
+        startedAsNewPlan && currentRecord?.status == .draft
+    }
+
+    /// Archives the draft this session created so it does not linger in the
+    /// plan list. Returns whether the editor can close.
+    func discardNewDraft() async -> Bool {
+        autosaveTask?.cancel()
+        guard hasUnsubmittedNewDraft, let currentRecord else { return true }
+        savePhase = .saving
+        do {
+            self.currentRecord = try await repository.transition(
+                id: currentRecord.id,
+                to: .archived,
+                expectedVersion: currentRecord.metadata.recordVersion,
+                member: member
+            )
+            savePhase = .saved
+            return true
+        } catch {
+            savePhase = .failed("The draft could not be discarded. It is still saved.")
+            return false
         }
     }
 

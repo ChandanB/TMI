@@ -544,6 +544,14 @@ struct CanonicalPlanDetailView: View {
                     }
                 }
             }
+            if PlanLifecycle.allowedTransitions(from: plan.status).contains(.pendingApproval),
+               state.childrenPhase == .loaded, !state.isReadyForApproval {
+                Label("Add a goal and a first action before submitting for approval.",
+                      systemImage: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(TMIColors.textSecondary)
+                    .accessibilityIdentifier("planDetail.approvalHint")
+            }
             if let message = state.actionMessage {
                 Text(message)
                     .font(.footnote)

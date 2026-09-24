@@ -78,6 +78,27 @@ struct PlanDetailReliabilityTests {
         await state.load(member: member(userID: "other"))
         #expect(!state.availableTransitions(for: member(userID: "other")).contains(.active))
     }
+
+    @Test func submittingNeedsAGoalAndAFirstAction() async {
+        let children = ReliabilityChildren()
+        let state = CanonicalPlanDetailState(planID: "p1", repository: ReliabilityPlans(), children: children)
+        await state.load(member: member())
+        #expect(!state.isReadyForApproval)
+        #expect(!state.availableTransitions(for: member()).contains(.pendingApproval))
+
+        children.storedActions = [ActionRecord(id: "a1", planID: "p1", goalID: "g1", title: "First step",
+                                               ownerMemberID: "owner", audience: .student, cadence: .weekly,
+                                               dueDate: .now, status: .open)]
+        await state.reloadChildren(member: member())
+        #expect(state.isReadyForApproval)
+        #expect(state.availableTransitions(for: member()).contains(.pendingApproval))
+    }
+
+    @Test func submittingIsNotOfferedWhileDetailsAreMissing() async {
+        let state = CanonicalPlanDetailState(planID: "p1", repository: ReliabilityPlans())
+        await state.load(member: member())
+        #expect(!state.availableTransitions(for: member()).contains(.pendingApproval))
+    }
 }
 
 @MainActor
@@ -106,7 +127,8 @@ private final class ReliabilityChildren: PlanChildRepositoryProtocol {
                     measure: .count, baseline: "0", target: "1", dueDate: .now,
                     responsibleMemberID: "owner", status: .inProgress)]
     }
-    func actions(planID: String, member: MembershipContext) async throws -> [ActionRecord] { [] }
+    var storedActions: [ActionRecord] = []
+    func actions(planID: String, member: MembershipContext) async throws -> [ActionRecord] { storedActions }
     func progress(planID: String, member: MembershipContext) async throws -> [ProgressRecord] { [] }
     func revisions(planID: String, member: MembershipContext) async throws -> [PlanRevision] {
         if let failure { throw failure }

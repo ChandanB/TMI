@@ -211,6 +211,29 @@ struct PlanEditorStateTests {
         #expect(resaved.status == .inProgress)
     }
 
+    @Test("Discarding a plan started in this session archives its autosaved draft")
+    func discardingNewDraftArchivesIt() async throws {
+        let repository = EditorPlanRepository()
+        let state = makeState(repository: repository)
+        #expect(!state.hasUnsubmittedNewDraft)
+        makeReady(state)
+        await state.autosave()
+        #expect(state.hasUnsubmittedNewDraft)
+
+        #expect(await state.discardNewDraft())
+        #expect(repository.transitions == [.archived])
+        #expect(!state.hasUnsubmittedNewDraft)
+    }
+
+    @Test("Closing an existing draft never offers to discard it")
+    func existingDraftIsNotDiscardable() async {
+        let repository = EditorPlanRepository()
+        let state = makeState(repository: repository, existingPlan: repository.record)
+        #expect(!state.hasUnsubmittedNewDraft)
+        #expect(await state.discardNewDraft())
+        #expect(repository.transitions.isEmpty)
+    }
+
     private func makeState(
         repository: EditorPlanRepository = EditorPlanRepository(),
         children: EditorChildRepository = EditorChildRepository(),

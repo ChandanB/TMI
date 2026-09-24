@@ -64,6 +64,7 @@ private struct PlanEditorWorkflowView: View {
         programContext.profile(forSchoolID: state.schoolID)
     }
     @State private var step: PlanEditorState.Step = .student
+    @State private var confirmingClose = false
 
     var body: some View {
         NavigationStack {
@@ -92,8 +93,28 @@ private struct PlanEditorWorkflowView: View {
             .interactiveDismissDisabled(state.savePhase == .saving)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                        .disabled(state.savePhase == .saving)
+                    Button("Close") {
+                        if state.hasUnsubmittedNewDraft {
+                            confirmingClose = true
+                        } else {
+                            dismiss()
+                        }
+                    }
+                    .disabled(state.savePhase == .saving)
+                    .confirmationDialog(
+                        "Keep this draft?",
+                        isPresented: $confirmingClose,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Keep Draft") { dismiss() }
+                        Button("Discard Draft", role: .destructive) {
+                            Task {
+                                if await state.discardNewDraft() { dismiss() }
+                            }
+                        }
+                    } message: {
+                        Text("The draft is saved to the plan list. Discarding archives it.")
+                    }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Save Draft") { Task { await state.autosave() } }
