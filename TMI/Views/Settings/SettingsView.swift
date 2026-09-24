@@ -104,20 +104,16 @@ struct SettingsView: View {
             }
 
             if currentMembership != nil {
+                // Value links: destinations are built only when opened (the
+                // eager form constructed every screen's services on render).
                 Section("Forms & meetings") {
-                    NavigationLink {
-                        FormTemplateLibraryView()
-                    } label: {
+                    NavigationLink(value: AppRoute.formTemplates) {
                         settingsLabel("Form Templates", symbol: "doc.on.doc", tone: .brand)
                     }
-                    NavigationLink {
-                        StaffAssignmentListView()
-                    } label: {
+                    NavigationLink(value: AppRoute.formAssignments) {
                         settingsLabel("Form Assignments", symbol: "list.bullet.rectangle", tone: .brand)
                     }
-                    NavigationLink {
-                        MeetingsHubView()
-                    } label: {
+                    NavigationLink(value: AppRoute.meetings) {
                         settingsLabel("Meetings", symbol: "calendar", tone: .success)
                     }
                 }

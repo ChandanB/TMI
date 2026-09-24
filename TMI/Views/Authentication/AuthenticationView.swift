@@ -73,6 +73,11 @@ struct AuthenticationView: View {
       }
     }
     .opacity(hasAppeared ? 1 : 0)
+#if os(macOS)
+    // Let the brand panel and gradient run under a chrome-less title bar.
+    .toolbar(removing: .title)
+    .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+#endif
     .task {
       withAnimation(.easeOut(duration: 0.45)) { hasAppeared = true }
       await stateModel.fetch()
@@ -256,19 +261,25 @@ struct AuthenticationView: View {
     }
     .animation(TMIAnimation.smooth, value: stateModel.errorMessage)
 
-    TMIButton(
-      text: "Sign In",
-      icon: "arrow.right",
-      style: .primary,
-      isLoading: stateModel.isAuthenticating,
-      action: authenticate
-    )
+    Button(action: authenticate) {
+      HStack(spacing: TMISpacing.sm) {
+        if stateModel.isAuthenticating {
+          ProgressView()
+            .controlSize(.small)
+            .tint(TMIColors.onBrand)
+        } else {
+          Image(systemName: "arrow.right")
+            .fontWeight(.semibold)
+        }
+        Text("Sign In")
+      }
+    }
+    .buttonStyle(.tmi(.primary, fullWidth: true))
+    .accessibilityLabel("Sign In")
     .accessibilityIdentifier("authentication.signIn.logIn")
     .disabled(stateModel.isAuthenticating)
     .keyboardShortcut(.defaultAction)
-#if os(macOS)
-    .frame(maxWidth: .infinity)
-#endif
+    .sensoryFeedback(.impact(weight: .light), trigger: stateModel.isAuthenticating)
 
     #if DEBUG
     // Developer-only shortcut past the login screen. Compiled out

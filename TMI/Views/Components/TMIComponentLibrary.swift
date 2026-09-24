@@ -352,6 +352,9 @@ struct TMITextField: View {
             }
             .font(.body)
             .foregroundStyle(TMIColors.textPrimary)
+            // The field draws its own fill and focus ring; a bordered native
+            // style would nest a second box inside it on the Mac.
+            .textFieldStyle(.plain)
             .autocorrectionDisabled()
             .tmiTextInputAutocapitalization(effectiveCapitalization)
             .modifier(TMITextContentTypeModifier(content: content ?? .legacy(isSecure: isSecure)))

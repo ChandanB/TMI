@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct FormTemplateDetailView: View {
+  @State private var showingEditor = false
   @Environment(\.dismiss) private var dismiss
   var template: FormTemplate
 
@@ -89,6 +90,13 @@ struct FormTemplateDetailView: View {
           }) {
             Label("Add to My Forms", systemImage: "plus.circle")
           }
+          if template.id != nil {
+            Button {
+              showingEditor = true
+            } label: {
+              Label("Edit Template", systemImage: "pencil")
+            }
+          }
         } label: {
           Label("More", systemImage: "ellipsis")
         }
@@ -98,6 +106,12 @@ struct FormTemplateDetailView: View {
       withAnimation(.easeInOut(duration: 0.5).delay(0.1)) {
         animateContent = true
       }
+    }
+    .sheet(isPresented: $showingEditor) {
+      // The editor owns its NavigationStack; saving uses updateTemplate and
+      // the server rules decide who may write.
+      FormTemplateEditorView(template: template)
+        .tmiSheetStyle()
     }
     .sheet(isPresented: $showingPreview) {
       NavigationStack {

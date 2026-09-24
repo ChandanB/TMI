@@ -137,55 +137,61 @@ struct StaffAdministrationView: View {
             Text("No staff yet. Invite someone to get started.").foregroundStyle(TMIColors.textSecondary)
         }
         ForEach(staff) { person in
-            Button {
-                if person.isManageable { editing = AdminMembershipDraft(member: person) }
-            } label: {
-                HStack(alignment: .center, spacing: TMISpacing.ms) {
-                    TMIAvatar(initials: Self.initials(person.title), size: 36)
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: TMISpacing.sm) {
-                            Text(person.title)
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(TMIColors.textPrimary)
-                            if person.isSelf {
-                                TMIStatusBadge("You", tone: .neutral)
-                            }
-                        }
-                        if let email = person.email, person.displayName != nil {
-                            Text(email)
-                                .font(.subheadline)
-                                .foregroundStyle(TMIColors.textSecondary)
-                                .textSelection(.enabled)
-                        }
-                        let sites = person.schoolIDs.map(programContext.siteName).joined(separator: ", ")
-                        if !sites.isEmpty {
-                            Text(sites)
-                                .font(.footnote)
-                                .foregroundStyle(TMIColors.textTertiary)
-                        }
-                    }
-                    Spacer(minLength: TMISpacing.sm)
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(person.role?.displayName ?? "Unknown role")
-                            .font(.subheadline)
-                            .foregroundStyle(TMIColors.textSecondary)
-                        if !person.isActive {
-                            TMIStatusBadge("Inactive", tone: .warning, systemImage: "pause.circle.fill")
-                        }
-                    }
-                    if person.isManageable {
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(TMIColors.textTertiary)
+            // Rows outside the admin's scope (including yourself) are plain
+            // rows, not disabled buttons, so they aren't dimmed.
+            if person.isManageable {
+                Button {
+                    editing = AdminMembershipDraft(member: person)
+                } label: {
+                    staffRow(person, showsChevron: true)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(TMIColors.surface)
+                .accessibilityHint("Edit access")
+            } else {
+                staffRow(person, showsChevron: false)
+                    .listRowBackground(TMIColors.surface)
+                    .accessibilityHint("Outside your administrative scope")
+            }
+        }
+    }
+
+    private func staffRow(_ person: AdminStaffMember, showsChevron: Bool) -> some View {
+        HStack(alignment: .center, spacing: TMISpacing.ms) {
+            TMIAvatar(initials: Self.initials(person.title), size: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: TMISpacing.sm) {
+                    Text(person.title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(TMIColors.textPrimary)
+                        .lineLimit(2)
+                    if person.isSelf {
+                        TMIStatusBadge("You", tone: .neutral)
                     }
                 }
-                .contentShape(Rectangle())
+                if let email = person.email, person.displayName != nil {
+                    Text(email)
+                        .font(.subheadline)
+                        .foregroundStyle(TMIColors.textSecondary)
+                        .textSelection(.enabled)
+                }
+                let sites = person.schoolIDs.map(programContext.siteName).joined(separator: ", ")
+                Text([person.role?.displayName ?? "Unknown role", sites].filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.footnote)
+                    .foregroundStyle(TMIColors.textTertiary)
+                if !person.isActive {
+                    TMIStatusBadge("Inactive", tone: .warning, systemImage: "pause.circle.fill")
+                        .padding(.top, 2)
+                }
             }
-            .buttonStyle(.plain)
-            .listRowBackground(TMIColors.surface)
-            .disabled(!person.isManageable)
-            .accessibilityHint(person.isManageable ? "Edit access" : "Outside your administrative scope")
+            Spacer(minLength: TMISpacing.sm)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TMIColors.textTertiary)
+            }
         }
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder

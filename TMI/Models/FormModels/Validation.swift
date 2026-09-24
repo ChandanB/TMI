@@ -151,6 +151,29 @@ nonisolated enum FieldType: String, Codable, CaseIterable, Sendable {
     case signature = "Signature"
     case allCases
     
+    /// Human-readable name ("Long text", not "Longtext").
+    var displayName: String {
+        switch self {
+        case .text: "Short text"
+        case .longText: "Long text"
+        case .number: "Number"
+        case .date: "Date"
+        case .dateTime: "Date and time"
+        case .time: "Time"
+        case .dropdown: "Dropdown"
+        case .multipleChoice: "Multiple choice"
+        case .checkbox: "Checkboxes"
+        case .email: "Email"
+        case .phoneNumber: "Phone number"
+        case .url: "Web address"
+        case .file: "File"
+        case .rating: "Rating"
+        case .table: "Table"
+        case .signature: "Signature"
+        case .allCases: "All"
+        }
+    }
+
     var requiresOptions: Bool {
         switch self {
         case .dropdown, .multipleChoice:
